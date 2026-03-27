@@ -12,7 +12,8 @@ import {
   X,
   Download,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -364,15 +365,26 @@ const Gastos = () => {
           </div>
           <div className="flex items-center gap-2">
             {canExportReports() && (
-              <Button 
-                variant="outline"
-                onClick={() => handleExport('xlsx')}
-                className="border-purple-200 text-purple-700 hover:bg-purple-50"
-                data-testid="export-button"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar Excel
-              </Button>
+              <>
+                <Button 
+                  variant="outline"
+                  onClick={() => handleExport('xlsx')}
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="export-excel-button"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Excel
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => handleExport('pdf')}
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="export-pdf-button"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  PDF
+                </Button>
+              </>
             )}
             {canCreateExpenses() && (
               <Button 

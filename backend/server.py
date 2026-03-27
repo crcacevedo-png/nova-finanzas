@@ -1046,8 +1046,8 @@ async def export_expenses(
             ws = wb.active
             ws.title = "Gastos"
             
-            # Header style
-            header_fill = PatternFill(start_color="115e59", end_color="115e59", fill_type="solid")
+            # Header style - Purple theme
+            header_fill = PatternFill(start_color="7c3aed", end_color="7c3aed", fill_type="solid")
             header_font = Font(color="FFFFFF", bold=True)
             thin_border = Border(
                 left=Side(style='thin'),
@@ -1069,16 +1069,32 @@ async def export_expenses(
             type_labels = {"fijo": "Gasto Fijo", "proveedor": "Pago Proveedor", "variable": "Gasto Variable"}
             status_labels = {"pendiente": "Pendiente", "parcial": "Parcial", "pagado": "Pagado", "vencido": "Vencido"}
             
+            # Currency format
+            currency_format = 'Q #,##0.00'
+            
             for row, e in enumerate(expenses, 2):
                 ws.cell(row=row, column=1, value=e["name"]).border = thin_border
                 ws.cell(row=row, column=2, value=type_labels.get(e["type"], e["type"])).border = thin_border
-                ws.cell(row=row, column=3, value=e["amount"]).border = thin_border
+                
+                # Monto with currency format
+                cell_amount = ws.cell(row=row, column=3, value=e["amount"])
+                cell_amount.border = thin_border
+                cell_amount.number_format = currency_format
+                
                 ws.cell(row=row, column=4, value=e["date"][:10]).border = thin_border
                 ws.cell(row=row, column=5, value=e.get("due_date", "")[:10] if e.get("due_date") else "").border = thin_border
                 ws.cell(row=row, column=6, value=e.get("invoice_number", "")).border = thin_border
                 ws.cell(row=row, column=7, value=status_labels.get(e["status"], e["status"])).border = thin_border
-                ws.cell(row=row, column=8, value=e.get("paid_amount", 0)).border = thin_border
-                ws.cell(row=row, column=9, value=e.get("remaining_amount", e["amount"])).border = thin_border
+                
+                # Pagado with currency format
+                cell_paid = ws.cell(row=row, column=8, value=e.get("paid_amount", 0))
+                cell_paid.border = thin_border
+                cell_paid.number_format = currency_format
+                
+                # Pendiente with currency format
+                cell_pending = ws.cell(row=row, column=9, value=e.get("remaining_amount", e["amount"]))
+                cell_pending.border = thin_border
+                cell_pending.number_format = currency_format
             
             # Adjust column widths
             ws.column_dimensions['A'].width = 35
@@ -1106,8 +1122,145 @@ async def export_expenses(
             return await export_expenses(format="csv", date_from=date_from, date_to=date_to, type=type, status=status, current_user=current_user)
     
     else:
-        # JSON format for PDF generation on frontend
-        return {"expenses": expenses, "generated_at": datetime.now(timezone.utc).isoformat()}
+        # PDF format
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+            
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(
+                output, 
+                pagesize=landscape(letter),
+                rightMargin=0.5*inch,
+                leftMargin=0.5*inch,
+                topMargin=0.5*inch,
+                bottomMargin=0.5*inch
+            )
+            
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Custom styles
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=18,
+                spaceAfter=12,
+                alignment=TA_CENTER,
+                textColor=colors.HexColor('#7c3aed')
+            )
+            
+            subtitle_style = ParagraphStyle(
+                'CustomSubtitle',
+                parent=styles['Normal'],
+                fontSize=10,
+                spaceAfter=20,
+                alignment=TA_CENTER,
+                textColor=colors.grey
+            )
+            
+            # Title
+            elements.append(Paragraph("NovaVision — Reporte de Gastos", title_style))
+            
+            # Subtitle with date and user
+            generated_at = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
+            elements.append(Paragraph(
+                f"Generado el: {generated_at} | Usuario: {current_user.get('name', 'N/A')}",
+                subtitle_style
+            ))
+            
+            elements.append(Spacer(1, 0.2*inch))
+            
+            # Table data
+            type_labels = {"fijo": "Gasto Fijo", "proveedor": "Pago Proveedor", "variable": "Gasto Variable"}
+            status_labels = {"pendiente": "Pendiente", "parcial": "Parcial", "pagado": "Pagado", "vencido": "Vencido"}
+            
+            # Header row
+            table_data = [["Nombre", "Tipo", "Monto (Q)", "Fecha", "Vencimiento", "Factura", "Estado", "Pagado (Q)", "Pendiente (Q)"]]
+            
+            # Data rows
+            for e in expenses:
+                table_data.append([
+                    e["name"][:30] + "..." if len(e["name"]) > 30 else e["name"],
+                    type_labels.get(e["type"], e["type"]),
+                    f'{e["amount"]:,.2f}',
+                    e["date"][:10] if e.get("date") else "",
+                    e["due_date"][:10] if e.get("due_date") else "-",
+                    e.get("invoice_number", "-") or "-",
+                    status_labels.get(e["status"], e["status"]),
+                    f'{e.get("paid_amount", 0):,.2f}',
+                    f'{e.get("remaining_amount", e["amount"]):,.2f}'
+                ])
+            
+            # Create table
+            col_widths = [2*inch, 1*inch, 0.9*inch, 0.8*inch, 0.8*inch, 1*inch, 0.8*inch, 0.9*inch, 0.9*inch]
+            table = Table(table_data, colWidths=col_widths)
+            
+            # Table style
+            table.setStyle(TableStyle([
+                # Header style
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('TOPPADDING', (0, 0), (-1, 0), 8),
+                
+                # Data rows style
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ALIGN', (2, 1), (2, -1), 'RIGHT'),  # Monto
+                ('ALIGN', (7, 1), (8, -1), 'RIGHT'),  # Pagado, Pendiente
+                ('ALIGN', (3, 1), (5, -1), 'CENTER'),  # Fechas
+                ('TOPPADDING', (0, 1), (-1, -1), 5),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+                
+                # Alternating row colors
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+                
+                # Grid
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#7c3aed')),
+            ]))
+            
+            elements.append(table)
+            
+            # Summary
+            total_amount = sum(e["amount"] for e in expenses)
+            total_paid = sum(e.get("paid_amount", 0) for e in expenses)
+            total_pending = sum(e.get("remaining_amount", e["amount"]) for e in expenses)
+            
+            elements.append(Spacer(1, 0.3*inch))
+            
+            summary_style = ParagraphStyle(
+                'Summary',
+                parent=styles['Normal'],
+                fontSize=10,
+                alignment=TA_RIGHT
+            )
+            
+            elements.append(Paragraph(
+                f"<b>Total Gastos:</b> Q {total_amount:,.2f} | <b>Total Pagado:</b> Q {total_paid:,.2f} | <b>Total Pendiente:</b> Q {total_pending:,.2f}",
+                summary_style
+            ))
+            
+            # Build PDF
+            doc.build(elements)
+            output.seek(0)
+            
+            return StreamingResponse(
+                output,
+                media_type="application/pdf",
+                headers={"Content-Disposition": "attachment; filename=gastos_novavision.pdf"}
+            )
+            
+        except ImportError as e:
+            raise HTTPException(status_code=500, detail=f"Librería PDF no disponible: {str(e)}")
 
 @api_router.get("/")
 async def root():
