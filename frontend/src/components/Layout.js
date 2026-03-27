@@ -82,7 +82,7 @@ const Layout = ({ children }) => {
       `}>
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          <Link to="/dashboard" className="flex items-center gap-3">
+          <Link to="/dashboard" className="flex items-center">
             <div className="bg-white rounded-lg p-1">
               <img 
                 src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
@@ -90,7 +90,6 @@ const Layout = ({ children }) => {
                 className="h-8 w-auto"
               />
             </div>
-            <span className="font-semibold text-lg font-['Outfit']">NovaVision</span>
           </Link>
           <button 
             className="lg:hidden p-1 hover:bg-slate-800 rounded"
@@ -163,14 +162,11 @@ const Layout = ({ children }) => {
             <Menu className="w-5 h-5 text-slate-600" />
           </button>
           <div className="flex-1 flex justify-center">
-            <div className="flex items-center gap-2">
-              <img 
-                src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
-                alt="NovaVision" 
-                className="h-10 w-auto"
-              />
-              <span className="font-semibold text-slate-900 font-['Outfit']">NovaVision</span>
-            </div>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
+              alt="NovaVision" 
+              className="h-10 w-auto"
+            />
           </div>
           <div className="w-10" /> {/* Spacer for centering */}
         </header>

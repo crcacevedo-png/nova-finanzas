@@ -55,9 +55,6 @@ const Login = () => {
             </div>
             
             <div>
-              <CardTitle className="text-2xl font-bold font-['Outfit'] text-slate-900">
-                NovaVision
-              </CardTitle>
               <CardDescription className="text-slate-500 mt-1">
                 Sistema de gastos y finanzas
               </CardDescription>
