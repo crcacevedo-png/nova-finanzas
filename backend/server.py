@@ -353,7 +353,7 @@ async def check_overdue_expenses():
     today = datetime.now(timezone.utc).date()
     expenses = await db.expenses.find(
         {"status": {"$in": ["pendiente", "parcial"]}, "due_date": {"$ne": None}},
-        {"_id": 0}
+        {"_id": 0, "id": 1, "due_date": 1, "status": 1}
     ).to_list(10000)
     
     for expense in expenses:
@@ -857,24 +857,34 @@ async def get_payments(
         if date_query:
             query["date"] = date_query
     
-    payments = await db.payments.find(query, {"_id": 0}).sort("date", -1).to_list(10000)
+    payments_pipeline = [
+        {"$match": query},
+        {"$sort": {"date": -1}},
+        {"$limit": 10000},
+        {"$lookup": {
+            "from": "expenses",
+            "localField": "expense_id",
+            "foreignField": "id",
+            "as": "expense_data"
+        }},
+        {"$lookup": {
+            "from": "users",
+            "localField": "created_by",
+            "foreignField": "id",
+            "as": "user_data"
+        }},
+        {"$addFields": {
+            "expense_name": {"$ifNull": [{"$arrayElemAt": ["$expense_data.name", 0]}, "N/A"]},
+            "created_by_name": {"$ifNull": [{"$arrayElemAt": ["$user_data.name", 0]}, "N/A"]}
+        }},
+        {"$project": {"expense_data": 0, "user_data": 0, "_id": 0}}
+    ]
     
-    # Enrich payments with expense name and user name
-    enriched_payments = []
-    for payment in payments:
-        # Get expense name
-        expense = await db.expenses.find_one({"id": payment["expense_id"]}, {"_id": 0, "name": 1})
-        payment["expense_name"] = expense["name"] if expense else "N/A"
-        
-        # Get user name
-        user = await db.users.find_one({"id": payment["created_by"]}, {"_id": 0, "name": 1})
-        payment["created_by_name"] = user["name"] if user else "N/A"
-        
-        enriched_payments.append(PaymentResponse(**payment))
+    payments = await db.payments.aggregate(payments_pipeline).to_list(10000)
     
     return PaymentListResponse(
-        data=enriched_payments,
-        total=len(enriched_payments)
+        data=[PaymentResponse(**p) for p in payments],
+        total=len(payments)
     )
 
 @api_router.get("/payments/{payment_id}", response_model=PaymentResponse)
@@ -974,9 +984,8 @@ async def get_dashboard_summary(current_user: dict = Depends(require_permission(
     total_paid = sum(e["paid_amount"] for e in expenses)
     total_pending = sum(e["remaining_amount"] for e in expenses)
     
-    # Get all expenses for overdue count
-    all_expenses = await db.expenses.find({}, {"_id": 0}).to_list(10000)
-    overdue_count = len([e for e in all_expenses if e["status"] == "vencido"])
+    # Get overdue count efficiently
+    overdue_count = await db.expenses.count_documents({"status": "vencido"})
     
     # Calculate by type
     by_type = []
@@ -999,7 +1008,7 @@ async def get_dashboard_summary(current_user: dict = Depends(require_permission(
 
 @api_router.get("/dashboard/monthly-chart", response_model=List[MonthlyChartItem])
 async def get_monthly_chart(current_user: dict = Depends(require_permission("view_dashboard"))):
-    expenses = await db.expenses.find({}, {"_id": 0}).to_list(10000)
+    expenses = await db.expenses.find({}, {"_id": 0, "date": 1, "amount": 1}).to_list(10000)
     
     # Group by month (last 6 months)
     now = datetime.now(timezone.utc)
@@ -1087,19 +1096,40 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: dict = Depends(require_permission("view_dashboard"))):
     """Legacy endpoint - redirects to summary"""
-    summary = await get_dashboard_summary(current_user)
-    all_expenses = await db.expenses.find({}, {"_id": 0}).to_list(10000)
+    # Use aggregation for efficient stats calculation
+    pipeline = [
+        {"$group": {
+            "_id": None,
+            "total_gastos": {"$sum": "$amount"},
+            "gastos_pendientes": {"$sum": {"$cond": [{"$eq": ["$status", "pendiente"]}, "$amount", 0]}},
+            "gastos_pagados": {"$sum": {"$cond": [{"$eq": ["$status", "pagado"]}, "$amount", 0]}},
+            "gastos_parciales": {"$sum": {"$cond": [{"$eq": ["$status", "parcial"]}, "$amount", 0]}},
+            "gastos_vencidos": {"$sum": {"$cond": [{"$eq": ["$status", "vencido"]}, "$amount", 0]}},
+            "total_fijos": {"$sum": {"$cond": [{"$eq": ["$type", "fijo"]}, "$amount", 0]}},
+            "total_proveedores": {"$sum": {"$cond": [{"$eq": ["$type", "proveedor"]}, "$amount", 0]}},
+            "total_variables": {"$sum": {"$cond": [{"$eq": ["$type", "variable"]}, "$amount", 0]}},
+            "alertas_30_dias": {"$sum": {"$cond": [{"$in": ["$status", ["pendiente", "parcial"]]}, 1, 0]}}
+        }}
+    ]
+    
+    result = await db.expenses.aggregate(pipeline).to_list(1)
+    
+    if result:
+        stats = result[0]
+        del stats["_id"]
+        stats["alertas_60_dias"] = 0
+        return stats
     
     return {
-        "total_gastos": sum(e["amount"] for e in all_expenses),
-        "gastos_pendientes": sum(e["amount"] for e in all_expenses if e["status"] == "pendiente"),
-        "gastos_pagados": sum(e["amount"] for e in all_expenses if e["status"] == "pagado"),
-        "gastos_parciales": sum(e["amount"] for e in all_expenses if e["status"] == "parcial"),
-        "gastos_vencidos": sum(e["amount"] for e in all_expenses if e["status"] == "vencido"),
-        "total_fijos": sum(e["amount"] for e in all_expenses if e["type"] == "fijo"),
-        "total_proveedores": sum(e["amount"] for e in all_expenses if e["type"] == "proveedor"),
-        "total_variables": sum(e["amount"] for e in all_expenses if e["type"] == "variable"),
-        "alertas_30_dias": len([e for e in all_expenses if e["status"] in ["pendiente", "parcial"]]),
+        "total_gastos": 0,
+        "gastos_pendientes": 0,
+        "gastos_pagados": 0,
+        "gastos_parciales": 0,
+        "gastos_vencidos": 0,
+        "total_fijos": 0,
+        "total_proveedores": 0,
+        "total_variables": 0,
+        "alertas_30_dias": 0,
         "alertas_60_dias": 0
     }
 
@@ -1118,7 +1148,7 @@ async def get_alerts_60(current_user: dict = Depends(require_permission("view_du
 @api_router.get("/dashboard/chart-data")
 async def get_chart_data(current_user: dict = Depends(require_permission("view_dashboard"))):
     """Legacy endpoint for chart data"""
-    expenses = await db.expenses.find({}, {"_id": 0}).to_list(10000)
+    expenses = await db.expenses.find({}, {"_id": 0, "date": 1, "type": 1, "amount": 1}).to_list(10000)
     
     monthly_data = {}
     for e in expenses:
