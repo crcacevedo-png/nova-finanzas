@@ -149,6 +149,13 @@
 - ✅ Dashboard con métricas y alertas
 - ✅ Exportación a Excel/CSV
 - ✅ UI responsive con Tailwind + Shadcn
+- ✅ **Rediseño P0 del Frontend (Sección 6):**
+  - ✅ Sidebar oscuro (slate-900)
+  - ✅ Tema púrpura (gradient-purple)
+  - ✅ Nueva página: Historial de Pagos
+  - ✅ Nueva página: Pagos por Vencer
+  - ✅ Badges de tipo con colores púrpura/violeta/amber
+  - ✅ Endpoint de pagos incluye expense_name y created_by_name
 
 ---
 
@@ -156,4 +163,13 @@
 
 - **Frontend**: https://novavision-finanzas.preview.emergentagent.com
 - **API**: https://novavision-finanzas.preview.emergentagent.com/api
+
+---
+
+## 7. Tareas Pendientes (P1)
+
+- [ ] Exportación a PDF en `/api/reports/expenses`
+- [ ] Cron job/tarea para actualizar automáticamente gastos vencidos
+- [ ] Refactorización de `server.py` (separar modelos, rutas, servicios)
+
 
