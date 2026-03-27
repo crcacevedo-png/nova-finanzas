@@ -49,6 +49,7 @@ import { Progress } from '../components/ui/progress';
 import { toast, Toaster } from 'sonner';
 
 const initialExpenseForm = {
+  provider: '',
   name: '',
   type: 'fijo',
   amount: '',
@@ -170,6 +171,7 @@ const Gastos = () => {
     if (expense) {
       setEditingExpense(expense);
       setExpenseForm({
+        provider: expense.provider || '',
         name: expense.name,
         type: expense.type,
         amount: expense.amount.toString(),
@@ -194,7 +196,7 @@ const Gastos = () => {
   const handleExpenseSubmit = async (e) => {
     e.preventDefault();
     
-    if (!expenseForm.name || !expenseForm.amount || !expenseForm.date) {
+    if (!expenseForm.provider || !expenseForm.name || !expenseForm.amount || !expenseForm.date) {
       toast.error('Por favor completa los campos requeridos');
       return;
     }
@@ -205,7 +207,8 @@ const Gastos = () => {
         ...expenseForm,
         amount: parseFloat(expenseForm.amount),
         due_date: expenseForm.due_date || null,
-        invoice_number: expenseForm.invoice_number || null
+        invoice_number: expenseForm.invoice_number || null,
+        provider: expenseForm.provider || null
       };
 
       if (editingExpense) {
@@ -635,6 +638,17 @@ const Gastos = () => {
             </DialogHeader>
             <form onSubmit={handleExpenseSubmit} className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="provider">Proveedor *</Label>
+                <Input
+                  id="provider"
+                  value={expenseForm.provider}
+                  onChange={(e) => setExpenseForm(prev => ({ ...prev, provider: e.target.value }))}
+                  placeholder="Ej: Óptica GT, Laboratorios ABC..."
+                  data-testid="expense-provider-input"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="name">Nombre del Gasto *</Label>
                 <Input
                   id="name"
@@ -727,7 +741,7 @@ const Gastos = () => {
                 <Button type="button" variant="outline" onClick={handleCloseExpenseDialog} disabled={submitting}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="gradient-purple hover:opacity-90 text-white" disabled={submitting} data-testid="expense-submit-button">
+                <Button type="submit" className="btn-primary" disabled={submitting} data-testid="expense-submit-button">
                   {submitting ? 'Guardando...' : editingExpense ? 'Actualizar' : 'Registrar'}
                 </Button>
               </DialogFooter>

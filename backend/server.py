@@ -139,6 +139,7 @@ class TokenResponse(BaseModel):
 
 # Expense Models
 class ExpenseBase(BaseModel):
+    provider: Optional[str] = None
     name: str
     type: Literal["fijo", "proveedor", "variable"]
     amount: float = Field(ge=0)
@@ -151,6 +152,7 @@ class ExpenseCreate(ExpenseBase):
     pass
 
 class ExpenseUpdate(BaseModel):
+    provider: Optional[str] = None
     name: Optional[str] = None
     type: Optional[Literal["fijo", "proveedor", "variable"]] = None
     amount: Optional[float] = None
@@ -162,6 +164,7 @@ class ExpenseUpdate(BaseModel):
 class ExpenseResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
+    provider: Optional[str] = None
     name: str
     type: str
     amount: float
@@ -758,6 +761,7 @@ async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depen
     
     expense_doc = {
         "id": expense_id,
+        "provider": expense_data.provider,
         "name": expense_data.name,
         "type": expense_data.type,
         "amount": expense_data.amount,
