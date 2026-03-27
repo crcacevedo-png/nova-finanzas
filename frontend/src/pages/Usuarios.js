@@ -160,9 +160,9 @@ const Usuarios = () => {
 
   const getRoleBadge = (role) => {
     const colors = {
-      superadmin: 'bg-purple-100 text-purple-800 border border-purple-200',
-      admin: 'bg-violet-100 text-violet-800 border border-violet-200',
-      usuario: 'bg-slate-100 text-slate-700 border border-slate-200'
+      superadmin: 'badge-superadmin border-0',
+      admin: 'badge-admin border-0',
+      usuario: 'badge-usuario border-0'
     };
     return (
       <Badge className={`${colors[role]} flex items-center gap-1`}>
@@ -184,7 +184,7 @@ const Usuarios = () => {
           </div>
           <Button 
             onClick={handleOpenDialog}
-            className="gradient-purple hover:opacity-90 text-white"
+            className="btn-primary"
             data-testid="add-user-button"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -227,15 +227,15 @@ const Usuarios = () => {
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                              <span className="text-purple-800 font-semibold">
+                            <div className="w-10 h-10 rounded-full bg-[#E1F5EE] flex items-center justify-center">
+                              <span className="text-[#0F6E56] font-semibold">
                                 {user.name.charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <div>
                               <p className="font-medium text-slate-900">{user.name}</p>
                               {user.id === currentUser?.id && (
-                                <span className="text-xs text-purple-600">(Tú)</span>
+                                <span className="text-xs text-[#0F6E56]">(Tú)</span>
                               )}
                             </div>
                           </div>
@@ -361,7 +361,7 @@ const Usuarios = () => {
                 </Button>
                 <Button
                   type="submit"
-                  className="gradient-purple hover:opacity-90 text-white"
+                  className="btn-primary"
                   disabled={submitting}
                   data-testid="user-submit-button"
                 >

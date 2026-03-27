@@ -76,9 +76,9 @@ const PagosPorVencer = () => {
 
   const getTypeBadge = (type) => {
     const colors = {
-      fijo: 'bg-purple-50 text-purple-700 border border-purple-200',
-      proveedor: 'bg-violet-50 text-violet-700 border border-violet-200',
-      variable: 'bg-amber-50 text-amber-700 border border-amber-200'
+      fijo: 'badge-fixed border-0',
+      proveedor: 'badge-provider border-0',
+      variable: 'badge-variable border-0'
     };
     return <Badge className={colors[type]}>{typeLabels[type]}</Badge>;
   };
@@ -86,28 +86,28 @@ const PagosPorVencer = () => {
   const getUrgencyBadge = (daysRemaining) => {
     if (daysRemaining < 0) {
       return (
-        <Badge className="bg-rose-100 text-rose-700 border border-rose-200">
+        <Badge className="badge-overdue border-0">
           <XCircle className="w-3 h-3 mr-1" />
           Vencido hace {Math.abs(daysRemaining)} días
         </Badge>
       );
     } else if (daysRemaining <= 7) {
       return (
-        <Badge className="bg-rose-50 text-rose-700 border border-rose-200">
+        <Badge className="badge-overdue border-0">
           <AlertCircle className="w-3 h-3 mr-1" />
           {daysRemaining} días
         </Badge>
       );
     } else if (daysRemaining <= 30) {
       return (
-        <Badge className="bg-amber-50 text-amber-700 border border-amber-200">
+        <Badge className="badge-pending border-0">
           <AlertTriangle className="w-3 h-3 mr-1" />
           {daysRemaining} días
         </Badge>
       );
     } else {
       return (
-        <Badge className="bg-blue-50 text-blue-700 border border-blue-200">
+        <Badge className="badge-admin border-0">
           <Clock className="w-3 h-3 mr-1" />
           {daysRemaining} días
         </Badge>
@@ -163,7 +163,7 @@ const PagosPorVencer = () => {
                   {formatCurrency(expense.amount)}
                 </TableCell>
                 <TableCell>
-                  <p className="font-semibold text-amber-600">
+                  <p className="font-semibold text-[#8B6914]">
                     {formatCurrency(expense.remaining_amount)}
                   </p>
                 </TableCell>
@@ -177,7 +177,7 @@ const PagosPorVencer = () => {
                   <Button
                     size="sm"
                     onClick={goToExpenses}
-                    className="gradient-purple hover:opacity-90 text-white"
+                    className="btn-primary"
                     data-testid={`pay-upcoming-${expense.id}`}
                   >
                     <DollarSign className="w-4 h-4 mr-1" />
@@ -204,7 +204,7 @@ const PagosPorVencer = () => {
           <Button 
             onClick={goToExpenses}
             variant="outline"
-            className="border-purple-200 text-purple-700 hover:bg-purple-50"
+            className="btn-outline"
           >
             Ver todos los gastos
             <ArrowRight className="w-4 h-4 ml-2" />
@@ -213,27 +213,27 @@ const PagosPorVencer = () => {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className={`border-2 ${overdue.length > 0 ? 'border-rose-300 bg-rose-50/50' : 'border-slate-200'}`}>
+          <Card className={`border-2 ${overdue.length > 0 ? 'border-[#C53030] bg-[#FDE8E8]/50' : 'border-[#DCE8E3]'}`}>
             <CardContent className="p-4 flex items-center gap-4">
-              <div className={`p-3 rounded-xl ${overdue.length > 0 ? 'bg-rose-100' : 'bg-slate-100'}`}>
-                <XCircle className={`w-5 h-5 ${overdue.length > 0 ? 'text-rose-700' : 'text-slate-500'}`} />
+              <div className={`p-3 rounded-xl ${overdue.length > 0 ? 'bg-[#FDE8E8]' : 'bg-[#EDF5F2]'}`}>
+                <XCircle className={`w-5 h-5 ${overdue.length > 0 ? 'text-[#C53030]' : 'text-[#5A7A72]'}`} />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Vencidos</p>
-                <p className={`text-2xl font-bold ${overdue.length > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Vencidos</p>
+                <p className={`text-2xl font-bold ${overdue.length > 0 ? 'text-[#C53030]' : ''}`} style={{ color: overdue.length === 0 ? 'var(--text-primary)' : undefined }}>
                   {overdue.length}
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className={`border-2 ${due30.length > 0 ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200'}`}>
+          <Card className={`border-2 ${due30.length > 0 ? 'border-[#8B6914] bg-[#FEF4E0]/50' : 'border-[#DCE8E3]'}`}>
             <CardContent className="p-4 flex items-center gap-4">
-              <div className={`p-3 rounded-xl ${due30.length > 0 ? 'bg-amber-100' : 'bg-slate-100'}`}>
-                <AlertTriangle className={`w-5 h-5 ${due30.length > 0 ? 'text-amber-700' : 'text-slate-500'}`} />
+              <div className={`p-3 rounded-xl ${due30.length > 0 ? 'bg-[#FEF4E0]' : 'bg-[#EDF5F2]'}`}>
+                <AlertTriangle className={`w-5 h-5 ${due30.length > 0 ? 'text-[#8B6914]' : 'text-[#5A7A72]'}`} />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Próximos 30 días</p>
-                <p className={`text-2xl font-bold ${due30.length > 0 ? 'text-amber-700' : 'text-slate-900'}`}>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Próximos 30 días</p>
+                <p className={`text-2xl font-bold ${due30.length > 0 ? 'text-[#8B6914]' : ''}`} style={{ color: due30.length === 0 ? 'var(--text-primary)' : undefined }}>
                   {due30.length}
                 </p>
               </div>
@@ -326,15 +326,15 @@ const PagosPorVencer = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200">
-                <p className="text-sm text-rose-600 mb-1">Total Vencido</p>
-                <p className="text-2xl font-bold text-rose-700">
+              <div className="p-4 rounded-xl bg-[#FDE8E8] border border-[#C53030]/20">
+                <p className="text-sm text-[#C53030] mb-1">Total Vencido</p>
+                <p className="text-2xl font-bold text-[#C53030]">
                   {formatCurrency(overdue.reduce((sum, e) => sum + e.remaining_amount, 0))}
                 </p>
               </div>
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                <p className="text-sm text-amber-600 mb-1">Por vencer (30 días)</p>
-                <p className="text-2xl font-bold text-amber-700">
+              <div className="p-4 rounded-xl bg-[#FEF4E0] border border-[#8B6914]/20">
+                <p className="text-sm text-[#8B6914] mb-1">Por vencer (30 días)</p>
+                <p className="text-2xl font-bold text-[#8B6914]">
                   {formatCurrency(due30.reduce((sum, e) => sum + e.remaining_amount, 0))}
                 </p>
               </div>

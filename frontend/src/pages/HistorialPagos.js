@@ -132,11 +132,11 @@ const HistorialPagos = () => {
 
   const getMethodBadge = (method) => {
     const colors = {
-      'Efectivo': 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-      'Transferencia bancaria': 'bg-blue-50 text-blue-700 border border-blue-200',
-      'Tarjeta de crédito': 'bg-purple-50 text-purple-700 border border-purple-200',
-      'Tarjeta de débito': 'bg-violet-50 text-violet-700 border border-violet-200',
-      'Cheque': 'bg-amber-50 text-amber-700 border border-amber-200'
+      'Efectivo': 'bg-[#E1F5EE] text-[#0F6E56] border-0',
+      'Transferencia bancaria': 'bg-[#E6F0FA] text-[#2B5EA7] border-0',
+      'Tarjeta de crédito': 'bg-[#E1F5EE] text-[#085041] border-0',
+      'Tarjeta de débito': 'bg-[#E6F0FA] text-[#2B5EA7] border-0',
+      'Cheque': 'bg-[#FEF4E0] text-[#8B6914] border-0'
     };
     return <Badge className={colors[method] || 'bg-slate-50 text-slate-700'}>{method}</Badge>;
   };
@@ -243,8 +243,8 @@ const HistorialPagos = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border border-slate-200">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-purple-100">
-                <CreditCard className="w-5 h-5 text-purple-700" />
+              <div className="p-3 rounded-xl bg-[#E1F5EE]">
+                <CreditCard className="w-5 h-5 text-[#0F6E56]" />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Total Pagos</p>
@@ -254,8 +254,8 @@ const HistorialPagos = () => {
           </Card>
           <Card className="border border-slate-200">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-emerald-100">
-                <FileText className="w-5 h-5 text-emerald-700" />
+              <div className="p-3 rounded-xl bg-[#E1F5EE]">
+                <FileText className="w-5 h-5 text-[#085041]" />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Monto Total</p>
@@ -267,8 +267,8 @@ const HistorialPagos = () => {
           </Card>
           <Card className="border border-slate-200">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-amber-100">
-                <Calendar className="w-5 h-5 text-amber-700" />
+              <div className="p-3 rounded-xl bg-[#FEF4E0]">
+                <Calendar className="w-5 h-5 text-[#8B6914]" />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Último Pago</p>
@@ -327,7 +327,7 @@ const HistorialPagos = () => {
                           <p className="font-medium text-slate-900">{payment.expense_name || 'N/A'}</p>
                         </TableCell>
                         <TableCell>
-                          <p className="font-semibold text-emerald-600">{formatCurrency(payment.amount)}</p>
+                          <p className="font-semibold text-[#0F6E56]">{formatCurrency(payment.amount)}</p>
                         </TableCell>
                         <TableCell>{getMethodBadge(payment.method)}</TableCell>
                         <TableCell className="text-slate-600">

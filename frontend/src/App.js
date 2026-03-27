@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children, requiredPermission }) => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+          <div className="w-12 h-12 border-4 border-[#9FE1CB] border-t-[#0F6E56] rounded-full animate-spin" />
           <p className="text-slate-500">Cargando...</p>
         </div>
       </div>
@@ -43,7 +43,7 @@ const PublicRoute = ({ children }) => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+          <div className="w-12 h-12 border-4 border-[#9FE1CB] border-t-[#0F6E56] rounded-full animate-spin" />
           <p className="text-slate-500">Cargando...</p>
         </div>
       </div>

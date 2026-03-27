@@ -331,19 +331,19 @@ const Gastos = () => {
 
   const getStatusBadge = (status) => {
     const colors = {
-      pendiente: 'bg-amber-50 text-amber-700 border border-amber-200',
-      parcial: 'bg-blue-50 text-blue-700 border border-blue-200',
-      pagado: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-      vencido: 'bg-rose-50 text-rose-700 border border-rose-200'
+      pendiente: 'badge-pending border-0',
+      parcial: 'badge-partial border-0',
+      pagado: 'badge-paid border-0',
+      vencido: 'badge-overdue border-0'
     };
     return <Badge className={colors[status]}>{statusLabels[status]}</Badge>;
   };
 
   const getTypeBadge = (type) => {
     const colors = {
-      fijo: 'bg-purple-50 text-purple-700 border border-purple-200',
-      proveedor: 'bg-violet-50 text-violet-700 border border-violet-200',
-      variable: 'bg-amber-50 text-amber-700 border border-amber-200'
+      fijo: 'badge-fixed border-0',
+      proveedor: 'badge-provider border-0',
+      variable: 'badge-variable border-0'
     };
     return <Badge className={colors[type]}>{typeLabels[type]}</Badge>;
   };
@@ -369,7 +369,7 @@ const Gastos = () => {
                 <Button 
                   variant="outline"
                   onClick={() => handleExport('xlsx')}
-                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="btn-outline"
                   data-testid="export-excel-button"
                 >
                   <Download className="w-4 h-4 mr-2" />
@@ -378,7 +378,7 @@ const Gastos = () => {
                 <Button 
                   variant="outline"
                   onClick={() => handleExport('pdf')}
-                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="btn-outline"
                   data-testid="export-pdf-button"
                 >
                   <FileText className="w-4 h-4 mr-2" />
@@ -389,7 +389,7 @@ const Gastos = () => {
             {canCreateExpenses() && (
               <Button 
                 onClick={() => handleOpenExpenseDialog()}
-                className="gradient-purple hover:opacity-90 text-white"
+                className="btn-primary"
                 data-testid="add-expense-button"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -562,7 +562,7 @@ const Gastos = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleOpenExpenseDialog(expense)}
-                                className="h-8 w-8 p-0 hover:bg-purple-50 hover:text-purple-700"
+                                className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
                                 data-testid={`edit-expense-${expense.id}`}
                               >
                                 <Pencil className="w-4 h-4" />

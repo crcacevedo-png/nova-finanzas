@@ -1,35 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ==================== TEAL SERENIDAD THEME ==================== */
+
 @layer base {
     :root {
-        --background: 210 40% 98%;
-        --foreground: 222 47% 11%;
+        /* Primary Teal Colors */
+        --teal-600: #0F6E56;
+        --teal-500: #1D9E75;
+        --teal-100: #9FE1CB;
+        --teal-50: #E1F5EE;
+        --cyan-soft: #7DD8C0;
+        --blue-teal: #2B5EA7;
+        
+        /* Backgrounds */
+        --bg-page: #F4F9F7;
+        --bg-card: #FFFFFF;
+        --bg-metrics: #EDF5F2;
+        --bg-sidebar: #0C2E2A;
+        --bg-sidebar-hover: #134840;
+        --bg-input: #FAFCFB;
+        --overlay-modal: rgba(10, 40, 35, 0.55);
+        
+        /* Texts */
+        --text-primary: #1A2F2B;
+        --text-secondary: #5A7A72;
+        --text-hint: #94B0A8;
+        --text-sidebar: #FFFFFF;
+        --text-sidebar-inactive: rgba(255, 255, 255, 0.55);
+        
+        /* Borders */
+        --border-default: #D4E4DE;
+        --border-hover: #9FE1CB;
+        --border-card: #DCE8E3;
+        
+        /* Status Colors */
+        --status-pending-bg: #FEF4E0;
+        --status-pending-text: #8B6914;
+        --status-partial-bg: #E1F5EE;
+        --status-partial-text: #0F6E56;
+        --status-paid-bg: #E1F5EE;
+        --status-paid-text: #085041;
+        --status-overdue-bg: #FDE8E8;
+        --status-overdue-text: #9B2C2C;
+        
+        /* Expense Type Colors */
+        --type-fixed-bg: #E6F0FA;
+        --type-fixed-text: #2B5EA7;
+        --type-provider-bg: #E1F5EE;
+        --type-provider-text: #0F6E56;
+        --type-variable-bg: #FEF4E0;
+        --type-variable-text: #8B6914;
+        
+        /* Alert Colors */
+        --alert-overdue: #C53030;
+        --alert-30days: #8B6914;
+        --alert-60days: #2B5EA7;
+        
+        /* Shadcn variables */
+        --background: 152 33% 97%;
+        --foreground: 166 28% 14%;
         --card: 0 0% 100%;
-        --card-foreground: 222 47% 11%;
+        --card-foreground: 166 28% 14%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222 47% 11%;
-        --primary: 262 83% 58%;
+        --popover-foreground: 166 28% 14%;
+        --primary: 160 75% 24%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 262 30% 96%;
-        --secondary-foreground: 262 83% 40%;
-        --muted: 210 40% 96%;
-        --muted-foreground: 215 16% 47%;
-        --accent: 262 30% 96%;
-        --accent-foreground: 262 83% 40%;
-        --destructive: 0 84% 60%;
+        --secondary: 152 25% 94%;
+        --secondary-foreground: 160 75% 24%;
+        --muted: 152 20% 94%;
+        --muted-foreground: 158 16% 41%;
+        --accent: 152 25% 94%;
+        --accent-foreground: 160 75% 24%;
+        --destructive: 0 72% 51%;
         --destructive-foreground: 0 0% 100%;
-        --border: 214 32% 91%;
-        --input: 214 32% 91%;
-        --ring: 262 83% 58%;
-        --chart-1: 262 83% 58%;
-        --chart-2: 262 70% 70%;
-        --chart-3: 142 76% 36%;
-        --chart-4: 38 92% 50%;
-        --chart-5: 0 84% 60%;
+        --border: 155 25% 87%;
+        --input: 155 25% 87%;
+        --ring: 160 75% 24%;
         --radius: 0.5rem;
     }
 }
@@ -39,50 +89,54 @@
         @apply border-border;
     }
     body {
-        @apply bg-background text-foreground;
-        font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        @apply text-foreground;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        background-color: var(--bg-page);
     }
     h1, h2, h3, h4, h5, h6 {
-        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        letter-spacing: -0.3px;
     }
 }
 
-/* Custom scrollbar */
+/* ==================== CUSTOM SCROLLBAR ==================== */
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f5f9;
+    background: var(--bg-metrics);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: var(--border-default);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: var(--text-hint);
 }
 
-/* Dark sidebar scrollbar */
 .sidebar-dark::-webkit-scrollbar-track {
-    background: #1e1e2e;
+    background: var(--bg-sidebar);
 }
 
 .sidebar-dark::-webkit-scrollbar-thumb {
-    background: #4a4a5e;
+    background: var(--bg-sidebar-hover);
 }
 
-/* Animations */
+/* ==================== ANIMATIONS ==================== */
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
+@keyframes fadeInSubtle {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideIn {
@@ -90,148 +144,364 @@
     to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes progressGrow {
+    from { width: 0%; }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-fade-in-subtle {
+    animation: fadeInSubtle 0.3s ease-out forwards;
+}
+
 .animate-slide-in {
     animation: slideIn 0.3s ease-out forwards;
 }
 
-/* Card hover effects */
+.animate-gradient {
+    background-size: 200% 200%;
+    animation: gradientShift 15s ease infinite;
+}
+
+.animate-progress {
+    animation: progressGrow 0.6s ease-out forwards;
+}
+
+/* ==================== CARD STYLES ==================== */
+
+.card-teal {
+    background: var(--bg-card);
+    border: 0.5px solid var(--border-card);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(12, 46, 42, 0.04);
+    transition: all 0.2s ease;
+}
+
+.card-teal:hover {
+    box-shadow: 0 4px 12px rgba(12, 46, 42, 0.08);
+}
+
+.card-metrics {
+    background: var(--bg-metrics);
+    border-radius: 12px;
+}
+
 .card-hover {
     transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .card-hover:hover {
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 20px rgba(12, 46, 42, 0.08);
     transform: translateY(-2px);
 }
 
-/* Table row hover */
+/* ==================== TABLE STYLES ==================== */
+
 .table-row-hover {
-    transition: background-color 0.15s ease;
+    transition: background-color 0.1s ease;
 }
 
 .table-row-hover:hover {
-    background-color: #f8fafc;
+    background-color: var(--bg-page);
 }
 
-/* Badge variants */
-.badge-success {
-    @apply bg-emerald-50 text-emerald-700 border border-emerald-200;
+.table-header {
+    color: var(--text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 11px;
 }
 
-.badge-warning {
-    @apply bg-amber-50 text-amber-700 border border-amber-200;
+/* ==================== BUTTON STYLES ==================== */
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--teal-600), var(--teal-500));
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(15, 110, 86, 0.2);
+    transition: all 0.2s ease;
 }
 
-.badge-danger {
-    @apply bg-rose-50 text-rose-700 border border-rose-200;
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--teal-500), var(--cyan-soft));
+    transform: scale(1.01);
 }
 
-.badge-info {
-    @apply bg-blue-50 text-blue-700 border border-blue-200;
+.btn-primary:active {
+    transform: scale(0.99);
 }
 
-.badge-purple {
-    @apply bg-purple-50 text-purple-700 border border-purple-200;
+.btn-outline {
+    background: transparent;
+    border: 0.5px solid var(--border-default);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
 }
 
-/* Gradient backgrounds */
-.gradient-purple {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+.btn-outline:hover {
+    background: var(--bg-metrics);
 }
 
-.gradient-green {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+/* ==================== INPUT STYLES ==================== */
+
+.input-teal {
+    background: var(--bg-input);
+    border: 0.5px solid var(--border-default);
+    border-radius: 8px;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
 }
 
-.gradient-orange {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+.input-teal:focus {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 0 3px rgba(159, 225, 203, 0.2);
+    outline: none;
 }
 
-.gradient-red {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+.input-teal::placeholder {
+    color: var(--text-hint);
 }
 
-/* Alert card borders */
-.alert-border-red {
-    border-top: 4px solid #ef4444;
+/* ==================== BADGE STYLES ==================== */
+
+.badge-pending {
+    background: var(--status-pending-bg);
+    color: var(--status-pending-text);
 }
 
-.alert-border-amber {
-    border-top: 4px solid #f59e0b;
+.badge-partial {
+    background: var(--status-partial-bg);
+    color: var(--status-partial-text);
 }
 
-.alert-border-blue {
-    border-top: 4px solid #3b82f6;
+.badge-paid {
+    background: var(--status-paid-bg);
+    color: var(--status-paid-text);
 }
 
-/* Left border alerts */
-.alert-left-red {
-    border-left: 4px solid #ef4444;
+.badge-overdue {
+    background: var(--status-overdue-bg);
+    color: var(--status-overdue-text);
 }
 
-.alert-left-amber {
-    border-left: 4px solid #f59e0b;
+.badge-fixed {
+    background: var(--type-fixed-bg);
+    color: var(--type-fixed-text);
 }
 
-.alert-left-blue {
-    border-left: 4px solid #3b82f6;
+.badge-provider {
+    background: var(--type-provider-bg);
+    color: var(--type-provider-text);
 }
 
-/* Accessibility - Focus visible */
+.badge-variable {
+    background: var(--type-variable-bg);
+    color: var(--type-variable-text);
+}
+
+.badge-superadmin {
+    background: var(--status-paid-bg);
+    color: var(--status-paid-text);
+}
+
+.badge-admin {
+    background: var(--type-fixed-bg);
+    color: var(--type-fixed-text);
+}
+
+.badge-usuario {
+    background: var(--bg-metrics);
+    color: var(--text-secondary);
+}
+
+/* ==================== SIDEBAR STYLES ==================== */
+
+.sidebar-teal {
+    background: var(--bg-sidebar);
+}
+
+.sidebar-item {
+    color: var(--text-sidebar-inactive);
+    padding: 11px 16px;
+    border-radius: 0 8px 8px 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-item:hover {
+    background: var(--bg-sidebar-hover);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar-item.active {
+    background: linear-gradient(90deg, rgba(29, 158, 117, 0.2), transparent);
+    color: var(--text-sidebar);
+    border-left: 3px solid var(--cyan-soft);
+}
+
+.sidebar-item .icon {
+    opacity: 0.6;
+}
+
+.sidebar-item.active .icon {
+    opacity: 1;
+}
+
+/* ==================== GLASSMORPHISM LOGIN ==================== */
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(12, 46, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.login-gradient {
+    background: linear-gradient(135deg, #E1F5EE, #D4EAE0, #E6F0FA, #E1F5EE);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+}
+
+.glass-input {
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+}
+
+.glass-input:focus {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 0 3px rgba(159, 225, 203, 0.3);
+    outline: none;
+}
+
+.glass-input::placeholder {
+    color: var(--text-hint);
+}
+
+.glass-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.glass-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--teal-600), var(--teal-500));
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: 0 4px 12px rgba(15, 110, 86, 0.25);
+    transition: all 0.2s ease;
+}
+
+.glass-btn:hover {
+    background: linear-gradient(135deg, var(--teal-500), var(--cyan-soft));
+    transform: scale(1.01);
+}
+
+.glass-btn:active {
+    transform: scale(0.99);
+}
+
+.glass-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    pointer-events: none;
+}
+
+.glass-error {
+    background: rgba(253, 232, 232, 0.8);
+    color: #9B2C2C;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    backdrop-filter: blur(4px);
+}
+
+/* ==================== GRADIENT BUTTONS ==================== */
+
+.gradient-teal {
+    background: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-500) 100%);
+}
+
+.gradient-teal:hover {
+    background: linear-gradient(135deg, var(--teal-500) 0%, var(--cyan-soft) 100%);
+}
+
+/* ==================== METRIC COLORS ==================== */
+
+.metric-blue { color: var(--blue-teal); }
+.metric-teal { color: var(--teal-600); }
+.metric-amber { color: var(--status-pending-text); }
+.metric-red { color: var(--alert-overdue); }
+
+/* ==================== ALERT CARDS ==================== */
+
+.alert-card-overdue {
+    border-left: 4px solid var(--alert-overdue);
+    background: var(--status-overdue-bg);
+}
+
+.alert-card-30days {
+    border-left: 4px solid var(--alert-30days);
+    background: var(--status-pending-bg);
+}
+
+.alert-card-60days {
+    border-left: 4px solid var(--alert-60days);
+    background: var(--type-fixed-bg);
+}
+
+/* ==================== TOAST STYLES ==================== */
+
+.toast-success {
+    background: var(--teal-50);
+    color: var(--status-paid-text);
+    border-left: 3px solid var(--teal-600);
+}
+
+.toast-error {
+    background: var(--status-overdue-bg);
+    color: var(--status-overdue-text);
+    border-left: 3px solid var(--alert-overdue);
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+
 *:focus-visible {
-    outline: 2px solid #7c3aed;
+    outline: 2px solid var(--teal-600);
     outline-offset: 2px;
 }
 
-/* Ensure interactive elements have visible focus */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-    outline: 2px solid #7c3aed;
+    outline: 2px solid var(--teal-600);
     outline-offset: 2px;
-    box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
+    box-shadow: 0 0 0 4px rgba(15, 110, 86, 0.2);
 }
 
-/* Skip to main content link (for screen readers) */
-.skip-link {
-    position: absolute;
-    top: -40px;
-    left: 0;
-    background: #7c3aed;
-    color: white;
-    padding: 8px 16px;
-    z-index: 100;
-    transition: top 0.3s;
-}
-
-.skip-link:focus {
-    top: 0;
-}
-
-/* Ensure sufficient color contrast */
-.text-muted {
-    color: #64748b; /* Minimum 4.5:1 contrast ratio */
-}
-
-/* Responsive tables */
-@media (max-width: 768px) {
-    .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    /* Full-width modals on mobile */
-    .dialog-content-mobile {
-        width: 100vw;
-        max-width: 100vw;
-        margin: 0;
-        border-radius: 0;
-    }
-}
-
-/* Screen reader only content */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -242,4 +512,31 @@ textarea:focus-visible {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 768px) {
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ==================== PROGRESS BAR ==================== */
+
+.progress-bar-teal {
+    background: linear-gradient(90deg, var(--cyan-soft), var(--teal-600));
+}
+
+.progress-bar-fixed {
+    background: var(--blue-teal);
+}
+
+.progress-bar-provider {
+    background: var(--teal-600);
+}
+
+.progress-bar-variable {
+    background: var(--status-pending-text);
 }

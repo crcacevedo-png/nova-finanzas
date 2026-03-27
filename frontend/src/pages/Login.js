@@ -1,134 +1,171 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, LogIn } from 'lucide-react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Toaster, toast } from 'sonner';
+import { Eye, EyeOff } from 'lucide-react';
 
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/jssdpppr_logo%20nova%20transparente.png";
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/qvzbrum6_logo%20nova%20transparente.png";
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!username || !password) {
-      toast.error('Por favor completa todos los campos');
-      return;
-    }
-
+    setError('');
     setLoading(true);
+
     try {
       await login(username, password);
-      toast.success('¡Bienvenido!');
       navigate('/dashboard');
-    } catch (error) {
-      const message = error.response?.data?.detail || 'Credenciales incorrectas';
-      toast.error(message);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 p-4">
-      <Toaster position="top-right" richColors />
-      
-      <div className="w-full max-w-md">
-        <Card className="border-0 shadow-2xl">
-          <CardHeader className="space-y-4 pb-6 text-center">
-            {/* Logo */}
-            <div className="flex justify-center">
-              <img 
-                src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
-                alt="NovaVision" 
-                className="h-[400px] w-auto"
+    <div className="min-h-screen flex items-center justify-center p-4 login-gradient relative overflow-hidden">
+      {/* Decorative blobs */}
+      <div 
+        className="glass-blob"
+        style={{
+          width: '300px',
+          height: '300px',
+          background: '#9FE1CB',
+          opacity: 0.3,
+          top: '-50px',
+          right: '-50px',
+          filter: 'blur(80px)'
+        }}
+      />
+      <div 
+        className="glass-blob"
+        style={{
+          width: '200px',
+          height: '200px',
+          background: '#7BADE2',
+          opacity: 0.2,
+          bottom: '50px',
+          left: '-30px',
+          filter: 'blur(60px)'
+        }}
+      />
+      <div 
+        className="glass-blob"
+        style={{
+          width: '150px',
+          height: '150px',
+          background: '#7DD8C0',
+          opacity: 0.25,
+          top: '40%',
+          left: '10%',
+          filter: 'blur(50px)'
+        }}
+      />
+
+      {/* Login Card */}
+      <div 
+        className="glass-card w-full max-w-[420px] p-12 animate-fade-in relative z-10"
+        data-testid="login-card"
+      >
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
+          <img 
+            src={LOGO_URL}
+            alt="NovaVision"
+            className="w-60 h-auto"
+            data-testid="login-logo"
+          />
+        </div>
+
+        {/* Subtitle */}
+        <p className="text-center text-sm text-[#5A7A72] mb-8 tracking-wide">
+          Sistema de gastos y finanzas
+        </p>
+
+        {/* Error Message */}
+        {error && (
+          <div className="glass-error mb-6 animate-fade-in" data-testid="login-error">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Username Field */}
+          <div className="space-y-2">
+            <label htmlFor="username" className="glass-label block">
+              Usuario
+            </label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Ingresa tu usuario"
+              className="glass-input w-full"
+              required
+              autoComplete="username"
+              data-testid="login-username-input"
+            />
+          </div>
+
+          {/* Password Field */}
+          <div className="space-y-2">
+            <label htmlFor="password" className="glass-label block">
+              Contraseña
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Ingresa tu contraseña"
+                className="glass-input w-full pr-10"
+                required
+                autoComplete="current-password"
+                data-testid="login-password-input"
               />
-            </div>
-            
-            <div>
-              <CardDescription className="text-slate-500 mt-1">
-                Sistema de gastos y finanzas
-              </CardDescription>
-            </div>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Usuario</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="tu_usuario"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="h-11"
-                  data-testid="login-username-input"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="h-11 pr-10"
-                    data-testid="login-password-input"
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-11 gradient-purple hover:opacity-90 text-white font-medium"
-                disabled={loading}
-                data-testid="login-submit-button"
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94B0A8] hover:text-[#5A7A72] transition-colors"
+                tabIndex={-1}
               >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Ingresando...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <LogIn className="w-4 h-4" />
-                    Iniciar sesión
-                  </span>
-                )}
-              </Button>
-            </form>
-
-            {/* Demo credentials */}
-            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
-              <p className="text-xs font-semibold text-slate-600 mb-2">Usuarios de prueba:</p>
-              <div className="space-y-1 text-xs text-slate-500">
-                <p><span className="font-medium">SuperAdmin:</span> superadmin / nova2024</p>
-                <p><span className="font-medium">Admin:</span> admin / admin2024</p>
-                <p><span className="font-medium">Usuario:</span> usuario / user2024</p>
-              </div>
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            className="glass-btn mt-6"
+            disabled={loading}
+            data-testid="login-submit-button"
+          >
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Ingresando...
+              </span>
+            ) : (
+              'Iniciar sesión'
+            )}
+          </button>
+        </form>
+
+        {/* Demo users hint */}
+        <p className="text-center text-[11px] text-[#94B0A8] mt-6">
+          Usuarios demo: superadmin / admin / usuario
+        </p>
       </div>
     </div>
   );
