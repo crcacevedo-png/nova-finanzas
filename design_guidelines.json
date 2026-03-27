@@ -1,0 +1,86 @@
+{
+  "theme": "Light",
+  "archetype": "1 (Organic & Earthy)",
+  "rationale": "Medical and finance require trust, clarity, and precision. A light theme with deep teal (satisfying the user's color request) paired with organic off-whites creates a calming yet authoritative financial dashboard. We avoid harsh generic cyan to maintain an elegant, 'E1' anti-AI aesthetic.",
+  "typography": {
+    "headings": {
+      "family": "Outfit",
+      "weights": ["400", "500", "600", "700"],
+      "classes": "font-sans tracking-tight"
+    },
+    "body": {
+      "family": "IBM Plex Sans",
+      "weights": ["400", "500"],
+      "classes": "font-sans tracking-normal"
+    },
+    "scale": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl",
+      "h3": "text-xl sm:text-2xl",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-sm sm:text-base",
+      "small": "text-xs uppercase tracking-[0.2em]"
+    }
+  },
+  "colors": {
+    "background": "bg-slate-50",
+    "surface": "bg-white",
+    "primary": "bg-teal-800",
+    "primary_hover": "bg-teal-900",
+    "primary_text": "text-teal-800",
+    "accent": "bg-teal-100",
+    "accent_text": "text-teal-900",
+    "text_main": "text-slate-900",
+    "text_muted": "text-slate-500",
+    "border": "border-slate-200",
+    "success": "text-emerald-700 bg-emerald-50 border-emerald-200",
+    "warning": "text-amber-700 bg-amber-50 border-amber-200",
+    "destructive": "text-rose-700 bg-rose-50 border-rose-200",
+    "chart_palette": [
+      "#115e59", 
+      "#14b8a6", 
+      "#99f6e4", 
+      "#f59e0b", 
+      "#10b981"
+    ]
+  },
+  "layout_and_spacing": {
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+    "card_style": "bg-white border border-slate-200 rounded-lg shadow-sm p-6",
+    "container_padding": "p-4 md:p-8",
+    "sidebar": "w-64 border-r border-slate-200 bg-white min-h-screen"
+  },
+  "components": {
+    "buttons": "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:opacity-50 disabled:pointer-events-none",
+    "inputs": "flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-50",
+    "tables": "w-full text-sm text-left border-collapse",
+    "table_headers": "bg-slate-50 text-slate-500 font-medium py-3 px-4 uppercase text-xs tracking-wider border-b border-slate-200",
+    "table_cells": "py-3 px-4 border-b border-slate-100 text-slate-700",
+    "badges": "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
+  },
+  "media": {
+    "login_background": {
+      "url": "https://images.unsplash.com/photo-1772557526164-db6af0e8c4eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGxpZ2h0JTIwdGVhbCUyMHNvZnQlMjBnZW9tZXRyaWMlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3NDU4NDE3Nnww&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract light teal geometric background for the login screen to provide a sophisticated entry point."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "instructions": "Use lucide-react for all standard icons (Eye, LayoutDashboard, Receipt, AlertCircle, Users, LogOut, Wallet, TrendingUp). No need to install additional libraries."
+  },
+  "instructions_to_main_agent": [
+    "1. Setup JWT authentication. Create a robust protected route wrapper that checks for roles (Superadmin, Admin, Usuario). Use the media.login_background image on the login page split screen.",
+    "2. Implement a unified layout consisting of a left Sidebar navigation and a top Header with user profile and logout.",
+    "3. Use Shadcn UI components for Tables, Selects, Dialogs, and Forms. Customize their colors to match the teal palette described.",
+    "4. For the Dashboard: Implement a 4-column grid. Place key metric cards at the top (Total Expenses GTQ, Pending Payments).",
+    "5. Expiration Alerts: Below the top metrics, create two distinct panels/lists exclusively for 'Vencimientos a 30 días' and 'Vencimientos a 60 días'. Use amber/rose colors for these warnings.",
+    "6. Expense Module: Create a view with a Data Table to list all expenses. Add a dialog/form to register new expenses (Fields: Concepto, Monto GTQ, Fecha, Categoría [Gastos fijos, Pagos proveedores, Gastos variables], Estado [Pagado, Pendiente]).",
+    "7. Financial Charts: Use Recharts to show monthly expenses by category. Ensure colors match the `chart_palette` array.",
+    "8. User Management: Simple view to add users and assign roles if Superadmin.",
+    "9. CRITICAL TESTING REQUIREMENT: Ensure every key interactive element has a `data-testid` attribute (e.g., `data-testid=\"login-submit-button\"`, `data-testid=\"expense-row-1\"`)."
+  ],
+  "accessibility": {
+    "contrast": "Ensure all text over the teal primary color is pure white (#FFFFFF).",
+    "focus": "All interactive elements must have a visible focus ring `focus:ring-2 focus:ring-teal-500`."
+  }
+}
