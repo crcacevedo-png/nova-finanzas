@@ -47,9 +47,11 @@ const Login = () => {
           <CardHeader className="space-y-4 pb-6 text-center">
             {/* Logo */}
             <div className="flex justify-center">
-              <div className="w-20 h-20 rounded-2xl gradient-purple flex items-center justify-center shadow-lg">
-                <span className="text-white text-3xl font-bold font-['Outfit']">NV</span>
-              </div>
+              <img 
+                src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
+                alt="NovaVision" 
+                className="h-20 w-auto"
+              />
             </div>
             
             <div>

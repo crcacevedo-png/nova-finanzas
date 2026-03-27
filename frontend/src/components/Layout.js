@@ -83,8 +83,12 @@ const Layout = ({ children }) => {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
           <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gradient-purple flex items-center justify-center">
-              <span className="text-white text-lg font-bold font-['Outfit']">NV</span>
+            <div className="bg-white rounded-lg p-1">
+              <img 
+                src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
+                alt="NovaVision" 
+                className="h-8 w-auto"
+              />
             </div>
             <span className="font-semibold text-lg font-['Outfit']">NovaVision</span>
           </Link>
@@ -160,9 +164,11 @@ const Layout = ({ children }) => {
           </button>
           <div className="flex-1 flex justify-center">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg gradient-purple flex items-center justify-center">
-                <span className="text-white text-sm font-bold">NV</span>
-              </div>
+              <img 
+                src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
+                alt="NovaVision" 
+                className="h-10 w-auto"
+              />
               <span className="font-semibold text-slate-900 font-['Outfit']">NovaVision</span>
             </div>
           </div>
