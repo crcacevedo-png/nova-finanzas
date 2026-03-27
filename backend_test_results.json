@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-27T04:11:07.368157",
+  "timestamp": "2026-03-27T04:16:42.020609",
   "total_tests": 17,
   "passed_tests": 13,
   "success_rate": "76.5%",
@@ -27,7 +27,7 @@
     {
       "test": "Create Expense",
       "success": true,
-      "details": "ID: bec57383-7550-43f7-8a68-62f5e9dabe69"
+      "details": "ID: 1ac67dcc-a88f-48c3-833a-4deeac49211f"
     },
     {
       "test": "Get Expense by ID",
@@ -42,7 +42,7 @@
     {
       "test": "Get All Expenses",
       "success": true,
-      "details": "Found 2 expenses"
+      "details": "Found 6 expenses"
     },
     {
       "test": "Filter Expenses",

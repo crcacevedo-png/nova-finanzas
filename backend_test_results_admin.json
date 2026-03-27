@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-03-27T04:17:48.382681",
+  "total_tests": 17,
+  "passed_tests": 17,
+  "success_rate": "100.0%",
+  "results": [
+    {
+      "test": "API Health Check",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Admin Login",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get Current User",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Expense",
+      "success": true,
+      "details": "ID: 11958a41-1fa9-4ac4-ae5d-86d06bad3b82"
+    },
+    {
+      "test": "Get Expense by ID",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Expense",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get All Expenses",
+      "success": true,
+      "details": "Found 6 expenses"
+    },
+    {
+      "test": "Filter Expenses",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Stats",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Alerts",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Chart Data",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get All Users",
+      "success": true,
+      "details": "Found 5 users"
+    },
+    {
+      "test": "Create User (Superadmin)",
+      "success": true,
+      "details": "ID: 29a3fde5-4538-441b-aa83-d8780b16f76c"
+    },
+    {
+      "test": "Toggle User Active",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete User",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Unauthorized Access Protection",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Delete Expense",
+      "success": true,
+      "details": ""
+    }
+  ]
+}

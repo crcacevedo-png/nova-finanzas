@@ -228,28 +228,28 @@ const Gastos = () => {
                 />
               </div>
               <Select
-                value={filters.categoria}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, categoria: value }))}
+                value={filters.categoria || "all"}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, categoria: value === "all" ? "" : value }))}
               >
                 <SelectTrigger className="w-full md:w-[200px]" data-testid="category-filter">
                   <SelectValue placeholder="Categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las categorías</SelectItem>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
                   <SelectItem value="gastos_fijos">Gastos Fijos</SelectItem>
                   <SelectItem value="pagos_proveedores">Pagos Proveedores</SelectItem>
                   <SelectItem value="gastos_variables">Gastos Variables</SelectItem>
                 </SelectContent>
               </Select>
               <Select
-                value={filters.estado}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, estado: value }))}
+                value={filters.estado || "all"}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, estado: value === "all" ? "" : value }))}
               >
                 <SelectTrigger className="w-full md:w-[180px]" data-testid="status-filter">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los estados</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
                   <SelectItem value="pagado">Pagado</SelectItem>
                 </SelectContent>
