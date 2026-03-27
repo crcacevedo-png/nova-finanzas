@@ -147,15 +147,25 @@
 - ✅ Paginación y filtros avanzados
 - ✅ Pagos parciales con cálculo automático
 - ✅ Dashboard con métricas y alertas
-- ✅ Exportación a Excel/CSV
+- ✅ Exportación a Excel y PDF
 - ✅ UI responsive con Tailwind + Shadcn
 - ✅ **Rediseño P0 del Frontend (Sección 6):**
   - ✅ Sidebar oscuro (slate-900)
-  - ✅ Tema púrpura (gradient-purple)
   - ✅ Nueva página: Historial de Pagos
   - ✅ Nueva página: Pagos por Vencer
-  - ✅ Badges de tipo con colores púrpura/violeta/amber
-  - ✅ Endpoint de pagos incluye expense_name y created_by_name
+- ✅ **Rediseño TEAL SERENIDAD (Diciembre 2025):**
+  - ✅ Nueva paleta de colores Teal (#0F6E56, #1D9E75)
+  - ✅ Login con glassmorphism y gradiente animado
+  - ✅ Sidebar oscuro (#0C2E2A) con logo transparente
+  - ✅ Logo NovaVision sin marco (transparente)
+  - ✅ Badges de tipo: fijo=azul, proveedor=teal, variable=ámbar
+  - ✅ Badges de estado: pendiente, parcial, pagado, vencido
+  - ✅ Badges de rol: superadmin, admin, usuario
+  - ✅ Métricas con colores azul/teal/ámbar/rojo
+  - ✅ Barras de progreso por tipo con colores específicos
+  - ✅ Alertas de vencimiento 30/60 días
+  - ✅ Rate limiting (5 intentos/minuto en login)
+  - ✅ Tipografía Plus Jakarta Sans
 
 ---
 
