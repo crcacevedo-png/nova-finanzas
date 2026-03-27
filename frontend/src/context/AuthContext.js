@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
+  const [permissions, setPermissions] = useState({});
 
   useEffect(() => {
     if (token) {
@@ -23,6 +24,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API_URL}/auth/me`);
       setUser(response.data);
+      setPermissions(response.data.permissions || {});
     } catch (error) {
       console.error('Error fetching user:', error);
       logout();
@@ -39,6 +41,7 @@ export const AuthProvider = ({ children }) => {
     axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     setToken(access_token);
     setUser(userData);
+    setPermissions(userData.permissions || {});
     
     return userData;
   };
@@ -51,6 +54,7 @@ export const AuthProvider = ({ children }) => {
     axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     setToken(access_token);
     setUser(userData);
+    setPermissions(userData.permissions || {});
     
     return userData;
   };
@@ -60,6 +64,7 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
+    setPermissions({});
   };
 
   const hasRole = (roles) => {
@@ -68,15 +73,36 @@ export const AuthProvider = ({ children }) => {
     return roles.includes(user.role);
   };
 
+  const hasPermission = (permission) => {
+    return permissions[permission] === true;
+  };
+
+  const canCreateExpenses = () => hasPermission('create_expenses');
+  const canEditExpenses = () => hasPermission('edit_expenses');
+  const canDeleteExpenses = () => hasPermission('delete_expenses');
+  const canRegisterPayments = () => hasPermission('register_payments');
+  const canManageUsers = () => hasPermission('manage_users');
+  const canViewUserManagement = () => hasPermission('view_user_management');
+  const canExportReports = () => hasPermission('export_reports');
+
   return (
     <AuthContext.Provider value={{
       user,
       token,
       loading,
+      permissions,
       login,
       register,
       logout,
       hasRole,
+      hasPermission,
+      canCreateExpenses,
+      canEditExpenses,
+      canDeleteExpenses,
+      canRegisterPayments,
+      canManageUsers,
+      canViewUserManagement,
+      canExportReports,
       isAuthenticated: !!user
     }}>
       {children}

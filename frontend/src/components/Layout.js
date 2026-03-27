@@ -7,8 +7,7 @@ import {
   Users, 
   LogOut, 
   Menu,
-  X,
-  Eye
+  X
 } from 'lucide-react';
 import { Button } from './ui/button';
 import {
@@ -22,8 +21,10 @@ import {
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { roleLabels } from '../services/api';
 
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/cjnymxl0_logo%20nova.png";
+
 const Layout = ({ children }) => {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, canViewUserManagement } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -38,23 +39,23 @@ const Layout = ({ children }) => {
       path: '/dashboard', 
       label: 'Dashboard', 
       icon: LayoutDashboard,
-      roles: ['superadmin', 'admin', 'usuario']
+      show: true
     },
     { 
       path: '/gastos', 
       label: 'Gastos', 
       icon: Receipt,
-      roles: ['superadmin', 'admin', 'usuario']
+      show: true
     },
     { 
       path: '/usuarios', 
       label: 'Usuarios', 
       icon: Users,
-      roles: ['superadmin']
+      show: canViewUserManagement()
     },
   ];
 
-  const filteredNavItems = navItems.filter(item => hasRole(item.roles));
+  const filteredNavItems = navItems.filter(item => item.show);
 
   const isActive = (path) => location.pathname === path;
 
@@ -77,12 +78,13 @@ const Layout = ({ children }) => {
       `}>
         <div className="h-full flex flex-col">
           {/* Logo */}
-          <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
-            <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-teal-800 flex items-center justify-center">
-                <Eye className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-semibold text-lg text-slate-900 font-['Outfit']">NovaVision</span>
+          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
+            <Link to="/dashboard" className="flex items-center">
+              <img 
+                src={LOGO_URL} 
+                alt="NovaVision" 
+                className="h-10 w-auto"
+              />
             </Link>
             <button 
               className="lg:hidden p-1 hover:bg-slate-100 rounded"
@@ -171,6 +173,7 @@ const Layout = ({ children }) => {
                 <div>
                   <p className="font-medium">{user?.name}</p>
                   <p className="text-xs text-slate-500">{user?.email}</p>
+                  <p className="text-xs text-teal-600 mt-1">{roleLabels[user?.role]}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

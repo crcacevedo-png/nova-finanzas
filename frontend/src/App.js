@@ -2,15 +2,14 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Gastos from './pages/Gastos';
 import Usuarios from './pages/Usuarios';
 import './App.css';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, loading, hasRole } = useAuth();
+const ProtectedRoute = ({ children, requiredPermission }) => {
+  const { isAuthenticated, loading, hasPermission } = useAuth();
 
   if (loading) {
     return (
@@ -27,7 +26,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !hasRole(allowedRoles)) {
+  if (requiredPermission && !hasPermission(requiredPermission)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -68,14 +67,6 @@ function AppRoutes() {
           </PublicRoute>
         } 
       />
-      <Route 
-        path="/register" 
-        element={
-          <PublicRoute>
-            <Register />
-          </PublicRoute>
-        } 
-      />
 
       {/* Protected Routes */}
       <Route 
@@ -97,7 +88,7 @@ function AppRoutes() {
       <Route 
         path="/usuarios" 
         element={
-          <ProtectedRoute allowedRoles={['superadmin']}>
+          <ProtectedRoute requiredPermission="view_user_management">
             <Usuarios />
           </ProtectedRoute>
         } 

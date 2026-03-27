@@ -8,6 +8,8 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Toaster, toast } from 'sonner';
 
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/cjnymxl0_logo%20nova.png";
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +31,7 @@ const Login = () => {
       toast.success('¡Bienvenido!');
       navigate('/dashboard');
     } catch (error) {
-      const message = error.response?.data?.detail || 'Error al iniciar sesión';
+      const message = error.response?.data?.detail || 'Credenciales incorrectas';
       toast.error(message);
     } finally {
       setLoading(false);
@@ -47,14 +49,13 @@ const Login = () => {
           backgroundImage: `url('https://images.unsplash.com/photo-1772557526164-db6af0e8c4eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGxpZ2h0JTIwdGVhbCUyMHNvZnQlMjBnZW9tZXRyaWMlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3NDU4NDE3Nnww&ixlib=rb-4.1.0&q=85')` 
         }}
       >
-        <div className="absolute inset-0 bg-teal-900/60" />
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-900/80 to-teal-700/70" />
         <div className="relative z-10 flex flex-col justify-center p-12 text-white">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <Eye className="w-7 h-7 text-white" />
-            </div>
-            <span className="text-3xl font-bold font-['Outfit']">NovaVision</span>
-          </div>
+          <img 
+            src={LOGO_URL} 
+            alt="NovaVision Logo" 
+            className="w-72 mb-8 drop-shadow-lg"
+          />
           <h1 className="text-4xl font-bold mb-4 font-['Outfit']">
             Sistema de Gastos y Finanzas
           </h1>
@@ -68,11 +69,13 @@ const Login = () => {
       <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-teal-800 flex items-center justify-center">
-              <Eye className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-slate-900 font-['Outfit']">NovaVision</span>
+          <div className="lg:hidden flex flex-col items-center mb-8">
+            <img 
+              src={LOGO_URL} 
+              alt="NovaVision Logo" 
+              className="w-56 mb-2"
+            />
+            <p className="text-sm text-slate-500">Sistema de Gastos y Finanzas</p>
           </div>
 
           <Card className="border-0 shadow-lg">
@@ -141,17 +144,14 @@ const Login = () => {
                 </Button>
               </form>
 
-              <div className="mt-6 text-center">
-                <p className="text-sm text-slate-500">
-                  ¿No tienes cuenta?{' '}
-                  <Link 
-                    to="/register" 
-                    className="text-teal-700 hover:text-teal-800 font-medium"
-                    data-testid="register-link"
-                  >
-                    Regístrate
-                  </Link>
-                </p>
+              {/* Demo credentials */}
+              <div className="mt-6 p-4 bg-slate-100 rounded-lg">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Usuarios de prueba:</p>
+                <div className="space-y-1 text-xs text-slate-500">
+                  <p><span className="font-medium">SuperAdmin:</span> superadmin@novavision.gt / nova2024</p>
+                  <p><span className="font-medium">Admin:</span> admin@novavision.gt / admin2024</p>
+                  <p><span className="font-medium">Usuario:</span> usuario@novavision.gt / user2024</p>
+                </div>
               </div>
             </CardContent>
           </Card>

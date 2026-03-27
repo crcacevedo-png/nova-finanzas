@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import { expenseApi, formatCurrency, formatDate, categoryLabels, statusLabels } from '../services/api';
 import { 
   Plus, 
   Search, 
-  Filter,
   Pencil,
   Trash2,
-  X,
-  Calendar
+  CheckCircle2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import {
   Dialog,
@@ -54,6 +53,7 @@ const initialFormState = {
 };
 
 const Gastos = () => {
+  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -150,7 +150,8 @@ const Gastos = () => {
       fetchExpenses();
     } catch (error) {
       console.error('Error saving expense:', error);
-      toast.error('Error al guardar el gasto');
+      const message = error.response?.data?.detail || 'Error al guardar el gasto';
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -170,10 +171,23 @@ const Gastos = () => {
       fetchExpenses();
     } catch (error) {
       console.error('Error deleting expense:', error);
-      toast.error('Error al eliminar el gasto');
+      const message = error.response?.data?.detail || 'Error al eliminar el gasto';
+      toast.error(message);
     } finally {
       setDeleteDialogOpen(false);
       setExpenseToDelete(null);
+    }
+  };
+
+  const handleMarkAsPaid = async (expense) => {
+    try {
+      await expenseApi.markAsPaid(expense.id);
+      toast.success('Pago registrado correctamente');
+      fetchExpenses();
+    } catch (error) {
+      console.error('Error marking as paid:', error);
+      const message = error.response?.data?.detail || 'Error al registrar el pago';
+      toast.error(message);
     }
   };
 
@@ -203,14 +217,16 @@ const Gastos = () => {
             <h1 className="text-2xl font-bold text-slate-900 font-['Outfit']">Gastos</h1>
             <p className="text-slate-500 text-sm">Administra los gastos de la clínica</p>
           </div>
-          <Button 
-            onClick={() => handleOpenDialog()}
-            className="bg-teal-800 hover:bg-teal-900 text-white"
-            data-testid="add-expense-button"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Gasto
-          </Button>
+          {canCreateExpenses() && (
+            <Button 
+              onClick={() => handleOpenDialog()}
+              className="bg-teal-800 hover:bg-teal-900 text-white"
+              data-testid="add-expense-button"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Gasto
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -312,25 +328,42 @@ const Gastos = () => {
                           {expense.fecha_vencimiento ? formatDate(expense.fecha_vencimiento) : '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenDialog(expense)}
-                              className="h-8 w-8 p-0 hover:bg-teal-50 hover:text-teal-700"
-                              data-testid={`edit-expense-${expense.id}`}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteClick(expense)}
-                              className="h-8 w-8 p-0 hover:bg-rose-50 hover:text-rose-700"
-                              data-testid={`delete-expense-${expense.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Mark as Paid button - only for pending expenses */}
+                            {canRegisterPayments() && expense.estado === 'pendiente' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleMarkAsPaid(expense)}
+                                className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-700"
+                                title="Marcar como pagado"
+                                data-testid={`pay-expense-${expense.id}`}
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canEditExpenses() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenDialog(expense)}
+                                className="h-8 w-8 p-0 hover:bg-teal-50 hover:text-teal-700"
+                                data-testid={`edit-expense-${expense.id}`}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDeleteExpenses() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteClick(expense)}
+                                className="h-8 w-8 p-0 hover:bg-rose-50 hover:text-rose-700"
+                                data-testid={`delete-expense-${expense.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

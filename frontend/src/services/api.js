@@ -26,6 +26,7 @@ export const expenseApi = {
   create: (data) => axios.post(`${API_URL}/expenses`, data),
   update: (id, data) => axios.put(`${API_URL}/expenses/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/expenses/${id}`),
+  markAsPaid: (id) => axios.put(`${API_URL}/expenses/${id}/pay`),
 };
 
 // User API

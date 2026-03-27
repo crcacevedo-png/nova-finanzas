@@ -24,7 +24,7 @@ db = client[os.environ['DB_NAME']]
 # JWT Settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'novavision_secret_key_2024')
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+JWT_EXPIRATION_HOURS = 8  # Changed to 8 hours
 
 # Create the main app
 app = FastAPI(title="NovaVision - Sistema de Gastos y Finanzas")
@@ -33,6 +33,56 @@ app = FastAPI(title="NovaVision - Sistema de Gastos y Finanzas")
 api_router = APIRouter(prefix="/api")
 
 security = HTTPBearer()
+
+# ==================== PERMISSIONS SYSTEM ====================
+
+PERMISSIONS = {
+    "superadmin": {
+        "view_dashboard": True,
+        "view_expenses": True,
+        "view_payment_history": True,
+        "view_due_payments": True,
+        "create_expenses": True,
+        "edit_expenses": True,
+        "delete_expenses": True,
+        "register_payments": True,
+        "delete_payments": True,
+        "manage_users": True,
+        "view_user_management": True,
+        "export_reports": True
+    },
+    "admin": {
+        "view_dashboard": True,
+        "view_expenses": True,
+        "view_payment_history": True,
+        "view_due_payments": True,
+        "create_expenses": True,
+        "edit_expenses": True,
+        "delete_expenses": False,
+        "register_payments": True,
+        "delete_payments": False,
+        "manage_users": False,
+        "view_user_management": False,
+        "export_reports": True
+    },
+    "usuario": {
+        "view_dashboard": True,
+        "view_expenses": True,
+        "view_payment_history": True,
+        "view_due_payments": True,
+        "create_expenses": False,
+        "edit_expenses": False,
+        "delete_expenses": False,
+        "register_payments": False,
+        "delete_payments": False,
+        "manage_users": False,
+        "view_user_management": False,
+        "export_reports": False
+    }
+}
+
+def get_permissions(role: str) -> dict:
+    return PERMISSIONS.get(role, PERMISSIONS["usuario"])
 
 # ==================== MODELS ====================
 
@@ -52,6 +102,7 @@ class UserResponse(BaseModel):
     role: str
     created_at: str
     is_active: bool = True
+    permissions: dict = {}
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -61,6 +112,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    expires_in: int = JWT_EXPIRATION_HOURS * 3600
 
 class ExpenseBase(BaseModel):
     concepto: str
@@ -145,6 +197,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
         
+        # Add permissions to user
+        user["permissions"] = get_permissions(user["role"])
+        
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")
@@ -157,6 +212,54 @@ def require_role(allowed_roles: List[str]):
             raise HTTPException(status_code=403, detail="Acceso denegado")
         return current_user
     return role_checker
+
+def require_permission(permission: str):
+    async def permission_checker(current_user: dict = Depends(get_current_user)):
+        user_permissions = get_permissions(current_user["role"])
+        if not user_permissions.get(permission, False):
+            raise HTTPException(status_code=403, detail="No tienes permiso para realizar esta acción")
+        return current_user
+    return permission_checker
+
+# ==================== SEED USERS ====================
+
+async def seed_default_users():
+    """Create default users if they don't exist"""
+    default_users = [
+        {
+            "email": "superadmin@novavision.gt",
+            "name": "Administrador General",
+            "password": "nova2024",
+            "role": "superadmin"
+        },
+        {
+            "email": "admin@novavision.gt",
+            "name": "Administrador",
+            "password": "admin2024",
+            "role": "admin"
+        },
+        {
+            "email": "usuario@novavision.gt",
+            "name": "Usuario NovaVision",
+            "password": "user2024",
+            "role": "usuario"
+        }
+    ]
+    
+    for user_data in default_users:
+        existing = await db.users.find_one({"email": user_data["email"]})
+        if not existing:
+            user_doc = {
+                "id": str(uuid.uuid4()),
+                "email": user_data["email"],
+                "name": user_data["name"],
+                "password": hash_password(user_data["password"]),
+                "role": user_data["role"],
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.users.insert_one(user_doc)
+            print(f"Created default user: {user_data['email']}")
 
 # ==================== AUTH ROUTES ====================
 
@@ -193,7 +296,8 @@ async def register(user_data: UserCreate):
             name=user_data.name,
             role=role,
             created_at=user_doc["created_at"],
-            is_active=True
+            is_active=True,
+            permissions=get_permissions(role)
         )
     )
 
@@ -216,7 +320,8 @@ async def login(credentials: UserLogin):
             name=user["name"],
             role=user["role"],
             created_at=user["created_at"],
-            is_active=user.get("is_active", True)
+            is_active=user.get("is_active", True),
+            permissions=get_permissions(user["role"])
         )
     )
 
@@ -224,15 +329,19 @@ async def login(credentials: UserLogin):
 async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**current_user)
 
+@api_router.get("/auth/permissions")
+async def get_user_permissions(current_user: dict = Depends(get_current_user)):
+    return {"permissions": get_permissions(current_user["role"])}
+
 # ==================== USER MANAGEMENT ROUTES ====================
 
 @api_router.get("/users", response_model=List[UserResponse])
-async def get_users(current_user: dict = Depends(require_role(["superadmin", "admin"]))):
+async def get_users(current_user: dict = Depends(require_permission("view_user_management"))):
     users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
-    return [UserResponse(**u) for u in users]
+    return [UserResponse(**u, permissions=get_permissions(u["role"])) for u in users]
 
 @api_router.post("/users", response_model=UserResponse)
-async def create_user(user_data: UserCreate, current_user: dict = Depends(require_role(["superadmin"]))):
+async def create_user(user_data: UserCreate, current_user: dict = Depends(require_permission("manage_users"))):
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
@@ -256,11 +365,12 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
         name=user_data.name,
         role=user_data.role,
         created_at=user_doc["created_at"],
-        is_active=True
+        is_active=True,
+        permissions=get_permissions(user_data.role)
     )
 
 @api_router.put("/users/{user_id}/toggle-active")
-async def toggle_user_active(user_id: str, current_user: dict = Depends(require_role(["superadmin"]))):
+async def toggle_user_active(user_id: str, current_user: dict = Depends(require_permission("manage_users"))):
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -271,7 +381,7 @@ async def toggle_user_active(user_id: str, current_user: dict = Depends(require_
     return {"message": "Estado actualizado", "is_active": new_status}
 
 @api_router.delete("/users/{user_id}")
-async def delete_user(user_id: str, current_user: dict = Depends(require_role(["superadmin"]))):
+async def delete_user(user_id: str, current_user: dict = Depends(require_permission("manage_users"))):
     if user_id == current_user["id"]:
         raise HTTPException(status_code=400, detail="No puedes eliminarte a ti mismo")
     
@@ -287,7 +397,7 @@ async def delete_user(user_id: str, current_user: dict = Depends(require_role(["
 async def get_expenses(
     categoria: Optional[str] = None,
     estado: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_expenses"))
 ):
     query = {}
     if categoria:
@@ -299,7 +409,7 @@ async def get_expenses(
     return [ExpenseResponse(**e) for e in expenses]
 
 @api_router.post("/expenses", response_model=ExpenseResponse)
-async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depends(get_current_user)):
+async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depends(require_permission("create_expenses"))):
     expense_id = str(uuid.uuid4())
     expense_doc = {
         "id": expense_id,
@@ -313,7 +423,7 @@ async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depen
     return ExpenseResponse(**expense_doc)
 
 @api_router.get("/expenses/{expense_id}", response_model=ExpenseResponse)
-async def get_expense(expense_id: str, current_user: dict = Depends(get_current_user)):
+async def get_expense(expense_id: str, current_user: dict = Depends(require_permission("view_expenses"))):
     expense = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
     if not expense:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
@@ -323,7 +433,7 @@ async def get_expense(expense_id: str, current_user: dict = Depends(get_current_
 async def update_expense(
     expense_id: str,
     expense_data: ExpenseUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     expense = await db.expenses.find_one({"id": expense_id})
     if not expense:
@@ -337,16 +447,32 @@ async def update_expense(
     return ExpenseResponse(**updated)
 
 @api_router.delete("/expenses/{expense_id}")
-async def delete_expense(expense_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_expense(expense_id: str, current_user: dict = Depends(require_permission("delete_expenses"))):
     result = await db.expenses.delete_one({"id": expense_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
     return {"message": "Gasto eliminado"}
 
+# ==================== PAYMENT ROUTES ====================
+
+@api_router.put("/expenses/{expense_id}/pay")
+async def register_payment(expense_id: str, current_user: dict = Depends(require_permission("register_payments"))):
+    expense = await db.expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    
+    await db.expenses.update_one(
+        {"id": expense_id}, 
+        {"$set": {"estado": "pagado", "paid_at": datetime.now(timezone.utc).isoformat(), "paid_by": current_user["id"]}}
+    )
+    
+    updated = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
+    return ExpenseResponse(**updated)
+
 # ==================== DASHBOARD & ALERTS ====================
 
 @api_router.get("/dashboard/stats", response_model=DashboardStats)
-async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
+async def get_dashboard_stats(current_user: dict = Depends(require_permission("view_dashboard"))):
     expenses = await db.expenses.find({}, {"_id": 0}).to_list(10000)
     
     total_gastos = sum(e["monto"] for e in expenses)
@@ -386,7 +512,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     )
 
 @api_router.get("/dashboard/alerts/30", response_model=List[AlertResponse])
-async def get_alerts_30_days(current_user: dict = Depends(get_current_user)):
+async def get_alerts_30_days(current_user: dict = Depends(require_permission("view_due_payments"))):
     today = datetime.now(timezone.utc).date()
     expenses = await db.expenses.find({"estado": "pendiente"}, {"_id": 0}).to_list(10000)
     
@@ -411,7 +537,7 @@ async def get_alerts_30_days(current_user: dict = Depends(get_current_user)):
     return sorted(alerts, key=lambda x: x.dias_restantes)
 
 @api_router.get("/dashboard/alerts/60", response_model=List[AlertResponse])
-async def get_alerts_60_days(current_user: dict = Depends(get_current_user)):
+async def get_alerts_60_days(current_user: dict = Depends(require_permission("view_due_payments"))):
     today = datetime.now(timezone.utc).date()
     expenses = await db.expenses.find({"estado": "pendiente"}, {"_id": 0}).to_list(10000)
     
@@ -436,7 +562,7 @@ async def get_alerts_60_days(current_user: dict = Depends(get_current_user)):
     return sorted(alerts, key=lambda x: x.dias_restantes)
 
 @api_router.get("/dashboard/chart-data")
-async def get_chart_data(current_user: dict = Depends(get_current_user)):
+async def get_chart_data(current_user: dict = Depends(require_permission("view_dashboard"))):
     expenses = await db.expenses.find({}, {"_id": 0}).to_list(10000)
     
     # Group by month and category
@@ -484,6 +610,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def startup_event():
+    """Run seed on startup"""
+    await seed_default_users()
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
