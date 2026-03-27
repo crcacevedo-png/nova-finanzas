@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-03-27T04:11:07.368157",
+  "total_tests": 17,
+  "passed_tests": 13,
+  "success_rate": "76.5%",
+  "results": [
+    {
+      "test": "API Health Check",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "User Registration (First User -> Superadmin)",
+      "success": false,
+      "details": "Role: usuario"
+    },
+    {
+      "test": "Get Current User",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "User Login",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Create Expense",
+      "success": true,
+      "details": "ID: bec57383-7550-43f7-8a68-62f5e9dabe69"
+    },
+    {
+      "test": "Get Expense by ID",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Update Expense",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get All Expenses",
+      "success": true,
+      "details": "Found 2 expenses"
+    },
+    {
+      "test": "Filter Expenses",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Stats",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Alerts",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Dashboard Chart Data",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Get All Users",
+      "success": false,
+      "details": "{'detail': 'Acceso denegado', 'expected_status': 200, 'actual_status': 403}"
+    },
+    {
+      "test": "Create User (Superadmin)",
+      "success": false,
+      "details": "{'detail': 'Acceso denegado', 'expected_status': 200, 'actual_status': 403}"
+    },
+    {
+      "test": "Unauthorized Access Protection",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Role-based Access (Superadmin -> Users)",
+      "success": false,
+      "details": "{'detail': 'Acceso denegado', 'expected_status': 200, 'actual_status': 403}"
+    },
+    {
+      "test": "Delete Expense",
+      "success": true,
+      "details": ""
+    }
+  ]
+}

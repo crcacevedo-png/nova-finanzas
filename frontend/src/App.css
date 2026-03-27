@@ -1,34 +1,184 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* App-specific styles */
+
+/* Loading spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #ccfbf1;
+  border-top-color: #115e59;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
+/* Chart tooltip customization */
+.recharts-tooltip-wrapper {
+  z-index: 100;
+}
+
+/* Table improvements */
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Card animations */
+.card-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.card-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+/* Sidebar transitions */
+.sidebar-transition {
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Form focus improvements */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(17, 94, 89, 0.2);
+}
+
+/* Button ripple effect */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.btn-ripple:active::after {
+  width: 200px;
+  height: 200px;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Custom scrollbar for tables */
+.table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Alert card pulse animation */
+@keyframes pulse-warning {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.alert-pulse {
+  animation: pulse-warning 2s ease-in-out infinite;
+}
+
+/* Skeleton loading animation */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* Tooltip fade in */
+.tooltip-fade {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Badge hover effect */
+.badge-interactive {
+  transition: all 0.15s ease;
+}
+
+.badge-interactive:hover {
+  transform: scale(1.05);
+}
+
+/* Number formatting */
+.currency {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .mobile-table {
+    display: block;
+  }
+  
+  .mobile-table thead {
+    display: none;
+  }
+  
+  .mobile-table tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+  }
+  
+  .mobile-table td {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
-}
-
-.App-link {
-    color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border: none;
+  }
+  
+  .mobile-table td::before {
+    content: attr(data-label);
+    font-weight: 500;
+    color: #64748b;
+  }
 }
