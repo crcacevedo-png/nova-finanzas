@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -11,7 +11,7 @@ import { Toaster, toast } from 'sonner';
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/jssdpppr_logo%20nova%20transparente.png";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -20,14 +20,14 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!username || !password) {
       toast.error('Por favor completa todos los campos');
       return;
     }
 
     setLoading(true);
     try {
-      await login(email, password);
+      await login(username, password);
       toast.success('¡Bienvenido!');
       navigate('/dashboard');
     } catch (error) {
@@ -90,15 +90,15 @@ const Login = () => {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico</Label>
+                  <Label htmlFor="username">Usuario</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="username"
+                    type="text"
+                    placeholder="tu_usuario"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
                     className="h-11"
-                    data-testid="login-email-input"
+                    data-testid="login-username-input"
                   />
                 </div>
 
@@ -148,9 +148,9 @@ const Login = () => {
               <div className="mt-6 p-4 bg-slate-100 rounded-lg">
                 <p className="text-xs font-semibold text-slate-600 mb-2">Usuarios de prueba:</p>
                 <div className="space-y-1 text-xs text-slate-500">
-                  <p><span className="font-medium">SuperAdmin:</span> superadmin@novavision.gt / nova2024</p>
-                  <p><span className="font-medium">Admin:</span> admin@novavision.gt / admin2024</p>
-                  <p><span className="font-medium">Usuario:</span> usuario@novavision.gt / user2024</p>
+                  <p><span className="font-medium">SuperAdmin:</span> superadmin / nova2024</p>
+                  <p><span className="font-medium">Admin:</span> admin / admin2024</p>
+                  <p><span className="font-medium">Usuario:</span> usuario / user2024</p>
                 </div>
               </div>
             </CardContent>

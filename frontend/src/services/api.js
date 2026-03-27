@@ -18,15 +18,25 @@ axios.interceptors.request.use(
 export const expenseApi = {
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
-    if (filters.categoria) params.append('categoria', filters.categoria);
-    if (filters.estado) params.append('estado', filters.estado);
+    if (filters.type) params.append('type', filters.type);
+    if (filters.status) params.append('status', filters.status);
     return axios.get(`${API_URL}/expenses?${params.toString()}`);
   },
   getById: (id) => axios.get(`${API_URL}/expenses/${id}`),
   create: (data) => axios.post(`${API_URL}/expenses`, data),
   update: (id, data) => axios.put(`${API_URL}/expenses/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/expenses/${id}`),
-  markAsPaid: (id) => axios.put(`${API_URL}/expenses/${id}/pay`),
+  getPayments: (expenseId) => axios.get(`${API_URL}/expenses/${expenseId}/payments`),
+};
+
+// Payment API
+export const paymentApi = {
+  getAll: (expenseId = null) => {
+    const params = expenseId ? `?expense_id=${expenseId}` : '';
+    return axios.get(`${API_URL}/payments${params}`);
+  },
+  create: (data) => axios.post(`${API_URL}/payments`, data),
+  delete: (id) => axios.delete(`${API_URL}/payments/${id}`),
 };
 
 // User API
@@ -56,6 +66,7 @@ export const formatCurrency = (amount) => {
 
 // Format date helper
 export const formatDate = (dateString) => {
+  if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('es-GT', {
     year: 'numeric',
     month: 'short',
@@ -63,18 +74,29 @@ export const formatDate = (dateString) => {
   });
 };
 
-// Category labels
-export const categoryLabels = {
-  gastos_fijos: 'Gastos Fijos',
-  pagos_proveedores: 'Pagos Proveedores',
-  gastos_variables: 'Gastos Variables',
+// Type labels (categorías)
+export const typeLabels = {
+  fijo: 'Gasto Fijo',
+  proveedor: 'Pago Proveedor',
+  variable: 'Gasto Variable',
 };
 
 // Status labels
 export const statusLabels = {
-  pagado: 'Pagado',
   pendiente: 'Pendiente',
+  parcial: 'Parcial',
+  pagado: 'Pagado',
+  vencido: 'Vencido',
 };
+
+// Payment method labels
+export const paymentMethodLabels = [
+  'Efectivo',
+  'Transferencia bancaria',
+  'Tarjeta de crédito',
+  'Tarjeta de débito',
+  'Cheque'
+];
 
 // Role labels
 export const roleLabels = {

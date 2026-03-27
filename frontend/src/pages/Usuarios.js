@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { userApi, roleLabels } from '../services/api';
+import { userApi, roleLabels, formatDate } from '../services/api';
 import { 
   Plus, 
-  UserCog,
   Trash2,
   Shield,
   ShieldCheck,
@@ -44,8 +43,8 @@ import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 
 const initialFormState = {
+  username: '',
   name: '',
-  email: '',
   password: '',
   role: 'usuario'
 };
@@ -93,7 +92,7 @@ const Usuarios = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.username || !formData.name || !formData.password) {
       toast.error('Por favor completa todos los campos');
       return;
     }
@@ -212,8 +211,9 @@ const Usuarios = () => {
                   <TableHeader>
                     <TableRow className="bg-slate-50">
                       <TableHead className="font-semibold text-slate-600">Usuario</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Email</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Nombre de Usuario</TableHead>
                       <TableHead className="font-semibold text-slate-600">Rol</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Último Acceso</TableHead>
                       <TableHead className="font-semibold text-slate-600">Estado</TableHead>
                       <TableHead className="font-semibold text-slate-600 text-right">Acciones</TableHead>
                     </TableRow>
@@ -240,10 +240,13 @@ const Usuarios = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-slate-600">{user.email}</TableCell>
+                        <TableCell className="text-slate-600 font-mono text-sm">{user.username}</TableCell>
                         <TableCell>{getRoleBadge(user.role)}</TableCell>
+                        <TableCell className="text-slate-500 text-sm">
+                          {user.last_login ? formatDate(user.last_login) : 'Nunca'}
+                        </TableCell>
                         <TableCell>
-                          <Badge className={user.is_active ? 'badge-success' : 'badge-danger'}>
+                          <Badge className={user.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}>
                             {user.is_active ? 'Activo' : 'Inactivo'}
                           </Badge>
                         </TableCell>
@@ -307,15 +310,15 @@ const Usuarios = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico *</Label>
+                <Label htmlFor="username">Nombre de Usuario *</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="usuario@email.com"
-                  data-testid="user-email-input"
+                  id="username"
+                  value={formData.username}
+                  onChange={(e) => handleInputChange('username', e.target.value.toLowerCase().replace(/\s/g, ''))}
+                  placeholder="juanperez"
+                  data-testid="user-username-input"
                 />
+                <p className="text-xs text-slate-500">Solo letras minúsculas y números, sin espacios</p>
               </div>
 
               <div className="space-y-2">

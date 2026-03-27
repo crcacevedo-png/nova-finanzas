@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { dashboardApi, formatCurrency, formatDate, categoryLabels } from '../services/api';
+import { dashboardApi, formatCurrency, formatDate, typeLabels, statusLabels } from '../services/api';
 import { 
   Wallet, 
   Clock, 
@@ -9,7 +9,8 @@ import {
   TrendingUp,
   Building2,
   Repeat,
-  AlertCircle
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -67,25 +68,32 @@ const AlertCard = ({ title, alerts, color, icon: Icon }) => (
               data-testid={`alert-item-${alert.id}`}
             >
               <div className="flex items-center justify-between mb-1">
-                <p className="font-medium text-slate-900 text-sm">{alert.concepto}</p>
+                <p className="font-medium text-slate-900 text-sm">{alert.name}</p>
                 <Badge 
                   variant="outline" 
-                  className={color === 'amber' ? 'badge-warning' : 'badge-danger'}
+                  className={color === 'amber' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-rose-100 text-rose-700 border-rose-200'}
                 >
-                  {alert.dias_restantes} días
+                  {alert.days_remaining} días
                 </Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">
-                  Vence: {formatDate(alert.fecha_vencimiento)}
+                  Vence: {formatDate(alert.due_date)}
                 </span>
                 <span className={`font-semibold ${color === 'amber' ? 'text-amber-700' : 'text-rose-700'}`}>
-                  {formatCurrency(alert.monto)}
+                  {formatCurrency(alert.remaining_amount)}
                 </span>
               </div>
-              {alert.proveedor && (
-                <p className="text-xs text-slate-400 mt-1">{alert.proveedor}</p>
-              )}
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className="text-xs bg-slate-100 text-slate-600 border-slate-200">
+                  {typeLabels[alert.type]}
+                </Badge>
+                {alert.status === 'parcial' && (
+                  <Badge className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    Pago parcial
+                  </Badge>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -126,9 +134,9 @@ const Dashboard = () => {
   };
 
   const pieData = stats ? [
-    { name: 'Gastos Fijos', value: stats.total_gastos_fijos },
-    { name: 'Pagos Proveedores', value: stats.total_pagos_proveedores },
-    { name: 'Gastos Variables', value: stats.total_gastos_variables }
+    { name: 'Gastos Fijos', value: stats.total_fijos },
+    { name: 'Pagos Proveedores', value: stats.total_proveedores },
+    { name: 'Gastos Variables', value: stats.total_variables }
   ].filter(d => d.value > 0) : [];
 
   if (loading) {
@@ -155,7 +163,7 @@ const Dashboard = () => {
           <p className="text-slate-500 text-sm">Resumen financiero de la clínica</p>
         </div>
 
-        {/* Stats Grid */}
+        {/* Main Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Gastos"
@@ -169,7 +177,7 @@ const Dashboard = () => {
             value={formatCurrency(stats?.gastos_pendientes || 0)}
             icon={Clock}
             color="bg-amber-500"
-            subtitle={`${(stats?.alertas_30_dias || 0) + (stats?.alertas_60_dias || 0)} por vencer`}
+            subtitle={`${stats?.alertas_30_dias || 0} por vencer (30d)`}
           />
           <StatCard
             title="Gastos Pagados"
@@ -183,8 +191,56 @@ const Dashboard = () => {
             value={`${(stats?.alertas_30_dias || 0) + (stats?.alertas_60_dias || 0)}`}
             icon={AlertTriangle}
             color="bg-rose-500"
-            subtitle={`${stats?.alertas_30_dias || 0} urgentes`}
+            subtitle={`${stats?.gastos_vencidos || 0} vencidos`}
           />
+        </div>
+
+        {/* Status Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border border-slate-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-100">
+                <Clock className="w-4 h-4 text-amber-700" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Pendientes</p>
+                <p className="font-semibold text-slate-900">{formatCurrency(stats?.gastos_pendientes || 0)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-100">
+                <TrendingUp className="w-4 h-4 text-blue-700" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Parciales</p>
+                <p className="font-semibold text-slate-900">{formatCurrency(stats?.gastos_parciales || 0)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-100">
+                <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Pagados</p>
+                <p className="font-semibold text-slate-900">{formatCurrency(stats?.gastos_pagados || 0)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border border-slate-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-rose-100">
+                <XCircle className="w-4 h-4 text-rose-700" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Vencidos</p>
+                <p className="font-semibold text-slate-900">{formatCurrency(stats?.gastos_vencidos || 0)}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Category Stats */}
@@ -197,7 +253,7 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-slate-500">Gastos Fijos</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {formatCurrency(stats?.total_gastos_fijos || 0)}
+                  {formatCurrency(stats?.total_fijos || 0)}
                 </p>
               </div>
             </CardContent>
@@ -210,7 +266,7 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-slate-500">Pagos Proveedores</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {formatCurrency(stats?.total_pagos_proveedores || 0)}
+                  {formatCurrency(stats?.total_proveedores || 0)}
                 </p>
               </div>
             </CardContent>
@@ -223,7 +279,7 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-slate-500">Gastos Variables</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {formatCurrency(stats?.total_gastos_variables || 0)}
+                  {formatCurrency(stats?.total_variables || 0)}
                 </p>
               </div>
             </CardContent>
@@ -271,9 +327,9 @@ const Dashboard = () => {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="gastos_fijos" name="Gastos Fijos" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="pagos_proveedores" name="Proveedores" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="gastos_variables" name="Variables" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="fijo" name="Gastos Fijos" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="proveedor" name="Proveedores" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="variable" name="Variables" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -288,7 +344,7 @@ const Dashboard = () => {
           <Card className="border border-slate-200">
             <CardHeader>
               <CardTitle className="text-lg font-semibold font-['Outfit']">
-                Distribución por Categoría
+                Distribución por Tipo
               </CardTitle>
             </CardHeader>
             <CardContent>

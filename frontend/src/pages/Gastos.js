@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { expenseApi, formatCurrency, formatDate, categoryLabels, statusLabels } from '../services/api';
+import { expenseApi, paymentApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels } from '../services/api';
 import { 
   Plus, 
   Search, 
   Pencil,
   Trash2,
-  CheckCircle2
+  DollarSign,
+  Eye,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import {
   Dialog,
@@ -39,40 +41,61 @@ import {
 } from '../components/ui/table';
 import { Textarea } from '../components/ui/textarea';
 import { Skeleton } from '../components/ui/skeleton';
+import { Progress } from '../components/ui/progress';
 import { toast, Toaster } from 'sonner';
 
-const initialFormState = {
-  concepto: '',
-  monto: '',
-  fecha: new Date().toISOString().split('T')[0],
-  categoria: 'gastos_fijos',
-  estado: 'pendiente',
-  fecha_vencimiento: '',
-  proveedor: '',
-  notas: ''
+const initialExpenseForm = {
+  name: '',
+  type: 'fijo',
+  amount: '',
+  date: new Date().toISOString().split('T')[0],
+  due_date: '',
+  invoice_number: '',
+  notes: ''
+};
+
+const initialPaymentForm = {
+  amount: '',
+  date: new Date().toISOString().split('T')[0],
+  method: 'Efectivo',
+  reference: '',
+  notes: ''
 };
 
 const Gastos = () => {
-  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments } = useAuth();
+  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments, canDeletePayments } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Dialogs
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  
+  // Selected items
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
-  const [formData, setFormData] = useState(initialFormState);
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [expensePayments, setExpensePayments] = useState([]);
+  
+  // Forms
+  const [expenseForm, setExpenseForm] = useState(initialExpenseForm);
+  const [paymentForm, setPaymentForm] = useState(initialPaymentForm);
+  
+  // Filters
+  const [filters, setFilters] = useState({ type: '', status: '', search: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [filters, setFilters] = useState({ categoria: '', estado: '', search: '' });
 
   useEffect(() => {
     fetchExpenses();
-  }, [filters.categoria, filters.estado]);
+  }, [filters.type, filters.status]);
 
   const fetchExpenses = async () => {
     try {
       const response = await expenseApi.getAll({
-        categoria: filters.categoria || undefined,
-        estado: filters.estado || undefined
+        type: filters.type || undefined,
+        status: filters.status || undefined
       });
       setExpenses(response.data);
     } catch (error) {
@@ -86,46 +109,42 @@ const Gastos = () => {
   const filteredExpenses = expenses.filter(expense => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      return expense.concepto.toLowerCase().includes(searchLower) ||
-             expense.proveedor?.toLowerCase().includes(searchLower);
+      return expense.name.toLowerCase().includes(searchLower) ||
+             expense.invoice_number?.toLowerCase().includes(searchLower);
     }
     return true;
   });
 
-  const handleOpenDialog = (expense = null) => {
+  // Expense handlers
+  const handleOpenExpenseDialog = (expense = null) => {
     if (expense) {
       setEditingExpense(expense);
-      setFormData({
-        concepto: expense.concepto,
-        monto: expense.monto.toString(),
-        fecha: expense.fecha.split('T')[0],
-        categoria: expense.categoria,
-        estado: expense.estado,
-        fecha_vencimiento: expense.fecha_vencimiento?.split('T')[0] || '',
-        proveedor: expense.proveedor || '',
-        notas: expense.notas || ''
+      setExpenseForm({
+        name: expense.name,
+        type: expense.type,
+        amount: expense.amount.toString(),
+        date: expense.date.split('T')[0],
+        due_date: expense.due_date?.split('T')[0] || '',
+        invoice_number: expense.invoice_number || '',
+        notes: expense.notes || ''
       });
     } else {
       setEditingExpense(null);
-      setFormData(initialFormState);
+      setExpenseForm(initialExpenseForm);
     }
-    setDialogOpen(true);
+    setExpenseDialogOpen(true);
   };
 
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
+  const handleCloseExpenseDialog = () => {
+    setExpenseDialogOpen(false);
     setEditingExpense(null);
-    setFormData(initialFormState);
+    setExpenseForm(initialExpenseForm);
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async (e) => {
+  const handleExpenseSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.concepto || !formData.monto || !formData.fecha) {
+    if (!expenseForm.name || !expenseForm.amount || !expenseForm.date) {
       toast.error('Por favor completa los campos requeridos');
       return;
     }
@@ -133,9 +152,10 @@ const Gastos = () => {
     setSubmitting(true);
     try {
       const data = {
-        ...formData,
-        monto: parseFloat(formData.monto),
-        fecha_vencimiento: formData.fecha_vencimiento || null
+        ...expenseForm,
+        amount: parseFloat(expenseForm.amount),
+        due_date: expenseForm.due_date || null,
+        invoice_number: expenseForm.invoice_number || null
       };
 
       if (editingExpense) {
@@ -146,7 +166,7 @@ const Gastos = () => {
         toast.success('Gasto registrado correctamente');
       }
 
-      handleCloseDialog();
+      handleCloseExpenseDialog();
       fetchExpenses();
     } catch (error) {
       console.error('Error saving expense:', error);
@@ -179,32 +199,108 @@ const Gastos = () => {
     }
   };
 
-  const handleMarkAsPaid = async (expense) => {
+  // Payment handlers
+  const handleOpenPaymentDialog = (expense) => {
+    setSelectedExpense(expense);
+    setPaymentForm({
+      ...initialPaymentForm,
+      amount: expense.remaining_amount.toString()
+    });
+    setPaymentDialogOpen(true);
+  };
+
+  const handleClosePaymentDialog = () => {
+    setPaymentDialogOpen(false);
+    setSelectedExpense(null);
+    setPaymentForm(initialPaymentForm);
+  };
+
+  const handlePaymentSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!paymentForm.amount || !paymentForm.date || !paymentForm.method) {
+      toast.error('Por favor completa los campos requeridos');
+      return;
+    }
+
+    const amount = parseFloat(paymentForm.amount);
+    if (amount > selectedExpense.remaining_amount) {
+      toast.error(`El monto no puede exceder Q${selectedExpense.remaining_amount.toFixed(2)}`);
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await expenseApi.markAsPaid(expense.id);
+      await paymentApi.create({
+        expense_id: selectedExpense.id,
+        amount: amount,
+        date: paymentForm.date,
+        method: paymentForm.method,
+        reference: paymentForm.reference || null,
+        notes: paymentForm.notes || ''
+      });
+      
       toast.success('Pago registrado correctamente');
+      handleClosePaymentDialog();
       fetchExpenses();
     } catch (error) {
-      console.error('Error marking as paid:', error);
+      console.error('Error creating payment:', error);
       const message = error.response?.data?.detail || 'Error al registrar el pago';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Detail view handlers
+  const handleViewDetails = async (expense) => {
+    setSelectedExpense(expense);
+    try {
+      const response = await expenseApi.getPayments(expense.id);
+      setExpensePayments(response.data);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      setExpensePayments([]);
+    }
+    setDetailDialogOpen(true);
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    try {
+      await paymentApi.delete(paymentId);
+      toast.success('Pago eliminado');
+      // Refresh payments and expenses
+      const response = await expenseApi.getPayments(selectedExpense.id);
+      setExpensePayments(response.data);
+      fetchExpenses();
+    } catch (error) {
+      const message = error.response?.data?.detail || 'Error al eliminar el pago';
       toast.error(message);
     }
   };
 
-  const getStatusBadge = (estado) => {
-    if (estado === 'pagado') {
-      return <Badge className="badge-success">{statusLabels[estado]}</Badge>;
-    }
-    return <Badge className="badge-warning">{statusLabels[estado]}</Badge>;
+  const getStatusBadge = (status) => {
+    const colors = {
+      pendiente: 'bg-amber-50 text-amber-700 border border-amber-200',
+      parcial: 'bg-blue-50 text-blue-700 border border-blue-200',
+      pagado: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      vencido: 'bg-rose-50 text-rose-700 border border-rose-200'
+    };
+    return <Badge className={colors[status]}>{statusLabels[status]}</Badge>;
   };
 
-  const getCategoryBadge = (categoria) => {
+  const getTypeBadge = (type) => {
     const colors = {
-      gastos_fijos: 'badge-info',
-      pagos_proveedores: 'bg-cyan-50 text-cyan-700 border border-cyan-200',
-      gastos_variables: 'bg-amber-50 text-amber-700 border border-amber-200'
+      fijo: 'bg-teal-50 text-teal-700 border border-teal-200',
+      proveedor: 'bg-cyan-50 text-cyan-700 border border-cyan-200',
+      variable: 'bg-amber-50 text-amber-700 border border-amber-200'
     };
-    return <Badge className={colors[categoria]}>{categoryLabels[categoria]}</Badge>;
+    return <Badge className={colors[type]}>{typeLabels[type]}</Badge>;
+  };
+
+  const getPaymentProgress = (expense) => {
+    const progress = (expense.paid_amount / expense.amount) * 100;
+    return Math.min(progress, 100);
   };
 
   return (
@@ -219,7 +315,7 @@ const Gastos = () => {
           </div>
           {canCreateExpenses() && (
             <Button 
-              onClick={() => handleOpenDialog()}
+              onClick={() => handleOpenExpenseDialog()}
               className="bg-teal-800 hover:bg-teal-900 text-white"
               data-testid="add-expense-button"
             >
@@ -236,7 +332,7 @@ const Gastos = () => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar por concepto o proveedor..."
+                  placeholder="Buscar por nombre o factura..."
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                   className="pl-10"
@@ -244,22 +340,22 @@ const Gastos = () => {
                 />
               </div>
               <Select
-                value={filters.categoria || "all"}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, categoria: value === "all" ? "" : value }))}
+                value={filters.type || "all"}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, type: value === "all" ? "" : value }))}
               >
-                <SelectTrigger className="w-full md:w-[200px]" data-testid="category-filter">
-                  <SelectValue placeholder="Categoría" />
+                <SelectTrigger className="w-full md:w-[180px]" data-testid="type-filter">
+                  <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  <SelectItem value="gastos_fijos">Gastos Fijos</SelectItem>
-                  <SelectItem value="pagos_proveedores">Pagos Proveedores</SelectItem>
-                  <SelectItem value="gastos_variables">Gastos Variables</SelectItem>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="fijo">Gasto Fijo</SelectItem>
+                  <SelectItem value="proveedor">Pago Proveedor</SelectItem>
+                  <SelectItem value="variable">Gasto Variable</SelectItem>
                 </SelectContent>
               </Select>
               <Select
-                value={filters.estado || "all"}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, estado: value === "all" ? "" : value }))}
+                value={filters.status || "all"}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === "all" ? "" : value }))}
               >
                 <SelectTrigger className="w-full md:w-[180px]" data-testid="status-filter">
                   <SelectValue placeholder="Estado" />
@@ -267,7 +363,9 @@ const Gastos = () => {
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="parcial">Parcial</SelectItem>
                   <SelectItem value="pagado">Pagado</SelectItem>
+                  <SelectItem value="vencido">Vencido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -292,10 +390,10 @@ const Gastos = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-50">
-                      <TableHead className="font-semibold text-slate-600">Concepto</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Nombre</TableHead>
                       <TableHead className="font-semibold text-slate-600">Monto</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Fecha</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Categoría</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Progreso</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
                       <TableHead className="font-semibold text-slate-600">Estado</TableHead>
                       <TableHead className="font-semibold text-slate-600">Vencimiento</TableHead>
                       <TableHead className="font-semibold text-slate-600 text-right">Acciones</TableHead>
@@ -310,43 +408,64 @@ const Gastos = () => {
                       >
                         <TableCell>
                           <div>
-                            <p className="font-medium text-slate-900">{expense.concepto}</p>
-                            {expense.proveedor && (
-                              <p className="text-xs text-slate-500">{expense.proveedor}</p>
+                            <p className="font-medium text-slate-900">{expense.name}</p>
+                            {expense.invoice_number && (
+                              <p className="text-xs text-slate-500">Factura: {expense.invoice_number}</p>
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-semibold text-slate-900">
-                          {formatCurrency(expense.monto)}
+                        <TableCell>
+                          <div>
+                            <p className="font-semibold text-slate-900">{formatCurrency(expense.amount)}</p>
+                            {expense.paid_amount > 0 && (
+                              <p className="text-xs text-slate-500">
+                                Pagado: {formatCurrency(expense.paid_amount)}
+                              </p>
+                            )}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-slate-600">
-                          {formatDate(expense.fecha)}
+                        <TableCell>
+                          <div className="w-24">
+                            <Progress value={getPaymentProgress(expense)} className="h-2" />
+                            <p className="text-xs text-slate-500 mt-1">
+                              {Math.round(getPaymentProgress(expense))}%
+                            </p>
+                          </div>
                         </TableCell>
-                        <TableCell>{getCategoryBadge(expense.categoria)}</TableCell>
-                        <TableCell>{getStatusBadge(expense.estado)}</TableCell>
+                        <TableCell>{getTypeBadge(expense.type)}</TableCell>
+                        <TableCell>{getStatusBadge(expense.status)}</TableCell>
                         <TableCell className="text-slate-600">
-                          {expense.fecha_vencimiento ? formatDate(expense.fecha_vencimiento) : '-'}
+                          {expense.due_date ? formatDate(expense.due_date) : '-'}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {/* Mark as Paid button - only for pending expenses */}
-                            {canRegisterPayments() && expense.estado === 'pendiente' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewDetails(expense)}
+                              className="h-8 w-8 p-0 hover:bg-slate-100"
+                              title="Ver detalles"
+                              data-testid={`view-expense-${expense.id}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {canRegisterPayments() && expense.status !== 'pagado' && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleMarkAsPaid(expense)}
+                                onClick={() => handleOpenPaymentDialog(expense)}
                                 className="h-8 w-8 p-0 hover:bg-emerald-50 hover:text-emerald-700"
-                                title="Marcar como pagado"
+                                title="Registrar pago"
                                 data-testid={`pay-expense-${expense.id}`}
                               >
-                                <CheckCircle2 className="w-4 h-4" />
+                                <DollarSign className="w-4 h-4" />
                               </Button>
                             )}
                             {canEditExpenses() && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleOpenDialog(expense)}
+                                onClick={() => handleOpenExpenseDialog(expense)}
                                 className="h-8 w-8 p-0 hover:bg-teal-50 hover:text-teal-700"
                                 data-testid={`edit-expense-${expense.id}`}
                               >
@@ -375,8 +494,8 @@ const Gastos = () => {
           </CardContent>
         </Card>
 
-        {/* Create/Edit Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {/* Create/Edit Expense Dialog */}
+        <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="font-['Outfit']">
@@ -388,73 +507,45 @@ const Gastos = () => {
                   : 'Completa los datos para registrar un nuevo gasto'}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleExpenseSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="concepto">Concepto *</Label>
+                <Label htmlFor="name">Nombre del Gasto *</Label>
                 <Input
-                  id="concepto"
-                  value={formData.concepto}
-                  onChange={(e) => handleInputChange('concepto', e.target.value)}
-                  placeholder="Descripción del gasto"
-                  data-testid="expense-concepto-input"
+                  id="name"
+                  value={expenseForm.name}
+                  onChange={(e) => setExpenseForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ej: Alquiler oficina, Lentes oftálmicos..."
+                  data-testid="expense-name-input"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="monto">Monto (GTQ) *</Label>
+                  <Label htmlFor="amount">Monto (GTQ) *</Label>
                   <Input
-                    id="monto"
+                    id="amount"
                     type="number"
                     step="0.01"
                     min="0"
-                    value={formData.monto}
-                    onChange={(e) => handleInputChange('monto', e.target.value)}
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
                     placeholder="0.00"
-                    data-testid="expense-monto-input"
+                    data-testid="expense-amount-input"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="fecha">Fecha *</Label>
-                  <Input
-                    id="fecha"
-                    type="date"
-                    value={formData.fecha}
-                    onChange={(e) => handleInputChange('fecha', e.target.value)}
-                    data-testid="expense-fecha-input"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoría *</Label>
+                  <Label htmlFor="type">Tipo *</Label>
                   <Select
-                    value={formData.categoria}
-                    onValueChange={(value) => handleInputChange('categoria', value)}
+                    value={expenseForm.type}
+                    onValueChange={(value) => setExpenseForm(prev => ({ ...prev, type: value }))}
                   >
-                    <SelectTrigger data-testid="expense-categoria-select">
+                    <SelectTrigger data-testid="expense-type-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="gastos_fijos">Gastos Fijos</SelectItem>
-                      <SelectItem value="pagos_proveedores">Pagos Proveedores</SelectItem>
-                      <SelectItem value="gastos_variables">Gastos Variables</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="estado">Estado *</Label>
-                  <Select
-                    value={formData.estado}
-                    onValueChange={(value) => handleInputChange('estado', value)}
-                  >
-                    <SelectTrigger data-testid="expense-estado-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pendiente">Pendiente</SelectItem>
-                      <SelectItem value="pagado">Pagado</SelectItem>
+                      <SelectItem value="fijo">Gasto Fijo</SelectItem>
+                      <SelectItem value="proveedor">Pago Proveedor</SelectItem>
+                      <SelectItem value="variable">Gasto Variable</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -462,58 +553,235 @@ const Gastos = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fecha_vencimiento">Fecha Vencimiento</Label>
+                  <Label htmlFor="date">Fecha Registro *</Label>
                   <Input
-                    id="fecha_vencimiento"
+                    id="date"
                     type="date"
-                    value={formData.fecha_vencimiento}
-                    onChange={(e) => handleInputChange('fecha_vencimiento', e.target.value)}
-                    data-testid="expense-vencimiento-input"
+                    value={expenseForm.date}
+                    onChange={(e) => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
+                    data-testid="expense-date-input"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="proveedor">Proveedor</Label>
+                  <Label htmlFor="due_date">Fecha Vencimiento</Label>
                   <Input
-                    id="proveedor"
-                    value={formData.proveedor}
-                    onChange={(e) => handleInputChange('proveedor', e.target.value)}
-                    placeholder="Nombre del proveedor"
-                    data-testid="expense-proveedor-input"
+                    id="due_date"
+                    type="date"
+                    value={expenseForm.due_date}
+                    onChange={(e) => setExpenseForm(prev => ({ ...prev, due_date: e.target.value }))}
+                    data-testid="expense-duedate-input"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notas">Notas</Label>
+                <Label htmlFor="invoice_number">Número de Factura</Label>
+                <Input
+                  id="invoice_number"
+                  value={expenseForm.invoice_number}
+                  onChange={(e) => setExpenseForm(prev => ({ ...prev, invoice_number: e.target.value }))}
+                  placeholder="Ej: FAC-001234"
+                  data-testid="expense-invoice-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notas</Label>
                 <Textarea
-                  id="notas"
-                  value={formData.notas}
-                  onChange={(e) => handleInputChange('notas', e.target.value)}
+                  id="notes"
+                  value={expenseForm.notes}
+                  onChange={(e) => setExpenseForm(prev => ({ ...prev, notes: e.target.value }))}
                   placeholder="Notas adicionales..."
                   rows={3}
-                  data-testid="expense-notas-input"
+                  data-testid="expense-notes-input"
                 />
               </div>
 
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCloseDialog}
-                  disabled={submitting}
-                >
+                <Button type="button" variant="outline" onClick={handleCloseExpenseDialog} disabled={submitting}>
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  className="bg-teal-800 hover:bg-teal-900 text-white"
-                  disabled={submitting}
-                  data-testid="expense-submit-button"
-                >
+                <Button type="submit" className="bg-teal-800 hover:bg-teal-900 text-white" disabled={submitting} data-testid="expense-submit-button">
                   {submitting ? 'Guardando...' : editingExpense ? 'Actualizar' : 'Registrar'}
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Payment Dialog */}
+        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit']">Registrar Pago</DialogTitle>
+              <DialogDescription>
+                {selectedExpense && (
+                  <div className="mt-2 p-3 bg-slate-50 rounded-lg">
+                    <p className="font-medium text-slate-900">{selectedExpense.name}</p>
+                    <p className="text-sm">Total: {formatCurrency(selectedExpense.amount)}</p>
+                    <p className="text-sm text-emerald-600">Pagado: {formatCurrency(selectedExpense.paid_amount)}</p>
+                    <p className="text-sm text-amber-600 font-medium">Pendiente: {formatCurrency(selectedExpense.remaining_amount)}</p>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handlePaymentSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="payment_amount">Monto a Pagar *</Label>
+                  <Input
+                    id="payment_amount"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    max={selectedExpense?.remaining_amount}
+                    value={paymentForm.amount}
+                    onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
+                    data-testid="payment-amount-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payment_date">Fecha *</Label>
+                  <Input
+                    id="payment_date"
+                    type="date"
+                    value={paymentForm.date}
+                    onChange={(e) => setPaymentForm(prev => ({ ...prev, date: e.target.value }))}
+                    data-testid="payment-date-input"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_method">Método de Pago *</Label>
+                <Select
+                  value={paymentForm.method}
+                  onValueChange={(value) => setPaymentForm(prev => ({ ...prev, method: value }))}
+                >
+                  <SelectTrigger data-testid="payment-method-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethodLabels.map(method => (
+                      <SelectItem key={method} value={method}>{method}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_reference">Referencia / Comprobante</Label>
+                <Input
+                  id="payment_reference"
+                  value={paymentForm.reference}
+                  onChange={(e) => setPaymentForm(prev => ({ ...prev, reference: e.target.value }))}
+                  placeholder="Número de transacción, cheque, etc."
+                  data-testid="payment-reference-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_notes">Notas</Label>
+                <Textarea
+                  id="payment_notes"
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Notas adicionales..."
+                  rows={2}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleClosePaymentDialog} disabled={submitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={submitting} data-testid="payment-submit-button">
+                  {submitting ? 'Registrando...' : 'Registrar Pago'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Detail Dialog */}
+        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit']">Detalle del Gasto</DialogTitle>
+            </DialogHeader>
+            {selectedExpense && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-slate-500">Nombre</p>
+                    <p className="font-medium">{selectedExpense.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Tipo</p>
+                    {getTypeBadge(selectedExpense.type)}
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Monto Total</p>
+                    <p className="font-semibold text-lg">{formatCurrency(selectedExpense.amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Estado</p>
+                    {getStatusBadge(selectedExpense.status)}
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Pagado</p>
+                    <p className="font-medium text-emerald-600">{formatCurrency(selectedExpense.paid_amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Pendiente</p>
+                    <p className="font-medium text-amber-600">{formatCurrency(selectedExpense.remaining_amount)}</p>
+                  </div>
+                  {selectedExpense.invoice_number && (
+                    <div>
+                      <p className="text-sm text-slate-500">Factura</p>
+                      <p className="font-medium">{selectedExpense.invoice_number}</p>
+                    </div>
+                  )}
+                  {selectedExpense.due_date && (
+                    <div>
+                      <p className="text-sm text-slate-500">Vencimiento</p>
+                      <p className="font-medium">{formatDate(selectedExpense.due_date)}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="font-semibold mb-3">Historial de Pagos</h4>
+                  {expensePayments.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">No hay pagos registrados</p>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {expensePayments.map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div>
+                            <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                            <p className="text-xs text-slate-500">
+                              {formatDate(payment.date)} • {payment.method}
+                              {payment.reference && ` • Ref: ${payment.reference}`}
+                            </p>
+                          </div>
+                          {canDeletePayments() && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeletePayment(payment.id)}
+                              className="h-8 w-8 p-0 hover:bg-rose-50 hover:text-rose-700"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
@@ -523,22 +791,15 @@ const Gastos = () => {
             <DialogHeader>
               <DialogTitle className="font-['Outfit']">Eliminar Gasto</DialogTitle>
               <DialogDescription>
-                ¿Estás seguro de que deseas eliminar el gasto "{expenseToDelete?.concepto}"? 
-                Esta acción no se puede deshacer.
+                ¿Estás seguro de que deseas eliminar el gasto "{expenseToDelete?.name}"? 
+                Esta acción eliminará también todos los pagos asociados y no se puede deshacer.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setDeleteDialogOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button
-                variant="destructive"
-                onClick={handleConfirmDelete}
-                data-testid="confirm-delete-button"
-              >
+              <Button variant="destructive" onClick={handleConfirmDelete} data-testid="confirm-delete-button">
                 Eliminar
               </Button>
             </DialogFooter>

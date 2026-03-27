@@ -33,21 +33,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
-    const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-    const { access_token, user: userData } = response.data;
-    
-    localStorage.setItem('token', access_token);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-    setToken(access_token);
-    setUser(userData);
-    setPermissions(userData.permissions || {});
-    
-    return userData;
-  };
-
-  const register = async (name, email, password, role = 'usuario') => {
-    const response = await axios.post(`${API_URL}/auth/register`, { name, email, password, role });
+  const login = async (username, password) => {
+    const response = await axios.post(`${API_URL}/auth/login`, { username, password });
     const { access_token, user: userData } = response.data;
     
     localStorage.setItem('token', access_token);
@@ -81,6 +68,7 @@ export const AuthProvider = ({ children }) => {
   const canEditExpenses = () => hasPermission('edit_expenses');
   const canDeleteExpenses = () => hasPermission('delete_expenses');
   const canRegisterPayments = () => hasPermission('register_payments');
+  const canDeletePayments = () => hasPermission('delete_payments');
   const canManageUsers = () => hasPermission('manage_users');
   const canViewUserManagement = () => hasPermission('view_user_management');
   const canExportReports = () => hasPermission('export_reports');
@@ -92,7 +80,6 @@ export const AuthProvider = ({ children }) => {
       loading,
       permissions,
       login,
-      register,
       logout,
       hasRole,
       hasPermission,
@@ -100,6 +87,7 @@ export const AuthProvider = ({ children }) => {
       canEditExpenses,
       canDeleteExpenses,
       canRegisterPayments,
+      canDeletePayments,
       canManageUsers,
       canViewUserManagement,
       canExportReports,
