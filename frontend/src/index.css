@@ -12,24 +12,24 @@
         --card-foreground: 222 47% 11%;
         --popover: 0 0% 100%;
         --popover-foreground: 222 47% 11%;
-        --primary: 173 58% 28%;
+        --primary: 262 83% 58%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 173 41% 92%;
-        --secondary-foreground: 173 58% 20%;
+        --secondary: 262 30% 96%;
+        --secondary-foreground: 262 83% 40%;
         --muted: 210 40% 96%;
         --muted-foreground: 215 16% 47%;
-        --accent: 173 41% 92%;
-        --accent-foreground: 173 58% 20%;
+        --accent: 262 30% 96%;
+        --accent-foreground: 262 83% 40%;
         --destructive: 0 84% 60%;
         --destructive-foreground: 0 0% 100%;
         --border: 214 32% 91%;
         --input: 214 32% 91%;
-        --ring: 173 58% 28%;
-        --chart-1: 173 58% 28%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 173 68% 75%;
+        --ring: 262 83% 58%;
+        --chart-1: 262 83% 58%;
+        --chart-2: 262 70% 70%;
+        --chart-3: 142 76% 36%;
         --chart-4: 38 92% 50%;
-        --chart-5: 160 84% 39%;
+        --chart-5: 0 84% 60%;
         --radius: 0.5rem;
     }
 }
@@ -64,6 +64,15 @@
 
 ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+/* Dark sidebar scrollbar */
+.sidebar-dark::-webkit-scrollbar-track {
+    background: #1e1e2e;
+}
+
+.sidebar-dark::-webkit-scrollbar-thumb {
+    background: #4a4a5e;
 }
 
 /* Animations */
@@ -104,21 +113,6 @@
     background-color: #f8fafc;
 }
 
-/* Focus states */
-.focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2;
-}
-
-/* Button transitions */
-.btn-transition {
-    @apply transition-all duration-200 ease-in-out;
-}
-
-/* Sidebar active state */
-.sidebar-item-active {
-    @apply bg-teal-50 text-teal-800 border-r-2 border-teal-600;
-}
-
 /* Badge variants */
 .badge-success {
     @apply bg-emerald-50 text-emerald-700 border border-emerald-200;
@@ -133,5 +127,52 @@
 }
 
 .badge-info {
-    @apply bg-teal-50 text-teal-700 border border-teal-200;
+    @apply bg-blue-50 text-blue-700 border border-blue-200;
+}
+
+.badge-purple {
+    @apply bg-purple-50 text-purple-700 border border-purple-200;
+}
+
+/* Gradient backgrounds */
+.gradient-purple {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.gradient-green {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.gradient-orange {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.gradient-red {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Alert card borders */
+.alert-border-red {
+    border-top: 4px solid #ef4444;
+}
+
+.alert-border-amber {
+    border-top: 4px solid #f59e0b;
+}
+
+.alert-border-blue {
+    border-top: 4px solid #3b82f6;
+}
+
+/* Left border alerts */
+.alert-left-red {
+    border-left: 4px solid #ef4444;
+}
+
+.alert-left-amber {
+    border-left: 4px solid #f59e0b;
+}
+
+.alert-left-blue {
+    border-left: 4px solid #3b82f6;
 }

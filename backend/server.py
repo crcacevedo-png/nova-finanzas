@@ -192,12 +192,14 @@ class PaymentResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     expense_id: str
+    expense_name: Optional[str] = None
     amount: float
     date: str
     method: str
     reference: Optional[str] = None
     notes: Optional[str] = ""
     created_by: str
+    created_by_name: Optional[str] = None
     created_at: str
 
 class PaymentListResponse(BaseModel):
@@ -700,9 +702,22 @@ async def get_payments(
     
     payments = await db.payments.find(query, {"_id": 0}).sort("date", -1).to_list(10000)
     
+    # Enrich payments with expense name and user name
+    enriched_payments = []
+    for payment in payments:
+        # Get expense name
+        expense = await db.expenses.find_one({"id": payment["expense_id"]}, {"_id": 0, "name": 1})
+        payment["expense_name"] = expense["name"] if expense else "N/A"
+        
+        # Get user name
+        user = await db.users.find_one({"id": payment["created_by"]}, {"_id": 0, "name": 1})
+        payment["created_by_name"] = user["name"] if user else "N/A"
+        
+        enriched_payments.append(PaymentResponse(**payment))
+    
     return PaymentListResponse(
-        data=[PaymentResponse(**p) for p in payments],
-        total=len(payments)
+        data=enriched_payments,
+        total=len(enriched_payments)
     )
 
 @api_router.get("/payments/{payment_id}", response_model=PaymentResponse)

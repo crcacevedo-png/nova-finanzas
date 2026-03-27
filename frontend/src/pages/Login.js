@@ -39,123 +39,97 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 p-4">
       <Toaster position="top-right" richColors />
       
-      {/* Left side - Image */}
-      <div 
-        className="hidden lg:flex lg:w-1/2 bg-cover bg-center relative"
-        style={{ 
-          backgroundImage: `url('https://images.unsplash.com/photo-1772557526164-db6af0e8c4eb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGxpZ2h0JTIwdGVhbCUyMHNvZnQlMjBnZW9tZXRyaWMlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3NDU4NDE3Nnww&ixlib=rb-4.1.0&q=85')` 
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-900/80 to-teal-700/70" />
-        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
-          <img 
-            src={LOGO_URL} 
-            alt="NovaVision Logo" 
-            className="w-[580px] mb-8 drop-shadow-lg"
-          />
-          <h1 className="text-4xl font-bold mb-4 font-['Outfit']">
-            Sistema de Gastos y Finanzas
-          </h1>
-          <p className="text-lg text-teal-100 max-w-md">
-            Gestiona los gastos de tu clínica oftalmológica de manera eficiente y profesional.
-          </p>
-        </div>
-      </div>
-
-      {/* Right side - Login form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center mb-8">
-            <img 
-              src={LOGO_URL} 
-              alt="NovaVision Logo" 
-              className="w-[450px] mb-2"
-            />
-            <p className="text-sm text-slate-500">Sistema de Gastos y Finanzas</p>
-          </div>
-
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="space-y-1 pb-6">
-              <CardTitle className="text-2xl font-bold text-center font-['Outfit']">
-                Iniciar Sesión
+      <div className="w-full max-w-md">
+        <Card className="border-0 shadow-2xl">
+          <CardHeader className="space-y-4 pb-6 text-center">
+            {/* Logo */}
+            <div className="flex justify-center">
+              <div className="w-20 h-20 rounded-2xl gradient-purple flex items-center justify-center shadow-lg">
+                <span className="text-white text-3xl font-bold font-['Outfit']">NV</span>
+              </div>
+            </div>
+            
+            <div>
+              <CardTitle className="text-2xl font-bold font-['Outfit'] text-slate-900">
+                NovaVision
               </CardTitle>
-              <CardDescription className="text-center">
-                Ingresa tus credenciales para acceder
+              <CardDescription className="text-slate-500 mt-1">
+                Sistema de gastos y finanzas
               </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Usuario</Label>
+            </div>
+          </CardHeader>
+          
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">Usuario</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="tu_usuario"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="h-11"
+                  data-testid="login-username-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <div className="relative">
                   <Input
-                    id="username"
-                    type="text"
-                    placeholder="tu_usuario"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="h-11"
-                    data-testid="login-username-input"
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-11 pr-10"
+                    data-testid="login-password-input"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-11 pr-10"
-                      data-testid="login-password-input"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-11 bg-teal-800 hover:bg-teal-900 text-white font-medium"
-                  disabled={loading}
-                  data-testid="login-submit-button"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Ingresando...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <LogIn className="w-4 h-4" />
-                      Iniciar Sesión
-                    </span>
-                  )}
-                </Button>
-              </form>
-
-              {/* Demo credentials */}
-              <div className="mt-6 p-4 bg-slate-100 rounded-lg">
-                <p className="text-xs font-semibold text-slate-600 mb-2">Usuarios de prueba:</p>
-                <div className="space-y-1 text-xs text-slate-500">
-                  <p><span className="font-medium">SuperAdmin:</span> superadmin / nova2024</p>
-                  <p><span className="font-medium">Admin:</span> admin / admin2024</p>
-                  <p><span className="font-medium">Usuario:</span> usuario / user2024</p>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+
+              <Button
+                type="submit"
+                className="w-full h-11 gradient-purple hover:opacity-90 text-white font-medium"
+                disabled={loading}
+                data-testid="login-submit-button"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Ingresando...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <LogIn className="w-4 h-4" />
+                    Iniciar sesión
+                  </span>
+                )}
+              </Button>
+            </form>
+
+            {/* Demo credentials */}
+            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+              <p className="text-xs font-semibold text-slate-600 mb-2">Usuarios de prueba:</p>
+              <div className="space-y-1 text-xs text-slate-500">
+                <p><span className="font-medium">SuperAdmin:</span> superadmin / nova2024</p>
+                <p><span className="font-medium">Admin:</span> admin / admin2024</p>
+                <p><span className="font-medium">Usuario:</span> usuario / user2024</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

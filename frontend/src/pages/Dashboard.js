@@ -29,10 +29,10 @@ import {
   Cell
 } from 'recharts';
 
-const CHART_COLORS = ['#115e59', '#14b8a6', '#99f6e4', '#f59e0b', '#10b981'];
+const CHART_COLORS = ['#7c3aed', '#a78bfa', '#c4b5fd', '#f59e0b', '#10b981'];
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
-  <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+  <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow card-hover">
     <CardContent className="p-6">
       <div className="flex items-start justify-between">
         <div>
@@ -40,7 +40,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
           <p className="text-2xl font-bold text-slate-900 font-['Outfit']">{value}</p>
           {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
+        <div className={`p-3 rounded-xl ${color}`}>
           <Icon className="w-5 h-5 text-white" />
         </div>
       </div>
@@ -169,28 +169,28 @@ const Dashboard = () => {
             title="Total Gastos"
             value={formatCurrency(stats?.total_gastos || 0)}
             icon={Wallet}
-            color="bg-teal-800"
+            color="gradient-purple"
             subtitle="Histórico total"
           />
           <StatCard
             title="Pagos Pendientes"
             value={formatCurrency(stats?.gastos_pendientes || 0)}
             icon={Clock}
-            color="bg-amber-500"
+            color="gradient-orange"
             subtitle={`${stats?.alertas_30_dias || 0} por vencer (30d)`}
           />
           <StatCard
             title="Gastos Pagados"
             value={formatCurrency(stats?.gastos_pagados || 0)}
             icon={CheckCircle2}
-            color="bg-emerald-600"
+            color="gradient-green"
             subtitle="Completados"
           />
           <StatCard
             title="Alertas Activas"
             value={`${(stats?.alertas_30_dias || 0) + (stats?.alertas_60_dias || 0)}`}
             icon={AlertTriangle}
-            color="bg-rose-500"
+            color="gradient-red"
             subtitle={`${stats?.gastos_vencidos || 0} vencidos`}
           />
         </div>
@@ -245,10 +245,10 @@ const Dashboard = () => {
 
         {/* Category Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border border-slate-200">
+          <Card className="border border-slate-200 card-hover">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-teal-100">
-                <Repeat className="w-5 h-5 text-teal-800" />
+              <div className="p-3 rounded-xl bg-purple-100">
+                <Repeat className="w-5 h-5 text-purple-700" />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Gastos Fijos</p>
@@ -258,10 +258,10 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-slate-200">
+          <Card className="border border-slate-200 card-hover">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-cyan-100">
-                <Building2 className="w-5 h-5 text-cyan-800" />
+              <div className="p-3 rounded-xl bg-violet-100">
+                <Building2 className="w-5 h-5 text-violet-700" />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Pagos Proveedores</p>
@@ -271,9 +271,9 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-slate-200">
+          <Card className="border border-slate-200 card-hover">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-amber-100">
+              <div className="p-3 rounded-xl bg-amber-100">
                 <TrendingUp className="w-5 h-5 text-amber-700" />
               </div>
               <div>

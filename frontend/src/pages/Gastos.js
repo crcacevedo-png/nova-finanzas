@@ -340,8 +340,8 @@ const Gastos = () => {
 
   const getTypeBadge = (type) => {
     const colors = {
-      fijo: 'bg-teal-50 text-teal-700 border border-teal-200',
-      proveedor: 'bg-cyan-50 text-cyan-700 border border-cyan-200',
+      fijo: 'bg-purple-50 text-purple-700 border border-purple-200',
+      proveedor: 'bg-violet-50 text-violet-700 border border-violet-200',
       variable: 'bg-amber-50 text-amber-700 border border-amber-200'
     };
     return <Badge className={colors[type]}>{typeLabels[type]}</Badge>;
@@ -367,7 +367,7 @@ const Gastos = () => {
               <Button 
                 variant="outline"
                 onClick={() => handleExport('xlsx')}
-                className="border-teal-200 text-teal-700 hover:bg-teal-50"
+                className="border-purple-200 text-purple-700 hover:bg-purple-50"
                 data-testid="export-button"
               >
                 <Download className="w-4 h-4 mr-2" />
@@ -377,7 +377,7 @@ const Gastos = () => {
             {canCreateExpenses() && (
               <Button 
                 onClick={() => handleOpenExpenseDialog()}
-                className="bg-teal-800 hover:bg-teal-900 text-white"
+                className="gradient-purple hover:opacity-90 text-white"
                 data-testid="add-expense-button"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -550,7 +550,7 @@ const Gastos = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleOpenExpenseDialog(expense)}
-                                className="h-8 w-8 p-0 hover:bg-teal-50 hover:text-teal-700"
+                                className="h-8 w-8 p-0 hover:bg-purple-50 hover:text-purple-700"
                                 data-testid={`edit-expense-${expense.id}`}
                               >
                                 <Pencil className="w-4 h-4" />
@@ -715,7 +715,7 @@ const Gastos = () => {
                 <Button type="button" variant="outline" onClick={handleCloseExpenseDialog} disabled={submitting}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-teal-800 hover:bg-teal-900 text-white" disabled={submitting} data-testid="expense-submit-button">
+                <Button type="submit" className="gradient-purple hover:opacity-90 text-white" disabled={submitting} data-testid="expense-submit-button">
                   {submitting ? 'Guardando...' : editingExpense ? 'Actualizar' : 'Registrar'}
                 </Button>
               </DialogFooter>

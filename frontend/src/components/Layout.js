@@ -7,21 +7,12 @@ import {
   Users, 
   LogOut, 
   Menu,
-  X
+  X,
+  History,
+  Clock
 } from 'lucide-react';
 import { Button } from './ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
-import { Avatar, AvatarFallback } from './ui/avatar';
 import { roleLabels } from '../services/api';
-
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/jssdpppr_logo%20nova%20transparente.png";
 
 const Layout = ({ children }) => {
   const { user, logout, canViewUserManagement } = useAuth();
@@ -48,8 +39,20 @@ const Layout = ({ children }) => {
       show: true
     },
     { 
+      path: '/historial-pagos', 
+      label: 'Historial de pagos', 
+      icon: History,
+      show: true
+    },
+    { 
+      path: '/pagos-por-vencer', 
+      label: 'Pagos por vencer', 
+      icon: Clock,
+      show: true
+    },
+    { 
       path: '/usuarios', 
-      label: 'Usuarios', 
+      label: 'Gestión de usuarios', 
       icon: Users,
       show: canViewUserManagement()
     },
@@ -60,7 +63,7 @@ const Layout = ({ children }) => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-100 flex">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
@@ -69,124 +72,101 @@ const Layout = ({ children }) => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Dark theme */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-64 bg-white border-r border-slate-200
+        w-64 bg-slate-900 text-white
         transform transition-transform duration-200 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        flex flex-col
       `}>
-        <div className="h-full flex flex-col">
-          {/* Logo */}
-          <div className="h-16 flex items-center justify-center px-3 border-b border-slate-200">
-            <Link to="/dashboard" className="flex items-center">
-              <img 
-                src={LOGO_URL} 
-                alt="NovaVision" 
-                className="w-44 h-auto"
-              />
-            </Link>
-            <button 
-              className="lg:hidden p-1 hover:bg-slate-100 rounded"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="w-5 h-5 text-slate-500" />
-            </button>
-          </div>
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+          <Link to="/dashboard" className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl gradient-purple flex items-center justify-center">
+              <span className="text-white text-lg font-bold font-['Outfit']">NV</span>
+            </div>
+            <span className="font-semibold text-lg font-['Outfit']">NovaVision</span>
+          </Link>
+          <button 
+            className="lg:hidden p-1 hover:bg-slate-800 rounded"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
-            {filteredNavItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  data-testid={`nav-${item.path.slice(1)}`}
-                  className={`
-                    flex items-center gap-3 px-4 py-3 rounded-lg
-                    transition-all duration-200 font-medium text-sm
-                    ${isActive(item.path) 
-                      ? 'bg-teal-50 text-teal-800 border-r-2 border-teal-600' 
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }
-                  `}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto sidebar-dark">
+          {filteredNavItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                data-testid={`nav-${item.path.slice(1)}`}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-lg
+                  transition-all duration-200 font-medium text-sm
+                  ${isActive(item.path) 
+                    ? 'bg-purple-600 text-white' 
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }
+                `}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Icon className="w-5 h-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
 
-          {/* User info at bottom */}
-          <div className="p-4 border-t border-slate-200">
-            <div className="flex items-center gap-3 px-2">
-              <Avatar className="h-9 w-9 bg-teal-100">
-                <AvatarFallback className="bg-teal-100 text-teal-800 font-medium">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
-                <p className="text-xs text-slate-500">{roleLabels[user?.role]}</p>
-              </div>
+        {/* User info at bottom */}
+        <div className="p-4 border-t border-slate-800">
+          <div className="flex items-center gap-3 px-2 mb-3">
+            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">
+              <span className="text-white font-semibold">
+                {user?.name?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+              <p className="text-xs text-slate-400">{roleLabels[user?.role]}</p>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800"
+            data-testid="logout-button"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Cerrar sesión
+          </Button>
         </div>
       </aside>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-screen">
-        {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8">
+        {/* Header - Mobile only */}
+        <header className="lg:hidden h-16 bg-white border-b border-slate-200 flex items-center px-4">
           <button 
-            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg"
+            className="p-2 hover:bg-slate-100 rounded-lg"
             onClick={() => setSidebarOpen(true)}
             data-testid="mobile-menu-button"
           >
             <Menu className="w-5 h-5 text-slate-600" />
           </button>
-
-          <div className="flex-1" />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="flex items-center gap-2 hover:bg-slate-100"
-                data-testid="user-menu-button"
-              >
-                <Avatar className="h-8 w-8 bg-teal-100">
-                  <AvatarFallback className="bg-teal-100 text-teal-800 font-medium text-sm">
-                    {user?.name?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden sm:inline text-sm font-medium text-slate-700">
-                  {user?.name}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div>
-                  <p className="font-medium">{user?.name}</p>
-                  <p className="text-xs text-slate-500">{user?.email}</p>
-                  <p className="text-xs text-teal-600 mt-1">{roleLabels[user?.role]}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={handleLogout}
-                className="text-rose-600 focus:text-rose-600 cursor-pointer"
-                data-testid="logout-button"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Cerrar Sesión
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg gradient-purple flex items-center justify-center">
+                <span className="text-white text-sm font-bold">NV</span>
+              </div>
+              <span className="font-semibold text-slate-900 font-['Outfit']">NovaVision</span>
+            </div>
+          </div>
+          <div className="w-10" /> {/* Spacer for centering */}
         </header>
 
         {/* Page content */}
