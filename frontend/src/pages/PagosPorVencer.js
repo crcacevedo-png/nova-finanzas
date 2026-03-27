@@ -39,21 +39,23 @@ const PagosPorVencer = () => {
 
   const fetchUpcomingPayments = async () => {
     try {
-      const [overdueRes, alerts30Res, alerts60Res] = await Promise.all([
+      const [upcomingRes, alerts30Res, alerts60Res] = await Promise.all([
         dashboardApi.getUpcoming(),
         dashboardApi.getAlerts30(),
         dashboardApi.getAlerts60()
       ]);
       
-      // Handle both possible response structures
-      if (overdueRes.data.overdue) {
-        setOverdue(overdueRes.data.overdue);
-        setDue30(overdueRes.data.due_30 || []);
-        setDue60(overdueRes.data.due_60 || []);
+      // Handle the response from /api/dashboard/upcoming
+      if (upcomingRes.data) {
+        // The endpoint returns { overdue: [], due30: [], due60: [] }
+        setOverdue(upcomingRes.data.overdue || []);
+        setDue30(upcomingRes.data.due30 || []);
+        setDue60(upcomingRes.data.due60 || []);
       } else {
-        setOverdue(overdueRes.data.filter(e => e.days_remaining < 0) || []);
+        // Fallback to individual alerts endpoints
         setDue30(alerts30Res.data || []);
         setDue60(alerts60Res.data || []);
+        setOverdue([]);
       }
     } catch (error) {
       console.error('Error fetching upcoming payments:', error);
