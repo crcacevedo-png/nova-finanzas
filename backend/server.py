@@ -383,6 +383,140 @@ async def seed_default_users():
             await db.users.insert_one(user_doc)
             print(f"Created default user: {user_data['username']}")
 
+
+async def seed_sample_expenses():
+    """Create sample expenses for demo if none exist"""
+    # Check if there are already expenses
+    count = await db.expenses.count_documents({})
+    if count > 0:
+        print(f"Expenses already exist ({count}), skipping sample data")
+        return
+    
+    # Get superadmin user for created_by field
+    superadmin = await db.users.find_one({"username": "superadmin"})
+    if not superadmin:
+        print("Superadmin not found, skipping sample expenses")
+        return
+    
+    created_by = superadmin["id"]
+    
+    sample_expenses = [
+        {
+            "name": "Alquiler de local",
+            "type": "fijo",
+            "amount": 12000.00,
+            "date": "2024-03-01",
+            "due_date": "2024-03-31",
+            "invoice_number": "FAC-0001",
+            "status": "pagado",
+            "notes": "Local principal Zona 10",
+            "paid_amount": 12000.00,
+            "remaining_amount": 0.00
+        },
+        {
+            "name": "Lentes oftálmicos — Proveedor Óptica GT",
+            "type": "proveedor",
+            "amount": 8500.00,
+            "date": "2024-03-05",
+            "due_date": "2024-04-05",
+            "invoice_number": "FAC-0045",
+            "status": "parcial",
+            "notes": "Pedido mensual de lentes",
+            "paid_amount": 4000.00,
+            "remaining_amount": 4500.00
+        },
+        {
+            "name": "Mantenimiento equipo láser",
+            "type": "variable",
+            "amount": 3200.00,
+            "date": "2024-03-10",
+            "due_date": "2024-04-10",
+            "invoice_number": None,
+            "status": "pendiente",
+            "notes": "Mantenimiento preventivo trimestral",
+            "paid_amount": 0.00,
+            "remaining_amount": 3200.00
+        },
+        {
+            "name": "Servicios básicos (agua, luz, internet)",
+            "type": "fijo",
+            "amount": 4500.00,
+            "date": "2024-03-01",
+            "due_date": "2024-03-15",
+            "invoice_number": "SRV-0312",
+            "status": "vencido",
+            "notes": "",
+            "paid_amount": 0.00,
+            "remaining_amount": 4500.00
+        },
+        {
+            "name": "Insumos médicos descartables",
+            "type": "proveedor",
+            "amount": 6000.00,
+            "date": "2024-03-12",
+            "due_date": "2024-05-12",
+            "invoice_number": "FAC-1122",
+            "status": "pendiente",
+            "notes": "Guantes, gasas, soluciones",
+            "paid_amount": 0.00,
+            "remaining_amount": 6000.00
+        }
+    ]
+    
+    for expense_data in sample_expenses:
+        expense_doc = {
+            "id": str(uuid.uuid4()),
+            "name": expense_data["name"],
+            "type": expense_data["type"],
+            "amount": expense_data["amount"],
+            "date": expense_data["date"],
+            "due_date": expense_data["due_date"],
+            "invoice_number": expense_data["invoice_number"],
+            "status": expense_data["status"],
+            "notes": expense_data["notes"],
+            "paid_amount": expense_data["paid_amount"],
+            "remaining_amount": expense_data["remaining_amount"],
+            "created_by": created_by,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.expenses.insert_one(expense_doc)
+        print(f"Created sample expense: {expense_data['name']}")
+    
+    # Create sample payment for the "pagado" expense
+    alquiler = await db.expenses.find_one({"name": "Alquiler de local"})
+    if alquiler:
+        payment_doc = {
+            "id": str(uuid.uuid4()),
+            "expense_id": alquiler["id"],
+            "amount": 12000.00,
+            "date": "2024-03-15",
+            "method": "Transferencia bancaria",
+            "reference": "TRANS-001234",
+            "notes": "Pago completo del alquiler",
+            "created_by": created_by,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payments.insert_one(payment_doc)
+        print("Created sample payment for Alquiler")
+    
+    # Create sample partial payment for "Lentes oftálmicos"
+    lentes = await db.expenses.find_one({"name": "Lentes oftálmicos — Proveedor Óptica GT"})
+    if lentes:
+        payment_doc = {
+            "id": str(uuid.uuid4()),
+            "expense_id": lentes["id"],
+            "amount": 4000.00,
+            "date": "2024-03-20",
+            "method": "Cheque",
+            "reference": "CHQ-5678",
+            "notes": "Primer abono",
+            "created_by": created_by,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payments.insert_one(payment_doc)
+        print("Created sample payment for Lentes oftálmicos")
+
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/login", response_model=TokenResponse)
@@ -1288,6 +1422,7 @@ logger = logging.getLogger(__name__)
 async def startup_event():
     """Run seed on startup and create indexes"""
     await seed_default_users()
+    await seed_sample_expenses()
     # Create indexes
     await db.expenses.create_index([("date", -1)])
     await db.expenses.create_index([("due_date", 1)])
