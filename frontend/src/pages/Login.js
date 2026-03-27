@@ -50,7 +50,7 @@ const Login = () => {
               <img 
                 src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
                 alt="NovaVision" 
-                className="h-20 w-auto"
+                className="h-[400px] w-auto"
               />
             </div>
             

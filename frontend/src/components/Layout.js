@@ -81,13 +81,13 @@ const Layout = ({ children }) => {
         flex flex-col
       `}>
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+        <div className="py-4 flex items-center justify-between px-4 border-b border-slate-800">
           <Link to="/dashboard" className="flex items-center">
-            <div className="bg-white rounded-lg p-1">
+            <div className="bg-white rounded-lg p-2">
               <img 
                 src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/fohqpodg_logo%20nova%20transparente.png" 
                 alt="NovaVision" 
-                className="h-8 w-auto"
+                className="h-14 w-auto"
               />
             </div>
           </Link>
