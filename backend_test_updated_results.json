@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-03-27T04:53:11.391591",
+  "total_tests": 11,
+  "passed_tests": 11,
+  "success_rate": "100.0%",
+  "results": [
+    {
+      "test": "Superadmin Login",
+      "success": true,
+      "details": "Logged in as superadmin"
+    },
+    {
+      "test": "Expenses Pagination",
+      "success": true,
+      "details": ""
+    },
+    {
+      "test": "Expenses Search Filter",
+      "success": true,
+      "details": "Found expense in search results"
+    },
+    {
+      "test": "Expenses Date Range Filter",
+      "success": true,
+      "details": "Found 4 expenses in date range"
+    },
+    {
+      "test": "Dashboard Summary New Format",
+      "success": true,
+      "details": "Summary: month=11000.0, paid=2000.0, pending=9000.0, overdue=0"
+    },
+    {
+      "test": "Dashboard Upcoming Payments",
+      "success": true,
+      "details": "Overdue: 0, Due30: 3, Due60: 0"
+    },
+    {
+      "test": "Reports CSV Export",
+      "success": true,
+      "details": "CSV export successful, 788 characters"
+    },
+    {
+      "test": "Get User by ID",
+      "success": true,
+      "details": "Retrieved user: superadmin (superadmin)"
+    },
+    {
+      "test": "Update User by ID",
+      "success": true,
+      "details": "User updated successfully: Updated Test User Name (admin)"
+    },
+    {
+      "test": "Auth Logout Token Invalidation",
+      "success": true,
+      "details": "Token successfully invalidated"
+    },
+    {
+      "test": "Superadmin Login",
+      "success": true,
+      "details": "Logged in as superadmin"
+    }
+  ]
+}

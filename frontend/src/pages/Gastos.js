@@ -9,7 +9,10 @@ import {
   Trash2,
   DollarSign,
   Eye,
-  X
+  X,
+  Download,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -63,9 +66,12 @@ const initialPaymentForm = {
 };
 
 const Gastos = () => {
-  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments, canDeletePayments } = useAuth();
+  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments, canDeletePayments, canExportReports } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Pagination
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   
   // Dialogs
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
@@ -84,26 +90,63 @@ const Gastos = () => {
   const [paymentForm, setPaymentForm] = useState(initialPaymentForm);
   
   // Filters
-  const [filters, setFilters] = useState({ type: '', status: '', search: '' });
+  const [filters, setFilters] = useState({ type: '', status: '', search: '', dateFrom: '', dateTo: '' });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchExpenses();
-  }, [filters.type, filters.status]);
+  }, [filters.type, filters.status, pagination.page]);
 
   const fetchExpenses = async () => {
     try {
       const response = await expenseApi.getAll({
         type: filters.type || undefined,
-        status: filters.status || undefined
+        status: filters.status || undefined,
+        search: filters.search || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        page: pagination.page,
+        limit: pagination.limit,
+        sortBy: 'date',
+        sortOrder: 'desc'
       });
-      setExpenses(response.data);
+      
+      // Handle new paginated response structure
+      if (response.data.data) {
+        setExpenses(response.data.data);
+        setPagination(prev => ({
+          ...prev,
+          total: response.data.total,
+          totalPages: response.data.total_pages
+        }));
+      } else {
+        setExpenses(response.data);
+      }
     } catch (error) {
       console.error('Error fetching expenses:', error);
       toast.error('Error al cargar los gastos');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = () => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+    fetchExpenses();
+  };
+
+  const handleExport = (format) => {
+    const token = localStorage.getItem('token');
+    const url = expenseApi.exportReport({
+      format,
+      type: filters.type || undefined,
+      status: filters.status || undefined,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined
+    });
+    
+    // Open download in new window with auth
+    window.open(url, '_blank');
   };
 
   const filteredExpenses = expenses.filter(expense => {
@@ -114,6 +157,12 @@ const Gastos = () => {
     }
     return true;
   });
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination(prev => ({ ...prev, page: newPage }));
+    }
+  };
 
   // Expense handlers
   const handleOpenExpenseDialog = (expense = null) => {
@@ -313,61 +362,96 @@ const Gastos = () => {
             <h1 className="text-2xl font-bold text-slate-900 font-['Outfit']">Gastos</h1>
             <p className="text-slate-500 text-sm">Administra los gastos de la clínica</p>
           </div>
-          {canCreateExpenses() && (
-            <Button 
-              onClick={() => handleOpenExpenseDialog()}
-              className="bg-teal-800 hover:bg-teal-900 text-white"
-              data-testid="add-expense-button"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Gasto
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {canExportReports() && (
+              <Button 
+                variant="outline"
+                onClick={() => handleExport('xlsx')}
+                className="border-teal-200 text-teal-700 hover:bg-teal-50"
+                data-testid="export-button"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </Button>
+            )}
+            {canCreateExpenses() && (
+              <Button 
+                onClick={() => handleOpenExpenseDialog()}
+                className="bg-teal-800 hover:bg-teal-900 text-white"
+                data-testid="add-expense-button"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Gasto
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}
         <Card className="border border-slate-200">
           <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
                   placeholder="Buscar por nombre o factura..."
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   className="pl-10"
                   data-testid="search-input"
                 />
               </div>
-              <Select
-                value={filters.type || "all"}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, type: value === "all" ? "" : value }))}
-              >
-                <SelectTrigger className="w-full md:w-[180px]" data-testid="type-filter">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los tipos</SelectItem>
-                  <SelectItem value="fijo">Gasto Fijo</SelectItem>
-                  <SelectItem value="proveedor">Pago Proveedor</SelectItem>
-                  <SelectItem value="variable">Gasto Variable</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={filters.status || "all"}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === "all" ? "" : value }))}
-              >
-                <SelectTrigger className="w-full md:w-[180px]" data-testid="status-filter">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="parcial">Parcial</SelectItem>
-                  <SelectItem value="pagado">Pagado</SelectItem>
-                  <SelectItem value="vencido">Vencido</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  type="date"
+                  placeholder="Desde"
+                  value={filters.dateFrom}
+                  onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                  className="w-36"
+                  data-testid="date-from-input"
+                />
+                <Input
+                  type="date"
+                  placeholder="Hasta"
+                  value={filters.dateTo}
+                  onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                  className="w-36"
+                  data-testid="date-to-input"
+                />
+                <Select
+                  value={filters.type || "all"}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, type: value === "all" ? "" : value }))}
+                >
+                  <SelectTrigger className="w-[150px]" data-testid="type-filter">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
+                    <SelectItem value="fijo">Gasto Fijo</SelectItem>
+                    <SelectItem value="proveedor">Pago Proveedor</SelectItem>
+                    <SelectItem value="variable">Gasto Variable</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filters.status || "all"}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === "all" ? "" : value }))}
+                >
+                  <SelectTrigger className="w-[150px]" data-testid="status-filter">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                    <SelectItem value="parcial">Parcial</SelectItem>
+                    <SelectItem value="pagado">Pagado</SelectItem>
+                    <SelectItem value="vencido">Vencido</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={handleSearch} className="px-6">
+                  Buscar
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -492,6 +576,36 @@ const Gastos = () => {
               </div>
             )}
           </CardContent>
+          
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="p-4 border-t border-slate-200 flex items-center justify-between">
+              <p className="text-sm text-slate-500">
+                Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} gastos
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm text-slate-600 px-2">
+                  Página {pagination.page} de {pagination.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Create/Edit Expense Dialog */}

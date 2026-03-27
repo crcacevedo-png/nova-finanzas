@@ -20,6 +20,13 @@ export const expenseApi = {
     const params = new URLSearchParams();
     if (filters.type) params.append('type', filters.type);
     if (filters.status) params.append('status', filters.status);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
     return axios.get(`${API_URL}/expenses?${params.toString()}`);
   },
   getById: (id) => axios.get(`${API_URL}/expenses/${id}`),
@@ -27,6 +34,15 @@ export const expenseApi = {
   update: (id, data) => axios.put(`${API_URL}/expenses/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/expenses/${id}`),
   getPayments: (expenseId) => axios.get(`${API_URL}/expenses/${expenseId}/payments`),
+  exportReport: (filters = {}) => {
+    const params = new URLSearchParams();
+    params.append('format', filters.format || 'xlsx');
+    if (filters.type) params.append('type', filters.type);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    return `${API_URL}/reports/expenses?${params.toString()}`;
+  }
 };
 
 // Payment API
@@ -49,6 +65,10 @@ export const userApi = {
 
 // Dashboard API
 export const dashboardApi = {
+  getSummary: () => axios.get(`${API_URL}/dashboard/summary`),
+  getMonthlyChart: () => axios.get(`${API_URL}/dashboard/monthly-chart`),
+  getUpcoming: () => axios.get(`${API_URL}/dashboard/upcoming`),
+  // Legacy endpoints for backwards compatibility
   getStats: () => axios.get(`${API_URL}/dashboard/stats`),
   getAlerts30: () => axios.get(`${API_URL}/dashboard/alerts/30`),
   getAlerts60: () => axios.get(`${API_URL}/dashboard/alerts/60`),
