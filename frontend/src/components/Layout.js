@@ -21,7 +21,7 @@ import {
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { roleLabels } from '../services/api';
 
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/cjnymxl0_logo%20nova.png";
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/jssdpppr_logo%20nova%20transparente.png";
 
 const Layout = ({ children }) => {
   const { user, logout, canViewUserManagement } = useAuth();
@@ -78,12 +78,12 @@ const Layout = ({ children }) => {
       `}>
         <div className="h-full flex flex-col">
           {/* Logo */}
-          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200">
+          <div className="h-16 flex items-center justify-center px-3 border-b border-slate-200">
             <Link to="/dashboard" className="flex items-center">
               <img 
                 src={LOGO_URL} 
                 alt="NovaVision" 
-                className="h-10 w-auto"
+                className="w-44 h-auto"
               />
             </Link>
             <button 

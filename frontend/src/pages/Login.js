@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Toaster, toast } from 'sonner';
 
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/cjnymxl0_logo%20nova.png";
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/jssdpppr_logo%20nova%20transparente.png";
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -54,7 +54,7 @@ const Login = () => {
           <img 
             src={LOGO_URL} 
             alt="NovaVision Logo" 
-            className="w-72 mb-8 drop-shadow-lg"
+            className="w-[580px] mb-8 drop-shadow-lg"
           />
           <h1 className="text-4xl font-bold mb-4 font-['Outfit']">
             Sistema de Gastos y Finanzas
@@ -73,7 +73,7 @@ const Login = () => {
             <img 
               src={LOGO_URL} 
               alt="NovaVision Logo" 
-              className="w-56 mb-2"
+              className="w-[450px] mb-2"
             />
             <p className="text-sm text-slate-500">Sistema de Gastos y Finanzas</p>
           </div>
