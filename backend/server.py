@@ -304,19 +304,28 @@ async def update_expense_amounts(expense_id: str):
     
     remaining_amount = max(0, expense["amount"] - paid_amount)
     
-    # Determine status
-    status = "pendiente"
+    # Determine status according to business rules:
+    # SI paidAmount >= amount → status = "pagado"
+    # SI paidAmount > 0 Y paidAmount < amount → status = "parcial"
+    # SI dueDate existe Y dueDate < hoy Y paidAmount < amount → status = "vencido"
+    # SI paidAmount == 0 Y (no hay dueDate O dueDate >= hoy) → status = "pendiente"
+    
     if paid_amount >= expense["amount"]:
         status = "pagado"
-    elif paid_amount > 0:
-        status = "parcial"
     elif expense.get("due_date"):
         try:
             due_date = datetime.fromisoformat(expense["due_date"]).date()
-            if due_date < datetime.now(timezone.utc).date():
+            today = datetime.now(timezone.utc).date()
+            if due_date < today and paid_amount < expense["amount"]:
                 status = "vencido"
+            elif paid_amount > 0:
+                status = "parcial"
+            else:
+                status = "pendiente"
         except:
-            pass
+            status = "parcial" if paid_amount > 0 else "pendiente"
+    else:
+        status = "parcial" if paid_amount > 0 else "pendiente"
     
     await db.expenses.update_one(
         {"id": expense_id},

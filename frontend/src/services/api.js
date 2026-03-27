@@ -76,12 +76,13 @@ export const dashboardApi = {
 };
 
 // Format currency helper
+// Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: 'GTQ',
+  const formatted = Number(amount).toLocaleString('es-GT', {
     minimumFractionDigits: 2,
-  }).format(amount);
+    maximumFractionDigits: 2
+  });
+  return `Q ${formatted}`;
 };
 
 // Format date helper
