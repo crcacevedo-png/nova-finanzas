@@ -187,6 +187,35 @@ class ExpenseListResponse(BaseModel):
     limit: int
     total_pages: int
 
+# Bank Account Models
+class BankAccountBase(BaseModel):
+    bank_name: str
+    account_number: str
+    account_alias: str
+
+class BankAccountCreate(BankAccountBase):
+    pass
+
+class BankAccountUpdate(BaseModel):
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    account_alias: Optional[str] = None
+
+class BankAccountResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    bank_name: str
+    account_number: str
+    account_alias: str
+    is_active: bool = True
+    created_by: str
+    created_at: str
+    updated_at: Optional[str] = None
+
+class BankAccountListResponse(BaseModel):
+    data: List[BankAccountResponse]
+    total: int
+
 # Payment Models
 class PaymentBase(BaseModel):
     expense_id: str
@@ -1170,6 +1199,90 @@ async def get_chart_data(current_user: dict = Depends(require_permission("view_d
     
     sorted_data = sorted(monthly_data.values(), key=lambda x: x["mes"])
     return sorted_data[-12:]
+
+
+# ==================== BANK ACCOUNTS ROUTES (SuperAdmin only) ====================
+
+def require_superadmin():
+    """Require superadmin role"""
+    async def checker(current_user: dict = Depends(get_current_user)):
+        if current_user["role"] != "superadmin":
+            raise HTTPException(status_code=403, detail="Solo SuperAdmin puede acceder a esta función")
+        return current_user
+    return checker
+
+@api_router.get("/bank-accounts", response_model=BankAccountListResponse)
+async def get_bank_accounts(current_user: dict = Depends(require_superadmin())):
+    """Get all bank accounts (SuperAdmin only)"""
+    accounts = await db.bank_accounts.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return BankAccountListResponse(data=[BankAccountResponse(**a) for a in accounts], total=len(accounts))
+
+@api_router.get("/bank-accounts/{account_id}", response_model=BankAccountResponse)
+async def get_bank_account(account_id: str, current_user: dict = Depends(require_superadmin())):
+    """Get a specific bank account (SuperAdmin only)"""
+    account = await db.bank_accounts.find_one({"id": account_id}, {"_id": 0})
+    if not account:
+        raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
+    return BankAccountResponse(**account)
+
+@api_router.post("/bank-accounts", response_model=BankAccountResponse)
+async def create_bank_account(account_data: BankAccountCreate, current_user: dict = Depends(require_superadmin())):
+    """Create a new bank account (SuperAdmin only)"""
+    # Check for duplicate account number
+    existing = await db.bank_accounts.find_one({"account_number": account_data.account_number})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe una cuenta con este número")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    account_doc = {
+        "id": str(uuid.uuid4()),
+        "bank_name": account_data.bank_name,
+        "account_number": account_data.account_number,
+        "account_alias": account_data.account_alias,
+        "is_active": True,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.bank_accounts.insert_one(account_doc)
+    if "_id" in account_doc:
+        del account_doc["_id"]
+    return BankAccountResponse(**account_doc)
+
+@api_router.put("/bank-accounts/{account_id}", response_model=BankAccountResponse)
+async def update_bank_account(account_id: str, account_data: BankAccountUpdate, current_user: dict = Depends(require_superadmin())):
+    """Update a bank account (SuperAdmin only)"""
+    account = await db.bank_accounts.find_one({"id": account_id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
+    
+    update_data = {k: v for k, v in account_data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    
+    # Check for duplicate account number if updating
+    if "account_number" in update_data and update_data["account_number"] != account["account_number"]:
+        existing = await db.bank_accounts.find_one({"account_number": update_data["account_number"]})
+        if existing:
+            raise HTTPException(status_code=400, detail="Ya existe una cuenta con este número")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.bank_accounts.update_one({"id": account_id}, {"$set": update_data})
+    updated = await db.bank_accounts.find_one({"id": account_id}, {"_id": 0})
+    return BankAccountResponse(**updated)
+
+@api_router.delete("/bank-accounts/{account_id}")
+async def delete_bank_account(account_id: str, current_user: dict = Depends(require_superadmin())):
+    """Delete a bank account (SuperAdmin only)"""
+    account = await db.bank_accounts.find_one({"id": account_id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
+    
+    await db.bank_accounts.delete_one({"id": account_id})
+    return {"message": "Cuenta bancaria eliminada correctamente"}
+
 
 # ==================== REPORTS ROUTES ====================
 

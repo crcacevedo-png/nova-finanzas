@@ -9,7 +9,11 @@ import {
   Users,
   LogOut,
   Menu,
-  X
+  X,
+  Settings,
+  Building2,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -26,6 +30,9 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
+
+  const isSuperAdmin = user?.role === 'superadmin';
 
   const handleLogout = async () => {
     await logout();
@@ -47,6 +54,11 @@ const Layout = ({ children }) => {
       testId: 'nav-usuarios' 
     });
   }
+
+  // Config sub-items (SuperAdmin only)
+  const configItems = [
+    { path: '/configuracion/cuentas-bancarias', icon: Building2, label: 'Cuentas Bancarias', testId: 'nav-cuentas-bancarias' },
+  ];
 
   const getRoleBadgeClass = (role) => {
     const classes = {
@@ -119,6 +131,37 @@ const Layout = ({ children }) => {
           {navItems.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
+          
+          {/* Configuration Section - SuperAdmin only */}
+          {isSuperAdmin && (
+            <div className="mt-4">
+              <button
+                onClick={() => setConfigOpen(!configOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  location.pathname.startsWith('/configuracion') ? 'active' : ''
+                }`}
+                data-testid="nav-configuracion"
+              >
+                <div className="flex items-center gap-3">
+                  <Settings className={`w-5 h-5 icon ${location.pathname.startsWith('/configuracion') ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">Configuración</span>
+                </div>
+                {configOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+              
+              {configOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {configItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* User Section */}

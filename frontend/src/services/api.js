@@ -75,6 +75,15 @@ export const dashboardApi = {
   getChartData: () => axios.get(`${API_URL}/dashboard/chart-data`),
 };
 
+// Bank Accounts API
+export const bankAccountApi = {
+  getAll: () => axios.get(`${API_URL}/bank-accounts`),
+  getById: (id) => axios.get(`${API_URL}/bank-accounts/${id}`),
+  create: (data) => axios.post(`${API_URL}/bank-accounts`, data),
+  update: (id, data) => axios.put(`${API_URL}/bank-accounts/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/bank-accounts/${id}`),
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {
