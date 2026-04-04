@@ -63,7 +63,9 @@ PERMISSIONS = {
         "delete_payments": True,
         "manage_users": True,
         "view_user_management": True,
-        "export_reports": True
+        "export_reports": True,
+        "authorize_payments": True,
+        "view_payment_authorizations": True
     },
     "admin": {
         "view_dashboard": True,
@@ -77,7 +79,10 @@ PERMISSIONS = {
         "delete_payments": False,
         "manage_users": False,
         "view_user_management": False,
-        "export_reports": True
+        "export_reports": True,
+        "authorize_payments": False,
+        "view_payment_authorizations": True,
+        "execute_payment_authorizations": True
     },
     "usuario": {
         "view_dashboard": True,
@@ -91,7 +96,10 @@ PERMISSIONS = {
         "delete_payments": False,
         "manage_users": False,
         "view_user_management": False,
-        "export_reports": False
+        "export_reports": False,
+        "authorize_payments": False,
+        "view_payment_authorizations": False,
+        "execute_payment_authorizations": False
     }
 }
 
@@ -245,6 +253,52 @@ class PaymentResponse(BaseModel):
 class PaymentListResponse(BaseModel):
     data: List[PaymentResponse]
     total: int
+
+# ==================== PAYMENT AUTHORIZATION MODELS ====================
+
+class PaymentAuthorizationBase(BaseModel):
+    expense_id: str
+    bank_account_id: str
+    amount_to_pay: float = Field(gt=0)
+    notes: Optional[str] = ""
+
+class PaymentAuthorizationCreate(PaymentAuthorizationBase):
+    pass
+
+class PaymentAuthorizationUpdate(BaseModel):
+    bank_account_id: Optional[str] = None
+    amount_to_pay: Optional[float] = None
+    notes: Optional[str] = None
+
+class PaymentAuthorizationResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    expense_id: str
+    expense_name: Optional[str] = None
+    expense_provider: Optional[str] = None
+    expense_amount: Optional[float] = None
+    expense_remaining: Optional[float] = None
+    expense_due_date: Optional[str] = None
+    bank_account_id: str
+    bank_account_alias: Optional[str] = None
+    bank_name: Optional[str] = None
+    amount_to_pay: float
+    status: str  # pendiente, ejecutado, cancelado
+    notes: Optional[str] = ""
+    authorized_by: str
+    authorized_by_name: Optional[str] = None
+    authorized_at: str
+    executed_by: Optional[str] = None
+    executed_by_name: Optional[str] = None
+    executed_at: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+class PaymentAuthorizationListResponse(BaseModel):
+    data: List[PaymentAuthorizationResponse]
+    total: int
+    pending_count: int
+    executed_count: int
 
 # Dashboard Models
 class TypeBreakdown(BaseModel):
@@ -1284,6 +1338,328 @@ async def delete_bank_account(account_id: str, current_user: dict = Depends(requ
     return {"message": "Cuenta bancaria eliminada correctamente"}
 
 
+# ==================== PAYMENT AUTHORIZATION ROUTES ====================
+
+async def enrich_authorization(auth: dict) -> dict:
+    """Enrich authorization with expense, bank account, and user data"""
+    # Obtener datos del gasto
+    expense = await db.expenses.find_one({"id": auth["expense_id"]}, {"_id": 0})
+    if expense:
+        auth["expense_name"] = expense.get("name", "N/A")
+        auth["expense_provider"] = expense.get("provider", "")
+        auth["expense_amount"] = expense.get("amount", 0)
+        auth["expense_remaining"] = expense.get("remaining_amount", expense.get("amount", 0))
+        auth["expense_due_date"] = expense.get("due_date", "")
+    
+    # Obtener datos de la cuenta bancaria
+    bank_account = await db.bank_accounts.find_one({"id": auth["bank_account_id"]}, {"_id": 0})
+    if bank_account:
+        auth["bank_account_alias"] = bank_account.get("account_alias", "N/A")
+        auth["bank_name"] = bank_account.get("bank_name", "N/A")
+    
+    # Obtener nombre del autorizador
+    authorizer = await db.users.find_one({"id": auth["authorized_by"]}, {"_id": 0, "name": 1})
+    if authorizer:
+        auth["authorized_by_name"] = authorizer.get("name", "N/A")
+    
+    # Obtener nombre del ejecutor si existe
+    if auth.get("executed_by"):
+        executor = await db.users.find_one({"id": auth["executed_by"]}, {"_id": 0, "name": 1})
+        if executor:
+            auth["executed_by_name"] = executor.get("name", "N/A")
+    
+    return auth
+
+
+@api_router.get("/payment-authorizations", response_model=PaymentAuthorizationListResponse)
+async def get_payment_authorizations(
+    status: Optional[str] = Query(None, pattern="^(pendiente|ejecutado|cancelado)$"),
+    current_user: dict = Depends(require_permission("view_payment_authorizations"))
+):
+    """Obtener todas las autorizaciones de pago"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    authorizations = await db.payment_authorizations.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    # Enriquecer cada autorización con datos relacionados
+    enriched = []
+    for auth in authorizations:
+        enriched_auth = await enrich_authorization(auth)
+        enriched.append(PaymentAuthorizationResponse(**enriched_auth))
+    
+    # Contar pendientes y ejecutados
+    pending_count = await db.payment_authorizations.count_documents({"status": "pendiente"})
+    executed_count = await db.payment_authorizations.count_documents({"status": "ejecutado"})
+    
+    return PaymentAuthorizationListResponse(
+        data=enriched,
+        total=len(enriched),
+        pending_count=pending_count,
+        executed_count=executed_count
+    )
+
+
+@api_router.get("/payment-authorizations/{auth_id}", response_model=PaymentAuthorizationResponse)
+async def get_payment_authorization(
+    auth_id: str,
+    current_user: dict = Depends(require_permission("view_payment_authorizations"))
+):
+    """Obtener una autorización específica"""
+    auth = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    if not auth:
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    
+    enriched = await enrich_authorization(auth)
+    return PaymentAuthorizationResponse(**enriched)
+
+
+@api_router.get("/expenses-pending-authorization")
+async def get_expenses_pending_authorization(
+    current_user: dict = Depends(require_permission("authorize_payments"))
+):
+    """Obtener gastos pendientes que pueden ser autorizados para pago (SuperAdmin only)"""
+    # Obtener gastos con status pendiente, parcial o vencido que aún tienen monto pendiente
+    expenses = await db.expenses.find(
+        {
+            "status": {"$in": ["pendiente", "parcial", "vencido"]},
+            "remaining_amount": {"$gt": 0}
+        },
+        {"_id": 0}
+    ).sort("due_date", 1).to_list(10000)
+    
+    # Obtener IDs de gastos que ya tienen autorización pendiente
+    existing_auths = await db.payment_authorizations.find(
+        {"status": "pendiente"},
+        {"_id": 0, "expense_id": 1}
+    ).to_list(10000)
+    authorized_expense_ids = {a["expense_id"] for a in existing_auths}
+    
+    # Filtrar gastos que no tienen autorización pendiente
+    available_expenses = [
+        e for e in expenses if e["id"] not in authorized_expense_ids
+    ]
+    
+    return {"data": available_expenses, "total": len(available_expenses)}
+
+
+@api_router.post("/payment-authorizations", response_model=PaymentAuthorizationResponse)
+async def create_payment_authorization(
+    auth_data: PaymentAuthorizationCreate,
+    current_user: dict = Depends(require_permission("authorize_payments"))
+):
+    """Crear una nueva autorización de pago (SuperAdmin only)"""
+    # Verificar que el gasto existe
+    expense = await db.expenses.find_one({"id": auth_data.expense_id}, {"_id": 0})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    
+    # Verificar que el gasto tiene monto pendiente
+    remaining = expense.get("remaining_amount", expense["amount"])
+    if remaining <= 0:
+        raise HTTPException(status_code=400, detail="Este gasto ya está completamente pagado")
+    
+    # Verificar que el monto a pagar no excede el pendiente
+    if auth_data.amount_to_pay > remaining:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El monto a autorizar (Q{auth_data.amount_to_pay:.2f}) excede el monto pendiente (Q{remaining:.2f})"
+        )
+    
+    # Verificar que la cuenta bancaria existe
+    bank_account = await db.bank_accounts.find_one({"id": auth_data.bank_account_id}, {"_id": 0})
+    if not bank_account:
+        raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
+    
+    # Verificar que no existe una autorización pendiente para este gasto
+    existing = await db.payment_authorizations.find_one({
+        "expense_id": auth_data.expense_id,
+        "status": "pendiente"
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe una autorización pendiente para este gasto")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    auth_doc = {
+        "id": str(uuid.uuid4()),
+        "expense_id": auth_data.expense_id,
+        "bank_account_id": auth_data.bank_account_id,
+        "amount_to_pay": auth_data.amount_to_pay,
+        "status": "pendiente",
+        "notes": auth_data.notes or "",
+        "authorized_by": current_user["id"],
+        "authorized_at": now,
+        "executed_by": None,
+        "executed_at": None,
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.payment_authorizations.insert_one(auth_doc)
+    
+    # Eliminar _id si existe
+    if "_id" in auth_doc:
+        del auth_doc["_id"]
+    
+    enriched = await enrich_authorization(auth_doc)
+    return PaymentAuthorizationResponse(**enriched)
+
+
+@api_router.put("/payment-authorizations/{auth_id}", response_model=PaymentAuthorizationResponse)
+async def update_payment_authorization(
+    auth_id: str,
+    auth_data: PaymentAuthorizationUpdate,
+    current_user: dict = Depends(require_permission("authorize_payments"))
+):
+    """Actualizar una autorización de pago (SuperAdmin only)"""
+    auth = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    if not auth:
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    
+    if auth["status"] != "pendiente":
+        raise HTTPException(status_code=400, detail="Solo se pueden editar autorizaciones pendientes")
+    
+    update_data = {k: v for k, v in auth_data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    
+    # Validar nuevo monto si se está actualizando
+    if "amount_to_pay" in update_data:
+        expense = await db.expenses.find_one({"id": auth["expense_id"]}, {"_id": 0})
+        if expense:
+            remaining = expense.get("remaining_amount", expense["amount"])
+            if update_data["amount_to_pay"] > remaining:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El monto a autorizar excede el monto pendiente (Q{remaining:.2f})"
+                )
+    
+    # Validar cuenta bancaria si se está actualizando
+    if "bank_account_id" in update_data:
+        bank_account = await db.bank_accounts.find_one({"id": update_data["bank_account_id"]}, {"_id": 0})
+        if not bank_account:
+            raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.payment_authorizations.update_one({"id": auth_id}, {"$set": update_data})
+    updated = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    
+    enriched = await enrich_authorization(updated)
+    return PaymentAuthorizationResponse(**enriched)
+
+
+@api_router.post("/payment-authorizations/{auth_id}/execute", response_model=PaymentAuthorizationResponse)
+async def execute_payment_authorization(
+    auth_id: str,
+    current_user: dict = Depends(require_permission("execute_payment_authorizations"))
+):
+    """Ejecutar una autorización de pago - crea el pago y actualiza el gasto (Admin only)"""
+    auth = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    if not auth:
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    
+    if auth["status"] != "pendiente":
+        raise HTTPException(status_code=400, detail="Esta autorización ya fue procesada")
+    
+    # Verificar que el gasto todavía existe y tiene saldo
+    expense = await db.expenses.find_one({"id": auth["expense_id"]}, {"_id": 0})
+    if not expense:
+        raise HTTPException(status_code=404, detail="El gasto asociado ya no existe")
+    
+    remaining = expense.get("remaining_amount", expense["amount"])
+    if auth["amount_to_pay"] > remaining:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El monto autorizado (Q{auth['amount_to_pay']:.2f}) excede el saldo pendiente actual (Q{remaining:.2f})"
+        )
+    
+    # Obtener información de la cuenta bancaria para la referencia
+    bank_account = await db.bank_accounts.find_one({"id": auth["bank_account_id"]}, {"_id": 0})
+    bank_ref = f"{bank_account['bank_name']} - {bank_account['account_alias']}" if bank_account else "N/A"
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Crear el pago real
+    payment_doc = {
+        "id": str(uuid.uuid4()),
+        "expense_id": auth["expense_id"],
+        "amount": auth["amount_to_pay"],
+        "date": now.split("T")[0],  # Solo fecha
+        "method": "Transferencia bancaria",
+        "reference": f"Auth: {auth_id[:8]} | Cuenta: {bank_ref}",
+        "notes": f"Pago autorizado. {auth.get('notes', '')}".strip(),
+        "created_by": current_user["id"],
+        "created_at": now
+    }
+    
+    await db.payments.insert_one(payment_doc)
+    
+    # Actualizar montos del gasto
+    await update_expense_amounts(auth["expense_id"])
+    
+    # Actualizar la autorización a ejecutado
+    await db.payment_authorizations.update_one(
+        {"id": auth_id},
+        {"$set": {
+            "status": "ejecutado",
+            "executed_by": current_user["id"],
+            "executed_at": now,
+            "updated_at": now
+        }}
+    )
+    
+    updated = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    enriched = await enrich_authorization(updated)
+    return PaymentAuthorizationResponse(**enriched)
+
+
+@api_router.post("/payment-authorizations/{auth_id}/cancel", response_model=PaymentAuthorizationResponse)
+async def cancel_payment_authorization(
+    auth_id: str,
+    current_user: dict = Depends(require_permission("authorize_payments"))
+):
+    """Cancelar una autorización de pago (SuperAdmin only)"""
+    auth = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    if not auth:
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    
+    if auth["status"] != "pendiente":
+        raise HTTPException(status_code=400, detail="Solo se pueden cancelar autorizaciones pendientes")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    await db.payment_authorizations.update_one(
+        {"id": auth_id},
+        {"$set": {
+            "status": "cancelado",
+            "updated_at": now
+        }}
+    )
+    
+    updated = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+    enriched = await enrich_authorization(updated)
+    return PaymentAuthorizationResponse(**enriched)
+
+
+@api_router.delete("/payment-authorizations/{auth_id}")
+async def delete_payment_authorization(
+    auth_id: str,
+    current_user: dict = Depends(require_permission("authorize_payments"))
+):
+    """Eliminar una autorización de pago (SuperAdmin only)"""
+    auth = await db.payment_authorizations.find_one({"id": auth_id})
+    if not auth:
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    
+    if auth["status"] == "ejecutado":
+        raise HTTPException(status_code=400, detail="No se pueden eliminar autorizaciones ejecutadas")
+    
+    await db.payment_authorizations.delete_one({"id": auth_id})
+    return {"message": "Autorización eliminada correctamente"}
+
+
 # ==================== REPORTS ROUTES ====================
 
 @api_router.get("/reports/expenses")
@@ -1587,6 +1963,9 @@ async def startup_event():
     await db.expenses.create_index([("type", 1)])
     await db.payments.create_index([("expense_id", 1)])
     await db.payments.create_index([("date", -1)])
+    await db.payment_authorizations.create_index([("expense_id", 1)])
+    await db.payment_authorizations.create_index([("status", 1)])
+    await db.payment_authorizations.create_index([("created_at", -1)])
     try:
         await db.users.create_index([("username", 1)], unique=True)
     except:

@@ -84,6 +84,21 @@ export const bankAccountApi = {
   delete: (id) => axios.delete(`${API_URL}/bank-accounts/${id}`),
 };
 
+// Payment Authorization API
+export const paymentAuthorizationApi = {
+  getAll: (status = null) => {
+    const params = status ? `?status=${status}` : '';
+    return axios.get(`${API_URL}/payment-authorizations${params}`);
+  },
+  getById: (id) => axios.get(`${API_URL}/payment-authorizations/${id}`),
+  getExpensesPendingAuth: () => axios.get(`${API_URL}/expenses-pending-authorization`),
+  create: (data) => axios.post(`${API_URL}/payment-authorizations`, data),
+  update: (id, data) => axios.put(`${API_URL}/payment-authorizations/${id}`, data),
+  execute: (id) => axios.post(`${API_URL}/payment-authorizations/${id}/execute`),
+  cancel: (id) => axios.post(`${API_URL}/payment-authorizations/${id}/cancel`),
+  delete: (id) => axios.delete(`${API_URL}/payment-authorizations/${id}`),
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {

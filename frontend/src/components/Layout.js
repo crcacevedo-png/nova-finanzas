@@ -13,7 +13,8 @@ import {
   Settings,
   Building2,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  FileCheck
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -33,6 +34,7 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
 
   const isSuperAdmin = user?.role === 'superadmin';
+  const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
 
   const handleLogout = async () => {
     await logout();
@@ -45,6 +47,16 @@ const Layout = ({ children }) => {
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
     { path: '/pagos-por-vencer', icon: Clock, label: 'Pagos por vencer', testId: 'nav-pagos-por-vencer' },
   ];
+
+  // Agregar Autorización de Pagos para Admin y SuperAdmin
+  if (isAdminOrSuperAdmin) {
+    navItems.push({ 
+      path: '/autorizacion-pagos', 
+      icon: FileCheck, 
+      label: 'Autorización de pagos', 
+      testId: 'nav-autorizacion-pagos' 
+    });
+  }
 
   if (canViewUserManagement()) {
     navItems.push({ 
