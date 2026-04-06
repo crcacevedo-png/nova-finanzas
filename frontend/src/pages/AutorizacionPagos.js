@@ -538,14 +538,16 @@ const AutorizacionPagos = () => {
                   value={formData.expense_id} 
                   onValueChange={handleExpenseSelect}
                 >
-                  <SelectTrigger className="input-teal" data-testid="expense-select">
-                    <SelectValue placeholder="Selecciona un gasto" />
+                  <SelectTrigger className="input-teal w-full" data-testid="expense-select">
+                    <SelectValue placeholder="Selecciona un gasto" className="truncate" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-w-[500px]">
                     {pendingExpenses.map((expense) => (
-                      <SelectItem key={expense.id} value={expense.id}>
-                        <div className="flex justify-between items-center gap-4">
-                          <span>{expense.name}</span>
+                      <SelectItem key={expense.id} value={expense.id} className="max-w-full">
+                        <div className="flex flex-col gap-1 py-1">
+                          <span className="text-sm font-medium truncate max-w-[450px]" title={expense.name}>
+                            {expense.name}
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             Pendiente: {formatCurrency(expense.remaining_amount)}
                           </span>

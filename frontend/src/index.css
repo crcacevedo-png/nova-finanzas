@@ -260,6 +260,16 @@
     transition: all 0.2s ease;
 }
 
+/* Select trigger text truncation */
+.input-teal [data-placeholder],
+.input-teal span[style*="pointer-events: none"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    display: block;
+}
+
 .input-teal:focus {
     border-color: var(--border-hover);
     box-shadow: 0 0 0 3px rgba(159, 225, 203, 0.2);
