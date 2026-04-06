@@ -54,9 +54,17 @@ const initialExpenseForm = {
   type: 'fijo',
   amount: '',
   date: new Date().toISOString().split('T')[0],
-  due_date: '',
+  due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 días
   invoice_number: '',
   notes: ''
+};
+
+// Función para calcular fecha de vencimiento (+30 días)
+const calculateDueDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + 30);
+  return date.toISOString().split('T')[0];
 };
 
 const initialPaymentForm = {
@@ -170,13 +178,14 @@ const Gastos = () => {
   const handleOpenExpenseDialog = (expense = null) => {
     if (expense) {
       setEditingExpense(expense);
+      const expenseDate = expense.date.split('T')[0];
       setExpenseForm({
         provider: expense.provider || '',
         name: expense.name,
         type: expense.type,
         amount: expense.amount.toString(),
-        date: expense.date.split('T')[0],
-        due_date: expense.due_date?.split('T')[0] || '',
+        date: expenseDate,
+        due_date: expense.due_date?.split('T')[0] || calculateDueDate(expenseDate),
         invoice_number: expense.invoice_number || '',
         notes: expense.notes || ''
       });
@@ -698,12 +707,19 @@ const Gastos = () => {
                     id="date"
                     type="date"
                     value={expenseForm.date}
-                    onChange={(e) => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      setExpenseForm(prev => ({ 
+                        ...prev, 
+                        date: newDate,
+                        due_date: calculateDueDate(newDate)
+                      }));
+                    }}
                     data-testid="expense-date-input"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="due_date">Fecha Vencimiento</Label>
+                  <Label htmlFor="due_date">Fecha Vencimiento (auto +30 días)</Label>
                   <Input
                     id="due_date"
                     type="date"
