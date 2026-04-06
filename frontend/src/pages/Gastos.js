@@ -498,12 +498,11 @@ const Gastos = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-50">
-                      <TableHead className="font-semibold text-slate-600">Nombre</TableHead>
                       <TableHead className="font-semibold text-slate-600">Proveedor</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Nombre</TableHead>
                       <TableHead className="font-semibold text-slate-600">Monto</TableHead>
                       <TableHead className="font-semibold text-slate-600">Progreso</TableHead>
                       <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Estado</TableHead>
                       <TableHead className="font-semibold text-slate-600">Vencimiento</TableHead>
                       <TableHead className="font-semibold text-slate-600 text-right">Acciones</TableHead>
                     </TableRow>
@@ -516,15 +515,15 @@ const Gastos = () => {
                         data-testid={`expense-row-${expense.id}`}
                       >
                         <TableCell>
+                          <span className="text-slate-700 font-medium">{expense.provider || '-'}</span>
+                        </TableCell>
+                        <TableCell>
                           <div>
                             <p className="font-medium text-slate-900">{expense.name}</p>
                             {expense.invoice_number && (
                               <p className="text-xs text-slate-500">Factura: {expense.invoice_number}</p>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-slate-700">{expense.provider || '-'}</span>
                         </TableCell>
                         <TableCell>
                           <div>
@@ -545,7 +544,6 @@ const Gastos = () => {
                           </div>
                         </TableCell>
                         <TableCell>{getTypeBadge(expense.type)}</TableCell>
-                        <TableCell>{getStatusBadge(expense.status)}</TableCell>
                         <TableCell className="text-slate-600">
                           {expense.due_date ? formatDate(expense.due_date) : '-'}
                         </TableCell>
