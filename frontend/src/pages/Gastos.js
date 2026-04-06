@@ -499,6 +499,7 @@ const Gastos = () => {
                   <TableHeader>
                     <TableRow className="bg-slate-50">
                       <TableHead className="font-semibold text-slate-600">Nombre</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Proveedor</TableHead>
                       <TableHead className="font-semibold text-slate-600">Monto</TableHead>
                       <TableHead className="font-semibold text-slate-600">Progreso</TableHead>
                       <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
@@ -521,6 +522,9 @@ const Gastos = () => {
                               <p className="text-xs text-slate-500">Factura: {expense.invoice_number}</p>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-slate-700">{expense.provider || '-'}</span>
                         </TableCell>
                         <TableCell>
                           <div>
