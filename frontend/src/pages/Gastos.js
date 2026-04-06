@@ -503,6 +503,7 @@ const Gastos = () => {
                       <TableHead className="font-semibold text-slate-600">Monto</TableHead>
                       <TableHead className="font-semibold text-slate-600">Progreso</TableHead>
                       <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Estado</TableHead>
                       <TableHead className="font-semibold text-slate-600">Vencimiento</TableHead>
                       <TableHead className="font-semibold text-slate-600 text-right">Acciones</TableHead>
                     </TableRow>
@@ -544,6 +545,7 @@ const Gastos = () => {
                           </div>
                         </TableCell>
                         <TableCell>{getTypeBadge(expense.type)}</TableCell>
+                        <TableCell>{getStatusBadge(expense.status)}</TableCell>
                         <TableCell className="text-slate-600">
                           {expense.due_date ? formatDate(expense.due_date) : '-'}
                         </TableCell>
