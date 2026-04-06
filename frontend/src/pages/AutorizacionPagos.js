@@ -147,8 +147,18 @@ const AutorizacionPagos = () => {
   const handleCreateAuthorization = async (e) => {
     e.preventDefault();
     
-    if (!formData.expense_id || !formData.bank_account_id || !formData.amount_to_pay) {
-      toast.error('Por favor completa los campos obligatorios');
+    if (!formData.expense_id) {
+      toast.error('Por favor selecciona un gasto');
+      return;
+    }
+    
+    if (!formData.bank_account_id) {
+      toast.error('Por favor selecciona una cuenta bancaria');
+      return;
+    }
+    
+    if (!formData.amount_to_pay || parseFloat(formData.amount_to_pay) <= 0) {
+      toast.error('Por favor ingresa un monto válido');
       return;
     }
 
