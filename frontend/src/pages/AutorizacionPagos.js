@@ -473,7 +473,7 @@ const AutorizacionPagos = () => {
                 <Clock className="w-5 h-5 text-teal-600" />
               </div>
               <div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Autorizados pendientes</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Pendientes de ejecutar</p>
                 <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {summary.pending}
                 </p>
