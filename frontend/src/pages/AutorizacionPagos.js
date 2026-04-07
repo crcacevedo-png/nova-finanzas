@@ -8,13 +8,14 @@ import {
   Clock,
   Building2,
   FileCheck,
-  AlertCircle,
   Eye,
   Trash2,
   RefreshCw,
-  CreditCard,
   Calendar,
-  User
+  User,
+  CheckSquare,
+  Square,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -46,6 +47,7 @@ import {
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { Textarea } from '../components/ui/textarea';
+import { Checkbox } from '../components/ui/checkbox';
 import { toast, Toaster } from 'sonner';
 import { paymentAuthorizationApi, bankAccountApi, formatCurrency, formatDate } from '../services/api';
 
@@ -62,12 +64,18 @@ const AutorizacionPagos = () => {
   
   const [authorizations, setAuthorizations] = useState([]);
   const [pendingExpenses, setPendingExpenses] = useState([]);
+  const [expensesDue30, setExpensesDue30] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('authorizations'); // 'authorizations' | 'expenses_due'
+  
+  // Selección múltiple
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState([]);
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [batchAuthDialogOpen, setBatchAuthDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [executeDialogOpen, setExecuteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -84,9 +92,25 @@ const AutorizacionPagos = () => {
     amount_to_pay: '',
     notes: ''
   });
+  
+  // Batch authorization form
+  const [batchBankAccountId, setBatchBankAccountId] = useState('');
 
   // Summary counts
-  const [summary, setSummary] = useState({ pending: 0, executed: 0, total: 0 });
+  const [summary, setSummary] = useState({ pending: 0, executed: 0, total: 0, due30Count: 0 });
+
+  // Calcular gastos que vencen en 30 días
+  const calculateExpensesDue30 = (expenses) => {
+    const today = new Date();
+    const in30Days = new Date();
+    in30Days.setDate(today.getDate() + 30);
+    
+    return expenses.filter(expense => {
+      if (!expense.due_date) return false;
+      const dueDate = new Date(expense.due_date);
+      return dueDate >= today && dueDate <= in30Days;
+    }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -96,11 +120,6 @@ const AutorizacionPagos = () => {
       const statusParam = statusFilter !== 'all' ? statusFilter : null;
       const authResponse = await paymentAuthorizationApi.getAll(statusParam);
       setAuthorizations(authResponse.data.data || []);
-      setSummary({
-        pending: authResponse.data.pending_count || 0,
-        executed: authResponse.data.executed_count || 0,
-        total: authResponse.data.total || 0
-      });
       
       // Solo SuperAdmin puede crear autorizaciones
       if (isSuperAdmin) {
@@ -108,8 +127,27 @@ const AutorizacionPagos = () => {
           paymentAuthorizationApi.getExpensesPendingAuth(),
           bankAccountApi.getAll()
         ]);
-        setPendingExpenses(expensesRes.data.data || []);
+        const allPendingExpenses = expensesRes.data.data || [];
+        setPendingExpenses(allPendingExpenses);
         setBankAccounts(accountsRes.data.data || []);
+        
+        // Calcular gastos que vencen en 30 días
+        const due30 = calculateExpensesDue30(allPendingExpenses);
+        setExpensesDue30(due30);
+        
+        setSummary({
+          pending: authResponse.data.pending_count || 0,
+          executed: authResponse.data.executed_count || 0,
+          total: authResponse.data.total || 0,
+          due30Count: due30.length
+        });
+      } else {
+        setSummary({
+          pending: authResponse.data.pending_count || 0,
+          executed: authResponse.data.executed_count || 0,
+          total: authResponse.data.total || 0,
+          due30Count: 0
+        });
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -122,6 +160,11 @@ const AutorizacionPagos = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Limpiar selección al cambiar de vista
+  useEffect(() => {
+    setSelectedExpenseIds([]);
+  }, [viewMode]);
 
   const handleOpenCreateDialog = () => {
     setFormData({
@@ -142,6 +185,79 @@ const AutorizacionPagos = () => {
       expense_id: expenseId,
       amount_to_pay: expense ? expense.remaining_amount.toString() : ''
     }));
+  };
+
+  // Toggle selección individual
+  const toggleExpenseSelection = (expenseId) => {
+    setSelectedExpenseIds(prev => {
+      if (prev.includes(expenseId)) {
+        return prev.filter(id => id !== expenseId);
+      } else {
+        return [...prev, expenseId];
+      }
+    });
+  };
+
+  // Seleccionar/Deseleccionar todos
+  const toggleSelectAll = () => {
+    if (selectedExpenseIds.length === expensesDue30.length) {
+      setSelectedExpenseIds([]);
+    } else {
+      setSelectedExpenseIds(expensesDue30.map(e => e.id));
+    }
+  };
+
+  // Abrir diálogo de autorización por lote
+  const handleOpenBatchAuth = () => {
+    if (selectedExpenseIds.length === 0) {
+      toast.error('Selecciona al menos un gasto para autorizar');
+      return;
+    }
+    setBatchBankAccountId('');
+    setBatchAuthDialogOpen(true);
+  };
+
+  // Crear autorizaciones en lote
+  const handleBatchAuthorization = async () => {
+    if (!batchBankAccountId) {
+      toast.error('Por favor selecciona una cuenta bancaria');
+      return;
+    }
+
+    setSubmitting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const expenseId of selectedExpenseIds) {
+      const expense = expensesDue30.find(e => e.id === expenseId);
+      if (!expense) continue;
+
+      try {
+        await paymentAuthorizationApi.create({
+          expense_id: expenseId,
+          bank_account_id: batchBankAccountId,
+          amount_to_pay: expense.remaining_amount,
+          notes: 'Autorización en lote'
+        });
+        successCount++;
+      } catch (error) {
+        errorCount++;
+        console.error(`Error autorizando gasto ${expenseId}:`, error);
+      }
+    }
+
+    setSubmitting(false);
+    setBatchAuthDialogOpen(false);
+    setSelectedExpenseIds([]);
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} autorización(es) creada(s) exitosamente`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} gasto(s) no pudieron ser autorizados`);
+    }
+    
+    fetchData();
   };
 
   const handleCreateAuthorization = async (e) => {
@@ -235,6 +351,18 @@ const AutorizacionPagos = () => {
     }
   };
 
+  // Calcular días hasta vencimiento
+  const getDaysUntilDue = (dueDate) => {
+    if (!dueDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
   const StatusBadge = ({ status }) => {
     const config = statusConfig[status] || statusConfig.pendiente;
     const Icon = config.icon;
@@ -242,6 +370,21 @@ const AutorizacionPagos = () => {
       <Badge className={`${config.color} flex items-center gap-1`}>
         <Icon className="w-3 h-3" />
         {config.label}
+      </Badge>
+    );
+  };
+
+  const DueDaysBadge = ({ dueDate }) => {
+    const days = getDaysUntilDue(dueDate);
+    if (days === null) return null;
+    
+    let bgColor = 'bg-emerald-100 text-emerald-700';
+    if (days <= 7) bgColor = 'bg-red-100 text-red-700';
+    else if (days <= 15) bgColor = 'bg-amber-100 text-amber-700';
+    
+    return (
+      <Badge className={`${bgColor} text-xs`}>
+        {days === 0 ? 'Hoy' : days === 1 ? '1 día' : `${days} días`}
       </Badge>
     );
   };
@@ -272,7 +415,17 @@ const AutorizacionPagos = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
               Actualizar
             </Button>
-            {isSuperAdmin && (
+            {isSuperAdmin && viewMode === 'expenses_due' && selectedExpenseIds.length > 0 && (
+              <Button 
+                onClick={handleOpenBatchAuth}
+                className="btn-primary"
+                data-testid="batch-authorize-button"
+              >
+                <CheckSquare className="w-4 h-4 mr-2" />
+                Autorizar ({selectedExpenseIds.length})
+              </Button>
+            )}
+            {isSuperAdmin && viewMode === 'authorizations' && (
               <Button 
                 onClick={handleOpenCreateDialog}
                 className="btn-primary"
@@ -288,20 +441,52 @@ const AutorizacionPagos = () => {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="card-metrics border-0 shadow-none">
+          {/* Card Por Vencer (30 días) - Clickeable */}
+          {isSuperAdmin && (
+            <Card 
+              className={`card-metrics border-0 shadow-none cursor-pointer transition-all hover:shadow-md ${viewMode === 'expenses_due' ? 'ring-2 ring-amber-500' : ''}`}
+              onClick={() => setViewMode('expenses_due')}
+              data-testid="due30-card"
+            >
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-amber-100">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Por vencer (30 días)</p>
+                  <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                    {summary.due30Count}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Card Autorizaciones Pendientes */}
+          <Card 
+            className={`card-metrics border-0 shadow-none cursor-pointer transition-all hover:shadow-md ${viewMode === 'authorizations' && statusFilter === 'pendiente' ? 'ring-2 ring-teal-500' : ''}`}
+            onClick={() => { setViewMode('authorizations'); setStatusFilter('pendiente'); }}
+            data-testid="pending-auth-card"
+          >
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-amber-100">
-                <Clock className="w-5 h-5 text-amber-600" />
+              <div className="p-3 rounded-xl bg-teal-100">
+                <Clock className="w-5 h-5 text-teal-600" />
               </div>
               <div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Pendientes</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Autorizados pendientes</p>
                 <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {summary.pending}
                 </p>
               </div>
             </CardContent>
           </Card>
-          <Card className="card-metrics border-0 shadow-none">
+          
+          {/* Card Ejecutados */}
+          <Card 
+            className={`card-metrics border-0 shadow-none cursor-pointer transition-all hover:shadow-md ${viewMode === 'authorizations' && statusFilter === 'ejecutado' ? 'ring-2 ring-emerald-500' : ''}`}
+            onClick={() => { setViewMode('authorizations'); setStatusFilter('ejecutado'); }}
+            data-testid="executed-card"
+          >
             <CardContent className="p-4 flex items-center gap-4">
               <div className="p-3 rounded-xl bg-emerald-100">
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
@@ -314,212 +499,340 @@ const AutorizacionPagos = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="card-metrics border-0 shadow-none">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-blue-100">
-                <FileCheck className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Autorizaciones</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {summary.total}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Filters */}
-        <Card className="card-teal">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex items-center gap-2">
-                <Label>Estado:</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px] input-teal" data-testid="status-filter">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="ejecutado">Ejecutado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Table */}
-        <Card className="card-teal">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Lista de Autorizaciones
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-6 space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : authorizations.length === 0 ? (
-              <div className="p-12 text-center">
-                <FileCheck className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-hint)' }} />
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  {statusFilter !== 'all' 
-                    ? `No hay autorizaciones con estado "${statusConfig[statusFilter]?.label || statusFilter}"`
-                    : 'No hay autorizaciones de pago'}
-                </p>
-                {isSuperAdmin && pendingExpenses.length > 0 && (
-                  <Button 
-                    onClick={handleOpenCreateDialog}
-                    className="btn-primary mt-4"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Crear primera autorización
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
-                      <TableHead className="table-header">Gasto</TableHead>
-                      <TableHead className="table-header">Proveedor</TableHead>
-                      <TableHead className="table-header">Monto Autorizado</TableHead>
-                      <TableHead className="table-header">Cuenta Bancaria</TableHead>
-                      <TableHead className="table-header">Estado</TableHead>
-                      <TableHead className="table-header">Autorizado por</TableHead>
-                      <TableHead className="table-header text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {authorizations.map((auth) => (
-                      <TableRow 
-                        key={auth.id} 
-                        className="table-row-hover"
-                        data-testid={`auth-row-${auth.id}`}
-                      >
-                        <TableCell>
-                          <div>
-                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                              {auth.expense_name}
-                            </p>
-                            <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
-                              Vence: {formatDate(auth.expense_due_date)}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span style={{ color: 'var(--text-secondary)' }}>
-                            {auth.expense_provider || '-'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-semibold" style={{ color: 'var(--primary-teal)' }}>
-                            {formatCurrency(auth.amount_to_pay)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4" style={{ color: 'var(--text-hint)' }} />
-                            <div>
-                              <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                                {auth.bank_account_alias}
-                              </p>
-                              <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
-                                {auth.bank_name}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={auth.status} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4" style={{ color: 'var(--text-hint)' }} />
-                            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                              {auth.authorized_by_name}
+        {/* Vista de Gastos por Vencer (30 días) */}
+        {viewMode === 'expenses_due' && isSuperAdmin && (
+          <Card className="card-teal">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Gastos por vencer en los próximos 30 días
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('authorizations')}
+                className="text-sm"
+              >
+                Ver autorizaciones
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-6 space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : expensesDue30.length === 0 ? (
+                <div className="p-12 text-center">
+                  <Calendar className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-hint)' }} />
+                  <p style={{ color: 'var(--text-secondary)' }}>
+                    No hay gastos por vencer en los próximos 30 días
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                        <TableHead className="table-header w-12">
+                          <Checkbox
+                            checked={selectedExpenseIds.length === expensesDue30.length && expensesDue30.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                            data-testid="select-all-checkbox"
+                          />
+                        </TableHead>
+                        <TableHead className="table-header">Proveedor</TableHead>
+                        <TableHead className="table-header">Gasto</TableHead>
+                        <TableHead className="table-header">Monto Pendiente</TableHead>
+                        <TableHead className="table-header">Vencimiento</TableHead>
+                        <TableHead className="table-header">Días</TableHead>
+                        <TableHead className="table-header text-right">Acción</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expensesDue30.map((expense) => (
+                        <TableRow 
+                          key={expense.id} 
+                          className={`table-row-hover ${selectedExpenseIds.includes(expense.id) ? 'bg-teal-50' : ''}`}
+                          data-testid={`expense-due-row-${expense.id}`}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedExpenseIds.includes(expense.id)}
+                              onCheckedChange={() => toggleExpenseSelection(expense.id)}
+                              data-testid={`select-expense-${expense.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                              {expense.provider || '-'}
                             </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }} title={expense.name}>
+                                {expense.name}
+                              </p>
+                              {expense.invoice_number && (
+                                <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                                  Factura: {expense.invoice_number}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                              {formatCurrency(expense.remaining_amount)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span style={{ color: 'var(--text-secondary)' }}>
+                              {formatDate(expense.due_date)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <DueDaysBadge dueDate={expense.due_date} />
+                          </TableCell>
+                          <TableCell className="text-right">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                setSelectedAuth(auth);
-                                setDetailDialogOpen(true);
+                                setSelectedExpense(expense);
+                                setFormData({
+                                  expense_id: expense.id,
+                                  bank_account_id: '',
+                                  amount_to_pay: expense.remaining_amount.toString(),
+                                  notes: ''
+                                });
+                                setCreateDialogOpen(true);
                               }}
-                              className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
-                              data-testid={`view-auth-${auth.id}`}
+                              className="h-8 px-3 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                              data-testid={`authorize-expense-${expense.id}`}
                             >
-                              <Eye className="w-4 h-4" />
+                              <Plus className="w-4 h-4 mr-1" />
+                              Autorizar
                             </Button>
-                            
-                            {/* Admin puede ejecutar pagos pendientes */}
-                            {isAdmin && auth.status === 'pendiente' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedAuth(auth);
-                                  setExecuteDialogOpen(true);
-                                }}
-                                className="h-8 w-8 p-0 hover:bg-emerald-100 hover:text-emerald-600"
-                                data-testid={`execute-auth-${auth.id}`}
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </Button>
-                            )}
-                            
-                            {/* SuperAdmin puede cancelar y eliminar */}
-                            {isSuperAdmin && auth.status === 'pendiente' && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedAuth(auth);
-                                    setCancelDialogOpen(true);
-                                  }}
-                                  className="h-8 w-8 p-0 hover:bg-amber-100 hover:text-amber-600"
-                                  data-testid={`cancel-auth-${auth.id}`}
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedAuth(auth);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                  className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
-                                  data-testid={`delete-auth-${auth.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Create Authorization Dialog (SuperAdmin only) */}
+        {/* Vista de Autorizaciones */}
+        {viewMode === 'authorizations' && (
+          <>
+            {/* Filters */}
+            <Card className="card-teal">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap gap-4 items-center">
+                  <div className="flex items-center gap-2">
+                    <Label>Estado:</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px] input-teal" data-testid="status-filter">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="pendiente">Pendiente</SelectItem>
+                        <SelectItem value="ejecutado">Ejecutado</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {isSuperAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setViewMode('expenses_due')}
+                      className="ml-auto"
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-2 text-amber-500" />
+                      Ver por vencer ({summary.due30Count})
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Table */}
+            <Card className="card-teal">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  Lista de Autorizaciones
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="p-6 space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : authorizations.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <FileCheck className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-hint)' }} />
+                    <p style={{ color: 'var(--text-secondary)' }}>
+                      {statusFilter !== 'all' 
+                        ? `No hay autorizaciones con estado "${statusConfig[statusFilter]?.label || statusFilter}"`
+                        : 'No hay autorizaciones de pago'}
+                    </p>
+                    {isSuperAdmin && pendingExpenses.length > 0 && (
+                      <Button 
+                        onClick={handleOpenCreateDialog}
+                        className="btn-primary mt-4"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crear primera autorización
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                          <TableHead className="table-header">Gasto</TableHead>
+                          <TableHead className="table-header">Proveedor</TableHead>
+                          <TableHead className="table-header">Monto Autorizado</TableHead>
+                          <TableHead className="table-header">Cuenta Bancaria</TableHead>
+                          <TableHead className="table-header">Estado</TableHead>
+                          <TableHead className="table-header">Autorizado por</TableHead>
+                          <TableHead className="table-header text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {authorizations.map((auth) => (
+                          <TableRow 
+                            key={auth.id} 
+                            className="table-row-hover"
+                            data-testid={`auth-row-${auth.id}`}
+                          >
+                            <TableCell>
+                              <div>
+                                <p className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }} title={auth.expense_name}>
+                                  {auth.expense_name}
+                                </p>
+                                <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                                  Vence: {formatDate(auth.expense_due_date)}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                {auth.expense_provider || '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                                {formatCurrency(auth.amount_to_pay)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4" style={{ color: 'var(--text-hint)' }} />
+                                <div>
+                                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                                    {auth.bank_account_alias}
+                                  </p>
+                                  <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                                    {auth.bank_name}
+                                  </p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={auth.status} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4" style={{ color: 'var(--text-hint)' }} />
+                                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                  {auth.authorized_by_name}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAuth(auth);
+                                    setDetailDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                                  data-testid={`view-auth-${auth.id}`}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                
+                                {/* Admin puede ejecutar pagos pendientes */}
+                                {isAdmin && auth.status === 'pendiente' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedAuth(auth);
+                                      setExecuteDialogOpen(true);
+                                    }}
+                                    className="h-8 w-8 p-0 hover:bg-emerald-100 hover:text-emerald-600"
+                                    data-testid={`execute-auth-${auth.id}`}
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                
+                                {/* SuperAdmin puede cancelar y eliminar */}
+                                {isSuperAdmin && auth.status === 'pendiente' && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedAuth(auth);
+                                        setCancelDialogOpen(true);
+                                      }}
+                                      className="h-8 w-8 p-0 hover:bg-amber-100 hover:text-amber-600"
+                                      data-testid={`cancel-auth-${auth.id}`}
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedAuth(auth);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                      className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                                      data-testid={`delete-auth-${auth.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* Create Authorization Dialog (Individual) */}
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogContent className="sm:max-w-[550px]">
             <DialogHeader>
@@ -665,6 +978,92 @@ const AutorizacionPagos = () => {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Batch Authorization Dialog */}
+        <Dialog open={batchAuthDialogOpen} onOpenChange={setBatchAuthDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle style={{ color: 'var(--text-primary)' }}>
+                Autorizar {selectedExpenseIds.length} pago(s)
+              </DialogTitle>
+              <DialogDescription style={{ color: 'var(--text-secondary)' }}>
+                Selecciona la cuenta bancaria para autorizar los pagos seleccionados
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Resumen de gastos seleccionados */}
+              <Card className="bg-amber-50 border-amber-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-amber-700 font-medium mb-2">
+                    Gastos seleccionados:
+                  </p>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {selectedExpenseIds.map(id => {
+                      const expense = expensesDue30.find(e => e.id === id);
+                      return expense ? (
+                        <div key={id} className="flex justify-between text-sm">
+                          <span className="truncate max-w-[250px]" title={expense.name}>{expense.name}</span>
+                          <span className="font-medium">{formatCurrency(expense.remaining_amount)}</span>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                  <div className="border-t border-amber-200 mt-2 pt-2 flex justify-between font-semibold">
+                    <span>Total:</span>
+                    <span>
+                      {formatCurrency(
+                        selectedExpenseIds.reduce((sum, id) => {
+                          const expense = expensesDue30.find(e => e.id === id);
+                          return sum + (expense?.remaining_amount || 0);
+                        }, 0)
+                      )}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Selección de cuenta bancaria */}
+              <div className="space-y-2">
+                <Label>Cuenta bancaria *</Label>
+                <Select value={batchBankAccountId} onValueChange={setBatchBankAccountId}>
+                  <SelectTrigger className="input-teal" data-testid="batch-bank-account-select">
+                    <SelectValue placeholder="Selecciona una cuenta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-muted-foreground" />
+                          <span>{account.account_alias}</span>
+                          <span className="text-xs text-muted-foreground">({account.bank_name})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setBatchAuthDialogOpen(false)} 
+                className="btn-outline"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleBatchAuthorization}
+                className="btn-primary" 
+                disabled={submitting || !batchBankAccountId}
+                data-testid="confirm-batch-authorization"
+              >
+                {submitting ? 'Procesando...' : `Autorizar ${selectedExpenseIds.length} pago(s)`}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
