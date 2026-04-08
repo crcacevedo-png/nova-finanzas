@@ -54,7 +54,11 @@ const initialExpenseForm = {
   type: 'fijo',
   amount: '',
   date: new Date().toISOString().split('T')[0],
-  due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 días
+  due_date: (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split('T')[0];
+  })(),
   invoice_number: '',
   notes: ''
 };
@@ -62,9 +66,14 @@ const initialExpenseForm = {
 // Función para calcular fecha de vencimiento (+30 días)
 const calculateDueDate = (dateString) => {
   if (!dateString) return '';
-  const date = new Date(dateString);
+  // Parsear la fecha manualmente para evitar problemas de zona horaria
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day); // month es 0-indexed
   date.setDate(date.getDate() + 30);
-  return date.toISOString().split('T')[0];
+  const newYear = date.getFullYear();
+  const newMonth = String(date.getMonth() + 1).padStart(2, '0');
+  const newDay = String(date.getDate()).padStart(2, '0');
+  return `${newYear}-${newMonth}-${newDay}`;
 };
 
 const initialPaymentForm = {
