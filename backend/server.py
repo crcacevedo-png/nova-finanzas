@@ -416,7 +416,7 @@ async def update_expense_amounts(expense_id: str):
                 status = "parcial"
             else:
                 status = "pendiente"
-        except:
+        except Exception:
             status = "parcial" if paid_amount > 0 else "pendiente"
     else:
         status = "parcial" if paid_amount > 0 else "pendiente"
@@ -447,7 +447,7 @@ async def check_overdue_expenses():
                     {"id": expense["id"]},
                     {"$set": {"status": "vencido", "updated_at": datetime.now(timezone.utc).isoformat()}}
                 )
-        except:
+        except Exception:
             pass
 
 # ==================== SEED USERS ====================
@@ -839,7 +839,7 @@ async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depen
             due_date = datetime.fromisoformat(expense_data.due_date).date()
             if due_date < datetime.now(timezone.utc).date():
                 status = "vencido"
-        except:
+        except Exception:
             pass
     
     expense_doc = {
@@ -1110,7 +1110,7 @@ async def get_monthly_chart(current_user: dict = Depends(require_permission("vie
             month_key = date.strftime("%Y-%m")
             if month_key in monthly_data:
                 monthly_data[month_key]["total"] += e["amount"]
-        except:
+        except Exception:
             pass
     
     # Sort by date and return
@@ -1165,7 +1165,7 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
                     due30.append(alert)
                 elif 30 < days <= 60:
                     due60.append(alert)
-            except:
+            except Exception:
                 pass
     
     # Sort by days remaining
@@ -1248,7 +1248,7 @@ async def get_chart_data(current_user: dict = Depends(require_permission("view_d
                 }
             
             monthly_data[month_key][e["type"]] += e["amount"]
-        except:
+        except Exception:
             pass
     
     sorted_data = sorted(monthly_data.values(), key=lambda x: x["mes"])
@@ -1968,7 +1968,7 @@ async def startup_event():
     await db.payment_authorizations.create_index([("created_at", -1)])
     try:
         await db.users.create_index([("username", 1)], unique=True)
-    except:
+    except Exception:
         pass  # Index may already exist
 
 @app.on_event("shutdown")
