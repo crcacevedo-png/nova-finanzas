@@ -69,6 +69,16 @@
 | POST | /api/payment-authorizations/:id/cancel | Cancelar autorización (SuperAdmin) |
 | DELETE | /api/payment-authorizations/:id | Eliminar autorización (SuperAdmin) |
 
+### Gastos Fijos Recurrentes (Admin/SuperAdmin)
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/fixed-expenses | Listar gastos fijos |
+| GET | /api/fixed-expenses/:id | Detalle de gasto fijo |
+| POST | /api/fixed-expenses | Crear gasto fijo |
+| PUT | /api/fixed-expenses/:id | Editar gasto fijo |
+| DELETE | /api/fixed-expenses/:id | Eliminar gasto fijo (soft delete) |
+| POST | /api/fixed-expenses/generate-now | Generar gastos del día (solo SuperAdmin) |
+
 ### Dashboard / Reportes
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -164,6 +174,22 @@
 }
 ```
 
+### Fixed Expenses (Gastos Fijos)
+```json
+{
+  "id": "uuid",
+  "supplier_id": "supplier_id",
+  "expense_name": "string",
+  "amount": "number",
+  "day_of_month": "int (1-31)",
+  "is_active": "boolean",
+  "created_by": "user_id",
+  "created_at": "datetime",
+  "updated_at": "datetime",
+  "last_generated": "string (YYYY-MM) | null"
+}
+```
+
 ---
 
 ## 3. Sistema de Permisos
@@ -224,6 +250,15 @@
   - ✅ Filtro por estado
   - ✅ Historial completo de autorizaciones
   - ✅ Tests automatizados (100% backend, 100% frontend)
+- ✅ **Módulo Gastos Fijos Recurrentes (Abril 2026):**
+  - ✅ CRUD completo de gastos fijos (proveedor, nombre, monto, día del mes)
+  - ✅ Vinculación con proveedores existentes (selector dinámico)
+  - ✅ Acceso para Admin y SuperAdmin
+  - ✅ APScheduler para generación automática diaria (00:05)
+  - ✅ Generación manual con botón "Generar Ahora" (solo SuperAdmin)
+  - ✅ Prevención de duplicados (campo last_generated)
+  - ✅ Gastos generados con vencimiento automático +30 días
+  - ✅ Tests automatizados (100% backend, 100% frontend)
 
 ---
 
@@ -237,7 +272,6 @@
 ## 7. Tareas Pendientes
 
 ### P2 - Mejoras
-- [ ] Cron job para actualizar automáticamente gastos vencidos en DB
 - [ ] Refactorización de `server.py` (separar modelos, rutas, servicios)
 
 ### Backlog

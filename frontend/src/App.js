@@ -134,7 +134,7 @@ function AppRoutes() {
       <Route 
         path="/configuracion/gastos-fijos" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="view_payment_authorizations">
             <GastosFijos />
           </ProtectedRoute>
         } 
