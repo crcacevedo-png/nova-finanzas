@@ -10,6 +10,7 @@ import PagosPorVencer from './pages/PagosPorVencer';
 import CuentasBancarias from './pages/CuentasBancarias';
 import AutorizacionPagos from './pages/AutorizacionPagos';
 import Proveedores from './pages/Proveedores';
+import GastosFijos from './pages/GastosFijos';
 import './App.css';
 
 // Protected Route Component
@@ -127,6 +128,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Proveedores />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/configuracion/gastos-fijos" 
+        element={
+          <ProtectedRoute>
+            <GastosFijos />
           </ProtectedRoute>
         } 
       />

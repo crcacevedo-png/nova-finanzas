@@ -108,6 +108,16 @@ export const supplierApi = {
   delete: (id) => axios.delete(`${API_URL}/suppliers/${id}`),
 };
 
+// Fixed Expenses API (Gastos Fijos Recurrentes)
+export const fixedExpenseApi = {
+  getAll: () => axios.get(`${API_URL}/fixed-expenses`),
+  getById: (id) => axios.get(`${API_URL}/fixed-expenses/${id}`),
+  create: (data) => axios.post(`${API_URL}/fixed-expenses`, data),
+  update: (id, data) => axios.put(`${API_URL}/fixed-expenses/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/fixed-expenses/${id}`),
+  generateNow: () => axios.post(`${API_URL}/fixed-expenses/generate-now`),
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {

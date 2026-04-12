@@ -7,6 +7,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 import os
 import logging
 from pathlib import Path
@@ -18,6 +20,7 @@ import jwt
 import bcrypt
 import io
 import json
+import asyncio
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -328,6 +331,42 @@ class SupplierResponse(BaseModel):
 
 class SupplierListResponse(BaseModel):
     data: List[SupplierResponse]
+    total: int
+
+# ==================== FIXED EXPENSE MODELS ====================
+
+class FixedExpenseBase(BaseModel):
+    supplier_id: str
+    expense_name: str
+    amount: float = Field(gt=0)
+    day_of_month: int = Field(ge=1, le=31)
+
+class FixedExpenseCreate(FixedExpenseBase):
+    pass
+
+class FixedExpenseUpdate(BaseModel):
+    supplier_id: Optional[str] = None
+    expense_name: Optional[str] = None
+    amount: Optional[float] = None
+    day_of_month: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class FixedExpenseResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    supplier_id: str
+    supplier_name: Optional[str] = ""
+    expense_name: str
+    amount: float
+    day_of_month: int
+    is_active: bool = True
+    created_by: str
+    created_at: str
+    updated_at: Optional[str] = None
+    last_generated: Optional[str] = None
+
+class FixedExpenseListResponse(BaseModel):
+    data: List[FixedExpenseResponse]
     total: int
 
 # Dashboard Models
@@ -1477,6 +1516,160 @@ async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_cur
     return {"message": "Proveedor eliminado correctamente"}
 
 
+# ==================== FIXED EXPENSE ROUTES ====================
+
+async def enrich_fixed_expense(fixed_expense: dict) -> dict:
+    """Enrich fixed expense with supplier name"""
+    supplier = await db.suppliers.find_one({"id": fixed_expense["supplier_id"]}, {"_id": 0})
+    if supplier:
+        fixed_expense["supplier_name"] = supplier.get("name", "")
+    else:
+        fixed_expense["supplier_name"] = "Proveedor eliminado"
+    return fixed_expense
+
+
+@api_router.get("/fixed-expenses", response_model=FixedExpenseListResponse)
+async def get_fixed_expenses(current_user: dict = Depends(get_current_user)):
+    """Obtener todos los gastos fijos (Admin y SuperAdmin)"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver gastos fijos")
+    
+    fixed_expenses = await db.fixed_expenses.find({"is_active": True}, {"_id": 0}).sort("day_of_month", 1).to_list(1000)
+    
+    # Enriquecer con nombre del proveedor
+    enriched = []
+    for fe in fixed_expenses:
+        enriched.append(await enrich_fixed_expense(fe))
+    
+    return FixedExpenseListResponse(data=enriched, total=len(enriched))
+
+
+@api_router.get("/fixed-expenses/{fixed_expense_id}", response_model=FixedExpenseResponse)
+async def get_fixed_expense(fixed_expense_id: str, current_user: dict = Depends(get_current_user)):
+    """Obtener un gasto fijo específico"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    fixed_expense = await db.fixed_expenses.find_one({"id": fixed_expense_id, "is_active": True}, {"_id": 0})
+    if not fixed_expense:
+        raise HTTPException(status_code=404, detail="Gasto fijo no encontrado")
+    
+    enriched = await enrich_fixed_expense(fixed_expense)
+    return FixedExpenseResponse(**enriched)
+
+
+@api_router.post("/fixed-expenses", response_model=FixedExpenseResponse)
+async def create_fixed_expense(fixed_expense_data: FixedExpenseCreate, current_user: dict = Depends(get_current_user)):
+    """Crear nuevo gasto fijo (Admin y SuperAdmin)"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear gastos fijos")
+    
+    # Verificar que el proveedor existe
+    supplier = await db.suppliers.find_one({"id": fixed_expense_data.supplier_id, "is_active": True})
+    if not supplier:
+        raise HTTPException(status_code=400, detail="Proveedor no encontrado")
+    
+    # Verificar duplicados (mismo proveedor + nombre de gasto)
+    existing = await db.fixed_expenses.find_one({
+        "supplier_id": fixed_expense_data.supplier_id,
+        "expense_name": {"$regex": f"^{fixed_expense_data.expense_name}$", "$options": "i"},
+        "is_active": True
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe un gasto fijo con este nombre para este proveedor")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    fixed_expense_doc = {
+        "id": str(uuid.uuid4()),
+        "supplier_id": fixed_expense_data.supplier_id,
+        "expense_name": fixed_expense_data.expense_name,
+        "amount": fixed_expense_data.amount,
+        "day_of_month": fixed_expense_data.day_of_month,
+        "is_active": True,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now,
+        "last_generated": None
+    }
+    
+    await db.fixed_expenses.insert_one(fixed_expense_doc)
+    if "_id" in fixed_expense_doc:
+        del fixed_expense_doc["_id"]
+    
+    enriched = await enrich_fixed_expense(fixed_expense_doc)
+    return FixedExpenseResponse(**enriched)
+
+
+@api_router.put("/fixed-expenses/{fixed_expense_id}", response_model=FixedExpenseResponse)
+async def update_fixed_expense(fixed_expense_id: str, fixed_expense_data: FixedExpenseUpdate, current_user: dict = Depends(get_current_user)):
+    """Actualizar gasto fijo (Admin y SuperAdmin)"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    fixed_expense = await db.fixed_expenses.find_one({"id": fixed_expense_id, "is_active": True})
+    if not fixed_expense:
+        raise HTTPException(status_code=404, detail="Gasto fijo no encontrado")
+    
+    update_data = {k: v for k, v in fixed_expense_data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    
+    # Verificar proveedor si se está actualizando
+    if "supplier_id" in update_data:
+        supplier = await db.suppliers.find_one({"id": update_data["supplier_id"], "is_active": True})
+        if not supplier:
+            raise HTTPException(status_code=400, detail="Proveedor no encontrado")
+    
+    # Verificar duplicados si se actualiza el nombre
+    if "expense_name" in update_data:
+        supplier_id = update_data.get("supplier_id", fixed_expense["supplier_id"])
+        existing = await db.fixed_expenses.find_one({
+            "supplier_id": supplier_id,
+            "expense_name": {"$regex": f"^{update_data['expense_name']}$", "$options": "i"},
+            "is_active": True,
+            "id": {"$ne": fixed_expense_id}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="Ya existe un gasto fijo con este nombre para este proveedor")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.fixed_expenses.update_one({"id": fixed_expense_id}, {"$set": update_data})
+    updated = await db.fixed_expenses.find_one({"id": fixed_expense_id}, {"_id": 0})
+    
+    enriched = await enrich_fixed_expense(updated)
+    return FixedExpenseResponse(**enriched)
+
+
+@api_router.delete("/fixed-expenses/{fixed_expense_id}")
+async def delete_fixed_expense(fixed_expense_id: str, current_user: dict = Depends(get_current_user)):
+    """Eliminar gasto fijo (soft delete) - Admin y SuperAdmin"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    fixed_expense = await db.fixed_expenses.find_one({"id": fixed_expense_id, "is_active": True})
+    if not fixed_expense:
+        raise HTTPException(status_code=404, detail="Gasto fijo no encontrado")
+    
+    # Soft delete
+    await db.fixed_expenses.update_one(
+        {"id": fixed_expense_id},
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Gasto fijo eliminado correctamente"}
+
+
+# Endpoint manual para generar gastos fijos (testing/admin)
+@api_router.post("/fixed-expenses/generate-now")
+async def generate_fixed_expenses_now(current_user: dict = Depends(get_current_user)):
+    """Generar manualmente los gastos fijos del día actual (solo SuperAdmin)"""
+    if current_user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo el SuperAdmin puede ejecutar esta acción")
+    
+    generated = await generate_fixed_expenses_for_today()
+    return {"message": f"Se generaron {generated} gastos fijos", "count": generated}
+
+
 # ==================== PAYMENT AUTHORIZATION ROUTES ====================
 
 async def enrich_authorization(auth: dict) -> dict:
@@ -2090,6 +2283,90 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== FIXED EXPENSE SCHEDULER ====================
+
+scheduler = AsyncIOScheduler()
+
+async def generate_fixed_expenses_for_today() -> int:
+    """Genera gastos a partir de los gastos fijos configurados para el día actual"""
+    today = datetime.now(timezone.utc)
+    day_of_month = today.day
+    current_month = today.strftime("%Y-%m")
+    
+    logger.info(f"Ejecutando generación de gastos fijos para el día {day_of_month} del mes {current_month}")
+    
+    # Obtener todos los gastos fijos activos para el día actual
+    fixed_expenses = await db.fixed_expenses.find({
+        "is_active": True,
+        "day_of_month": day_of_month
+    }, {"_id": 0}).to_list(1000)
+    
+    generated_count = 0
+    
+    for fe in fixed_expenses:
+        # Verificar si ya se generó este mes
+        last_generated = fe.get("last_generated")
+        if last_generated and last_generated.startswith(current_month):
+            logger.info(f"Gasto fijo {fe['id']} ya fue generado este mes, saltando...")
+            continue
+        
+        # Obtener el proveedor para el nombre
+        supplier = await db.suppliers.find_one({"id": fe["supplier_id"]}, {"_id": 0})
+        supplier_name = supplier["name"] if supplier else "Proveedor"
+        
+        # Calcular fecha de vencimiento (+30 días)
+        expense_date = today.strftime("%Y-%m-%d")
+        due_date = (today + timedelta(days=30)).strftime("%Y-%m-%d")
+        
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Crear el gasto
+        expense_doc = {
+            "id": str(uuid.uuid4()),
+            "provider": supplier_name,
+            "name": fe["expense_name"],
+            "type": "fijo",
+            "amount": fe["amount"],
+            "date": expense_date,
+            "due_date": due_date,
+            "invoice_number": f"GF-{current_month}-{fe['id'][:8]}",
+            "status": "pendiente",
+            "notes": f"Gasto fijo generado automáticamente (ID: {fe['id'][:8]})",
+            "paid_amount": 0,
+            "remaining_amount": fe["amount"],
+            "created_by": "system",
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        await db.expenses.insert_one(expense_doc)
+        
+        # Actualizar la fecha de última generación
+        await db.fixed_expenses.update_one(
+            {"id": fe["id"]},
+            {"$set": {"last_generated": current_month, "updated_at": now}}
+        )
+        
+        generated_count += 1
+        logger.info(f"Gasto fijo generado: {fe['expense_name']} - Q{fe['amount']:.2f}")
+    
+    logger.info(f"Generación completada. Total gastos generados: {generated_count}")
+    return generated_count
+
+
+def start_scheduler():
+    """Inicia el scheduler para tareas programadas"""
+    # Ejecutar todos los días a las 00:05 hora del servidor
+    scheduler.add_job(
+        generate_fixed_expenses_for_today,
+        CronTrigger(hour=0, minute=5),
+        id="generate_fixed_expenses",
+        replace_existing=True
+    )
+    scheduler.start()
+    logger.info("Scheduler de gastos fijos iniciado (ejecuta diariamente a las 00:05)")
+
+
 @app.on_event("startup")
 async def startup_event():
     """Run seed on startup and create indexes"""
@@ -2107,11 +2384,18 @@ async def startup_event():
     await db.payment_authorizations.create_index([("created_at", -1)])
     await db.suppliers.create_index([("name", 1)])
     await db.suppliers.create_index([("is_active", 1)])
+    await db.fixed_expenses.create_index([("supplier_id", 1)])
+    await db.fixed_expenses.create_index([("day_of_month", 1)])
+    await db.fixed_expenses.create_index([("is_active", 1)])
     try:
         await db.users.create_index([("username", 1)], unique=True)
     except Exception:
         pass  # Index may already exist
+    
+    # Iniciar scheduler de gastos fijos
+    start_scheduler()
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    scheduler.shutdown(wait=False)
     client.close()

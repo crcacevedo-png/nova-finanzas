@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ChevronRight,
   FileCheck,
-  Truck
+  Truck,
+  CalendarClock
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -78,6 +79,12 @@ const Layout = ({ children }) => {
       icon: Truck, 
       label: 'Proveedores', 
       testId: 'nav-proveedores' 
+    });
+    configItems.push({ 
+      path: '/configuracion/gastos-fijos', 
+      icon: CalendarClock, 
+      label: 'Gastos Fijos', 
+      testId: 'nav-gastos-fijos' 
     });
   }
   
