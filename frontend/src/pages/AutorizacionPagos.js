@@ -97,19 +97,34 @@ const AutorizacionPagos = () => {
   const [batchBankAccountId, setBatchBankAccountId] = useState('');
 
   // Summary counts
-  const [summary, setSummary] = useState({ pending: 0, executed: 0, total: 0, due30Count: 0 });
+  const [summary, setSummary] = useState({ pending: 0, executed: 0, total: 0, due30Count: 0, overdueCount: 0 });
 
-  // Calcular gastos que vencen en 30 días
-  const calculateExpensesDue30 = (expenses) => {
+  // Calcular gastos por vencer (próximos 30 días) y vencidos
+  const calculateExpensesDueAndOverdue = (expenses) => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const in30Days = new Date();
     in30Days.setDate(today.getDate() + 30);
     
     return expenses.filter(expense => {
       if (!expense.due_date) return false;
       const dueDate = new Date(expense.due_date);
-      return dueDate >= today && dueDate <= in30Days;
+      dueDate.setHours(0, 0, 0, 0);
+      // Incluir vencidos (dueDate < today) y por vencer en 30 días
+      return dueDate <= in30Days;
     }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+  };
+  
+  // Contar gastos vencidos
+  const countOverdue = (expenses) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return expenses.filter(expense => {
+      if (!expense.due_date) return false;
+      const dueDate = new Date(expense.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today;
+    }).length;
   };
 
   const fetchData = useCallback(async () => {
@@ -131,22 +146,25 @@ const AutorizacionPagos = () => {
         setPendingExpenses(allPendingExpenses);
         setBankAccounts(accountsRes.data.data || []);
         
-        // Calcular gastos que vencen en 30 días
-        const due30 = calculateExpensesDue30(allPendingExpenses);
-        setExpensesDue30(due30);
+        // Calcular gastos vencidos y por vencer en 30 días
+        const dueAndOverdue = calculateExpensesDueAndOverdue(allPendingExpenses);
+        setExpensesDue30(dueAndOverdue);
+        const overdueCount = countOverdue(allPendingExpenses);
         
         setSummary({
           pending: authResponse.data.pending_count || 0,
           executed: authResponse.data.executed_count || 0,
           total: authResponse.data.total || 0,
-          due30Count: due30.length
+          due30Count: dueAndOverdue.length,
+          overdueCount: overdueCount
         });
       } else {
         setSummary({
           pending: authResponse.data.pending_count || 0,
           executed: authResponse.data.executed_count || 0,
           total: authResponse.data.total || 0,
-          due30Count: 0
+          due30Count: 0,
+          overdueCount: 0
         });
       }
     } catch (error) {
@@ -379,12 +397,31 @@ const AutorizacionPagos = () => {
     if (days === null) return null;
     
     let bgColor = 'bg-emerald-100 text-emerald-700';
-    if (days <= 7) bgColor = 'bg-red-100 text-red-700';
-    else if (days <= 15) bgColor = 'bg-amber-100 text-amber-700';
+    let label = '';
+    
+    if (days < 0) {
+      // Vencido - días negativos
+      bgColor = 'bg-red-600 text-white';
+      label = `${days} días`;
+    } else if (days === 0) {
+      bgColor = 'bg-red-100 text-red-700';
+      label = 'Hoy';
+    } else if (days === 1) {
+      bgColor = 'bg-red-100 text-red-700';
+      label = '1 día';
+    } else if (days <= 7) {
+      bgColor = 'bg-red-100 text-red-700';
+      label = `${days} días`;
+    } else if (days <= 15) {
+      bgColor = 'bg-amber-100 text-amber-700';
+      label = `${days} días`;
+    } else {
+      label = `${days} días`;
+    }
     
     return (
       <Badge className={`${bgColor} text-xs`}>
-        {days === 0 ? 'Hoy' : days === 1 ? '1 día' : `${days} días`}
+        {label}
       </Badge>
     );
   };
@@ -440,7 +477,28 @@ const AutorizacionPagos = () => {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Card Vencidos - Clickeable */}
+          {isSuperAdmin && (
+            <Card 
+              className={`card-metrics border-0 shadow-none cursor-pointer transition-all hover:shadow-md ${viewMode === 'expenses_due' && summary.overdueCount > 0 ? 'ring-2 ring-red-500' : ''}`}
+              onClick={() => setViewMode('expenses_due')}
+              data-testid="overdue-card"
+            >
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-red-100">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Vencidos</p>
+                  <p className="text-2xl font-bold" style={{ color: summary.overdueCount > 0 ? '#dc2626' : 'var(--text-primary)' }}>
+                    {summary.overdueCount}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {/* Card Por Vencer (30 días) - Clickeable */}
           {isSuperAdmin && (
             <Card 
@@ -453,7 +511,7 @@ const AutorizacionPagos = () => {
                   <AlertTriangle className="w-5 h-5 text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Por vencer (30 días)</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Por pagar</p>
                   <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                     {summary.due30Count}
                   </p>
@@ -506,7 +564,7 @@ const AutorizacionPagos = () => {
           <Card className="card-teal">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Gastos por vencer en los próximos 30 días
+                Gastos pendientes de pago {summary.overdueCount > 0 && <span className="text-red-600 text-sm ml-2">({summary.overdueCount} vencidos)</span>}
               </CardTitle>
               <Button
                 variant="ghost"
@@ -528,7 +586,7 @@ const AutorizacionPagos = () => {
                 <div className="p-12 text-center">
                   <Calendar className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-hint)' }} />
                   <p style={{ color: 'var(--text-secondary)' }}>
-                    No hay gastos por vencer en los próximos 30 días
+                    No hay gastos pendientes de pago
                   </p>
                 </div>
               ) : (
