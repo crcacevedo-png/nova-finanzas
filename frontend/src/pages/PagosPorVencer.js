@@ -80,37 +80,40 @@ const PagosPorVencer = () => {
     const colors = {
       fijo: 'badge-fixed border-0',
       proveedor: 'badge-provider border-0',
-      variable: 'badge-variable border-0'
+      variable: 'badge-variable border-0',
+      igss: 'bg-purple-100 text-purple-700 border-0'
     };
-    return <Badge className={colors[type]}>{typeLabels[type]}</Badge>;
+    return <Badge className={colors[type] || 'bg-gray-100 text-gray-700 border-0'}>{typeLabels[type] || type}</Badge>;
   };
 
   const getUrgencyBadge = (daysRemaining) => {
     if (daysRemaining < 0) {
       return (
-        <Badge className="badge-overdue border-0">
-          <XCircle className="w-3 h-3 mr-1" />
-          Vencido hace {Math.abs(daysRemaining)} días
+        <Badge className="bg-red-600 text-white border-0">
+          {daysRemaining} días
+        </Badge>
+      );
+    } else if (daysRemaining === 0) {
+      return (
+        <Badge className="bg-red-100 text-red-700 border-0">
+          Hoy
         </Badge>
       );
     } else if (daysRemaining <= 7) {
       return (
-        <Badge className="badge-overdue border-0">
-          <AlertCircle className="w-3 h-3 mr-1" />
+        <Badge className="bg-red-100 text-red-700 border-0">
           {daysRemaining} días
         </Badge>
       );
-    } else if (daysRemaining <= 30) {
+    } else if (daysRemaining <= 15) {
       return (
-        <Badge className="badge-pending border-0">
-          <AlertTriangle className="w-3 h-3 mr-1" />
+        <Badge className="bg-amber-100 text-amber-700 border-0">
           {daysRemaining} días
         </Badge>
       );
     } else {
       return (
-        <Badge className="badge-admin border-0">
-          <Clock className="w-3 h-3 mr-1" />
+        <Badge className="bg-emerald-100 text-emerald-700 border-0">
           {daysRemaining} días
         </Badge>
       );
@@ -135,14 +138,15 @@ const PagosPorVencer = () => {
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50">
-              <TableHead className="font-semibold text-slate-600">Gasto</TableHead>
-              <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
-              <TableHead className="font-semibold text-slate-600">Monto Total</TableHead>
-              <TableHead className="font-semibold text-slate-600">Pendiente</TableHead>
-              <TableHead className="font-semibold text-slate-600">Vencimiento</TableHead>
-              <TableHead className="font-semibold text-slate-600">Urgencia</TableHead>
-              <TableHead className="font-semibold text-slate-600 text-right">Acción</TableHead>
+            <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+              <TableHead className="table-header">Proveedor</TableHead>
+              <TableHead className="table-header">Gasto</TableHead>
+              <TableHead className="table-header">Tipo</TableHead>
+              <TableHead className="table-header">Monto Total</TableHead>
+              <TableHead className="table-header">Pendiente</TableHead>
+              <TableHead className="table-header">Vencimiento</TableHead>
+              <TableHead className="table-header">Días</TableHead>
+              <TableHead className="table-header text-right">Acción</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -153,10 +157,15 @@ const PagosPorVencer = () => {
                 data-testid={`upcoming-expense-${expense.id}`}
               >
                 <TableCell>
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {expense.provider || '-'}
+                  </span>
+                </TableCell>
+                <TableCell>
                   <div>
-                    <p className="font-medium text-slate-900">{expense.name}</p>
+                    <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{expense.name}</p>
                     {expense.invoice_number && (
-                      <p className="text-xs text-slate-500">Factura: {expense.invoice_number}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-hint)' }}>Factura: {expense.invoice_number}</p>
                     )}
                   </div>
                 </TableCell>
@@ -165,11 +174,11 @@ const PagosPorVencer = () => {
                   {formatCurrency(expense.amount)}
                 </TableCell>
                 <TableCell>
-                  <p className="font-semibold text-[#8B6914]">
+                  <p className="font-semibold" style={{ color: 'var(--primary-teal)' }}>
                     {formatCurrency(expense.remaining_amount)}
                   </p>
                 </TableCell>
-                <TableCell className="text-slate-600">
+                <TableCell style={{ color: 'var(--text-secondary)' }}>
                   {formatDate(expense.due_date)}
                 </TableCell>
                 <TableCell>

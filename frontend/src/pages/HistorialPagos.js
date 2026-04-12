@@ -301,15 +301,15 @@ const HistorialPagos = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50">
-                      <TableHead className="font-semibold text-slate-600">Fecha</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Gasto</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Monto</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Método</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Referencia</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Registrado por</TableHead>
+                    <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                      <TableHead className="table-header">Fecha</TableHead>
+                      <TableHead className="table-header">Gasto</TableHead>
+                      <TableHead className="table-header">Monto</TableHead>
+                      <TableHead className="table-header">Método</TableHead>
+                      <TableHead className="table-header">Referencia</TableHead>
+                      <TableHead className="table-header">Registrado por</TableHead>
                       {canDeletePayments() && (
-                        <TableHead className="font-semibold text-slate-600 text-right">Acciones</TableHead>
+                        <TableHead className="table-header text-right">Acciones</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
@@ -320,20 +320,20 @@ const HistorialPagos = () => {
                         className="table-row-hover"
                         data-testid={`payment-row-${payment.id}`}
                       >
-                        <TableCell className="text-slate-600">
+                        <TableCell style={{ color: 'var(--text-secondary)' }}>
                           {formatDate(payment.date)}
                         </TableCell>
                         <TableCell>
-                          <p className="font-medium text-slate-900">{payment.expense_name || 'N/A'}</p>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{payment.expense_name || 'N/A'}</p>
                         </TableCell>
                         <TableCell>
-                          <p className="font-semibold text-[#0F6E56]">{formatCurrency(payment.amount)}</p>
+                          <p className="font-semibold" style={{ color: 'var(--primary-teal)' }}>{formatCurrency(payment.amount)}</p>
                         </TableCell>
                         <TableCell>{getMethodBadge(payment.method)}</TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell style={{ color: 'var(--text-secondary)' }}>
                           {payment.reference || '-'}
                         </TableCell>
-                        <TableCell className="text-slate-600 text-sm">
+                        <TableCell className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                           {payment.created_by_name || '-'}
                         </TableCell>
                         {canDeletePayments() && (

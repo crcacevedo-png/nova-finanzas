@@ -375,6 +375,41 @@ const Gastos = () => {
     return Math.min(progress, 100);
   };
 
+  // Calcular días hasta vencimiento
+  const getDaysUntilDue = (dueDate) => {
+    if (!dueDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Badge de días con colores
+  const getDaysBadge = (dueDate) => {
+    const days = getDaysUntilDue(dueDate);
+    if (days === null) return <span style={{ color: 'var(--text-hint)' }}>-</span>;
+    
+    let bgColor = 'bg-emerald-100 text-emerald-700';
+    let label = `${days} días`;
+    
+    if (days < 0) {
+      bgColor = 'bg-red-600 text-white';
+      label = `${days} días`;
+    } else if (days === 0) {
+      bgColor = 'bg-red-100 text-red-700';
+      label = 'Hoy';
+    } else if (days <= 7) {
+      bgColor = 'bg-red-100 text-red-700';
+    } else if (days <= 15) {
+      bgColor = 'bg-amber-100 text-amber-700';
+    }
+    
+    return <Badge className={`${bgColor} border-0 text-xs`}>{label}</Badge>;
+  };
+
   return (
     <Layout>
       <Toaster position="top-right" richColors />
@@ -508,15 +543,16 @@ const Gastos = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50">
-                      <TableHead className="font-semibold text-slate-600">Proveedor</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Nombre</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Monto</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Progreso</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Tipo</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Estado</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Vencimiento</TableHead>
-                      <TableHead className="font-semibold text-slate-600 text-right">Acciones</TableHead>
+                    <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                      <TableHead className="table-header">Proveedor</TableHead>
+                      <TableHead className="table-header">Nombre</TableHead>
+                      <TableHead className="table-header">Monto</TableHead>
+                      <TableHead className="table-header">Progreso</TableHead>
+                      <TableHead className="table-header">Tipo</TableHead>
+                      <TableHead className="table-header">Estado</TableHead>
+                      <TableHead className="table-header">Vencimiento</TableHead>
+                      <TableHead className="table-header">Días</TableHead>
+                      <TableHead className="table-header text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -527,11 +563,11 @@ const Gastos = () => {
                         data-testid={`expense-row-${expense.id}`}
                       >
                         <TableCell>
-                          <span className="text-slate-700 font-medium">{expense.provider || '-'}</span>
+                          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{expense.provider || '-'}</span>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-slate-900">{expense.name}</p>
+                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{expense.name}</p>
                             {expense.invoice_number && (
                               <p className="text-xs text-slate-500">Factura: {expense.invoice_number}</p>
                             )}
@@ -557,8 +593,11 @@ const Gastos = () => {
                         </TableCell>
                         <TableCell>{getTypeBadge(expense.type)}</TableCell>
                         <TableCell>{getStatusBadge(expense.status)}</TableCell>
-                        <TableCell className="text-slate-600">
+                        <TableCell style={{ color: 'var(--text-secondary)' }}>
                           {expense.due_date ? formatDate(expense.due_date) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {getDaysBadge(expense.due_date)}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

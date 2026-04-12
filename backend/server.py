@@ -351,12 +351,14 @@ class MonthlyChartItem(BaseModel):
 class AlertResponse(BaseModel):
     id: str
     name: str
+    provider: Optional[str] = ""
     amount: float
     remaining_amount: float
     due_date: str
     days_remaining: int
     type: str
     status: str
+    invoice_number: Optional[str] = ""
 
 class UpcomingPayments(BaseModel):
     overdue: List[AlertResponse]
@@ -1162,18 +1164,7 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
     due60 = []
     
     for e in expenses:
-        if e["status"] == "vencido":
-            overdue.append(AlertResponse(
-                id=e["id"],
-                name=e["name"],
-                amount=e["amount"],
-                remaining_amount=e.get("remaining_amount", e["amount"]),
-                due_date=e.get("due_date", e["date"]),
-                days_remaining=0,
-                type=e["type"],
-                status=e["status"]
-            ))
-        elif e.get("due_date"):
+        if e.get("due_date"):
             try:
                 due_date = datetime.fromisoformat(e["due_date"]).date()
                 days = (due_date - today).days
@@ -1181,12 +1172,14 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
                 alert = AlertResponse(
                     id=e["id"],
                     name=e["name"],
+                    provider=e.get("provider", ""),
                     amount=e["amount"],
                     remaining_amount=e.get("remaining_amount", e["amount"]),
                     due_date=e["due_date"],
                     days_remaining=days,
                     type=e["type"],
-                    status=e["status"]
+                    status=e["status"],
+                    invoice_number=e.get("invoice_number", "")
                 )
                 
                 if days < 0:
@@ -1197,6 +1190,20 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
                     due60.append(alert)
             except Exception:
                 pass
+        elif e["status"] == "vencido":
+            # Sin fecha de vencimiento pero marcado como vencido
+            overdue.append(AlertResponse(
+                id=e["id"],
+                name=e["name"],
+                provider=e.get("provider", ""),
+                amount=e["amount"],
+                remaining_amount=e.get("remaining_amount", e["amount"]),
+                due_date=e.get("due_date", e["date"]),
+                days_remaining=0,
+                type=e["type"],
+                status=e["status"],
+                invoice_number=e.get("invoice_number", "")
+            ))
     
     # Sort by days remaining
     overdue.sort(key=lambda x: x.days_remaining)
