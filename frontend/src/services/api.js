@@ -99,6 +99,15 @@ export const paymentAuthorizationApi = {
   delete: (id) => axios.delete(`${API_URL}/payment-authorizations/${id}`),
 };
 
+// Suppliers API
+export const supplierApi = {
+  getAll: () => axios.get(`${API_URL}/suppliers`),
+  getById: (id) => axios.get(`${API_URL}/suppliers/${id}`),
+  create: (data) => axios.post(`${API_URL}/suppliers`, data),
+  update: (id, data) => axios.put(`${API_URL}/suppliers/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/suppliers/${id}`),
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {
@@ -124,6 +133,7 @@ export const typeLabels = {
   fijo: 'Gasto Fijo',
   proveedor: 'Pago Proveedor',
   variable: 'Gasto Variable',
+  igss: 'Gasto IGSS',
 };
 
 // Status labels

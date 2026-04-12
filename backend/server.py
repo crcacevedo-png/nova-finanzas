@@ -149,7 +149,7 @@ class TokenResponse(BaseModel):
 class ExpenseBase(BaseModel):
     provider: Optional[str] = None
     name: str
-    type: Literal["fijo", "proveedor", "variable"]
+    type: Literal["fijo", "proveedor", "variable", "igss"]
     amount: float = Field(ge=0)
     date: str
     due_date: Optional[str] = None
@@ -162,7 +162,7 @@ class ExpenseCreate(ExpenseBase):
 class ExpenseUpdate(BaseModel):
     provider: Optional[str] = None
     name: Optional[str] = None
-    type: Optional[Literal["fijo", "proveedor", "variable"]] = None
+    type: Optional[Literal["fijo", "proveedor", "variable", "igss"]] = None
     amount: Optional[float] = None
     date: Optional[str] = None
     due_date: Optional[str] = None
@@ -299,6 +299,36 @@ class PaymentAuthorizationListResponse(BaseModel):
     total: int
     pending_count: int
     executed_count: int
+
+# ==================== SUPPLIER/PROVIDER MODELS ====================
+
+class SupplierBase(BaseModel):
+    name: str
+    contact_name: Optional[str] = ""
+    phone: Optional[str] = ""
+
+class SupplierCreate(SupplierBase):
+    pass
+
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+
+class SupplierResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    contact_name: Optional[str] = ""
+    phone: Optional[str] = ""
+    is_active: bool = True
+    created_by: str
+    created_at: str
+    updated_at: Optional[str] = None
+
+class SupplierListResponse(BaseModel):
+    data: List[SupplierResponse]
+    total: int
 
 # Dashboard Models
 class TypeBreakdown(BaseModel):
@@ -1338,6 +1368,108 @@ async def delete_bank_account(account_id: str, current_user: dict = Depends(requ
     return {"message": "Cuenta bancaria eliminada correctamente"}
 
 
+# ==================== SUPPLIER/PROVIDER ROUTES ====================
+
+@api_router.get("/suppliers", response_model=SupplierListResponse)
+async def get_suppliers(current_user: dict = Depends(get_current_user)):
+    """Obtener todos los proveedores (Admin y SuperAdmin)"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver proveedores")
+    
+    suppliers = await db.suppliers.find({"is_active": True}, {"_id": 0}).sort("name", 1).to_list(1000)
+    return SupplierListResponse(data=suppliers, total=len(suppliers))
+
+
+@api_router.get("/suppliers/{supplier_id}", response_model=SupplierResponse)
+async def get_supplier(supplier_id: str, current_user: dict = Depends(get_current_user)):
+    """Obtener un proveedor específico"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    supplier = await db.suppliers.find_one({"id": supplier_id, "is_active": True}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    return SupplierResponse(**supplier)
+
+
+@api_router.post("/suppliers", response_model=SupplierResponse)
+async def create_supplier(supplier_data: SupplierCreate, current_user: dict = Depends(get_current_user)):
+    """Crear nuevo proveedor (Admin y SuperAdmin)"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear proveedores")
+    
+    # Verificar si ya existe un proveedor con el mismo nombre
+    existing = await db.suppliers.find_one({"name": {"$regex": f"^{supplier_data.name}$", "$options": "i"}, "is_active": True})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe un proveedor con este nombre")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    supplier_doc = {
+        "id": str(uuid.uuid4()),
+        "name": supplier_data.name,
+        "contact_name": supplier_data.contact_name or "",
+        "phone": supplier_data.phone or "",
+        "is_active": True,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.suppliers.insert_one(supplier_doc)
+    if "_id" in supplier_doc:
+        del supplier_doc["_id"]
+    return SupplierResponse(**supplier_doc)
+
+
+@api_router.put("/suppliers/{supplier_id}", response_model=SupplierResponse)
+async def update_supplier(supplier_id: str, supplier_data: SupplierUpdate, current_user: dict = Depends(get_current_user)):
+    """Actualizar proveedor (Admin y SuperAdmin)"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    supplier = await db.suppliers.find_one({"id": supplier_id, "is_active": True})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    update_data = {k: v for k, v in supplier_data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    
+    # Verificar nombre duplicado si se está actualizando
+    if "name" in update_data and update_data["name"].lower() != supplier["name"].lower():
+        existing = await db.suppliers.find_one({
+            "name": {"$regex": f"^{update_data['name']}$", "$options": "i"},
+            "is_active": True,
+            "id": {"$ne": supplier_id}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="Ya existe un proveedor con este nombre")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.suppliers.update_one({"id": supplier_id}, {"$set": update_data})
+    updated = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    return SupplierResponse(**updated)
+
+
+@api_router.delete("/suppliers/{supplier_id}")
+async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_current_user)):
+    """Eliminar proveedor (soft delete) - Admin y SuperAdmin"""
+    if current_user["role"] not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    supplier = await db.suppliers.find_one({"id": supplier_id, "is_active": True})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    # Soft delete
+    await db.suppliers.update_one(
+        {"id": supplier_id},
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Proveedor eliminado correctamente"}
+
+
 # ==================== PAYMENT AUTHORIZATION ROUTES ====================
 
 async def enrich_authorization(auth: dict) -> dict:
@@ -1966,6 +2098,8 @@ async def startup_event():
     await db.payment_authorizations.create_index([("expense_id", 1)])
     await db.payment_authorizations.create_index([("status", 1)])
     await db.payment_authorizations.create_index([("created_at", -1)])
+    await db.suppliers.create_index([("name", 1)])
+    await db.suppliers.create_index([("is_active", 1)])
     try:
         await db.users.create_index([("username", 1)], unique=True)
     except Exception:

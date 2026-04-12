@@ -364,9 +364,10 @@ const Gastos = () => {
     const colors = {
       fijo: 'badge-fixed border-0',
       proveedor: 'badge-provider border-0',
-      variable: 'badge-variable border-0'
+      variable: 'badge-variable border-0',
+      igss: 'bg-purple-100 text-purple-700 border-0'
     };
-    return <Badge className={colors[type]}>{typeLabels[type]}</Badge>;
+    return <Badge className={colors[type] || 'bg-gray-100 text-gray-700 border-0'}>{typeLabels[type] || type}</Badge>;
   };
 
   const getPaymentProgress = (expense) => {
@@ -464,6 +465,7 @@ const Gastos = () => {
                     <SelectItem value="fijo">Gasto Fijo</SelectItem>
                     <SelectItem value="proveedor">Pago Proveedor</SelectItem>
                     <SelectItem value="variable">Gasto Variable</SelectItem>
+                    <SelectItem value="igss">Gasto IGSS</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select
@@ -708,6 +710,7 @@ const Gastos = () => {
                       <SelectItem value="fijo">Gasto Fijo</SelectItem>
                       <SelectItem value="proveedor">Pago Proveedor</SelectItem>
                       <SelectItem value="variable">Gasto Variable</SelectItem>
+                      <SelectItem value="igss">Gasto IGSS</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

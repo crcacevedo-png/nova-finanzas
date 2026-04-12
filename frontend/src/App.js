@@ -9,6 +9,7 @@ import HistorialPagos from './pages/HistorialPagos';
 import PagosPorVencer from './pages/PagosPorVencer';
 import CuentasBancarias from './pages/CuentasBancarias';
 import AutorizacionPagos from './pages/AutorizacionPagos';
+import Proveedores from './pages/Proveedores';
 import './App.css';
 
 // Protected Route Component
@@ -118,6 +119,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_user_management">
             <CuentasBancarias />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/configuracion/proveedores" 
+        element={
+          <ProtectedRoute>
+            <Proveedores />
           </ProtectedRoute>
         } 
       />

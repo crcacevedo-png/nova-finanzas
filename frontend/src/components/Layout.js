@@ -14,7 +14,8 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
-  FileCheck
+  FileCheck,
+  Truck
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -67,10 +68,28 @@ const Layout = ({ children }) => {
     });
   }
 
-  // Config sub-items (SuperAdmin only)
-  const configItems = [
-    { path: '/configuracion/cuentas-bancarias', icon: Building2, label: 'Cuentas Bancarias', testId: 'nav-cuentas-bancarias' },
-  ];
+  // Config sub-items (Admin y SuperAdmin)
+  const configItems = [];
+  
+  // Proveedores - disponible para Admin y SuperAdmin
+  if (isAdminOrSuperAdmin) {
+    configItems.push({ 
+      path: '/configuracion/proveedores', 
+      icon: Truck, 
+      label: 'Proveedores', 
+      testId: 'nav-proveedores' 
+    });
+  }
+  
+  // Cuentas Bancarias - solo SuperAdmin
+  if (isSuperAdmin) {
+    configItems.push({ 
+      path: '/configuracion/cuentas-bancarias', 
+      icon: Building2, 
+      label: 'Cuentas Bancarias', 
+      testId: 'nav-cuentas-bancarias' 
+    });
+  }
 
   const getRoleBadgeClass = (role) => {
     const classes = {
@@ -144,8 +163,8 @@ const Layout = ({ children }) => {
             <NavLink key={item.path} item={item} />
           ))}
           
-          {/* Configuration Section - SuperAdmin only */}
-          {isSuperAdmin && (
+          {/* Configuration Section - Admin y SuperAdmin */}
+          {isAdminOrSuperAdmin && configItems.length > 0 && (
             <div className="mt-4">
               <button
                 onClick={() => setConfigOpen(!configOpen)}
