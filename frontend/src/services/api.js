@@ -118,6 +118,58 @@ export const fixedExpenseApi = {
   generateNow: () => axios.post(`${API_URL}/fixed-expenses/generate-now`),
 };
 
+// IGSS Units API (Catálogo de Unidades IGSS)
+export const igssUnitApi = {
+  getAll: () => axios.get(`${API_URL}/igss-units`),
+  getById: (id) => axios.get(`${API_URL}/igss-units/${id}`),
+  create: (data) => axios.post(`${API_URL}/igss-units`, data),
+  update: (id, data) => axios.put(`${API_URL}/igss-units/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/igss-units/${id}`),
+};
+
+// Patients API (Base de Datos de Pacientes)
+export const patientApi = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.search) params.append('search', filters.search);
+    if (filters.referral_institution) params.append('referral_institution', filters.referral_institution);
+    if (filters.igss_unit_id) params.append('igss_unit_id', filters.igss_unit_id);
+    if (filters.gender) params.append('gender', filters.gender);
+    if (filters.age_from) params.append('age_from', filters.age_from.toString());
+    if (filters.age_to) params.append('age_to', filters.age_to.toString());
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters.is_active !== undefined) params.append('is_active', filters.is_active.toString());
+    return axios.get(`${API_URL}/patients?${params.toString()}`);
+  },
+  getById: (id) => axios.get(`${API_URL}/patients/${id}`),
+  create: (data) => axios.post(`${API_URL}/patients`, data),
+  update: (id, data) => axios.put(`${API_URL}/patients/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/patients/${id}`),
+  reactivate: (id) => axios.post(`${API_URL}/patients/${id}/reactivate`),
+  search: (q, limit = 10) => axios.get(`${API_URL}/patients/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  checkDuplicate: (params) => axios.get(`${API_URL}/patients/check-duplicate`, { params }),
+  exportExcel: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.referral_institution) params.append('referral_institution', filters.referral_institution);
+    if (filters.gender) params.append('gender', filters.gender);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    return `${API_URL}/patients/export/excel?${params.toString()}`;
+  },
+  exportPdf: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.referral_institution) params.append('referral_institution', filters.referral_institution);
+    if (filters.gender) params.append('gender', filters.gender);
+    return `${API_URL}/patients/export/pdf?${params.toString()}`;
+  },
+  downloadTemplate: () => `${API_URL}/patients/export/template`,
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {
@@ -168,4 +220,32 @@ export const roleLabels = {
   superadmin: 'Super Admin',
   admin: 'Administrador',
   usuario: 'Usuario',
+};
+
+// Patient referral institution labels
+export const referralInstitutionLabels = {
+  particular: 'Particular',
+  igss: 'IGSS',
+  seguro_privado: 'Seguro Privado',
+  otra: 'Otra Institución',
+};
+
+// Patient gender labels
+export const genderLabels = {
+  masculino: 'Masculino',
+  femenino: 'Femenino',
+  otro: 'Otro',
+};
+
+// Calculate age from birth date
+export const calculateAge = (birthDate) => {
+  if (!birthDate) return 0;
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
 };

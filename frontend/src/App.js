@@ -11,6 +11,8 @@ import CuentasBancarias from './pages/CuentasBancarias';
 import AutorizacionPagos from './pages/AutorizacionPagos';
 import Proveedores from './pages/Proveedores';
 import GastosFijos from './pages/GastosFijos';
+import Pacientes from './pages/Pacientes';
+import UnidadesIGSS from './pages/UnidadesIGSS';
 import './App.css';
 
 // Protected Route Component
@@ -144,6 +146,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_payment_authorizations">
             <AutorizacionPagos />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/pacientes" 
+        element={
+          <ProtectedRoute requiredPermission="view_patients">
+            <Pacientes />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/configuracion/unidades-igss" 
+        element={
+          <ProtectedRoute requiredPermission="manage_igss_units">
+            <UnidadesIGSS />
           </ProtectedRoute>
         } 
       />

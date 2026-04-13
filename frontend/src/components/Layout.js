@@ -16,7 +16,9 @@ import {
   ChevronRight,
   FileCheck,
   Truck,
-  CalendarClock
+  CalendarClock,
+  UserRound,
+  Building
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -45,6 +47,7 @@ const Layout = ({ children }) => {
 
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
+    { path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' },
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
     { path: '/pagos-por-vencer', icon: Clock, label: 'Pagos por vencer', testId: 'nav-pagos-por-vencer' },
@@ -95,6 +98,12 @@ const Layout = ({ children }) => {
       icon: Building2, 
       label: 'Cuentas Bancarias', 
       testId: 'nav-cuentas-bancarias' 
+    });
+    configItems.push({ 
+      path: '/configuracion/unidades-igss', 
+      icon: Building, 
+      label: 'Unidades IGSS', 
+      testId: 'nav-unidades-igss' 
     });
   }
 
