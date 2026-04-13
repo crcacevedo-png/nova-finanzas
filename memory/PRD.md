@@ -79,6 +79,40 @@
 | DELETE | /api/fixed-expenses/:id | Eliminar gasto fijo (soft delete) |
 | POST | /api/fixed-expenses/generate-now | Generar gastos del día (solo SuperAdmin) |
 
+### Pacientes (Base de Datos de Pacientes)
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/patients | Listar con filtros y paginación |
+| GET | /api/patients/:id | Detalle de paciente |
+| POST | /api/patients | Crear paciente |
+| PUT | /api/patients/:id | Editar paciente |
+| DELETE | /api/patients/:id | Desactivar paciente (soft delete) |
+| POST | /api/patients/:id/reactivate | Reactivar paciente |
+| GET | /api/patients/search?q= | Búsqueda para autocompletado |
+| GET | /api/patients/check-duplicate | Verificar duplicados por DPI o nombre |
+| GET | /api/patients/export/excel | Exportar a Excel |
+| GET | /api/patients/export/pdf | Exportar a PDF |
+| GET | /api/patients/export/template | Descargar plantilla de importación |
+
+**Query params para GET /api/patients:**
+- `page`, `limit` - Paginación
+- `search` - Busca en nombre, apellido, DPI, teléfono, expediente
+- `referral_institution` - particular|igss|seguro_privado|otra
+- `igss_unit_id` - Filtro por unidad IGSS
+- `gender` - masculino|femenino|otro
+- `age_from`, `age_to` - Rango de edad
+- `dateFrom`, `dateTo` - Rango de fecha de registro
+- `is_active` - true|false
+
+### Unidades IGSS (Catálogo - Solo SuperAdmin)
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/igss-units | Listar unidades IGSS |
+| GET | /api/igss-units/:id | Detalle de unidad |
+| POST | /api/igss-units | Crear unidad IGSS |
+| PUT | /api/igss-units/:id | Editar unidad |
+| DELETE | /api/igss-units/:id | Eliminar unidad |
+
 ### Dashboard / Reportes
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
@@ -190,6 +224,50 @@
 }
 ```
 
+### Patients (Pacientes)
+```json
+{
+  "id": "uuid",
+  "record_number": "string (EXP-YYYYMM-XXXX)",
+  "first_name": "string",
+  "last_name": "string",
+  "gender": "masculino|femenino|otro",
+  "birth_date": "date (YYYY-MM-DD)",
+  "profession": "string|null",
+  "phone": "string",
+  "email": "string|null",
+  "dpi": "string (13 dígitos)|null",
+  "emergency_phone": "string|null",
+  "emergency_contact_name": "string|null",
+  "emergency_contact_relationship": "string|null",
+  "referral_institution": "particular|igss|seguro_privado|otra",
+  "insurance_name": "string|null (si seguro_privado)",
+  "other_institution_name": "string|null (si otra)",
+  "igss_unit_id": "igss_unit_id|null (si igss)",
+  "comments": "string|null",
+  "is_active": "boolean",
+  "created_by": "user_id",
+  "created_at": "datetime",
+  "updated_by": "user_id|null",
+  "updated_at": "datetime"
+}
+```
+**Nota:** La edad se calcula dinámicamente a partir de birth_date (no se almacena).
+
+### IGSS Units (Unidades IGSS)
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "code": "string|null",
+  "description": "string|null",
+  "is_active": "boolean",
+  "created_by": "user_id",
+  "created_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
 ---
 
 ## 3. Sistema de Permisos
@@ -209,6 +287,12 @@
 | **Autorizar pagos** | ✅ | ❌ | ❌ |
 | **Ver autorizaciones** | ✅ | ✅ | ❌ |
 | **Ejecutar autorizaciones** | ❌ | ✅ | ❌ |
+| **Ver pacientes** | ✅ | ✅ | ✅ |
+| **Crear pacientes** | ✅ | ✅ | ❌ |
+| **Editar pacientes** | ✅ | ✅ | ❌ |
+| **Desactivar pacientes** | ✅ | ❌ | ❌ |
+| **Gestionar unidades IGSS** | ✅ | ❌ | ❌ |
+| **Importar/Exportar pacientes** | ✅ | ✅ | ❌ |
 
 ---
 
@@ -259,6 +343,26 @@
   - ✅ Prevención de duplicados (campo last_generated)
   - ✅ Gastos generados con vencimiento automático +30 días
   - ✅ Tests automatizados (100% backend, 100% frontend)
+- ✅ **Módulo Base de Datos de Pacientes (Abril 2026):**
+  - ✅ CRUD completo (crear, listar, ver detalle, editar, desactivar/reactivar)
+  - ✅ Campos: nombre, apellido, género, fecha nacimiento, profesión, teléfono, email, DPI (13 dígitos único)
+  - ✅ Contacto de emergencia (nombre, parentesco, teléfono)
+  - ✅ Institución referente con campos condicionales (IGSS→Unidad, Seguro→Aseguradora, Otra→Nombre)
+  - ✅ Número de expediente correlativo automático (EXP-YYYYMM-XXXX)
+  - ✅ Edad calculada dinámicamente (no almacenada en BD)
+  - ✅ Detección de duplicados (por DPI o nombre+fecha nacimiento)
+  - ✅ Soft delete con posibilidad de reactivar
+  - ✅ Exportación a Excel y PDF con filtros
+  - ✅ Plantilla descargable para importación
+  - ✅ Endpoint de búsqueda para autocompletado (/api/patients/search)
+  - ✅ Paginación y filtros avanzados
+  - ✅ Permisos: SuperAdmin (total), Admin (CRUD sin eliminar), Usuario (solo lectura)
+  - ✅ Tests automatizados (100% backend, 100% frontend)
+- ✅ **Catálogo de Unidades IGSS (Abril 2026):**
+  - ✅ CRUD completo para unidades del IGSS
+  - ✅ Acceso exclusivo SuperAdmin
+  - ✅ Validación de uso antes de eliminar (pacientes asociados)
+  - ✅ Catálogo inicia vacío, administrable desde el panel
 
 ---
 
@@ -273,9 +377,11 @@
 
 ### P2 - Mejoras
 - [ ] Refactorización de `server.py` (separar modelos, rutas, servicios)
+- [ ] Importación masiva de pacientes desde Excel/CSV
 
 ### Backlog
 - [ ] Módulo de reportes gráficos avanzados
 - [ ] Notificaciones push/email para autorizaciones pendientes
-
-
+- [ ] Módulo Óptica (ventas, órdenes) - debe usar tabla patients como fuente de clientes
+- [ ] Módulo de Citas médicas - debe usar tabla patients
+- [ ] Vista de detalle del paciente con pestañas de historial (Óptica, Citas, etc.)
