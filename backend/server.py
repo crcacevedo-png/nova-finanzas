@@ -268,6 +268,7 @@ class PaymentResponse(BaseModel):
     id: str
     expense_id: str
     expense_name: Optional[str] = None
+    expense_provider: Optional[str] = None
     amount: float
     date: str
     method: str
@@ -1332,6 +1333,7 @@ async def get_payments(
         }},
         {"$addFields": {
             "expense_name": {"$ifNull": [{"$arrayElemAt": ["$expense_data.name", 0]}, "N/A"]},
+            "expense_provider": {"$ifNull": [{"$arrayElemAt": ["$expense_data.provider", 0]}, ""]},
             "created_by_name": {"$ifNull": [{"$arrayElemAt": ["$user_data.name", 0]}, "N/A"]}
         }},
         {"$project": {"expense_data": 0, "user_data": 0, "_id": 0}}

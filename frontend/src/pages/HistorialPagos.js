@@ -303,6 +303,7 @@ const HistorialPagos = () => {
                   <TableHeader>
                     <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
                       <TableHead className="table-header">Fecha</TableHead>
+                      <TableHead className="table-header">Proveedor</TableHead>
                       <TableHead className="table-header">Gasto</TableHead>
                       <TableHead className="table-header">Monto</TableHead>
                       <TableHead className="table-header">Método</TableHead>
@@ -324,7 +325,12 @@ const HistorialPagos = () => {
                           {formatDate(payment.date)}
                         </TableCell>
                         <TableCell>
-                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{payment.expense_name || 'N/A'}</p>
+                          <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {payment.expense_provider || '-'}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <p style={{ color: 'var(--text-secondary)' }}>{payment.expense_name || 'N/A'}</p>
                         </TableCell>
                         <TableCell>
                           <p className="font-semibold" style={{ color: 'var(--primary-teal)' }}>{formatCurrency(payment.amount)}</p>
