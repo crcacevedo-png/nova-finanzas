@@ -108,8 +108,8 @@ const Gastos = () => {
   const [expenseForm, setExpenseForm] = useState(initialExpenseForm);
   const [paymentForm, setPaymentForm] = useState(initialPaymentForm);
   
-  // Filters
-  const [filters, setFilters] = useState({ type: '', status: '', search: '', dateFrom: '', dateTo: '' });
+  // Filters - Por defecto excluir pagados (mostrar pendiente y vencido)
+  const [filters, setFilters] = useState({ type: '', status: 'no_pagado', search: '', dateFrom: '', dateTo: '' });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -120,7 +120,7 @@ const Gastos = () => {
     try {
       const response = await expenseApi.getAll({
         type: filters.type || undefined,
-        status: filters.status || undefined,
+        status: filters.status === 'all' ? undefined : (filters.status || 'no_pagado'),
         search: filters.search || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
@@ -159,7 +159,7 @@ const Gastos = () => {
     const url = expenseApi.exportReport({
       format,
       type: filters.type || undefined,
-      status: filters.status || undefined,
+      status: filters.status === 'all' ? undefined : (filters.status || 'no_pagado'),
       dateFrom: filters.dateFrom || undefined,
       dateTo: filters.dateTo || undefined
     });
@@ -504,18 +504,19 @@ const Gastos = () => {
                   </SelectContent>
                 </Select>
                 <Select
-                  value={filters.status || "all"}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === "all" ? "" : value }))}
+                  value={filters.status || "no_pagado"}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
                 >
-                  <SelectTrigger className="w-[150px]" data-testid="status-filter">
+                  <SelectTrigger className="w-[180px]" data-testid="status-filter">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="parcial">Parcial</SelectItem>
-                    <SelectItem value="pagado">Pagado</SelectItem>
-                    <SelectItem value="vencido">Vencido</SelectItem>
+                    <SelectItem value="no_pagado">Pendientes/Vencidos</SelectItem>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="pendiente">Solo Pendiente</SelectItem>
+                    <SelectItem value="parcial">Solo Parcial</SelectItem>
+                    <SelectItem value="pagado">Solo Pagado</SelectItem>
+                    <SelectItem value="vencido">Solo Vencido</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline" onClick={handleSearch} className="px-6">

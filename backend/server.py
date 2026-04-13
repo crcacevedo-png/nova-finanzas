@@ -1160,8 +1160,12 @@ async def get_expenses(
         query["type"] = type
     
     # Status filter
-    if status and status in ["pendiente", "parcial", "pagado", "vencido"]:
-        query["status"] = status
+    if status:
+        if status == "no_pagado":
+            # Filtro especial: mostrar pendiente, parcial y vencido (excluir pagado)
+            query["status"] = {"$in": ["pendiente", "parcial", "vencido"]}
+        elif status in ["pendiente", "parcial", "pagado", "vencido"]:
+            query["status"] = status
     
     # Search filter (name or invoice_number)
     if search:
