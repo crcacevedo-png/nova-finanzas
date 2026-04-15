@@ -170,6 +170,73 @@ export const patientApi = {
   downloadTemplate: () => `${API_URL}/patients/export/template`,
 };
 
+// ==================== OPTICA APIs ====================
+
+// Doctors API (Médicos)
+export const doctorApi = {
+  getAll: (search = '') => axios.get(`${API_URL}/doctors${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getById: (id) => axios.get(`${API_URL}/doctors/${id}`),
+  create: (data) => axios.post(`${API_URL}/doctors`, data),
+  update: (id, data) => axios.put(`${API_URL}/doctors/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/doctors/${id}`),
+  search: (q, limit = 10) => axios.get(`${API_URL}/doctors/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+};
+
+// Frame Inventory API (Inventario de Aros)
+export const frameApi = {
+  getAll: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.low_stock) queryParams.append('low_stock', 'true');
+    return axios.get(`${API_URL}/optica/frames?${queryParams.toString()}`);
+  },
+  getById: (id) => axios.get(`${API_URL}/optica/frames/${id}`),
+  create: (data) => axios.post(`${API_URL}/optica/frames`, data),
+  update: (id, data) => axios.put(`${API_URL}/optica/frames/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/optica/frames/${id}`),
+  search: (q, limit = 10) => axios.get(`${API_URL}/optica/frames/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+};
+
+// Contact Lens Inventory API (Lentes de Contacto)
+export const contactLensApi = {
+  getAll: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.lens_type) queryParams.append('lens_type', params.lens_type);
+    if (params.low_stock) queryParams.append('low_stock', 'true');
+    return axios.get(`${API_URL}/optica/contact-lenses?${queryParams.toString()}`);
+  },
+  create: (data) => axios.post(`${API_URL}/optica/contact-lenses`, data),
+  update: (id, data) => axios.put(`${API_URL}/optica/contact-lenses/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/optica/contact-lenses/${id}`),
+  search: (q, limit = 10) => axios.get(`${API_URL}/optica/contact-lenses/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+};
+
+// Lens Type Catalog API (Catálogo de Tipos de Lente)
+export const lensTypeApi = {
+  getAll: () => axios.get(`${API_URL}/optica/lens-types`),
+  create: (data) => axios.post(`${API_URL}/optica/lens-types`, data),
+  update: (id, data) => axios.put(`${API_URL}/optica/lens-types/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/optica/lens-types/${id}`),
+};
+
+// Optica Sales API (Ventas de Óptica)
+export const opticaSaleApi = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    return axios.get(`${API_URL}/optica/sales?${params.toString()}`);
+  },
+  getById: (id) => axios.get(`${API_URL}/optica/sales/${id}`),
+  create: (data) => axios.post(`${API_URL}/optica/sales`, data),
+  getPending: () => axios.get(`${API_URL}/optica/sales/pending`),
+  addPayment: (saleId, data) => axios.post(`${API_URL}/optica/sales/${saleId}/payments`, data),
+  cancel: (saleId) => axios.put(`${API_URL}/optica/sales/${saleId}/cancel`),
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {
@@ -248,4 +315,28 @@ export const calculateAge = (birthDate) => {
     age--;
   }
   return Math.max(0, age);
+};
+
+// Optica - Contact Lens Types
+export const contactLensTypeLabels = {
+  esferico: 'Esférico',
+  torico: 'Tórico',
+  multifocal: 'Multifocal',
+  cosmetico: 'Cosmético',
+};
+
+// Optica - Payment Methods
+export const paymentMethodLabels = {
+  efectivo: 'Efectivo',
+  tarjeta: 'Tarjeta',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  mixto: 'Mixto',
+};
+
+// Optica - Sale Status
+export const saleStatusLabels = {
+  pendiente: 'Pendiente',
+  pagado: 'Pagado',
+  cancelado: 'Cancelado',
 };
