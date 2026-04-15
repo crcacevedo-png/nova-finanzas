@@ -129,6 +129,7 @@ const Layout = ({ children }) => {
   const opticaItems = canViewOptica ? [
     { path: '/optica/inventario', icon: Package, label: 'Inventario', testId: 'nav-optica-inventario' },
     { path: '/optica/ventas', icon: ShoppingCart, label: 'Ventas', testId: 'nav-optica-ventas' },
+    { path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' },
     { path: '/optica/tipos-lente', icon: Eye, label: 'Tipos de Lente', testId: 'nav-optica-tipos-lente' },
   ] : [];
 

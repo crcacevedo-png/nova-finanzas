@@ -250,6 +250,20 @@ export const opticaSaleApi = {
   },
 };
 
+// Optica Purchases API
+export const opticaPurchaseApi = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append('search', filters.search);
+    if (filters.category) params.append('category', filters.category);
+    return axios.get(`${API_URL}/optica/purchases?${params.toString()}`);
+  },
+  getById: (id) => axios.get(`${API_URL}/optica/purchases/${id}`),
+  create: (data) => axios.post(`${API_URL}/optica/purchases`, data),
+  update: (id, data) => axios.put(`${API_URL}/optica/purchases/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/optica/purchases/${id}`),
+};
+
 // Format currency helper
 // Format currency helper - Format: Q 1,234.56
 export const formatCurrency = (amount) => {

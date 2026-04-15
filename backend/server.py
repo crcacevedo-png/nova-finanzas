@@ -4424,6 +4424,170 @@ async def get_optica_monthly_report(
     return report_data
 
 
+# ==================== OPTICA PURCHASES ROUTES ====================
+
+class OpticaPurchaseBase(BaseModel):
+    supplier_id: Optional[str] = None
+    category: str  # aros, lentes_contacto, cristales, accesorios, insumos, otros
+    description: str
+    quantity: int = 1
+    unit_price: float = 0
+    total: float
+    invoice_number: Optional[str] = None
+    purchase_date: str
+    notes: Optional[str] = ""
+
+class OpticaPurchaseCreate(OpticaPurchaseBase):
+    pass
+
+class OpticaPurchaseUpdate(BaseModel):
+    supplier_id: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    quantity: Optional[int] = None
+    unit_price: Optional[float] = None
+    total: Optional[float] = None
+    invoice_number: Optional[str] = None
+    purchase_date: Optional[str] = None
+    notes: Optional[str] = None
+
+class OpticaPurchaseResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    category: str
+    description: str
+    quantity: int
+    unit_price: float
+    total: float
+    invoice_number: Optional[str] = None
+    purchase_date: str
+    notes: Optional[str] = ""
+    created_at: str
+    updated_at: str
+
+class OpticaPurchaseListResponse(BaseModel):
+    data: List[OpticaPurchaseResponse]
+    total: int
+
+
+@api_router.get("/optica/purchases", response_model=OpticaPurchaseListResponse)
+async def get_optica_purchases(
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Obtener lista de compras de óptica"""
+    query = {}
+    
+    if search:
+        query["$or"] = [
+            {"description": {"$regex": search, "$options": "i"}},
+            {"invoice_number": {"$regex": search, "$options": "i"}}
+        ]
+    
+    if category:
+        query["category"] = category
+    
+    purchases = await db.optica_purchases.find(query, {"_id": 0}).sort("purchase_date", -1).to_list(500)
+    
+    # Enriquecer con nombre de proveedor
+    for purchase in purchases:
+        if purchase.get("supplier_id"):
+            supplier = await db.suppliers.find_one({"id": purchase["supplier_id"]}, {"_id": 0, "name": 1})
+            purchase["supplier_name"] = supplier.get("name") if supplier else None
+        else:
+            purchase["supplier_name"] = None
+    
+    return {"data": purchases, "total": len(purchases)}
+
+
+@api_router.get("/optica/purchases/{purchase_id}", response_model=OpticaPurchaseResponse)
+async def get_optica_purchase(purchase_id: str, current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtener detalle de una compra"""
+    purchase = await db.optica_purchases.find_one({"id": purchase_id}, {"_id": 0})
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Compra no encontrada")
+    
+    if purchase.get("supplier_id"):
+        supplier = await db.suppliers.find_one({"id": purchase["supplier_id"]}, {"_id": 0, "name": 1})
+        purchase["supplier_name"] = supplier.get("name") if supplier else None
+    
+    return purchase
+
+
+@api_router.post("/optica/purchases", response_model=OpticaPurchaseResponse)
+async def create_optica_purchase(
+    purchase: OpticaPurchaseCreate,
+    current_user: dict = Depends(require_permission("manage_optica_inventory"))
+):
+    """Crear una nueva compra de óptica"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    new_purchase = {
+        "id": str(uuid.uuid4()),
+        **purchase.model_dump(),
+        "created_at": now,
+        "updated_at": now,
+        "created_by": current_user["id"]
+    }
+    
+    await db.optica_purchases.insert_one(new_purchase)
+    del new_purchase["_id"]
+    
+    # Agregar nombre del proveedor
+    if new_purchase.get("supplier_id"):
+        supplier = await db.suppliers.find_one({"id": new_purchase["supplier_id"]}, {"_id": 0, "name": 1})
+        new_purchase["supplier_name"] = supplier.get("name") if supplier else None
+    else:
+        new_purchase["supplier_name"] = None
+    
+    return new_purchase
+
+
+@api_router.put("/optica/purchases/{purchase_id}", response_model=OpticaPurchaseResponse)
+async def update_optica_purchase(
+    purchase_id: str,
+    purchase: OpticaPurchaseUpdate,
+    current_user: dict = Depends(require_permission("manage_optica_inventory"))
+):
+    """Actualizar una compra de óptica"""
+    existing = await db.optica_purchases.find_one({"id": purchase_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Compra no encontrada")
+    
+    update_data = {k: v for k, v in purchase.model_dump().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.optica_purchases.update_one({"id": purchase_id}, {"$set": update_data})
+    
+    updated = await db.optica_purchases.find_one({"id": purchase_id}, {"_id": 0})
+    
+    if updated.get("supplier_id"):
+        supplier = await db.suppliers.find_one({"id": updated["supplier_id"]}, {"_id": 0, "name": 1})
+        updated["supplier_name"] = supplier.get("name") if supplier else None
+    else:
+        updated["supplier_name"] = None
+    
+    return updated
+
+
+@api_router.delete("/optica/purchases/{purchase_id}")
+async def delete_optica_purchase(
+    purchase_id: str,
+    current_user: dict = Depends(require_permission("manage_optica_inventory"))
+):
+    """Eliminar una compra de óptica"""
+    existing = await db.optica_purchases.find_one({"id": purchase_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Compra no encontrada")
+    
+    await db.optica_purchases.delete_one({"id": purchase_id})
+    
+    return {"message": "Compra eliminada correctamente"}
+
+
 # ==================== PAYMENT AUTHORIZATION ROUTES ====================
 
 async def enrich_authorization(auth: dict) -> dict:
