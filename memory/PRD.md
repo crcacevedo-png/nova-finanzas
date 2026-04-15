@@ -28,7 +28,7 @@
 |--------|----------|-------------|
 | GET | /api/expenses | Listar con filtros y paginación |
 | GET | /api/expenses/:id | Obtener gasto con pagos asociados |
-| POST | /api/expenses | Crear gasto nuevo |
+| POST | /api/expenses | Crear gasto nuevo (genera número correlativo automático) |
 | PUT | /api/expenses/:id | Editar gasto |
 | DELETE | /api/expenses/:id | Eliminar gasto |
 
@@ -39,6 +39,11 @@
 - `search` - Busca en name e invoiceNumber
 - `dateFrom`, `dateTo` - Rango de fechas
 - `sortBy`, `sortOrder` - Ordenamiento
+
+**Número Correlativo (expense_number):**
+- Formato: GST-XXXX (4 dígitos con ceros a la izquierda)
+- Se genera automáticamente al crear un gasto usando MongoDB counters collection
+- Operación atómica con find_one_and_update para evitar duplicados
 
 ### Pagos
 | Método | Endpoint | Descripción |
@@ -192,6 +197,7 @@
 ```json
 {
   "id": "uuid",
+  "expense_number": "string (GST-XXXX, auto-generado)",
   "provider": "string|null",
   "name": "string",
   "type": "fijo|proveedor|variable",
@@ -206,6 +212,14 @@
   "created_by": "user_id",
   "created_at": "datetime",
   "updated_at": "datetime"
+}
+```
+
+### Counters (para números correlativos)
+```json
+{
+  "_id": "expense_number",
+  "seq": "number (último número usado)"
 }
 ```
 
@@ -441,6 +455,15 @@
     - ✅ Exportar a Excel (.xlsx) con formato profesional
     - ✅ Exportar a PDF con tabla de ventas
   - ✅ Endpoints backend: `/api/optica/dashboard/stats`, `/api/optica/dashboard/monthly-chart`, `/api/optica/dashboard/top-doctors`, `/api/optica/dashboard/top-brands`, `/api/optica/reports/monthly`
+- ✅ **Número Correlativo Automático en Gastos (Abril 2026):**
+  - ✅ Generación automática al crear gasto (formato GST-XXXX)
+  - ✅ Secuencia atómica usando colección MongoDB `counters`
+  - ✅ Campo `expense_number` en modelos ExpenseResponse, PaymentResponse, PaymentAuthorizationResponse
+  - ✅ Columna "No." visible en tabla de Gastos (antes de Proveedor)
+  - ✅ Columna "No." visible en Autorización de Pagos (ambas vistas)
+  - ✅ Columna "No." visible en Historial de Pagos
+  - ✅ Gastos anteriores muestran "-" (compatibilidad retroactiva)
+  - ✅ Tests automatizados (100% backend, 100% frontend)
 
 ---
 
