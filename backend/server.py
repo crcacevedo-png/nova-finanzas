@@ -177,6 +177,11 @@ PERMISSIONS = {
         "manage_igss_units": False,
         "import_patients": False,
         "export_patients": False,
+        # Acceso a Proveedores (solo ver y crear)
+        "view_suppliers": True,
+        "create_suppliers": True,
+        "edit_suppliers": False,
+        "delete_suppliers": False,
         # Permisos completos de Óptica
         "view_optica": True,
         "manage_optica_inventory": True,
@@ -2165,8 +2170,8 @@ async def delete_bank_account(account_id: str, current_user: dict = Depends(requ
 
 @api_router.get("/suppliers", response_model=SupplierListResponse)
 async def get_suppliers(current_user: dict = Depends(get_current_user)):
-    """Obtener todos los proveedores (Admin y SuperAdmin)"""
-    if current_user["role"] not in ["admin", "superadmin"]:
+    """Obtener todos los proveedores (Admin, SuperAdmin y Optica)"""
+    if current_user["role"] not in ["admin", "superadmin", "optica"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver proveedores")
     
     suppliers = await db.suppliers.find({"is_active": True}, {"_id": 0}).sort("name", 1).to_list(1000)
@@ -2176,7 +2181,7 @@ async def get_suppliers(current_user: dict = Depends(get_current_user)):
 @api_router.get("/suppliers/{supplier_id}", response_model=SupplierResponse)
 async def get_supplier(supplier_id: str, current_user: dict = Depends(get_current_user)):
     """Obtener un proveedor específico"""
-    if current_user["role"] not in ["admin", "superadmin"]:
+    if current_user["role"] not in ["admin", "superadmin", "optica"]:
         raise HTTPException(status_code=403, detail="No tiene permisos")
     
     supplier = await db.suppliers.find_one({"id": supplier_id, "is_active": True}, {"_id": 0})
@@ -2187,8 +2192,8 @@ async def get_supplier(supplier_id: str, current_user: dict = Depends(get_curren
 
 @api_router.post("/suppliers", response_model=SupplierResponse)
 async def create_supplier(supplier_data: SupplierCreate, current_user: dict = Depends(get_current_user)):
-    """Crear nuevo proveedor (Admin y SuperAdmin)"""
-    if current_user["role"] not in ["admin", "superadmin"]:
+    """Crear nuevo proveedor (Admin, SuperAdmin y Optica)"""
+    if current_user["role"] not in ["admin", "superadmin", "optica"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para crear proveedores")
     
     # Verificar si ya existe un proveedor con el mismo nombre

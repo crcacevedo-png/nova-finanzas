@@ -57,18 +57,24 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
-  // Items principales del sidebar (1. Dashboard, 2. Pacientes)
-  const navItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
-    { path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' },
-  ];
+  // Items principales del sidebar
+  const navItems = [];
+  
+  // Dashboard - Solo para roles que no sean optica
+  if (user?.role !== 'optica') {
+    navItems.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' });
+  }
+  
+  // Pacientes - Visible para todos
+  navItems.push({ path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' });
 
   // Finanzas sub-items (visible para todos los roles autenticados)
-  const finanzasItems = [
+  // Finanzas sub-items (NO visible para optica)
+  const finanzasItems = user?.role !== 'optica' ? [
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
     { path: '/pagos-por-vencer', icon: Clock, label: 'Pagos por vencer', testId: 'nav-pagos-por-vencer' },
-  ];
+  ] : [];
   
   // Agregar Autorización de Pagos solo para Admin y SuperAdmin
   if (isAdminOrSuperAdmin) {
@@ -80,17 +86,21 @@ const Layout = ({ children }) => {
     });
   }
 
-  // Config sub-items (Admin y SuperAdmin)
+  // Config sub-items
   const configItems = [];
   
-  // Proveedores - disponible para Admin y SuperAdmin
-  if (isAdminOrSuperAdmin) {
+  // Proveedores - disponible para Admin, SuperAdmin y Optica
+  if (isAdminOrSuperAdmin || canViewOptica) {
     configItems.push({ 
       path: '/configuracion/proveedores', 
       icon: Truck, 
       label: 'Proveedores', 
       testId: 'nav-proveedores' 
     });
+  }
+  
+  // Gastos Fijos - solo Admin y SuperAdmin
+  if (isAdminOrSuperAdmin) {
     configItems.push({ 
       path: '/configuracion/gastos-fijos', 
       icon: CalendarClock, 
@@ -228,34 +238,36 @@ const Layout = ({ children }) => {
             </div>
           )}
 
-          {/* 4. Finanzas Section */}
-          <div className="mt-4">
-            <button
-              onClick={() => setFinanzasOpen(!finanzasOpen)}
-              className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                ['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
-              }`}
-              data-testid="nav-finanzas"
-            >
-              <div className="flex items-center gap-3">
-                <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
-                <span className="font-medium text-sm">Finanzas</span>
-              </div>
-              {finanzasOpen ? (
-                <ChevronDown className="w-4 h-4 opacity-60" />
-              ) : (
-                <ChevronRight className="w-4 h-4 opacity-60" />
+          {/* 4. Finanzas Section - NO para optica */}
+          {finanzasItems.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setFinanzasOpen(!finanzasOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  ['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+                }`}
+                data-testid="nav-finanzas"
+              >
+                <div className="flex items-center gap-3">
+                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">Finanzas</span>
+                </div>
+                {finanzasOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+              
+              {finanzasOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {finanzasItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
               )}
-            </button>
-            
-            {finanzasOpen && (
-              <div className="ml-4 mt-1 space-y-1">
-                {finanzasItems.map((item) => (
-                  <NavLink key={item.path} item={item} />
-                ))}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* 5. Médicos - Solo para optica y superadmin */}
           {canViewOptica && (
@@ -267,8 +279,8 @@ const Layout = ({ children }) => {
             <NavLink item={{ path: '/usuarios', icon: Users, label: 'Gestión de usuarios', testId: 'nav-usuarios' }} />
           )}
           
-          {/* 7. Configuration Section - Admin y SuperAdmin */}
-          {isAdminOrSuperAdmin && configItems.length > 0 && (
+          {/* 7. Configuration Section - Admin, SuperAdmin y Optica (si tiene items) */}
+          {configItems.length > 0 && (
             <div className="mt-4">
               <button
                 onClick={() => setConfigOpen(!configOpen)}

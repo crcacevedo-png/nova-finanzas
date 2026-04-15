@@ -45,6 +45,11 @@ const Proveedores = () => {
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Permisos basados en rol
+  const canCreate = true; // Todos los que acceden pueden crear
+  const canEdit = user?.role === 'superadmin' || user?.role === 'admin';
+  const canDelete = user?.role === 'superadmin' || user?.role === 'admin';
+  
   const [formData, setFormData] = useState({
     name: '',
     contact_name: '',
@@ -69,6 +74,12 @@ const Proveedores = () => {
   }, [fetchSuppliers]);
 
   const handleOpenDialog = (supplier = null) => {
+    // Si es edición, verificar permisos
+    if (supplier && !canEdit) {
+      toast.error('No tienes permisos para editar proveedores');
+      return;
+    }
+    
     if (supplier) {
       setEditingSupplier(supplier);
       setFormData({
@@ -238,7 +249,9 @@ const Proveedores = () => {
                       <TableHead className="table-header">Nombre</TableHead>
                       <TableHead className="table-header">Contacto</TableHead>
                       <TableHead className="table-header">Teléfono</TableHead>
-                      <TableHead className="table-header text-right">Acciones</TableHead>
+                      {(canEdit || canDelete) && (
+                        <TableHead className="table-header text-right">Acciones</TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -282,31 +295,37 @@ const Proveedores = () => {
                             <span style={{ color: 'var(--text-hint)' }}>-</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenDialog(supplier)}
-                              className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
-                              data-testid={`edit-supplier-${supplier.id}`}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedSupplier(supplier);
-                                setDeleteDialogOpen(true);
-                              }}
-                              className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
-                              data-testid={`delete-supplier-${supplier.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        {(canEdit || canDelete) && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenDialog(supplier)}
+                                  className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                                  data-testid={`edit-supplier-${supplier.id}`}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedSupplier(supplier);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                                  data-testid={`delete-supplier-${supplier.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
