@@ -757,8 +757,8 @@ const AutorizacionPagos = () => {
                     <Table>
                       <TableHeader>
                         <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
-                          <TableHead className="table-header">Gasto</TableHead>
                           <TableHead className="table-header">Proveedor</TableHead>
+                          <TableHead className="table-header">Gasto</TableHead>
                           <TableHead className="table-header">Monto Autorizado</TableHead>
                           <TableHead className="table-header">Cuenta Bancaria</TableHead>
                           <TableHead className="table-header">Estado</TableHead>
@@ -774,6 +774,11 @@ const AutorizacionPagos = () => {
                             data-testid={`auth-row-${auth.id}`}
                           >
                             <TableCell>
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                {auth.expense_provider || '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
                               <div>
                                 <p className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }} title={auth.expense_name}>
                                   {auth.expense_name}
@@ -782,11 +787,6 @@ const AutorizacionPagos = () => {
                                   Vence: {formatDate(auth.expense_due_date)}
                                 </p>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <span style={{ color: 'var(--text-secondary)' }}>
-                                {auth.expense_provider || '-'}
-                              </span>
                             </TableCell>
                             <TableCell>
                               <span className="font-semibold" style={{ color: 'var(--primary-teal)' }}>
