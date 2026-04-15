@@ -463,6 +463,7 @@
   - ✅ Columna "No." visible en Autorización de Pagos (ambas vistas)
   - ✅ Columna "No." visible en Historial de Pagos
   - ✅ Gastos anteriores muestran "-" (compatibilidad retroactiva)
+  - ✅ **Gastos Fijos generados automáticamente también reciben correlativo**
   - ✅ Tests automatizados (100% backend, 100% frontend)
 
 ---

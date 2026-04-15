@@ -5269,9 +5269,13 @@ async def generate_fixed_expenses_for_today() -> int:
         
         now = datetime.now(timezone.utc).isoformat()
         
+        # Generar número correlativo automático
+        expense_number = await get_next_expense_number()
+        
         # Crear el gasto
         expense_doc = {
             "id": str(uuid.uuid4()),
+            "expense_number": expense_number,  # Número correlativo automático
             "provider": supplier_name,
             "name": fe["expense_name"],
             "type": "fijo",
