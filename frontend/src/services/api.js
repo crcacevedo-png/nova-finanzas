@@ -287,6 +287,7 @@ export const roleLabels = {
   superadmin: 'Super Admin',
   admin: 'Administrador',
   usuario: 'Usuario',
+  optica: 'Óptica',
 };
 
 // Patient referral institution labels

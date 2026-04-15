@@ -9,7 +9,8 @@ import {
   ShieldCheck,
   User,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Glasses
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -153,6 +154,8 @@ const Usuarios = () => {
         return <ShieldCheck className="w-4 h-4" />;
       case 'admin':
         return <Shield className="w-4 h-4" />;
+      case 'optica':
+        return <Glasses className="w-4 h-4" />;
       default:
         return <User className="w-4 h-4" />;
     }
@@ -162,12 +165,13 @@ const Usuarios = () => {
     const colors = {
       superadmin: 'badge-superadmin border-0',
       admin: 'badge-admin border-0',
-      usuario: 'badge-usuario border-0'
+      usuario: 'badge-usuario border-0',
+      optica: 'badge-optica border-0'
     };
     return (
-      <Badge className={`${colors[role]} flex items-center gap-1`}>
+      <Badge className={`${colors[role] || 'badge-usuario border-0'} flex items-center gap-1`}>
         {getRoleIcon(role)}
-        {roleLabels[role]}
+        {roleLabels[role] || role}
       </Badge>
     );
   };
@@ -346,6 +350,7 @@ const Usuarios = () => {
                     <SelectItem value="superadmin">Super Admin</SelectItem>
                     <SelectItem value="admin">Administrador</SelectItem>
                     <SelectItem value="usuario">Usuario</SelectItem>
+                    <SelectItem value="optica">Óptica</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
