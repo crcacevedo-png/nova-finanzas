@@ -23,7 +23,8 @@ import {
   ShoppingCart,
   Stethoscope,
   Eye,
-  Package
+  Package,
+  Wallet
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -43,6 +44,9 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
+  const [finanzasOpen, setFinanzasOpen] = useState(
+    ['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p))
+  );
 
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
@@ -53,30 +57,36 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
+  // Items principales del sidebar
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
     { path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' },
-    { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
-    { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
-    { path: '/pagos-por-vencer', icon: Clock, label: 'Pagos por vencer', testId: 'nav-pagos-por-vencer' },
   ];
 
-  // Agregar Autorización de Pagos para Admin y SuperAdmin
-  if (isAdminOrSuperAdmin) {
-    navItems.push({ 
-      path: '/autorizacion-pagos', 
-      icon: FileCheck, 
-      label: 'Autorización de pagos', 
-      testId: 'nav-autorizacion-pagos' 
-    });
-  }
-
+  // Agregar Gestión de Usuarios para SuperAdmin
   if (canViewUserManagement()) {
     navItems.push({ 
       path: '/usuarios', 
       icon: Users, 
       label: 'Gestión de usuarios', 
       testId: 'nav-usuarios' 
+    });
+  }
+
+  // Finanzas sub-items (visible para todos los roles autenticados)
+  const finanzasItems = [
+    { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
+    { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
+    { path: '/pagos-por-vencer', icon: Clock, label: 'Pagos por vencer', testId: 'nav-pagos-por-vencer' },
+  ];
+  
+  // Agregar Autorización de Pagos solo para Admin y SuperAdmin
+  if (isAdminOrSuperAdmin) {
+    finanzasItems.push({ 
+      path: '/autorizacion-pagos', 
+      icon: FileCheck, 
+      label: 'Autorización de pagos', 
+      testId: 'nav-autorizacion-pagos' 
     });
   }
 
@@ -195,6 +205,35 @@ const Layout = ({ children }) => {
           {navItems.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
+
+          {/* Finanzas Section */}
+          <div className="mt-4">
+            <button
+              onClick={() => setFinanzasOpen(!finanzasOpen)}
+              className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                ['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+              }`}
+              data-testid="nav-finanzas"
+            >
+              <div className="flex items-center gap-3">
+                <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/pagos-por-vencer', '/autorizacion-pagos'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                <span className="font-medium text-sm">Finanzas</span>
+              </div>
+              {finanzasOpen ? (
+                <ChevronDown className="w-4 h-4 opacity-60" />
+              ) : (
+                <ChevronRight className="w-4 h-4 opacity-60" />
+              )}
+            </button>
+            
+            {finanzasOpen && (
+              <div className="ml-4 mt-1 space-y-1">
+                {finanzasItems.map((item) => (
+                  <NavLink key={item.path} item={item} />
+                ))}
+              </div>
+            )}
+          </div>
           
           {/* Configuration Section - Admin y SuperAdmin */}
           {isAdminOrSuperAdmin && configItems.length > 0 && (
