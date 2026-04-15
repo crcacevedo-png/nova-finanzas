@@ -1,7 +1,7 @@
 # NovaVision — Sistema de Gastos y Finanzas
 ## Product Requirements Document
 
-### Última actualización: 2026-04-04
+### Última actualización: 2026-04-15
 
 ---
 
@@ -112,6 +112,54 @@
 | POST | /api/igss-units | Crear unidad IGSS |
 | PUT | /api/igss-units/:id | Editar unidad |
 | DELETE | /api/igss-units/:id | Eliminar unidad |
+
+### Módulo Óptica (Solo optica y superadmin)
+
+#### Médicos
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/doctors | Listar médicos |
+| GET | /api/doctors/:id | Detalle de médico |
+| POST | /api/doctors | Crear médico |
+| PUT | /api/doctors/:id | Editar médico |
+| DELETE | /api/doctors/:id | Eliminar médico |
+| GET | /api/doctors/search?q= | Búsqueda para autocompletado |
+
+#### Inventario de Aros
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/optica/frames | Listar aros con filtros |
+| GET | /api/optica/frames/:id | Detalle de aro |
+| POST | /api/optica/frames | Crear aro |
+| PUT | /api/optica/frames/:id | Editar aro |
+| DELETE | /api/optica/frames/:id | Eliminar aro |
+| GET | /api/optica/frames/search?q= | Búsqueda para autocompletado |
+
+#### Lentes de Contacto
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/optica/contact-lenses | Listar lentes de contacto |
+| POST | /api/optica/contact-lenses | Crear lente de contacto |
+| PUT | /api/optica/contact-lenses/:id | Editar lente de contacto |
+| DELETE | /api/optica/contact-lenses/:id | Eliminar lente de contacto |
+
+#### Tipos de Lente (Catálogo)
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/optica/lens-types | Listar tipos de lente |
+| POST | /api/optica/lens-types | Crear tipo de lente |
+| PUT | /api/optica/lens-types/:id | Editar tipo de lente |
+| DELETE | /api/optica/lens-types/:id | Eliminar tipo de lente |
+
+#### Ventas de Óptica
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /api/optica/sales | Listar ventas con filtros |
+| GET | /api/optica/sales/:id | Detalle de venta |
+| POST | /api/optica/sales | Crear venta |
+| GET | /api/optica/sales/pending | Ventas con saldo pendiente |
+| POST | /api/optica/sales/:id/payments | Registrar abono |
+| PUT | /api/optica/sales/:id/cancel | Cancelar venta |
 
 ### Dashboard / Reportes
 | Método | Endpoint | Descripción |
@@ -303,6 +351,7 @@
 | superadmin | nova2024 | Super Admin |
 | admin | admin2024 | Administrador |
 | usuario | user2024 | Usuario |
+| optica | optica2024 | Óptica |
 
 ---
 
@@ -363,6 +412,24 @@
   - ✅ Acceso exclusivo SuperAdmin
   - ✅ Validación de uso antes de eliminar (pacientes asociados)
   - ✅ Catálogo inicia vacío, administrable desde el panel
+- ✅ **Módulo Óptica - Fase 1 (Abril 2026):**
+  - ✅ Nuevo rol `optica` con permisos específicos
+  - ✅ Acceso exclusivo para roles `optica` y `superadmin`
+  - ✅ Submenú colapsable en sidebar con 4 secciones
+  - ✅ **Base de Médicos:** CRUD completo (nombre, especialidad, licencia, teléfono, email)
+  - ✅ **Inventario de Aros:** CRUD (marca, código, modelo, color, costo, venta, stock)
+  - ✅ **Catálogo Tipos de Lente:** CRUD administrable (nombre, descripción, costo, precio venta)
+  - ✅ **Ventas de Óptica:** 
+    - ✅ Crear venta con búsqueda de paciente (conectado a tabla patients)
+    - ✅ Selección de médico referente (opcional)
+    - ✅ Agregar aro desde inventario
+    - ✅ Agregar tipos de lente con cantidad y precio editable
+    - ✅ Descuento porcentual
+    - ✅ Pago inicial y abonos posteriores
+    - ✅ Estados: pendiente, pagado, cancelado
+  - ✅ Dashboard de cards con métricas (stock, valor inventario, ventas totales, saldo pendiente)
+  - ✅ Seed data: 4 médicos, 6 aros, 7 tipos de lente
+  - ✅ Tests automatizados (100% backend, 100% frontend)
 
 ---
 
@@ -375,13 +442,18 @@
 
 ## 7. Tareas Pendientes
 
+### P1 - Fase 2 Óptica
+- [ ] Submódulo de "Gastos de Óptica" (usando proveedores globales)
+- [ ] Dashboard de Óptica (gráficos, top médicos, top marcas, órdenes pendientes)
+- [ ] Informe mensual exportable (PDF y Excel)
+- [ ] Inventario de Lentes de Contacto (UI similar a Aros)
+
 ### P2 - Mejoras
-- [ ] Refactorización de `server.py` (separar modelos, rutas, servicios)
+- [ ] Refactorización de `server.py` (separar modelos, rutas, servicios - archivo tiene 4600+ líneas)
 - [ ] Importación masiva de pacientes desde Excel/CSV
 
 ### Backlog
 - [ ] Módulo de reportes gráficos avanzados
 - [ ] Notificaciones push/email para autorizaciones pendientes
-- [ ] Módulo Óptica (ventas, órdenes) - debe usar tabla patients como fuente de clientes
-- [ ] Módulo de Citas médicas - debe usar tabla patients
+- [ ] Módulo de Citas médicas (debe usar tabla patients)
 - [ ] Vista de detalle del paciente con pestañas de historial (Óptica, Citas, etc.)
