@@ -332,6 +332,11 @@
     color: var(--text-secondary);
 }
 
+.badge-optica {
+    background: #E0F2FE;
+    color: #0369A1;
+}
+
 /* ==================== SIDEBAR STYLES ==================== */
 
 .sidebar-teal {

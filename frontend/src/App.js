@@ -13,6 +13,11 @@ import Proveedores from './pages/Proveedores';
 import GastosFijos from './pages/GastosFijos';
 import Pacientes from './pages/Pacientes';
 import UnidadesIGSS from './pages/UnidadesIGSS';
+// Módulo Óptica
+import OpticaInventario from './pages/OpticaInventario';
+import OpticaVentas from './pages/OpticaVentas';
+import Medicos from './pages/Medicos';
+import TiposLente from './pages/TiposLente';
 import './App.css';
 
 // Protected Route Component
@@ -162,6 +167,40 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="manage_igss_units">
             <UnidadesIGSS />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Módulo Óptica - Solo accesible para roles optica y superadmin */}
+      <Route 
+        path="/optica/inventario" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <OpticaInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/ventas" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <OpticaVentas />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/medicos" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <Medicos />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/tipos-lente" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <TiposLente />
           </ProtectedRoute>
         } 
       />

@@ -53,7 +53,7 @@ import {
   lensTypeApi,
   formatCurrency, 
   formatDate,
-  paymentMethodLabels,
+  opticaPaymentMethodLabels,
   saleStatusLabels
 } from '../services/api';
 
@@ -805,7 +805,7 @@ const OpticaVentas = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(paymentMethodLabels).map(([key, label]) => (
+                      {Object.entries(opticaPaymentMethodLabels).map(([key, label]) => (
                         <SelectItem key={key} value={key}>{label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -881,7 +881,7 @@ const OpticaVentas = () => {
                   </div>
                   <div>
                     <p style={{ color: 'var(--text-hint)' }}>Método de Pago</p>
-                    <p>{paymentMethodLabels[selectedSale.payment_method]}</p>
+                    <p>{opticaPaymentMethodLabels[selectedSale.payment_method]}</p>
                   </div>
                 </div>
 
@@ -935,7 +935,7 @@ const OpticaVentas = () => {
                       <div key={i} className="text-sm flex justify-between py-1 border-b last:border-0">
                         <div>
                           <span>{formatDate(payment.created_at)}</span>
-                          <span className="text-gray-500 ml-2">({paymentMethodLabels[payment.payment_method]})</span>
+                          <span className="text-gray-500 ml-2">({opticaPaymentMethodLabels[payment.payment_method]})</span>
                         </div>
                         <span className="font-medium text-green-600">{formatCurrency(payment.amount)}</span>
                       </div>

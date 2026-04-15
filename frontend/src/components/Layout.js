@@ -18,7 +18,12 @@ import {
   Truck,
   CalendarClock,
   UserRound,
-  Building
+  Building,
+  Glasses,
+  ShoppingCart,
+  Stethoscope,
+  Eye,
+  Package
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -27,18 +32,21 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finan
 const roleLabels = {
   superadmin: 'Super Admin',
   admin: 'Administrador',
-  usuario: 'Usuario'
+  usuario: 'Usuario',
+  optica: 'Óptica'
 };
 
 const Layout = ({ children }) => {
-  const { user, logout, canViewUserManagement } = useAuth();
+  const { user, logout, canViewUserManagement, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
+  const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
 
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+  const canViewOptica = hasPermission('view_optica');
 
   const handleLogout = async () => {
     await logout();
@@ -111,10 +119,19 @@ const Layout = ({ children }) => {
     const classes = {
       superadmin: 'badge-superadmin',
       admin: 'badge-admin',
-      usuario: 'badge-usuario'
+      usuario: 'badge-usuario',
+      optica: 'badge-optica'
     };
     return classes[role] || 'badge-usuario';
   };
+
+  // Optica sub-items (solo para rol optica y superadmin)
+  const opticaItems = canViewOptica ? [
+    { path: '/optica/inventario', icon: Package, label: 'Inventario', testId: 'nav-optica-inventario' },
+    { path: '/optica/ventas', icon: ShoppingCart, label: 'Ventas', testId: 'nav-optica-ventas' },
+    { path: '/optica/medicos', icon: Stethoscope, label: 'Médicos', testId: 'nav-optica-medicos' },
+    { path: '/optica/tipos-lente', icon: Eye, label: 'Tipos de Lente', testId: 'nav-optica-tipos-lente' },
+  ] : [];
 
   const NavLink = ({ item }) => {
     const isActive = location.pathname === item.path;
@@ -203,6 +220,37 @@ const Layout = ({ children }) => {
               {configOpen && (
                 <div className="ml-4 mt-1 space-y-1">
                   {configItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Optica Section - Solo para optica y superadmin */}
+          {canViewOptica && opticaItems.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setOpticaOpen(!opticaOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  location.pathname.startsWith('/optica') ? 'active' : ''
+                }`}
+                data-testid="nav-optica"
+              >
+                <div className="flex items-center gap-3">
+                  <Glasses className={`w-5 h-5 icon ${location.pathname.startsWith('/optica') ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">Óptica</span>
+                </div>
+                {opticaOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+              
+              {opticaOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {opticaItems.map((item) => (
                     <NavLink key={item.path} item={item} />
                   ))}
                 </div>

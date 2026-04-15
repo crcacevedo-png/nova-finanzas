@@ -326,7 +326,7 @@ export const contactLensTypeLabels = {
 };
 
 // Optica - Payment Methods
-export const paymentMethodLabels = {
+export const opticaPaymentMethodLabels = {
   efectivo: 'Efectivo',
   tarjeta: 'Tarjeta',
   transferencia: 'Transferencia',
