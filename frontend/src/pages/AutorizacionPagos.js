@@ -67,7 +67,7 @@ const AutorizacionPagos = () => {
   const [expensesDue30, setExpensesDue30] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('pendiente'); // Por defecto solo pendientes
   const [viewMode, setViewMode] = useState('authorizations'); // 'authorizations' | 'expenses_due'
   
   // Selección múltiple
@@ -695,13 +695,13 @@ const AutorizacionPagos = () => {
                     <Label>Estado:</Label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger className="w-[180px] input-teal" data-testid="status-filter">
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue placeholder="Pendiente" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="pendiente">Pendiente</SelectItem>
-                        <SelectItem value="ejecutado">Ejecutado</SelectItem>
-                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                        <SelectItem value="pendiente">Solo Pendientes</SelectItem>
+                        <SelectItem value="all">Todos (historial)</SelectItem>
+                        <SelectItem value="ejecutado">Solo Ejecutados</SelectItem>
+                        <SelectItem value="cancelado">Solo Cancelados</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
