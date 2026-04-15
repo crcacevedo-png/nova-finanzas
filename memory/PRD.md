@@ -430,6 +430,17 @@
   - ✅ Dashboard de cards con métricas (stock, valor inventario, ventas totales, saldo pendiente)
   - ✅ Seed data: 4 médicos, 6 aros, 7 tipos de lente
   - ✅ Tests automatizados (100% backend, 100% frontend)
+- ✅ **Módulo Óptica - Fase 2 (Abril 2026):**
+  - ✅ **Dashboard de Ventas Óptica:**
+    - ✅ Métricas: Ventas del mes, Cobrado mes, Saldo pendiente, Órdenes mes, Pendientes
+    - ✅ Gráfico de barras: Ventas últimos 6 meses (con Recharts)
+    - ✅ Top 3 Médicos por ventas
+    - ✅ Top 3 Marcas de Aros por ventas
+  - ✅ **Exportar Informe Mensual:**
+    - ✅ Modal con selector de año y mes
+    - ✅ Exportar a Excel (.xlsx) con formato profesional
+    - ✅ Exportar a PDF con tabla de ventas
+  - ✅ Endpoints backend: `/api/optica/dashboard/stats`, `/api/optica/dashboard/monthly-chart`, `/api/optica/dashboard/top-doctors`, `/api/optica/dashboard/top-brands`, `/api/optica/reports/monthly`
 
 ---
 
@@ -442,14 +453,12 @@
 
 ## 7. Tareas Pendientes
 
-### P1 - Fase 2 Óptica
-- [ ] Submódulo de "Gastos de Óptica" (usando proveedores globales)
-- [ ] Dashboard de Óptica (gráficos, top médicos, top marcas, órdenes pendientes)
-- [ ] Informe mensual exportable (PDF y Excel)
+### P1 - Mejoras Óptica
 - [ ] Inventario de Lentes de Contacto (UI similar a Aros)
+- [ ] Submódulo de "Gastos de Óptica" (usando proveedores globales)
 
-### P2 - Mejoras
-- [ ] Refactorización de `server.py` (separar modelos, rutas, servicios - archivo tiene 4600+ líneas)
+### P2 - Mejoras Generales
+- [ ] Refactorización de `server.py` (separar modelos, rutas, servicios - archivo tiene 5000+ líneas)
 - [ ] Importación masiva de pacientes desde Excel/CSV
 
 ### Backlog

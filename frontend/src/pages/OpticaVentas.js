@@ -11,7 +11,15 @@ import {
   CreditCard,
   AlertCircle,
   X,
-  Check
+  Check,
+  TrendingUp,
+  FileSpreadsheet,
+  FileText,
+  Download,
+  Stethoscope,
+  Award,
+  BarChart3,
+  CalendarDays
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -56,6 +64,15 @@ import {
   opticaPaymentMethodLabels,
   saleStatusLabels
 } from '../services/api';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 const OpticaVentas = () => {
   const { user, hasPermission } = useAuth();
@@ -108,6 +125,25 @@ const OpticaVentas = () => {
     notes: ''
   });
 
+  // Dashboard states
+  const [dashboardStats, setDashboardStats] = useState({
+    ventas_mes: 0,
+    cobrado_mes: 0,
+    ordenes_mes: 0,
+    saldo_pendiente: 0,
+    ordenes_pendientes: 0
+  });
+  const [monthlyChart, setMonthlyChart] = useState([]);
+  const [topDoctors, setTopDoctors] = useState([]);
+  const [topBrands, setTopBrands] = useState([]);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  
+  // Report states
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
+  const [exportingReport, setExportingReport] = useState(false);
+
   const canManage = hasPermission('manage_optica_sales');
 
   const fetchSales = useCallback(async () => {
@@ -135,10 +171,61 @@ const OpticaVentas = () => {
     }
   }, []);
 
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setLoadingDashboard(true);
+      const [statsRes, chartRes, doctorsRes, brandsRes] = await Promise.all([
+        opticaSaleApi.getDashboardStats(),
+        opticaSaleApi.getMonthlyChart(),
+        opticaSaleApi.getTopDoctors(5),
+        opticaSaleApi.getTopBrands(5)
+      ]);
+      setDashboardStats(statsRes.data);
+      setMonthlyChart(chartRes.data);
+      setTopDoctors(doctorsRes.data);
+      setTopBrands(brandsRes.data);
+    } catch (error) {
+      console.error('Error fetching dashboard:', error);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSales();
     fetchLensTypes();
-  }, [fetchSales, fetchLensTypes]);
+    fetchDashboard();
+  }, [fetchSales, fetchLensTypes, fetchDashboard]);
+
+  const handleExportReport = async (format) => {
+    setExportingReport(true);
+    try {
+      const response = await opticaSaleApi.getMonthlyReport(reportYear, reportMonth, format);
+      
+      const blob = new Blob([response.data], { 
+        type: format === 'excel' 
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf'
+      });
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ventas_optica_${reportYear}_${String(reportMonth).padStart(2, '0')}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`Informe ${format.toUpperCase()} descargado exitosamente`);
+      setReportDialogOpen(false);
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      toast.error('Error al exportar el informe');
+    } finally {
+      setExportingReport(false);
+    }
+  };
 
   // Search handlers
   const searchPatients = async (query) => {
@@ -361,7 +448,11 @@ const OpticaVentas = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={fetchSales} className="btn-outline">
+            <Button variant="outline" onClick={() => setReportDialogOpen(true)} className="btn-outline" data-testid="export-report-button">
+              <Download className="w-4 h-4 mr-2" />
+              Exportar Informe
+            </Button>
+            <Button variant="outline" onClick={() => { fetchSales(); fetchDashboard(); }} className="btn-outline">
               <RefreshCw className="w-4 h-4 mr-2" />
               Actualizar
             </Button>
@@ -374,41 +465,191 @@ const OpticaVentas = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Dashboard Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="card-metrics border-0 shadow-none">
-            <CardContent className="p-4 flex items-center gap-4">
+            <CardContent className="p-4 flex items-center gap-3">
               <div className="p-3 rounded-xl bg-teal-100">
-                <ShoppingCart className="w-5 h-5 text-teal-600" />
+                <TrendingUp className="w-5 h-5 text-teal-600" />
               </div>
               <div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Ventas</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{formatCurrency(totalSales)}</p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Ventas del Mes</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {loadingDashboard ? '...' : formatCurrency(dashboardStats.ventas_mes)}
+                </p>
               </div>
             </CardContent>
           </Card>
           <Card className="card-metrics border-0 shadow-none">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-amber-100">
-                <AlertCircle className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Saldo Pendiente</p>
-                <p className="text-2xl font-bold text-amber-600">{formatCurrency(pendingBalance)}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-metrics border-0 shadow-none">
-            <CardContent className="p-4 flex items-center gap-4">
+            <CardContent className="p-4 flex items-center gap-3">
               <div className="p-3 rounded-xl bg-emerald-100">
                 <DollarSign className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Órdenes</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{sales.length}</p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Cobrado Mes</p>
+                <p className="text-lg font-bold text-emerald-600">
+                  {loadingDashboard ? '...' : formatCurrency(dashboardStats.cobrado_mes)}
+                </p>
               </div>
             </CardContent>
           </Card>
+          <Card className="card-metrics border-0 shadow-none">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-amber-100">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Saldo Pendiente</p>
+                <p className="text-lg font-bold text-amber-600">
+                  {loadingDashboard ? '...' : formatCurrency(dashboardStats.saldo_pendiente)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="card-metrics border-0 shadow-none">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-blue-100">
+                <ShoppingCart className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Órdenes Mes</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {loadingDashboard ? '...' : dashboardStats.ordenes_mes}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="card-metrics border-0 shadow-none">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-xl bg-orange-100">
+                <CreditCard className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Pendientes</p>
+                <p className="text-lg font-bold text-orange-600">
+                  {loadingDashboard ? '...' : dashboardStats.ordenes_pendientes}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts and Rankings */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Monthly Chart */}
+          <Card className="card-teal lg:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                <BarChart3 className="w-4 h-4" />
+                Ventas Últimos 6 Meses
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingDashboard ? (
+                <Skeleton className="h-[200px] w-full" />
+              ) : monthlyChart.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={monthlyChart}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="mes" tick={{ fontSize: 11 }} stroke="#6B7280" />
+                    <YAxis tickFormatter={(v) => `Q${(v/1000).toFixed(0)}k`} tick={{ fontSize: 11 }} stroke="#6B7280" />
+                    <Tooltip 
+                      formatter={(value) => [formatCurrency(value), 'Ventas']}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB' }}
+                    />
+                    <Bar dataKey="ventas" fill="#0F6E56" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[200px] flex items-center justify-center">
+                  <p style={{ color: 'var(--text-hint)' }}>Sin datos de ventas</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top Doctors & Brands */}
+          <div className="space-y-4">
+            {/* Top Doctors */}
+            <Card className="card-teal">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Stethoscope className="w-4 h-4" />
+                  Top Médicos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {loadingDashboard ? (
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+                  </div>
+                ) : topDoctors.length > 0 ? (
+                  <div className="space-y-2">
+                    {topDoctors.slice(0, 3).map((doc, i) => (
+                      <div key={doc.doctor_id} className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                            i === 0 ? 'bg-yellow-100 text-yellow-700' : 
+                            i === 1 ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {i + 1}
+                          </span>
+                          <span className="text-sm truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>
+                            {doc.doctor_name}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                          {doc.count} ventas
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-center py-2" style={{ color: 'var(--text-hint)' }}>Sin datos</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top Brands */}
+            <Card className="card-teal">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Award className="w-4 h-4" />
+                  Top Marcas Aros
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {loadingDashboard ? (
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+                  </div>
+                ) : topBrands.length > 0 ? (
+                  <div className="space-y-2">
+                    {topBrands.slice(0, 3).map((brand, i) => (
+                      <div key={brand.brand} className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                            i === 0 ? 'bg-yellow-100 text-yellow-700' : 
+                            i === 1 ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {i + 1}
+                          </span>
+                          <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                            {brand.brand}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                          {brand.count} ventas
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-center py-2" style={{ color: 'var(--text-hint)' }}>Sin datos</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Filters */}
@@ -1022,6 +1263,70 @@ const OpticaVentas = () => {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Export Report Dialog */}
+        <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarDays className="w-5 h-5" />
+                Exportar Informe Mensual
+              </DialogTitle>
+              <DialogDescription>
+                Selecciona el mes y formato para exportar
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Año</Label>
+                  <Select value={reportYear.toString()} onValueChange={(v) => setReportYear(parseInt(v))}>
+                    <SelectTrigger className="input-teal">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[2024, 2025, 2026].map(y => (
+                        <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Mes</Label>
+                  <Select value={reportMonth.toString()} onValueChange={(v) => setReportMonth(parseInt(v))}>
+                    <SelectTrigger className="input-teal">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map((m, i) => (
+                        <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  onClick={() => handleExportReport('excel')} 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  disabled={exportingReport}
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  {exportingReport ? 'Exportando...' : 'Excel'}
+                </Button>
+                <Button 
+                  onClick={() => handleExportReport('pdf')} 
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  disabled={exportingReport}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  {exportingReport ? 'Exportando...' : 'PDF'}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

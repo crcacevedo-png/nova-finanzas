@@ -235,6 +235,19 @@ export const opticaSaleApi = {
   getPending: () => axios.get(`${API_URL}/optica/sales/pending`),
   addPayment: (saleId, data) => axios.post(`${API_URL}/optica/sales/${saleId}/payments`, data),
   cancel: (saleId) => axios.put(`${API_URL}/optica/sales/${saleId}/cancel`),
+  // Dashboard
+  getDashboardStats: () => axios.get(`${API_URL}/optica/dashboard/stats`),
+  getMonthlyChart: () => axios.get(`${API_URL}/optica/dashboard/monthly-chart`),
+  getTopDoctors: (limit = 5) => axios.get(`${API_URL}/optica/dashboard/top-doctors?limit=${limit}`),
+  getTopBrands: (limit = 5) => axios.get(`${API_URL}/optica/dashboard/top-brands?limit=${limit}`),
+  // Reports
+  getMonthlyReport: (year, month, format = 'json') => {
+    const url = `${API_URL}/optica/reports/monthly?year=${year}&month=${month}&format=${format}`;
+    if (format === 'json') {
+      return axios.get(url);
+    }
+    return axios.get(url, { responseType: 'blob' });
+  },
 };
 
 // Format currency helper

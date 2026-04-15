@@ -4044,6 +4044,386 @@ async def cancel_optica_sale(sale_id: str, current_user: dict = Depends(require_
     return {"message": "Venta cancelada correctamente. Stock restaurado."}
 
 
+# ==================== OPTICA DASHBOARD & REPORTS ====================
+
+@api_router.get("/optica/dashboard/stats")
+async def get_optica_dashboard_stats(current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtener estadísticas del dashboard de óptica"""
+    now = datetime.now(timezone.utc)
+    first_day_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Pipeline para ventas del mes actual
+    pipeline_month = [
+        {"$match": {
+            "created_at": {"$gte": first_day_month.isoformat()},
+            "status": {"$ne": "cancelado"}
+        }},
+        {"$group": {
+            "_id": None,
+            "total_ventas": {"$sum": "$total"},
+            "total_cobrado": {"$sum": "$paid_amount"},
+            "count": {"$sum": 1}
+        }}
+    ]
+    
+    month_result = await db.optica_sales.aggregate(pipeline_month).to_list(1)
+    month_stats = month_result[0] if month_result else {"total_ventas": 0, "total_cobrado": 0, "count": 0}
+    
+    # Saldo pendiente total (todas las ventas pendientes)
+    pipeline_pending = [
+        {"$match": {"status": "pendiente"}},
+        {"$group": {
+            "_id": None,
+            "saldo_pendiente": {"$sum": {"$subtract": ["$total", "$paid_amount"]}},
+            "count_pendientes": {"$sum": 1}
+        }}
+    ]
+    
+    pending_result = await db.optica_sales.aggregate(pipeline_pending).to_list(1)
+    pending_stats = pending_result[0] if pending_result else {"saldo_pendiente": 0, "count_pendientes": 0}
+    
+    return {
+        "ventas_mes": month_stats.get("total_ventas", 0),
+        "cobrado_mes": month_stats.get("total_cobrado", 0),
+        "ordenes_mes": month_stats.get("count", 0),
+        "saldo_pendiente": pending_stats.get("saldo_pendiente", 0),
+        "ordenes_pendientes": pending_stats.get("count_pendientes", 0)
+    }
+
+
+@api_router.get("/optica/dashboard/monthly-chart")
+async def get_optica_monthly_chart(current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtener datos de ventas por mes (últimos 6 meses)"""
+    now = datetime.now(timezone.utc)
+    six_months_ago = now - timedelta(days=180)
+    
+    pipeline = [
+        {"$match": {
+            "created_at": {"$gte": six_months_ago.isoformat()},
+            "status": {"$ne": "cancelado"}
+        }},
+        {"$addFields": {
+            "created_date": {"$dateFromString": {"dateString": "$created_at"}}
+        }},
+        {"$group": {
+            "_id": {
+                "year": {"$year": "$created_date"},
+                "month": {"$month": "$created_date"}
+            },
+            "total": {"$sum": "$total"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id.year": 1, "_id.month": 1}}
+    ]
+    
+    results = await db.optica_sales.aggregate(pipeline).to_list(12)
+    
+    month_names = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    
+    chart_data = []
+    for r in results:
+        chart_data.append({
+            "mes": f"{month_names[r['_id']['month']]} {r['_id']['year']}",
+            "ventas": r["total"],
+            "ordenes": r["count"]
+        })
+    
+    return chart_data
+
+
+@api_router.get("/optica/dashboard/top-doctors")
+async def get_optica_top_doctors(limit: int = 5, current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtener top médicos por ventas"""
+    pipeline = [
+        {"$match": {"doctor_id": {"$ne": None}, "status": {"$ne": "cancelado"}}},
+        {"$group": {
+            "_id": "$doctor_id",
+            "total_ventas": {"$sum": "$total"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"total_ventas": -1}},
+        {"$limit": limit}
+    ]
+    
+    results = await db.optica_sales.aggregate(pipeline).to_list(limit)
+    
+    # Enriquecer con nombres de médicos
+    top_doctors = []
+    for r in results:
+        doctor = await db.doctors.find_one({"id": r["_id"]}, {"_id": 0, "name": 1})
+        top_doctors.append({
+            "doctor_id": r["_id"],
+            "doctor_name": doctor.get("name", "Sin nombre") if doctor else "Sin nombre",
+            "total_ventas": r["total_ventas"],
+            "count": r["count"]
+        })
+    
+    return top_doctors
+
+
+@api_router.get("/optica/dashboard/top-brands")
+async def get_optica_top_brands(limit: int = 5, current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtener top marcas de aros por ventas"""
+    pipeline = [
+        {"$match": {"frame_id": {"$ne": None}, "status": {"$ne": "cancelado"}}},
+        {"$lookup": {
+            "from": "optica_frames",
+            "localField": "frame_id",
+            "foreignField": "id",
+            "as": "frame"
+        }},
+        {"$unwind": "$frame"},
+        {"$group": {
+            "_id": "$frame.brand",
+            "total_ventas": {"$sum": "$frame_price"},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": limit}
+    ]
+    
+    results = await db.optica_sales.aggregate(pipeline).to_list(limit)
+    
+    return [{"brand": r["_id"], "total_ventas": r["total_ventas"], "count": r["count"]} for r in results]
+
+
+@api_router.get("/optica/reports/monthly")
+async def get_optica_monthly_report(
+    year: int = None, 
+    month: int = None, 
+    format: str = "json",
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Obtener informe mensual de ventas de óptica"""
+    now = datetime.now(timezone.utc)
+    year = year or now.year
+    month = month or now.month
+    
+    start_date = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end_date = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    
+    # Obtener ventas del mes
+    sales = await db.optica_sales.find({
+        "created_at": {"$gte": start_date.isoformat(), "$lt": end_date.isoformat()},
+        "status": {"$ne": "cancelado"}
+    }, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    
+    # Enriquecer con nombres
+    for sale in sales:
+        if sale.get("patient_id"):
+            patient = await db.patients.find_one({"id": sale["patient_id"]}, {"_id": 0, "first_name": 1, "last_name": 1})
+            if patient:
+                sale["patient_name"] = f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip()
+        if sale.get("doctor_id"):
+            doctor = await db.doctors.find_one({"id": sale["doctor_id"]}, {"_id": 0, "name": 1})
+            if doctor:
+                sale["doctor_name"] = doctor.get("name", "")
+    
+    # Calcular totales
+    total_ventas = sum(s.get("total", 0) for s in sales)
+    total_cobrado = sum(s.get("paid_amount", 0) for s in sales)
+    total_pendiente = total_ventas - total_cobrado
+    
+    report_data = {
+        "year": year,
+        "month": month,
+        "month_name": ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"][month],
+        "total_ventas": total_ventas,
+        "total_cobrado": total_cobrado,
+        "total_pendiente": total_pendiente,
+        "count": len(sales),
+        "sales": sales
+    }
+    
+    if format == "json":
+        return report_data
+    
+    # Generar Excel
+    if format == "excel":
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from io import BytesIO
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Ventas {report_data['month_name']} {year}"
+        
+        # Estilos
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Título
+        ws.merge_cells('A1:H1')
+        ws['A1'] = f"Informe de Ventas Óptica - {report_data['month_name']} {year}"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws['A1'].alignment = Alignment(horizontal='center')
+        
+        # Resumen
+        ws['A3'] = "Total Ventas:"
+        ws['B3'] = total_ventas
+        ws['B3'].number_format = '"Q"#,##0.00'
+        ws['A4'] = "Total Cobrado:"
+        ws['B4'] = total_cobrado
+        ws['B4'].number_format = '"Q"#,##0.00'
+        ws['A5'] = "Saldo Pendiente:"
+        ws['B5'] = total_pendiente
+        ws['B5'].number_format = '"Q"#,##0.00'
+        ws['A6'] = "Total Órdenes:"
+        ws['B6'] = len(sales)
+        
+        # Headers de tabla
+        headers = ["Fecha", "Paciente", "Médico", "Aro", "Lentes", "Subtotal", "Descuento", "Total", "Pagado", "Pendiente", "Estado"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=8, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.border = border
+            cell.alignment = Alignment(horizontal='center')
+        
+        # Datos
+        for row_num, sale in enumerate(sales, 9):
+            ws.cell(row=row_num, column=1, value=sale.get("created_at", "")[:10]).border = border
+            ws.cell(row=row_num, column=2, value=sale.get("patient_name", "")).border = border
+            ws.cell(row=row_num, column=3, value=sale.get("doctor_name", "")).border = border
+            ws.cell(row=row_num, column=4, value=sale.get("frame_info", "")).border = border
+            ws.cell(row=row_num, column=5, value=", ".join([l.get("name", "") for l in sale.get("lens_items", [])])).border = border
+            
+            subtotal_cell = ws.cell(row=row_num, column=6, value=sale.get("subtotal", 0))
+            subtotal_cell.number_format = '"Q"#,##0.00'
+            subtotal_cell.border = border
+            
+            discount_cell = ws.cell(row=row_num, column=7, value=f"{sale.get('discount_percent', 0)}%")
+            discount_cell.border = border
+            
+            total_cell = ws.cell(row=row_num, column=8, value=sale.get("total", 0))
+            total_cell.number_format = '"Q"#,##0.00'
+            total_cell.border = border
+            
+            paid_cell = ws.cell(row=row_num, column=9, value=sale.get("paid_amount", 0))
+            paid_cell.number_format = '"Q"#,##0.00'
+            paid_cell.border = border
+            
+            pending = sale.get("total", 0) - sale.get("paid_amount", 0)
+            pending_cell = ws.cell(row=row_num, column=10, value=pending)
+            pending_cell.number_format = '"Q"#,##0.00'
+            pending_cell.border = border
+            
+            status_labels = {"pendiente": "Pendiente", "pagado": "Pagado", "cancelado": "Cancelado"}
+            ws.cell(row=row_num, column=11, value=status_labels.get(sale.get("status", ""), sale.get("status", ""))).border = border
+        
+        # Ajustar anchos
+        ws.column_dimensions['A'].width = 12
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 20
+        ws.column_dimensions['D'].width = 25
+        ws.column_dimensions['E'].width = 30
+        ws.column_dimensions['F'].width = 12
+        ws.column_dimensions['G'].width = 10
+        ws.column_dimensions['H'].width = 12
+        ws.column_dimensions['I'].width = 12
+        ws.column_dimensions['J'].width = 12
+        ws.column_dimensions['K'].width = 12
+        
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=ventas_optica_{year}_{month:02d}.xlsx"}
+        )
+    
+    # Generar PDF
+    if format == "pdf":
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from io import BytesIO
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Título
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16, alignment=1)
+        elements.append(Paragraph(f"Informe de Ventas Óptica - {report_data['month_name']} {year}", title_style))
+        elements.append(Spacer(1, 20))
+        
+        # Resumen
+        summary_data = [
+            ["Total Ventas", f"Q {total_ventas:,.2f}"],
+            ["Total Cobrado", f"Q {total_cobrado:,.2f}"],
+            ["Saldo Pendiente", f"Q {total_pendiente:,.2f}"],
+            ["Total Órdenes", str(len(sales))]
+        ]
+        summary_table = Table(summary_data, colWidths=[150, 150])
+        summary_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+        
+        # Tabla de ventas
+        table_data = [["Fecha", "Paciente", "Médico", "Total", "Pagado", "Pendiente", "Estado"]]
+        for sale in sales:
+            pending = sale.get("total", 0) - sale.get("paid_amount", 0)
+            status_labels = {"pendiente": "Pendiente", "pagado": "Pagado", "cancelado": "Cancelado"}
+            table_data.append([
+                sale.get("created_at", "")[:10],
+                sale.get("patient_name", "")[:25],
+                sale.get("doctor_name", "")[:20],
+                f"Q {sale.get('total', 0):,.2f}",
+                f"Q {sale.get('paid_amount', 0):,.2f}",
+                f"Q {pending:,.2f}",
+                status_labels.get(sale.get("status", ""), sale.get("status", ""))
+            ])
+        
+        if len(table_data) > 1:
+            sales_table = Table(table_data, colWidths=[70, 140, 120, 80, 80, 80, 70])
+            sales_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0F6E56')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ALIGN', (3, 1), (5, -1), 'RIGHT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F0F9F6')])
+            ]))
+            elements.append(sales_table)
+        
+        doc.build(elements)
+        buffer.seek(0)
+        
+        return StreamingResponse(
+            buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=ventas_optica_{year}_{month:02d}.pdf"}
+        )
+    
+    return report_data
+
+
 # ==================== PAYMENT AUTHORIZATION ROUTES ====================
 
 async def enrich_authorization(auth: dict) -> dict:
