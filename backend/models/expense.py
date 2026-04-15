@@ -32,6 +32,7 @@ class ExpenseUpdate(BaseModel):
 class ExpenseResponse(ExpenseBase):
     model_config = ConfigDict(extra="ignore")
     id: str
+    expense_number: Optional[str] = None  # Número correlativo automático (ej: GST-0001)
     status: str
     paid_amount: float
     remaining_amount: float

@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -262,6 +263,7 @@ class ExpenseUpdate(BaseModel):
 class ExpenseResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
+    expense_number: Optional[str] = None  # Número correlativo automático (ej: GST-0001)
     provider: Optional[str] = None
     name: str
     type: str
@@ -330,6 +332,7 @@ class PaymentResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     expense_id: str
+    expense_number: Optional[str] = None  # Número correlativo del gasto
     expense_name: Optional[str] = None
     expense_provider: Optional[str] = None
     amount: float
@@ -365,6 +368,7 @@ class PaymentAuthorizationResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     expense_id: str
+    expense_number: Optional[str] = None  # Número correlativo del gasto
     expense_name: Optional[str] = None
     expense_provider: Optional[str] = None
     expense_amount: Optional[float] = None
@@ -910,6 +914,22 @@ def require_permission(permission: str):
     return permission_checker
 
 # ==================== EXPENSE HELPERS ====================
+
+async def get_next_expense_number() -> str:
+    """
+    Genera el siguiente número correlativo para gastos.
+    Usa una colección 'counters' con find_one_and_update para operaciones atómicas.
+    Formato: GST-0001, GST-0002, etc.
+    """
+    result = await db.counters.find_one_and_update(
+        {"_id": "expense_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
+    # Formatear el número con ceros a la izquierda (4 dígitos)
+    seq_num = result["seq"]
+    return f"GST-{seq_num:04d}"
 
 async def update_expense_amounts(expense_id: str):
     """Update paidAmount, remainingAmount, and status based on payments"""
@@ -1654,6 +1674,9 @@ async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depen
     expense_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     
+    # Generar número correlativo automático
+    expense_number = await get_next_expense_number()
+    
     # Determine initial status
     status = "pendiente"
     if expense_data.due_date:
@@ -1666,6 +1689,7 @@ async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depen
     
     expense_doc = {
         "id": expense_id,
+        "expense_number": expense_number,  # Número correlativo automático
         "provider": expense_data.provider,
         "name": expense_data.name,
         "type": expense_data.type,
@@ -1781,6 +1805,7 @@ async def get_payments(
         {"$addFields": {
             "expense_name": {"$ifNull": [{"$arrayElemAt": ["$expense_data.name", 0]}, "N/A"]},
             "expense_provider": {"$ifNull": [{"$arrayElemAt": ["$expense_data.provider", 0]}, ""]},
+            "expense_number": {"$ifNull": [{"$arrayElemAt": ["$expense_data.expense_number", 0]}, ""]},
             "created_by_name": {"$ifNull": [{"$arrayElemAt": ["$user_data.name", 0]}, "N/A"]}
         }},
         {"$project": {"expense_data": 0, "user_data": 0, "_id": 0}}
@@ -4605,6 +4630,7 @@ async def enrich_authorization(auth: dict) -> dict:
         auth["expense_amount"] = expense.get("amount", 0)
         auth["expense_remaining"] = expense.get("remaining_amount", expense.get("amount", 0))
         auth["expense_due_date"] = expense.get("due_date", "")
+        auth["expense_number"] = expense.get("expense_number", "")  # Número correlativo
     
     # Obtener datos de la cuenta bancaria
     bank_account = await db.bank_accounts.find_one({"id": auth["bank_account_id"]}, {"_id": 0})

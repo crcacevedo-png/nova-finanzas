@@ -601,6 +601,7 @@ const AutorizacionPagos = () => {
                             data-testid="select-all-checkbox"
                           />
                         </TableHead>
+                        <TableHead className="table-header">No.</TableHead>
                         <TableHead className="table-header">Proveedor</TableHead>
                         <TableHead className="table-header">Gasto</TableHead>
                         <TableHead className="table-header">Monto Pendiente</TableHead>
@@ -622,6 +623,11 @@ const AutorizacionPagos = () => {
                               onCheckedChange={() => toggleExpenseSelection(expense.id)}
                               data-testid={`select-expense-${expense.id}`}
                             />
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono text-sm font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                              {expense.expense_number || '-'}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -757,6 +763,7 @@ const AutorizacionPagos = () => {
                     <Table>
                       <TableHeader>
                         <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                          <TableHead className="table-header">No.</TableHead>
                           <TableHead className="table-header">Proveedor</TableHead>
                           <TableHead className="table-header">Gasto</TableHead>
                           <TableHead className="table-header">Monto Autorizado</TableHead>
@@ -773,6 +780,11 @@ const AutorizacionPagos = () => {
                             className="table-row-hover"
                             data-testid={`auth-row-${auth.id}`}
                           >
+                            <TableCell>
+                              <span className="font-mono text-sm font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                                {auth.expense_number || '-'}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <span style={{ color: 'var(--text-secondary)' }}>
                                 {auth.expense_provider || '-'}

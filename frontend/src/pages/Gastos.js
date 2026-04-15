@@ -545,6 +545,7 @@ const Gastos = () => {
                 <Table>
                   <TableHeader>
                     <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                      <TableHead className="table-header">No.</TableHead>
                       <TableHead className="table-header">Proveedor</TableHead>
                       <TableHead className="table-header">Nombre</TableHead>
                       <TableHead className="table-header">Monto</TableHead>
@@ -563,6 +564,11 @@ const Gastos = () => {
                         className="table-row-hover"
                         data-testid={`expense-row-${expense.id}`}
                       >
+                        <TableCell>
+                          <span className="font-mono text-sm font-semibold" style={{ color: 'var(--primary-teal)' }}>
+                            {expense.expense_number || '-'}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{expense.provider || '-'}</span>
                         </TableCell>
