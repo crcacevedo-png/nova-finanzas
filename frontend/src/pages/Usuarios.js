@@ -110,7 +110,16 @@ const Usuarios = () => {
       handleCloseDialog();
       fetchUsers();
     } catch (error) {
-      const message = error.response?.data?.detail || 'Error al crear el usuario';
+      let message = 'Error al crear el usuario';
+      const detail = error.response?.data?.detail;
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        // Pydantic validation errors
+        message = detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        message = detail.msg || detail.message || JSON.stringify(detail);
+      }
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -140,7 +149,15 @@ const Usuarios = () => {
       toast.success('Usuario eliminado correctamente');
       fetchUsers();
     } catch (error) {
-      const message = error.response?.data?.detail || 'Error al eliminar el usuario';
+      let message = 'Error al eliminar el usuario';
+      const detail = error.response?.data?.detail;
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        message = detail.msg || detail.message || JSON.stringify(detail);
+      }
       toast.error(message);
     } finally {
       setDeleteDialogOpen(false);

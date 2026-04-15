@@ -202,7 +202,7 @@ def get_permissions(role: str) -> dict:
 class UserBase(BaseModel):
     username: str
     name: str
-    role: str = Field(default="usuario", pattern="^(superadmin|admin|usuario)$")
+    role: str = Field(default="usuario", pattern="^(superadmin|admin|usuario|optica)$")
 
 class UserCreate(UserBase):
     password: str
