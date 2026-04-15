@@ -125,11 +125,10 @@ const Layout = ({ children }) => {
     return classes[role] || 'badge-usuario';
   };
 
-  // Optica sub-items (solo para rol optica y superadmin)
+  // Optica sub-items (solo para rol optica y superadmin) - Sin Médicos
   const opticaItems = canViewOptica ? [
     { path: '/optica/inventario', icon: Package, label: 'Inventario', testId: 'nav-optica-inventario' },
     { path: '/optica/ventas', icon: ShoppingCart, label: 'Ventas', testId: 'nav-optica-ventas' },
-    { path: '/optica/medicos', icon: Stethoscope, label: 'Médicos', testId: 'nav-optica-medicos' },
     { path: '/optica/tipos-lente', icon: Eye, label: 'Tipos de Lente', testId: 'nav-optica-tipos-lente' },
   ] : [];
 
@@ -257,12 +256,17 @@ const Layout = ({ children }) => {
             )}
           </div>
 
-          {/* 5. Gestión de Usuarios - Solo SuperAdmin */}
+          {/* 5. Médicos - Solo para optica y superadmin */}
+          {canViewOptica && (
+            <NavLink item={{ path: '/optica/medicos', icon: Stethoscope, label: 'Médicos', testId: 'nav-medicos' }} />
+          )}
+
+          {/* 6. Gestión de Usuarios - Solo SuperAdmin */}
           {canViewUserManagement() && (
             <NavLink item={{ path: '/usuarios', icon: Users, label: 'Gestión de usuarios', testId: 'nav-usuarios' }} />
           )}
           
-          {/* 6. Configuration Section - Admin y SuperAdmin */}
+          {/* 7. Configuration Section - Admin y SuperAdmin */}
           {isAdminOrSuperAdmin && configItems.length > 0 && (
             <div className="mt-4">
               <button
