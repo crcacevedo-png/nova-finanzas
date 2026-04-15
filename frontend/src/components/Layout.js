@@ -57,21 +57,11 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
-  // Items principales del sidebar
+  // Items principales del sidebar (1. Dashboard, 2. Pacientes)
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' },
     { path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' },
   ];
-
-  // Agregar Gestión de Usuarios para SuperAdmin
-  if (canViewUserManagement()) {
-    navItems.push({ 
-      path: '/usuarios', 
-      icon: Users, 
-      label: 'Gestión de usuarios', 
-      testId: 'nav-usuarios' 
-    });
-  }
 
   // Finanzas sub-items (visible para todos los roles autenticados)
   const finanzasItems = [
@@ -202,11 +192,43 @@ const Layout = ({ children }) => {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
+          {/* 1. Dashboard y 2. Pacientes */}
           {navItems.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
 
-          {/* Finanzas Section */}
+          {/* 3. Optica Section - Solo para optica y superadmin */}
+          {canViewOptica && opticaItems.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setOpticaOpen(!opticaOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  location.pathname.startsWith('/optica') ? 'active' : ''
+                }`}
+                data-testid="nav-optica"
+              >
+                <div className="flex items-center gap-3">
+                  <Glasses className={`w-5 h-5 icon ${location.pathname.startsWith('/optica') ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">Óptica</span>
+                </div>
+                {opticaOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+              
+              {opticaOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {opticaItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4. Finanzas Section */}
           <div className="mt-4">
             <button
               onClick={() => setFinanzasOpen(!finanzasOpen)}
@@ -234,8 +256,13 @@ const Layout = ({ children }) => {
               </div>
             )}
           </div>
+
+          {/* 5. Gestión de Usuarios - Solo SuperAdmin */}
+          {canViewUserManagement() && (
+            <NavLink item={{ path: '/usuarios', icon: Users, label: 'Gestión de usuarios', testId: 'nav-usuarios' }} />
+          )}
           
-          {/* Configuration Section - Admin y SuperAdmin */}
+          {/* 6. Configuration Section - Admin y SuperAdmin */}
           {isAdminOrSuperAdmin && configItems.length > 0 && (
             <div className="mt-4">
               <button
@@ -259,37 +286,6 @@ const Layout = ({ children }) => {
               {configOpen && (
                 <div className="ml-4 mt-1 space-y-1">
                   {configItems.map((item) => (
-                    <NavLink key={item.path} item={item} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Optica Section - Solo para optica y superadmin */}
-          {canViewOptica && opticaItems.length > 0 && (
-            <div className="mt-4">
-              <button
-                onClick={() => setOpticaOpen(!opticaOpen)}
-                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                  location.pathname.startsWith('/optica') ? 'active' : ''
-                }`}
-                data-testid="nav-optica"
-              >
-                <div className="flex items-center gap-3">
-                  <Glasses className={`w-5 h-5 icon ${location.pathname.startsWith('/optica') ? 'opacity-100' : 'opacity-60'}`} />
-                  <span className="font-medium text-sm">Óptica</span>
-                </div>
-                {opticaOpen ? (
-                  <ChevronDown className="w-4 h-4 opacity-60" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 opacity-60" />
-                )}
-              </button>
-              
-              {opticaOpen && (
-                <div className="ml-4 mt-1 space-y-1">
-                  {opticaItems.map((item) => (
                     <NavLink key={item.path} item={item} />
                   ))}
                 </div>
