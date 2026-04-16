@@ -1630,11 +1630,13 @@ async def get_expenses(
         elif status in ["pendiente", "parcial", "pagado", "vencido"]:
             query["status"] = status
     
-    # Search filter (name or invoice_number)
+    # Search filter (provider, name, invoice_number, or expense_number)
     if search:
         query["$or"] = [
+            {"provider": {"$regex": search, "$options": "i"}},
             {"name": {"$regex": search, "$options": "i"}},
-            {"invoice_number": {"$regex": search, "$options": "i"}}
+            {"invoice_number": {"$regex": search, "$options": "i"}},
+            {"expense_number": {"$regex": search, "$options": "i"}}
         ]
     
     # Date range filter

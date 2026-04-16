@@ -171,8 +171,10 @@ const Gastos = () => {
   const filteredExpenses = expenses.filter(expense => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      return expense.name.toLowerCase().includes(searchLower) ||
-             expense.invoice_number?.toLowerCase().includes(searchLower);
+      return expense.provider?.toLowerCase().includes(searchLower) ||
+             expense.name.toLowerCase().includes(searchLower) ||
+             expense.invoice_number?.toLowerCase().includes(searchLower) ||
+             expense.expense_number?.toLowerCase().includes(searchLower);
     }
     return true;
   });
@@ -463,7 +465,7 @@ const Gastos = () => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar por nombre o factura..."
+                  placeholder="Buscar por proveedor, nombre, No. o factura..."
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}

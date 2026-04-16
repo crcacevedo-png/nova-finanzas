@@ -148,7 +148,9 @@ const HistorialPagos = () => {
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       matches = matches && (
+        payment.expense_provider?.toLowerCase().includes(searchLower) ||
         payment.expense_name?.toLowerCase().includes(searchLower) ||
+        payment.expense_number?.toLowerCase().includes(searchLower) ||
         payment.reference?.toLowerCase().includes(searchLower)
       );
     }
@@ -191,7 +193,7 @@ const HistorialPagos = () => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar por gasto o referencia..."
+                  placeholder="Buscar por proveedor, gasto, No. o referencia..."
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
