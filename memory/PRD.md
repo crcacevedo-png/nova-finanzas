@@ -482,12 +482,12 @@
 - [ ] Submódulo de "Gastos de Óptica" (usando proveedores globales)
 
 ### P2 - Mejoras Generales
-- [x] Refactorización de `server.py` - **FASE 1 COMPLETADA** (Ver `/app/backend/REFACTORING_GUIDE.md`)
-  - ✅ Estructura de directorios creada (`/config`, `/routes`, `/models`)
-  - ✅ Permisos extraídos a `/config/permissions.py`
-  - ✅ Base de datos extraída a `/config/database.py`
-  - ✅ Rutas de auth y gastos documentadas en `/routes/`
-  - ⏳ Pendiente: Migrar rutas restantes en fases 2-5
+- [x] Refactorización de `server.py` - **FASE 2 COMPLETADA** (Ver `/app/backend/REFACTORING_GUIDE.md`)
+  - ✅ Fase 1: Configuración (`/config/`), Auth y Expenses (`/routes/`)
+  - ✅ Fase 2: Payments, Dashboard, Bank Accounts (`/routes/`)
+  - ⏳ Fase 3: Proveedores, Gastos Fijos, IGSS
+  - ⏳ Fase 4: Pacientes, Óptica, Reportes
+  - ⏳ Fase 5: Autorizaciones, integración final
 - [ ] Importación masiva de pacientes desde Excel/CSV
 
 ### Backlog

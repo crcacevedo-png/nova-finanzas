@@ -43,9 +43,12 @@ Líneas 5237-5385: Scheduler de Gastos Fijos
 │   ├── supplier.py      ✅ Modelos de proveedores (referencia)
 │   └── user.py          ✅ Modelos de usuarios (referencia)
 ├── routes/
-│   ├── __init__.py      ✅ Exporta helpers compartidos
-│   ├── auth.py          ✅ Rutas de autenticación y usuarios
-│   └── expenses.py      ✅ Helpers y modelos de gastos
+│   ├── __init__.py      ✅ Exporta helpers y modelos compartidos
+│   ├── auth.py          ✅ Rutas de autenticación y usuarios (Fase 1)
+│   ├── expenses.py      ✅ Helpers y modelos de gastos (Fase 1)
+│   ├── payments.py      ✅ Modelos y helpers de pagos (Fase 2)
+│   ├── dashboard.py     ✅ Modelos y helpers de dashboard (Fase 2)
+│   └── bank_accounts.py ✅ Modelos de cuentas bancarias (Fase 2)
 ├── services/
 │   └── __init__.py
 ├── utils/
@@ -58,6 +61,7 @@ Líneas 5237-5385: Scheduler de Gastos Fijos
 │   ├── test_patients.py
 │   └── test_payment_authorizations.py
 ├── requirements.txt
+├── REFACTORING_GUIDE.md ← Esta guía
 └── server.py            ← Punto de entrada principal (5385 líneas)
 ```
 
@@ -67,10 +71,11 @@ Líneas 5237-5385: Scheduler de Gastos Fijos
 - Extraer configuración a `/config/database.py` y `/config/permissions.py`
 - Crear estructura base de rutas en `/routes/auth.py` y `/routes/expenses.py`
 
-### Fase 2 - Pendiente
-- Migrar rutas de Pagos a `/routes/payments.py`
-- Migrar rutas de Dashboard a `/routes/dashboard.py`
-- Migrar rutas de Cuentas Bancarias a `/routes/bank_accounts.py`
+### Fase 2 - Completada ✅
+- Migrar modelos y helpers de Pagos a `/routes/payments.py`
+- Migrar modelos y helpers de Dashboard a `/routes/dashboard.py`
+- Migrar modelos de Cuentas Bancarias a `/routes/bank_accounts.py`
+- Actualizar `/routes/__init__.py` con nuevos exports
 
 ### Fase 3 - Pendiente
 - Migrar rutas de Proveedores a `/routes/suppliers.py`
