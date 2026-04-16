@@ -482,7 +482,12 @@
 - [ ] Submódulo de "Gastos de Óptica" (usando proveedores globales)
 
 ### P2 - Mejoras Generales
-- [ ] Refactorización de `server.py` (separar modelos, rutas, servicios - archivo tiene 5000+ líneas)
+- [x] Refactorización de `server.py` - **FASE 1 COMPLETADA** (Ver `/app/backend/REFACTORING_GUIDE.md`)
+  - ✅ Estructura de directorios creada (`/config`, `/routes`, `/models`)
+  - ✅ Permisos extraídos a `/config/permissions.py`
+  - ✅ Base de datos extraída a `/config/database.py`
+  - ✅ Rutas de auth y gastos documentadas en `/routes/`
+  - ⏳ Pendiente: Migrar rutas restantes en fases 2-5
 - [ ] Importación masiva de pacientes desde Excel/CSV
 
 ### Backlog
@@ -490,3 +495,4 @@
 - [ ] Notificaciones push/email para autorizaciones pendientes
 - [ ] Módulo de Citas médicas (debe usar tabla patients)
 - [ ] Vista de detalle del paciente con pestañas de historial (Óptica, Citas, etc.)
+

@@ -17,7 +17,7 @@ PERMISSIONS = {
         "export_reports": True,
         "authorize_payments": True,
         "view_payment_authorizations": True,
-        "execute_payment_authorizations": True,
+        # Permisos de Pacientes
         "view_patients": True,
         "create_patients": True,
         "edit_patients": True,
@@ -25,10 +25,7 @@ PERMISSIONS = {
         "manage_igss_units": True,
         "import_patients": True,
         "export_patients": True,
-        "view_suppliers": True,
-        "create_suppliers": True,
-        "edit_suppliers": True,
-        "delete_suppliers": True,
+        # Permisos de Óptica (SuperAdmin tiene acceso total)
         "view_optica": True,
         "manage_optica_inventory": True,
         "manage_optica_sales": True,
@@ -50,9 +47,10 @@ PERMISSIONS = {
         "manage_users": False,
         "view_user_management": False,
         "export_reports": True,
-        "authorize_payments": True,
+        "authorize_payments": False,
         "view_payment_authorizations": True,
         "execute_payment_authorizations": True,
+        # Permisos de Pacientes
         "view_patients": True,
         "create_patients": True,
         "edit_patients": True,
@@ -60,10 +58,7 @@ PERMISSIONS = {
         "manage_igss_units": False,
         "import_patients": True,
         "export_patients": True,
-        "view_suppliers": True,
-        "create_suppliers": True,
-        "edit_suppliers": True,
-        "delete_suppliers": True,
+        # Sin acceso a Óptica
         "view_optica": False,
         "manage_optica_inventory": False,
         "manage_optica_sales": False,
@@ -77,10 +72,10 @@ PERMISSIONS = {
         "view_expenses": True,
         "view_payment_history": True,
         "view_due_payments": True,
-        "create_expenses": True,
+        "create_expenses": False,
         "edit_expenses": False,
         "delete_expenses": False,
-        "register_payments": True,
+        "register_payments": False,
         "delete_payments": False,
         "manage_users": False,
         "view_user_management": False,
@@ -88,17 +83,15 @@ PERMISSIONS = {
         "authorize_payments": False,
         "view_payment_authorizations": False,
         "execute_payment_authorizations": False,
+        # Permisos de Pacientes (solo lectura)
         "view_patients": True,
-        "create_patients": True,
-        "edit_patients": True,
+        "create_patients": False,
+        "edit_patients": False,
         "delete_patients": False,
         "manage_igss_units": False,
         "import_patients": False,
         "export_patients": False,
-        "view_suppliers": False,
-        "create_suppliers": False,
-        "edit_suppliers": False,
-        "delete_suppliers": False,
+        # Sin acceso a Óptica
         "view_optica": False,
         "manage_optica_inventory": False,
         "manage_optica_sales": False,
@@ -108,6 +101,7 @@ PERMISSIONS = {
         "manage_lens_catalog": False
     },
     "optica": {
+        # Sin acceso al módulo de finanzas general
         "view_dashboard": False,
         "view_expenses": False,
         "view_payment_history": False,
@@ -123,6 +117,7 @@ PERMISSIONS = {
         "authorize_payments": False,
         "view_payment_authorizations": False,
         "execute_payment_authorizations": False,
+        # Acceso a Pacientes (para seleccionar clientes)
         "view_patients": True,
         "create_patients": True,
         "edit_patients": True,
@@ -130,10 +125,12 @@ PERMISSIONS = {
         "manage_igss_units": False,
         "import_patients": False,
         "export_patients": False,
+        # Acceso a Proveedores (solo ver y crear)
         "view_suppliers": True,
         "create_suppliers": True,
         "edit_suppliers": False,
         "delete_suppliers": False,
+        # Permisos completos de Óptica
         "view_optica": True,
         "manage_optica_inventory": True,
         "manage_optica_sales": True,
@@ -144,13 +141,6 @@ PERMISSIONS = {
     }
 }
 
-
-def get_user_permissions(role: str) -> dict:
-    """Obtener los permisos de un rol"""
+def get_permissions(role: str) -> dict:
+    """Obtener permisos para un rol específico"""
     return PERMISSIONS.get(role, PERMISSIONS["usuario"])
-
-
-def has_permission(role: str, permission: str) -> bool:
-    """Verificar si un rol tiene un permiso específico"""
-    permissions = get_user_permissions(role)
-    return permissions.get(permission, False)
