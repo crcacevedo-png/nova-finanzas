@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { expenseApi, paymentApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels } from '../services/api';
+import { expenseApi, paymentApi, dashboardApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels } from '../services/api';
 import { 
   Plus, 
   Search, 
@@ -13,7 +13,10 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
-  FileText
+  FileText,
+  XCircle,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -89,6 +92,11 @@ const Gastos = () => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Dashboard de montos pendientes
+  const [overdueExpenses, setOverdueExpenses] = useState([]);
+  const [due30Expenses, setDue30Expenses] = useState([]);
+  const [due60Expenses, setDue60Expenses] = useState([]);
+  
   // Pagination
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   
@@ -114,7 +122,21 @@ const Gastos = () => {
 
   useEffect(() => {
     fetchExpenses();
+    fetchDashboardData();
   }, [filters.type, filters.status, pagination.page]);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await dashboardApi.getUpcoming();
+      if (response.data) {
+        setOverdueExpenses(response.data.overdue || []);
+        setDue30Expenses(response.data.due30 || []);
+        setDue60Expenses(response.data.due60 || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
 
   const fetchExpenses = async () => {
     try {
@@ -457,6 +479,44 @@ const Gastos = () => {
             )}
           </div>
         </div>
+
+        {/* Resumen de Montos Pendientes */}
+        <Card className="border border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold font-['Outfit']">Resumen de Montos Pendientes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-4 rounded-xl bg-[#FDE8E8] border border-[#C53030]/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <XCircle className="w-4 h-4 text-[#C53030]" />
+                  <p className="text-sm text-[#C53030]">Total Vencido ({overdueExpenses.length})</p>
+                </div>
+                <p className="text-2xl font-bold text-[#C53030]">
+                  {formatCurrency(overdueExpenses.reduce((sum, e) => sum + (e.remaining_amount || 0), 0))}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-[#FEF4E0] border border-[#8B6914]/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="w-4 h-4 text-[#8B6914]" />
+                  <p className="text-sm text-[#8B6914]">Por vencer - 30 días ({due30Expenses.length})</p>
+                </div>
+                <p className="text-2xl font-bold text-[#8B6914]">
+                  {formatCurrency(due30Expenses.reduce((sum, e) => sum + (e.remaining_amount || 0), 0))}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm text-blue-600">Por vencer 30-60 días ({due60Expenses.length})</p>
+                </div>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(due60Expenses.reduce((sum, e) => sum + (e.remaining_amount || 0), 0))}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card className="border border-slate-200">
