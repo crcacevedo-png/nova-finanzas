@@ -4852,11 +4852,29 @@ async def execute_payment_authorization(
         raise HTTPException(status_code=404, detail="El gasto asociado ya no existe")
     
     remaining = expense.get("remaining_amount", expense["amount"])
-    if auth["amount_to_pay"] > remaining:
-        raise HTTPException(
-            status_code=400,
-            detail=f"El monto autorizado (Q{auth['amount_to_pay']:.2f}) excede el saldo pendiente actual (Q{remaining:.2f})"
+    
+    # Si el gasto ya está completamente pagado, cancelar la autorización automáticamente
+    if remaining <= 0:
+        now = datetime.now(timezone.utc).isoformat()
+        await db.payment_authorizations.update_one(
+            {"id": auth_id},
+            {"$set": {
+                "status": "cancelado",
+                "notes": f"{auth.get('notes', '')} [Auto-cancelado: gasto ya pagado completamente]".strip(),
+                "updated_at": now
+            }}
         )
+        updated = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
+        enriched = await enrich_authorization(updated)
+        # Retornar respuesta especial indicando que se canceló
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El gasto ya fue pagado completamente. La autorización ha sido cancelada automáticamente."
+        )
+    
+    # Determinar el monto a pagar (usar el menor entre lo autorizado y lo pendiente)
+    amount_to_pay = min(auth["amount_to_pay"], remaining)
+    amount_adjusted = amount_to_pay < auth["amount_to_pay"]
     
     # Obtener información de la cuenta bancaria para la referencia
     bank_account = await db.bank_accounts.find_one({"id": auth["bank_account_id"]}, {"_id": 0})
@@ -4864,15 +4882,16 @@ async def execute_payment_authorization(
     
     now = datetime.now(timezone.utc).isoformat()
     
-    # Crear el pago real
+    # Crear el pago real (con monto ajustado si es necesario)
+    adjustment_note = f" [Ajustado de Q{auth['amount_to_pay']:.2f} a Q{amount_to_pay:.2f}]" if amount_adjusted else ""
     payment_doc = {
         "id": str(uuid.uuid4()),
         "expense_id": auth["expense_id"],
-        "amount": auth["amount_to_pay"],
+        "amount": amount_to_pay,
         "date": now.split("T")[0],  # Solo fecha
         "method": "Transferencia bancaria",
         "reference": f"Auth: {auth_id[:8]} | Cuenta: {bank_ref}",
-        "notes": f"Pago autorizado. {auth.get('notes', '')}".strip(),
+        "notes": f"Pago autorizado.{adjustment_note} {auth.get('notes', '')}".strip(),
         "created_by": current_user["id"],
         "created_at": now
     }
@@ -4882,15 +4901,22 @@ async def execute_payment_authorization(
     # Actualizar montos del gasto
     await update_expense_amounts(auth["expense_id"])
     
+    # Preparar datos de actualización de la autorización
+    auth_update = {
+        "status": "ejecutado",
+        "executed_by": current_user["id"],
+        "executed_at": now,
+        "updated_at": now
+    }
+    
+    # Si el monto fue ajustado, agregar nota
+    if amount_adjusted:
+        auth_update["notes"] = f"{auth.get('notes', '')} [Ejecutado con monto ajustado: Q{amount_to_pay:.2f} de Q{auth['amount_to_pay']:.2f}]".strip()
+    
     # Actualizar la autorización a ejecutado
     await db.payment_authorizations.update_one(
         {"id": auth_id},
-        {"$set": {
-            "status": "ejecutado",
-            "executed_by": current_user["id"],
-            "executed_at": now,
-            "updated_at": now
-        }}
+        {"$set": auth_update}
     )
     
     updated = await db.payment_authorizations.find_one({"id": auth_id}, {"_id": 0})
