@@ -48,7 +48,10 @@ Líneas 5237-5385: Scheduler de Gastos Fijos
 │   ├── expenses.py      ✅ Helpers y modelos de gastos (Fase 1)
 │   ├── payments.py      ✅ Modelos y helpers de pagos (Fase 2)
 │   ├── dashboard.py     ✅ Modelos y helpers de dashboard (Fase 2)
-│   └── bank_accounts.py ✅ Modelos de cuentas bancarias (Fase 2)
+│   ├── bank_accounts.py ✅ Modelos de cuentas bancarias (Fase 2)
+│   ├── suppliers.py     ✅ Modelos de proveedores (Fase 3)
+│   ├── fixed_expenses.py ✅ Modelos y helpers de gastos fijos (Fase 3)
+│   └── igss_units.py    ✅ Modelos de unidades IGSS (Fase 3)
 ├── services/
 │   └── __init__.py
 ├── utils/
@@ -77,7 +80,13 @@ Líneas 5237-5385: Scheduler de Gastos Fijos
 - Migrar modelos de Cuentas Bancarias a `/routes/bank_accounts.py`
 - Actualizar `/routes/__init__.py` con nuevos exports
 
-### Fase 3 - Pendiente
+### Fase 3 - Completada ✅
+- Migrar modelos de Proveedores a `/routes/suppliers.py`
+- Migrar modelos y helpers de Gastos Fijos a `/routes/fixed_expenses.py`
+- Migrar modelos de Unidades IGSS a `/routes/igss_units.py`
+- Actualizar `/routes/__init__.py` con nuevos exports
+
+### Fase 4 - Pendiente
 - Migrar rutas de Proveedores a `/routes/suppliers.py`
 - Migrar rutas de Gastos Fijos a `/routes/fixed_expenses.py`
 - Migrar rutas de Unidades IGSS a `/routes/igss_units.py`

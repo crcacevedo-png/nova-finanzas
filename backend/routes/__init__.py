@@ -1,5 +1,5 @@
 # /app/backend/routes/__init__.py
-# Módulo de rutas - Exporta routers y funciones auxiliares compartidas
+# Módulo de rutas - Exporta routers, modelos y funciones auxiliares
 
 # ==================== FASE 1 ====================
 from routes.auth import (
@@ -58,6 +58,35 @@ from routes.bank_accounts import (
     BankAccountListResponse
 )
 
+# ==================== FASE 3 ====================
+from routes.suppliers import (
+    router as suppliers_router,
+    SupplierBase,
+    SupplierCreate,
+    SupplierUpdate,
+    SupplierResponse,
+    SupplierListResponse
+)
+
+from routes.fixed_expenses import (
+    router as fixed_expenses_router,
+    enrich_fixed_expense,
+    FixedExpenseBase,
+    FixedExpenseCreate,
+    FixedExpenseUpdate,
+    FixedExpenseResponse,
+    FixedExpenseListResponse
+)
+
+from routes.igss_units import (
+    router as igss_units_router,
+    IGSSUnitBase,
+    IGSSUnitCreate,
+    IGSSUnitUpdate,
+    IGSSUnitResponse,
+    IGSSUnitListResponse
+)
+
 __all__ = [
     # ==================== Routers ====================
     'auth_router',
@@ -66,6 +95,9 @@ __all__ = [
     'payments_router',
     'dashboard_router',
     'bank_accounts_router',
+    'suppliers_router',
+    'fixed_expenses_router',
+    'igss_units_router',
     
     # ==================== Auth helpers ====================
     'get_current_user',
@@ -117,5 +149,29 @@ __all__ = [
     'BankAccountCreate',
     'BankAccountUpdate',
     'BankAccountResponse',
-    'BankAccountListResponse'
+    'BankAccountListResponse',
+    
+    # ==================== Supplier models ====================
+    'SupplierBase',
+    'SupplierCreate',
+    'SupplierUpdate',
+    'SupplierResponse',
+    'SupplierListResponse',
+    
+    # ==================== Fixed Expense helpers ====================
+    'enrich_fixed_expense',
+    
+    # ==================== Fixed Expense models ====================
+    'FixedExpenseBase',
+    'FixedExpenseCreate',
+    'FixedExpenseUpdate',
+    'FixedExpenseResponse',
+    'FixedExpenseListResponse',
+    
+    # ==================== IGSS Unit models ====================
+    'IGSSUnitBase',
+    'IGSSUnitCreate',
+    'IGSSUnitUpdate',
+    'IGSSUnitResponse',
+    'IGSSUnitListResponse'
 ]

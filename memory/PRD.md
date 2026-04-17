@@ -482,10 +482,10 @@
 - [ ] Submódulo de "Gastos de Óptica" (usando proveedores globales)
 
 ### P2 - Mejoras Generales
-- [x] Refactorización de `server.py` - **FASE 2 COMPLETADA** (Ver `/app/backend/REFACTORING_GUIDE.md`)
+- [x] Refactorización de `server.py` - **FASE 3 COMPLETADA** (Ver `/app/backend/REFACTORING_GUIDE.md`)
   - ✅ Fase 1: Configuración (`/config/`), Auth y Expenses (`/routes/`)
   - ✅ Fase 2: Payments, Dashboard, Bank Accounts (`/routes/`)
-  - ⏳ Fase 3: Proveedores, Gastos Fijos, IGSS
+  - ✅ Fase 3: Suppliers, Fixed Expenses, IGSS Units (`/routes/`)
   - ⏳ Fase 4: Pacientes, Óptica, Reportes
   - ⏳ Fase 5: Autorizaciones, integración final
 - [ ] Importación masiva de pacientes desde Excel/CSV
