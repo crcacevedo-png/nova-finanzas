@@ -792,12 +792,21 @@ const AutorizacionPagos = () => {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }} title={auth.expense_name}>
-                                  {auth.expense_name}
-                                </p>
-                                <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
-                                  Vence: {formatDate(auth.expense_due_date)}
-                                </p>
+                                {auth.expense_name ? (
+                                  <>
+                                    <p className="font-medium truncate max-w-[200px]" style={{ color: 'var(--text-primary)' }} title={auth.expense_name}>
+                                      {auth.expense_name}
+                                    </p>
+                                    <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                                      Vence: {formatDate(auth.expense_due_date)}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                    <span className="text-sm text-amber-600">Gasto eliminado</span>
+                                  </div>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -853,7 +862,9 @@ const AutorizacionPagos = () => {
                                       setSelectedAuth(auth);
                                       setExecuteDialogOpen(true);
                                     }}
-                                    className="h-8 w-8 p-0 hover:bg-emerald-100 hover:text-emerald-600"
+                                    className={`h-8 w-8 p-0 ${!auth.expense_name ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-100 hover:text-emerald-600'}`}
+                                    disabled={!auth.expense_name}
+                                    title={!auth.expense_name ? 'El gasto asociado ya no existe' : 'Ejecutar pago'}
                                     data-testid={`execute-auth-${auth.id}`}
                                   >
                                     <CheckCircle className="w-4 h-4" />
