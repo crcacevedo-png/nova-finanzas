@@ -6,7 +6,6 @@ import Dashboard from './pages/Dashboard';
 import Gastos from './pages/Gastos';
 import Usuarios from './pages/Usuarios';
 import HistorialPagos from './pages/HistorialPagos';
-import PagosPorVencer from './pages/PagosPorVencer';
 import CuentasBancarias from './pages/CuentasBancarias';
 import AutorizacionPagos from './pages/AutorizacionPagos';
 import Proveedores from './pages/Proveedores';
@@ -104,14 +103,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <HistorialPagos />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/pagos-por-vencer" 
-        element={
-          <ProtectedRoute>
-            <PagosPorVencer />
           </ProtectedRoute>
         } 
       />
