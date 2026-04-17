@@ -7,7 +7,6 @@ import Gastos from './pages/Gastos';
 import Usuarios from './pages/Usuarios';
 import HistorialPagos from './pages/HistorialPagos';
 import CuentasBancarias from './pages/CuentasBancarias';
-import AutorizacionPagos from './pages/AutorizacionPagos';
 import Proveedores from './pages/Proveedores';
 import GastosFijos from './pages/GastosFijos';
 import Pacientes from './pages/Pacientes';
@@ -135,14 +134,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_payment_authorizations">
             <GastosFijos />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/autorizacion-pagos" 
-        element={
-          <ProtectedRoute requiredPermission="view_payment_authorizations">
-            <AutorizacionPagos />
           </ProtectedRoute>
         } 
       />
