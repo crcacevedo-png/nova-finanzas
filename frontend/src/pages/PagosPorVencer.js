@@ -265,6 +265,35 @@ const PagosPorVencer = () => {
           </Card>
         </div>
 
+        {/* Total Amounts Card - Movido arriba */}
+        <Card className="border border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg font-semibold font-['Outfit']">Resumen de Montos Pendientes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-4 rounded-xl bg-[#FDE8E8] border border-[#C53030]/20">
+                <p className="text-sm text-[#C53030] mb-1">Total Vencido</p>
+                <p className="text-2xl font-bold text-[#C53030]">
+                  {formatCurrency(overdue.reduce((sum, e) => sum + e.remaining_amount, 0))}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-[#FEF4E0] border border-[#8B6914]/20">
+                <p className="text-sm text-[#8B6914] mb-1">Por vencer (30 días)</p>
+                <p className="text-2xl font-bold text-[#8B6914]">
+                  {formatCurrency(due30.reduce((sum, e) => sum + e.remaining_amount, 0))}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
+                <p className="text-sm text-blue-600 mb-1">Por vencer (30-60 días)</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {formatCurrency(due60.reduce((sum, e) => sum + e.remaining_amount, 0))}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Tabs with Tables */}
         <Card className="border border-slate-200">
           <CardContent className="p-0">
@@ -327,35 +356,6 @@ const PagosPorVencer = () => {
                 </TabsContent>
               </Tabs>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Total Amounts Card */}
-        <Card className="border border-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold font-['Outfit']">Resumen de Montos Pendientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-4 rounded-xl bg-[#FDE8E8] border border-[#C53030]/20">
-                <p className="text-sm text-[#C53030] mb-1">Total Vencido</p>
-                <p className="text-2xl font-bold text-[#C53030]">
-                  {formatCurrency(overdue.reduce((sum, e) => sum + e.remaining_amount, 0))}
-                </p>
-              </div>
-              <div className="p-4 rounded-xl bg-[#FEF4E0] border border-[#8B6914]/20">
-                <p className="text-sm text-[#8B6914] mb-1">Por vencer (30 días)</p>
-                <p className="text-2xl font-bold text-[#8B6914]">
-                  {formatCurrency(due30.reduce((sum, e) => sum + e.remaining_amount, 0))}
-                </p>
-              </div>
-              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
-                <p className="text-sm text-blue-600 mb-1">Por vencer (30-60 días)</p>
-                <p className="text-2xl font-bold text-blue-700">
-                  {formatCurrency(due60.reduce((sum, e) => sum + e.remaining_amount, 0))}
-                </p>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
