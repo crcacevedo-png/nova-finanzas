@@ -275,6 +275,7 @@ class ExpenseResponse(BaseModel):
     notes: Optional[str] = ""
     paid_amount: float = 0
     remaining_amount: float = 0
+    is_authorized: bool = False  # Marcado para autorización por SuperAdmin
     created_by: str
     created_at: str
     updated_at: Optional[str] = None
@@ -1760,6 +1761,82 @@ async def delete_expense(expense_id: str, current_user: dict = Depends(require_p
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
     return {"message": "Gasto eliminado"}
+
+@api_router.put("/expenses/{expense_id}/toggle-authorization")
+async def toggle_expense_authorization(expense_id: str, current_user: dict = Depends(require_permission("authorize_payments"))):
+    """Toggle el estado de autorización de un gasto (Solo SuperAdmin)"""
+    expense = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    
+    # Solo gastos con saldo pendiente pueden ser autorizados
+    if expense.get("remaining_amount", 0) <= 0:
+        raise HTTPException(status_code=400, detail="Este gasto ya está completamente pagado")
+    
+    new_status = not expense.get("is_authorized", False)
+    
+    await db.expenses.update_one(
+        {"id": expense_id},
+        {"$set": {
+            "is_authorized": new_status,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
+    return ExpenseResponse(**updated)
+
+@api_router.post("/expenses/confirm-authorizations")
+async def confirm_expense_authorizations(current_user: dict = Depends(require_permission("authorize_payments"))):
+    """Confirma los gastos autorizados y crea autorizaciones de pago para el admin"""
+    # Obtener cuenta bancaria por defecto
+    bank_account = await db.bank_accounts.find_one({"is_active": True}, {"_id": 0})
+    if not bank_account:
+        raise HTTPException(status_code=400, detail="No hay cuentas bancarias activas para procesar pagos")
+    
+    # Buscar gastos marcados como autorizados con saldo pendiente
+    authorized_expenses = await db.expenses.find(
+        {"is_authorized": True, "remaining_amount": {"$gt": 0}},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    if not authorized_expenses:
+        raise HTTPException(status_code=400, detail="No hay gastos autorizados pendientes de confirmar")
+    
+    created_count = 0
+    now = datetime.now(timezone.utc).isoformat()
+    
+    for expense in authorized_expenses:
+        # Crear autorización de pago
+        auth_doc = {
+            "id": str(uuid.uuid4()),
+            "expense_id": expense["id"],
+            "bank_account_id": bank_account["id"],
+            "amount_to_pay": expense["remaining_amount"],
+            "status": "pendiente",
+            "notes": f"Autorizado desde módulo de Gastos",
+            "authorized_by": current_user["id"],
+            "authorized_at": now,
+            "executed_by": None,
+            "executed_at": None,
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        await db.payment_authorizations.insert_one(auth_doc)
+        
+        # Quitar marca de autorización del gasto
+        await db.expenses.update_one(
+            {"id": expense["id"]},
+            {"$set": {"is_authorized": False, "updated_at": now}}
+        )
+        
+        created_count += 1
+    
+    return {
+        "message": f"Se crearon {created_count} autorizaciones de pago",
+        "count": created_count
+    }
 
 # ==================== PAYMENT ROUTES ====================
 

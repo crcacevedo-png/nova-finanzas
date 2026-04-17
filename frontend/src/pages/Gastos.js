@@ -16,7 +16,9 @@ import {
   FileText,
   XCircle,
   AlertTriangle,
-  Clock
+  Clock,
+  CheckCircle,
+  Send
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -88,9 +90,11 @@ const initialPaymentForm = {
 };
 
 const Gastos = () => {
-  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments, canDeletePayments, canExportReports } = useAuth();
+  const { canCreateExpenses, canEditExpenses, canDeleteExpenses, canRegisterPayments, canDeletePayments, canExportReports, user } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin';
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmingAuthorizations, setConfirmingAuthorizations] = useState(false);
   
   // Dashboard de montos pendientes
   const [overdueExpenses, setOverdueExpenses] = useState([]);
@@ -434,6 +438,46 @@ const Gastos = () => {
     return <Badge className={`${bgColor} border-0 text-xs`}>{label}</Badge>;
   };
 
+  // Función para toggle autorización
+  const handleToggleAuthorization = async (expenseId) => {
+    try {
+      await expenseApi.toggleAuthorization(expenseId);
+      fetchExpenses();
+    } catch (error) {
+      console.error('Error toggling authorization:', error);
+      alert(error.response?.data?.detail || 'Error al cambiar estado de autorización');
+    }
+  };
+
+  // Función para confirmar autorizaciones
+  const handleConfirmAuthorizations = async () => {
+    const authorizedExpenses = expenses.filter(e => e.is_authorized);
+    if (authorizedExpenses.length === 0) {
+      alert('No hay gastos autorizados para confirmar');
+      return;
+    }
+    
+    if (!window.confirm(`¿Confirmar ${authorizedExpenses.length} gasto(s) autorizado(s) para enviar al administrador?`)) {
+      return;
+    }
+    
+    setConfirmingAuthorizations(true);
+    try {
+      const response = await expenseApi.confirmAuthorizations();
+      alert(response.data.message);
+      fetchExpenses();
+      fetchDashboardData();
+    } catch (error) {
+      console.error('Error confirming authorizations:', error);
+      alert(error.response?.data?.detail || 'Error al confirmar autorizaciones');
+    } finally {
+      setConfirmingAuthorizations(false);
+    }
+  };
+
+  // Contar gastos autorizados
+  const authorizedCount = expenses.filter(e => e.is_authorized).length;
+
   return (
     <Layout>
       <Toaster position="top-right" richColors />
@@ -475,6 +519,18 @@ const Gastos = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Gasto
+              </Button>
+            )}
+            {/* Botón Confirmar Autorizaciones - Solo SuperAdmin */}
+            {isSuperAdmin && authorizedCount > 0 && (
+              <Button 
+                onClick={handleConfirmAuthorizations}
+                disabled={confirmingAuthorizations}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                data-testid="confirm-authorizations-button"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {confirmingAuthorizations ? 'Enviando...' : `Confirmar Autorizaciones (${authorizedCount})`}
               </Button>
             )}
           </div>
@@ -611,7 +667,6 @@ const Gastos = () => {
                       <TableHead className="table-header">Proveedor</TableHead>
                       <TableHead className="table-header">Nombre</TableHead>
                       <TableHead className="table-header">Monto</TableHead>
-                      <TableHead className="table-header">Progreso</TableHead>
                       <TableHead className="table-header">Tipo</TableHead>
                       <TableHead className="table-header">Estado</TableHead>
                       <TableHead className="table-header">Vencimiento</TableHead>
@@ -623,7 +678,7 @@ const Gastos = () => {
                     {filteredExpenses.map((expense) => (
                       <TableRow 
                         key={expense.id} 
-                        className="table-row-hover"
+                        className={`table-row-hover ${expense.is_authorized ? 'bg-emerald-50' : ''}`}
                         data-testid={`expense-row-${expense.id}`}
                       >
                         <TableCell>
@@ -652,14 +707,6 @@ const Gastos = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="w-24">
-                            <Progress value={getPaymentProgress(expense)} className="h-2" />
-                            <p className="text-xs text-slate-500 mt-1">
-                              {Math.round(getPaymentProgress(expense))}%
-                            </p>
-                          </div>
-                        </TableCell>
                         <TableCell>{getTypeBadge(expense.type)}</TableCell>
                         <TableCell>{getStatusBadge(expense.status)}</TableCell>
                         <TableCell style={{ color: 'var(--text-secondary)' }}>
@@ -670,6 +717,24 @@ const Gastos = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {/* Botón Autorizar - Solo SuperAdmin y gastos no pagados */}
+                            {isSuperAdmin && expense.status !== 'pagado' && expense.remaining_amount > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleToggleAuthorization(expense.id)}
+                                className={`h-8 px-3 ${
+                                  expense.is_authorized 
+                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                }`}
+                                title={expense.is_authorized ? 'Quitar autorización' : 'Autorizar para pago'}
+                                data-testid={`authorize-expense-${expense.id}`}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                {expense.is_authorized ? 'Autorizado' : 'Autorizar'}
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
