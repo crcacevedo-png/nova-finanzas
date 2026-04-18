@@ -23,7 +23,8 @@ import {
   Stethoscope,
   Eye,
   Package,
-  Wallet
+  Wallet,
+  ClipboardCheck
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -44,7 +45,7 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
   const [finanzasOpen, setFinanzasOpen] = useState(
-    ['/gastos', '/historial-pagos'].some(p => location.pathname.startsWith(p))
+    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes'].some(p => location.pathname.startsWith(p))
   );
 
   const isSuperAdmin = user?.role === 'superadmin';
@@ -72,6 +73,8 @@ const Layout = ({ children }) => {
   const finanzasItems = user?.role !== 'optica' ? [
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
+    // Autorizaciones Pendientes - Solo Admin y SuperAdmin
+    ...(isAdminOrSuperAdmin ? [{ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' }] : []),
   ] : [];
   
   // Config sub-items
@@ -232,12 +235,12 @@ const Layout = ({ children }) => {
               <button
                 onClick={() => setFinanzasOpen(!finanzasOpen)}
                 className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                  ['/gastos', '/historial-pagos'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
                 }`}
                 data-testid="nav-finanzas"
               >
                 <div className="flex items-center gap-3">
-                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
                   <span className="font-medium text-sm">Finanzas</span>
                 </div>
                 {finanzasOpen ? (

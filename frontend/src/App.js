@@ -17,6 +17,7 @@ import OpticaVentas from './pages/OpticaVentas';
 import OpticaCompras from './pages/OpticaCompras';
 import Medicos from './pages/Medicos';
 import TiposLente from './pages/TiposLente';
+import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import './App.css';
 
 // Protected Route Component
@@ -192,6 +193,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_optica">
             <TiposLente />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Autorizaciones Pendientes - Admin y SuperAdmin */}
+      <Route 
+        path="/autorizaciones-pendientes" 
+        element={
+          <ProtectedRoute requiredPermission="view_payment_authorizations">
+            <AutorizacionesPendientes />
           </ProtectedRoute>
         } 
       />

@@ -89,9 +89,11 @@ export const bankAccountApi = {
 
 // Payment Authorization API
 export const paymentAuthorizationApi = {
-  getAll: (status = null) => {
-    const params = status ? `?status=${status}` : '';
-    return axios.get(`${API_URL}/payment-authorizations${params}`);
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    const queryString = params.toString();
+    return axios.get(`${API_URL}/payment-authorizations${queryString ? `?${queryString}` : ''}`);
   },
   getById: (id) => axios.get(`${API_URL}/payment-authorizations/${id}`),
   getExpensesPendingAuth: () => axios.get(`${API_URL}/expenses-pending-authorization`),
