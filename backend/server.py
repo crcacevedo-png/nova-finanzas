@@ -1786,14 +1786,47 @@ async def toggle_expense_authorization(expense_id: str, current_user: dict = Dep
     updated = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
     return ExpenseResponse(**updated)
 
+class AuthorizeExpenseRequest(BaseModel):
+    bank_account_id: str
+
+@api_router.post("/expenses/{expense_id}/authorize")
+async def authorize_expense_with_bank(
+    expense_id: str, 
+    auth_data: AuthorizeExpenseRequest,
+    current_user: dict = Depends(require_permission("authorize_payments"))
+):
+    """Autoriza un gasto con una cuenta bancaria específica (Solo SuperAdmin)"""
+    expense = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Gasto no encontrado")
+    
+    # Solo gastos con saldo pendiente pueden ser autorizados
+    if expense.get("remaining_amount", 0) <= 0:
+        raise HTTPException(status_code=400, detail="Este gasto ya está completamente pagado")
+    
+    # Verificar que la cuenta bancaria existe
+    bank_account = await db.bank_accounts.find_one({"id": auth_data.bank_account_id}, {"_id": 0})
+    if not bank_account:
+        raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Marcar el gasto como autorizado y guardar la cuenta bancaria seleccionada
+    await db.expenses.update_one(
+        {"id": expense_id},
+        {"$set": {
+            "is_authorized": True,
+            "authorized_bank_account_id": auth_data.bank_account_id,
+            "updated_at": now
+        }}
+    )
+    
+    updated = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
+    return ExpenseResponse(**updated)
+
 @api_router.post("/expenses/confirm-authorizations")
 async def confirm_expense_authorizations(current_user: dict = Depends(require_permission("authorize_payments"))):
     """Confirma los gastos autorizados y crea autorizaciones de pago para el admin"""
-    # Obtener cuenta bancaria por defecto
-    bank_account = await db.bank_accounts.find_one({"is_active": True}, {"_id": 0})
-    if not bank_account:
-        raise HTTPException(status_code=400, detail="No hay cuentas bancarias activas para procesar pagos")
-    
     # Buscar gastos marcados como autorizados con saldo pendiente
     authorized_expenses = await db.expenses.find(
         {"is_authorized": True, "remaining_amount": {"$gt": 0}},
@@ -1803,15 +1836,24 @@ async def confirm_expense_authorizations(current_user: dict = Depends(require_pe
     if not authorized_expenses:
         raise HTTPException(status_code=400, detail="No hay gastos autorizados pendientes de confirmar")
     
+    # Obtener cuenta bancaria por defecto si algún gasto no tiene cuenta asignada
+    default_bank = await db.bank_accounts.find_one({"is_active": True}, {"_id": 0})
+    
     created_count = 0
     now = datetime.now(timezone.utc).isoformat()
     
     for expense in authorized_expenses:
+        # Usar la cuenta bancaria asignada al gasto o la por defecto
+        bank_id = expense.get("authorized_bank_account_id") or (default_bank["id"] if default_bank else None)
+        
+        if not bank_id:
+            continue  # Saltar si no hay cuenta bancaria
+        
         # Crear autorización de pago
         auth_doc = {
             "id": str(uuid.uuid4()),
             "expense_id": expense["id"],
-            "bank_account_id": bank_account["id"],
+            "bank_account_id": bank_id,
             "amount_to_pay": expense["remaining_amount"],
             "status": "pendiente",
             "notes": f"Autorizado desde módulo de Gastos",
@@ -1825,10 +1867,14 @@ async def confirm_expense_authorizations(current_user: dict = Depends(require_pe
         
         await db.payment_authorizations.insert_one(auth_doc)
         
-        # Quitar marca de autorización del gasto
+        # Quitar marca de autorización del gasto y limpiar cuenta asignada
         await db.expenses.update_one(
             {"id": expense["id"]},
-            {"$set": {"is_authorized": False, "updated_at": now}}
+            {"$set": {
+                "is_authorized": False, 
+                "authorized_bank_account_id": None,
+                "updated_at": now
+            }}
         )
         
         created_count += 1

@@ -35,6 +35,7 @@ export const expenseApi = {
   delete: (id) => axios.delete(`${API_URL}/expenses/${id}`),
   getPayments: (expenseId) => axios.get(`${API_URL}/expenses/${expenseId}/payments`),
   toggleAuthorization: (id) => axios.put(`${API_URL}/expenses/${id}/toggle-authorization`),
+  authorizeWithBank: (id, bankAccountId) => axios.post(`${API_URL}/expenses/${id}/authorize`, { bank_account_id: bankAccountId }),
   confirmAuthorizations: () => axios.post(`${API_URL}/expenses/confirm-authorizations`),
   exportReport: (filters = {}) => {
     const params = new URLSearchParams();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { expenseApi, paymentApi, dashboardApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels } from '../services/api';
+import { expenseApi, paymentApi, dashboardApi, bankAccountApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels } from '../services/api';
 import { 
   Plus, 
   Search, 
@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle,
-  Send
+  Send,
+  Building2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -109,12 +110,18 @@ const Gastos = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   
   // Selected items
   const [editingExpense, setEditingExpense] = useState(null);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [expensePayments, setExpensePayments] = useState([]);
+  const [expenseToAuthorize, setExpenseToAuthorize] = useState(null);
+  
+  // Bank accounts for authorization
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedBankAccount, setSelectedBankAccount] = useState('');
   
   // Forms
   const [expenseForm, setExpenseForm] = useState(initialExpenseForm);
@@ -127,7 +134,17 @@ const Gastos = () => {
   useEffect(() => {
     fetchExpenses();
     fetchDashboardData();
+    fetchBankAccounts();
   }, [filters.type, filters.status, pagination.page]);
+
+  const fetchBankAccounts = async () => {
+    try {
+      const response = await bankAccountApi.getAll();
+      setBankAccounts(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -438,18 +455,49 @@ const Gastos = () => {
     return <Badge className={`${bgColor} border-0 text-xs`}>{label}</Badge>;
   };
 
-  // Función para toggle autorización
-  const handleToggleAuthorization = async (expenseId) => {
+  // Abrir modal de autorización
+  const handleOpenAuthDialog = (expense) => {
+    setExpenseToAuthorize(expense);
+    setSelectedBankAccount('');
+    setAuthDialogOpen(true);
+  };
+
+  // Confirmar autorización con cuenta bancaria seleccionada
+  const handleConfirmAuthorization = async () => {
+    if (!selectedBankAccount) {
+      toast.error('Selecciona una cuenta bancaria');
+      return;
+    }
+    
+    setSubmitting(true);
     try {
-      await expenseApi.toggleAuthorization(expenseId);
+      await expenseApi.authorizeWithBank(expenseToAuthorize.id, selectedBankAccount);
+      toast.success('Gasto autorizado exitosamente');
+      setAuthDialogOpen(false);
+      setExpenseToAuthorize(null);
+      setSelectedBankAccount('');
       fetchExpenses();
     } catch (error) {
-      console.error('Error toggling authorization:', error);
-      alert(error.response?.data?.detail || 'Error al cambiar estado de autorización');
+      console.error('Error authorizing expense:', error);
+      toast.error(error.response?.data?.detail || 'Error al autorizar el gasto');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Función para confirmar autorizaciones
+  // Función para quitar autorización
+  const handleRemoveAuthorization = async (expenseId) => {
+    try {
+      await expenseApi.toggleAuthorization(expenseId);
+      toast.success('Autorización removida');
+      fetchExpenses();
+    } catch (error) {
+      console.error('Error removing authorization:', error);
+      toast.error(error.response?.data?.detail || 'Error al quitar autorización');
+    }
+  };
+
+  // Función para confirmar autorizaciones (enviar a admin)
   const handleConfirmAuthorizations = async () => {
     const authorizedExpenses = expenses.filter(e => e.is_authorized);
     if (authorizedExpenses.length === 0) {
@@ -719,21 +767,31 @@ const Gastos = () => {
                           <div className="flex items-center justify-end gap-1">
                             {/* Botón Autorizar - Solo SuperAdmin y gastos no pagados */}
                             {isSuperAdmin && expense.status !== 'pagado' && expense.remaining_amount > 0 && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleToggleAuthorization(expense.id)}
-                                className={`h-8 px-3 ${
-                                  expense.is_authorized 
-                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
-                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
-                                }`}
-                                title={expense.is_authorized ? 'Quitar autorización' : 'Autorizar para pago'}
-                                data-testid={`authorize-expense-${expense.id}`}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                {expense.is_authorized ? 'Autorizado' : 'Autorizar'}
-                              </Button>
+                              expense.is_authorized ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveAuthorization(expense.id)}
+                                  className="h-8 px-3 bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                  title="Quitar autorización"
+                                  data-testid={`remove-auth-expense-${expense.id}`}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Autorizado
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenAuthDialog(expense)}
+                                  className="h-8 px-3 bg-red-100 text-red-700 hover:bg-red-200"
+                                  title="Autorizar para pago"
+                                  data-testid={`authorize-expense-${expense.id}`}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Autorizar
+                                </Button>
+                              )
                             )}
                             <Button
                               variant="ghost"
@@ -1146,6 +1204,88 @@ const Gastos = () => {
               </Button>
               <Button variant="destructive" onClick={handleConfirmDelete} data-testid="confirm-delete-button">
                 Eliminar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Authorization Dialog - Selección de Cuenta Bancaria */}
+        <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+                Autorizar Gasto para Pago
+              </DialogTitle>
+              <DialogDescription>
+                Selecciona la cuenta bancaria desde donde se realizará el pago.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {expenseToAuthorize && (
+              <div className="space-y-4">
+                {/* Info del gasto */}
+                <div className="p-4 bg-slate-50 rounded-lg border">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-mono text-sm font-semibold text-emerald-600">
+                        {expenseToAuthorize.expense_number || '-'}
+                      </p>
+                      <p className="font-medium text-slate-900">{expenseToAuthorize.name}</p>
+                      <p className="text-sm text-slate-500">{expenseToAuthorize.provider || 'Sin proveedor'}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-emerald-600">
+                        {formatCurrency(expenseToAuthorize.remaining_amount)}
+                      </p>
+                      <p className="text-xs text-slate-500">Monto a pagar</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selección de cuenta bancaria */}
+                <div className="space-y-2">
+                  <Label htmlFor="bank_account" className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Cuenta Bancaria *
+                  </Label>
+                  <Select value={selectedBankAccount} onValueChange={setSelectedBankAccount}>
+                    <SelectTrigger data-testid="auth-bank-select">
+                      <SelectValue placeholder="Selecciona una cuenta bancaria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{account.account_alias}</span>
+                            <span className="text-xs text-slate-500">{account.bank_name} - {account.account_number}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setAuthDialogOpen(false);
+                  setExpenseToAuthorize(null);
+                  setSelectedBankAccount('');
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleConfirmAuthorization}
+                disabled={!selectedBankAccount || submitting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                data-testid="confirm-auth-button"
+              >
+                {submitting ? 'Autorizando...' : 'Autorizar Gasto'}
               </Button>
             </DialogFooter>
           </DialogContent>
