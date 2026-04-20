@@ -239,13 +239,13 @@ const AutorizacionesPendientes = () => {
                       >
                         <TableCell>
                           <span className="font-mono text-sm font-semibold" style={{ color: 'var(--primary-teal)' }}>
-                            {auth.expense?.expense_number || '-'}
+                            {auth.expense_number || '-'}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-slate-900">{auth.expense?.name || 'N/A'}</p>
-                            <p className="text-xs text-slate-500">{auth.expense?.provider || 'Sin proveedor'}</p>
+                            <p className="font-medium text-slate-900">{auth.expense_name || 'N/A'}</p>
+                            <p className="text-xs text-slate-500">{auth.expense_provider || 'Sin proveedor'}</p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -254,7 +254,10 @@ const AutorizacionesPendientes = () => {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm">{auth.bank_account?.account_alias || 'N/A'}</span>
+                            <div className="flex flex-col">
+                              <span className="text-sm">{auth.bank_account_alias || 'N/A'}</span>
+                              {auth.bank_name && <span className="text-xs text-slate-400">{auth.bank_name}</span>}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>{getStatusBadge(auth.status)}</TableCell>
@@ -329,7 +332,7 @@ const AutorizacionesPendientes = () => {
                   <div>
                     <p className="text-sm text-slate-500">No. Gasto</p>
                     <p className="font-mono font-semibold" style={{ color: 'var(--primary-teal)' }}>
-                      {selectedAuth.expense?.expense_number || '-'}
+                      {selectedAuth.expense_number || '-'}
                     </p>
                   </div>
                   <div>
@@ -338,11 +341,11 @@ const AutorizacionesPendientes = () => {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Gasto</p>
-                    <p className="font-medium">{selectedAuth.expense?.name || 'N/A'}</p>
+                    <p className="font-medium">{selectedAuth.expense_name || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Proveedor</p>
-                    <p className="font-medium">{selectedAuth.expense?.provider || '-'}</p>
+                    <p className="font-medium">{selectedAuth.expense_provider || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Monto a Pagar</p>
@@ -350,7 +353,8 @@ const AutorizacionesPendientes = () => {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Cuenta Bancaria</p>
-                    <p className="font-medium">{selectedAuth.bank_account?.account_alias || 'N/A'}</p>
+                    <p className="font-medium">{selectedAuth.bank_account_alias || 'N/A'}</p>
+                    {selectedAuth.bank_name && <p className="text-xs text-slate-400">{selectedAuth.bank_name}</p>}
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Autorizado Por</p>
@@ -398,10 +402,10 @@ const AutorizacionesPendientes = () => {
             </DialogHeader>
             {selectedAuth && (
               <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                <p className="font-medium text-emerald-900">{selectedAuth.expense?.name}</p>
+                <p className="font-medium text-emerald-900">{selectedAuth.expense_name}</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(selectedAuth.amount_to_pay)}</p>
                 <p className="text-sm text-emerald-700 mt-2">
-                  Cuenta: {selectedAuth.bank_account?.account_alias}
+                  Cuenta: {selectedAuth.bank_account_alias}
                 </p>
               </div>
             )}
@@ -435,7 +439,7 @@ const AutorizacionesPendientes = () => {
             </DialogHeader>
             {selectedAuth && (
               <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                <p className="font-medium text-red-900">{selectedAuth.expense?.name}</p>
+                <p className="font-medium text-red-900">{selectedAuth.expense_name}</p>
                 <p className="text-xl font-bold text-red-600 mt-1">{formatCurrency(selectedAuth.amount_to_pay)}</p>
               </div>
             )}
