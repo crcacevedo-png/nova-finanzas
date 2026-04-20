@@ -1795,13 +1795,14 @@ async def authorize_expense_with_bank(
     auth_data: AuthorizeExpenseRequest,
     current_user: dict = Depends(require_permission("authorize_payments"))
 ):
-    """Autoriza un gasto con una cuenta bancaria específica (Solo SuperAdmin)"""
+    """Autoriza un gasto con una cuenta bancaria específica y crea la autorización de pago (Solo SuperAdmin)"""
     expense = await db.expenses.find_one({"id": expense_id}, {"_id": 0})
     if not expense:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
     
     # Solo gastos con saldo pendiente pueden ser autorizados
-    if expense.get("remaining_amount", 0) <= 0:
+    remaining = expense.get("remaining_amount", expense.get("amount", 0))
+    if remaining <= 0:
         raise HTTPException(status_code=400, detail="Este gasto ya está completamente pagado")
     
     # Verificar que la cuenta bancaria existe
@@ -1809,9 +1810,36 @@ async def authorize_expense_with_bank(
     if not bank_account:
         raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")
     
+    # Verificar si ya existe una autorización pendiente para este gasto
+    existing_auth = await db.payment_authorizations.find_one({
+        "expense_id": expense_id, 
+        "status": "pendiente"
+    }, {"_id": 0})
+    
+    if existing_auth:
+        raise HTTPException(status_code=400, detail="Ya existe una autorización pendiente para este gasto")
+    
     now = datetime.now(timezone.utc).isoformat()
     
-    # Marcar el gasto como autorizado y guardar la cuenta bancaria seleccionada
+    # Crear autorización de pago directamente (sin necesidad de "Confirmar")
+    auth_doc = {
+        "id": str(uuid.uuid4()),
+        "expense_id": expense_id,
+        "bank_account_id": auth_data.bank_account_id,
+        "amount_to_pay": remaining,
+        "status": "pendiente",
+        "notes": f"Autorizado desde módulo de Gastos",
+        "authorized_by": current_user["id"],
+        "authorized_at": now,
+        "executed_by": None,
+        "executed_at": None,
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.payment_authorizations.insert_one(auth_doc)
+    
+    # Marcar el gasto como autorizado
     await db.expenses.update_one(
         {"id": expense_id},
         {"$set": {

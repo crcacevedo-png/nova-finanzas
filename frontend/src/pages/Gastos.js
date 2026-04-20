@@ -472,7 +472,7 @@ const Gastos = () => {
     setSubmitting(true);
     try {
       await expenseApi.authorizeWithBank(expenseToAuthorize.id, selectedBankAccount);
-      toast.success('Gasto autorizado exitosamente');
+      toast.success('Gasto autorizado y enviado al Admin para pago');
       setAuthDialogOpen(false);
       setExpenseToAuthorize(null);
       setSelectedBankAccount('');
@@ -567,18 +567,6 @@ const Gastos = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Gasto
-              </Button>
-            )}
-            {/* Botón Confirmar Autorizaciones - Solo SuperAdmin */}
-            {isSuperAdmin && authorizedCount > 0 && (
-              <Button 
-                onClick={handleConfirmAuthorizations}
-                disabled={confirmingAuthorizations}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                data-testid="confirm-authorizations-button"
-              >
-                <Send className="w-4 h-4 mr-2" />
-                {confirmingAuthorizations ? 'Enviando...' : `Confirmar Autorizaciones (${authorizedCount})`}
               </Button>
             )}
           </div>
