@@ -13,10 +13,11 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 ```
 /app/
 ├── backend/
-│   ├── server.py              # API principal FastAPI (5500+ líneas)
+│   ├── server.py              # API principal FastAPI (6500+ líneas)
 │   ├── config/                # database.py, permissions.py
 │   ├── routes/                # Archivos base para refactorización futura
 │   ├── models/                
+│   ├── tests/                 # Tests pytest (test_surgeries.py, etc.)
 │   └── utils/                 
 ├── frontend/
 │   └── src/
@@ -26,6 +27,7 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 │       ├── pages/
 │       │   ├── Gastos.js      # Hub central de gastos y autorizaciones
 │       │   ├── AutorizacionesPendientes.js  # Vista Admin para ejecutar pagos
+│       │   ├── SalaOperaciones.js           # Módulo de cirugías (NUEVO)
 │       │   ├── HistorialPagos.js
 │       │   └── (Otras páginas...)
 │       └── services/
@@ -37,8 +39,8 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 ## Módulos Implementados
 
 ### 1. Autenticación y Roles
-- **SuperAdmin**: Control total, autoriza gastos
-- **Admin**: Ejecuta pagos autorizados, gestión general
+- **SuperAdmin**: Control total, autoriza gastos, cancela/elimina cirugías
+- **Admin**: Ejecuta pagos autorizados, gestión general, crea/edita cirugías
 - **Optica**: Solo módulo de óptica
 - JWT con permisos granulares
 
@@ -74,7 +76,19 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 - Base de datos de pacientes
 - Historial médico básico
 
-### 7. Configuración
+### 7. Sala de Operaciones (NUEVO - 25 Abril 2026)
+- Ruta: `/sala-operaciones`
+- **CRUD completo de cirugías oftalmológicas**
+- Campos: fecha, hora, paciente, procedimiento, cirujano, ojo (OD/OI/AO), tipo anestesia, anestesiólogo, institución
+- **Datos IGSS**: unidad, SPS, número afiliación, código procedimiento, costo
+- **Equipo utilizado**: lista de equipos con cantidad
+- **Insumos**: con categorías (lente, medicamento, material, descartable, sutura, viscoelástico, otro), cantidad, costo unitario, costo total
+- **Cálculo de costos**: Costo procedimiento + Total insumos = Total general
+- **Cancelación de cirugías**: con motivo y opción de reagendamiento
+- **Exportación**: Excel y PDF con filtros
+- **Permisos**: Admin puede crear/editar, SuperAdmin puede eliminar/cancelar
+
+### 8. Configuración
 - Cuentas bancarias
 - Proveedores
 - Usuarios
@@ -83,18 +97,16 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 
 ## Cambios Recientes (Abril 2026)
 
-### Sesión Actual
-1. ✅ **Autorización directa**: Al autorizar gasto, se crea automáticamente la autorización de pago (eliminado paso "Confirmar Autorizaciones")
-2. ✅ **Eliminado sidebar "Autorizaciones" para SuperAdmin**: Solo visible para Admin
-3. ✅ **Corregido bug N/A en autorizaciones**: Frontend ahora usa campos planos (expense_name, bank_account_alias) en lugar de objetos anidados
-4. ✅ **Formato de fecha corregido**: Ahora es día/mes/año (DD/MM/YYYY) en todo el sistema
+### Sesión 25 Abril 2026
+1. ✅ **Módulo Sala de Operaciones completo**: CRUD de cirugías, equipo, insumos, exportación Excel/PDF
+2. ✅ **Corrección de permisos**: Cambiado `manage_expenses` a `create_expenses`/`edit_expenses` para Admin
+3. ✅ **Testing completo**: 22/22 tests backend + validación frontend (iteration_14.json)
 
 ### Sesión Anterior
-- Número correlativo automático para gastos (GST-XXXX)
-- Búsqueda mejorada de gastos (por proveedor, nombre, número)
-- Eliminación de módulos independientes "Pagos por Vencer" y "Autorización de Pagos"
-- Dashboard movido a página de Gastos
-- Refactorización Fase 1-3 (estructura base en /routes/)
+1. ✅ **Autorización directa**: Al autorizar gasto, se crea automáticamente la autorización de pago
+2. ✅ **Eliminado sidebar "Autorizaciones" para SuperAdmin**: Solo visible para Admin
+3. ✅ **Corregido bug N/A en autorizaciones**: Frontend ahora usa campos planos
+4. ✅ **Formato de fecha corregido**: Ahora es día/mes/año (DD/MM/YYYY)
 
 ---
 
@@ -109,9 +121,17 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 - `POST /api/payment-authorizations/{id}/execute` - Admin ejecuta pago
 - `POST /api/payment-authorizations/{id}/cancel` - SuperAdmin cancela
 
-### Pagos
-- `GET /api/payments` - Historial de pagos
-- `POST /api/payments` - Registrar pago manual
+### Cirugías (NUEVO)
+- `GET /api/surgeries` - Lista cirugías con filtros
+- `POST /api/surgeries` - Registrar nueva cirugía
+- `PUT /api/surgeries/{id}` - Editar cirugía
+- `DELETE /api/surgeries/{id}` - Eliminar (solo SuperAdmin)
+- `POST /api/surgeries/{id}/cancel` - Cancelar con motivo
+- `POST /api/surgeries/{id}/equipment` - Agregar equipo
+- `DELETE /api/surgeries/{id}/equipment/{eq_id}` - Eliminar equipo
+- `POST /api/surgeries/{id}/supplies` - Agregar insumo
+- `DELETE /api/surgeries/{id}/supplies/{sup_id}` - Eliminar insumo
+- `GET /api/reports/surgeries?format=xlsx|pdf` - Exportar a Excel/PDF
 
 ---
 
@@ -138,6 +158,7 @@ Ver `/app/memory/test_credentials.md`
 - **Frontend**: React, Tailwind CSS, Shadcn/UI
 - **Base de datos**: MongoDB (Atlas en producción)
 - **Autenticación**: JWT
+- **Reportes**: openpyxl (Excel), reportlab (PDF)
 
 ---
 
