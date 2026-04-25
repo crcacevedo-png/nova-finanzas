@@ -24,7 +24,8 @@ import {
   Eye,
   Package,
   Wallet,
-  ClipboardCheck
+  ClipboardCheck,
+  Scissors
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -67,6 +68,9 @@ const Layout = ({ children }) => {
   
   // Pacientes - Visible para todos
   navItems.push({ path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' });
+  
+  // Sala de Operaciones - Visible para todos
+  navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
 
   // Finanzas sub-items (visible para todos los roles autenticados)
   // Finanzas sub-items (NO visible para optica)

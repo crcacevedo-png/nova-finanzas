@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -395,6 +395,97 @@ class PaymentAuthorizationListResponse(BaseModel):
     total: int
     pending_count: int
     executed_count: int
+
+# ==================== SURGERY MODELS (Sala de Operaciones) ====================
+
+class IGSSData(BaseModel):
+    unit: Optional[str] = None
+    sps: Optional[str] = None
+    affiliation_number: Optional[str] = None
+    code: Optional[str] = None
+    procedure_cost: Optional[float] = None
+
+class EquipmentItem(BaseModel):
+    id: Optional[str] = None
+    name: str
+    quantity: int = 1
+    notes: Optional[str] = ""
+    added_at: Optional[str] = None
+    added_by: Optional[str] = None
+
+class SupplyItem(BaseModel):
+    id: Optional[str] = None
+    name: str
+    category: str = "otro"  # lente, medicamento, material, descartable, sutura, viscoelastico, otro
+    quantity: int = 1
+    unit_cost: float = 0
+    total_cost: Optional[float] = None
+    notes: Optional[str] = ""
+    added_at: Optional[str] = None
+    added_by: Optional[str] = None
+
+class SurgeryBase(BaseModel):
+    date: str
+    time: str
+    patient_name: str
+    procedure: str
+    surgeon: str
+    eye: str  # OD, OI, AO
+    anesthesia_type: str  # local, topica, general, retrobulbar, peribulbar, sedacion
+    anesthesiologist: str
+    institution: str
+    igss_data: Optional[IGSSData] = None
+    observations: Optional[str] = ""
+
+class SurgeryCreate(SurgeryBase):
+    pass
+
+class SurgeryUpdate(BaseModel):
+    date: Optional[str] = None
+    time: Optional[str] = None
+    patient_name: Optional[str] = None
+    procedure: Optional[str] = None
+    surgeon: Optional[str] = None
+    eye: Optional[str] = None
+    anesthesia_type: Optional[str] = None
+    anesthesiologist: Optional[str] = None
+    institution: Optional[str] = None
+    igss_data: Optional[IGSSData] = None
+    observations: Optional[str] = None
+    status: Optional[str] = None  # activo, cancelado
+    cancellation_reason: Optional[str] = None
+    rescheduled_to: Optional[str] = None
+
+class SurgeryResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    date: str
+    time: str
+    patient_name: str
+    procedure: str
+    surgeon: str
+    eye: str
+    anesthesia_type: str
+    anesthesiologist: str
+    institution: str
+    igss_data: Optional[IGSSData] = None
+    observations: Optional[str] = ""
+    equipment: List[EquipmentItem] = []
+    supplies: List[SupplyItem] = []
+    status: str = "activo"
+    cancellation_reason: Optional[str] = None
+    rescheduled_to: Optional[str] = None
+    created_by: str
+    created_by_name: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+class SurgeryListResponse(BaseModel):
+    data: List[SurgeryResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
 
 # ==================== SUPPLIER/PROVIDER MODELS ====================
 
@@ -913,6 +1004,14 @@ def require_permission(permission: str):
             raise HTTPException(status_code=403, detail="No tienes permiso para realizar esta acción")
         return current_user
     return permission_checker
+
+def require_role(role: str):
+    """Requiere que el usuario tenga un rol específico"""
+    async def role_checker(current_user: dict = Depends(get_current_user)):
+        if current_user["role"] != role:
+            raise HTTPException(status_code=403, detail=f"Se requiere rol {role} para esta acción")
+        return current_user
+    return role_checker
 
 # ==================== EXPENSE HELPERS ====================
 
@@ -1448,6 +1547,143 @@ async def seed_optica_data():
     print(f"Created {len(lens_types)} sample lens types")
     
     print("Optica sample data created successfully")
+
+
+async def seed_surgeries_data():
+    """Crear datos de ejemplo para el módulo de Sala de Operaciones"""
+    surgeries_count = await db.surgeries.count_documents({})
+    if surgeries_count > 0:
+        print(f"Surgeries data already exists ({surgeries_count} surgeries), skipping")
+        return
+    
+    admin = await db.users.find_one({"username": "superadmin"})
+    created_by = admin["id"] if admin else "system"
+    now = datetime.now(timezone.utc).isoformat()
+    
+    surgeries = [
+        {
+            "id": str(uuid.uuid4()),
+            "date": "2026-04-07",
+            "time": "08:00",
+            "patient_name": "María Elena López García",
+            "procedure": "Facoemulsificación + LIO",
+            "surgeon": "Dr. Roberto Méndez",
+            "eye": "OD",
+            "anesthesia_type": "local",
+            "anesthesiologist": "Dr. Carlos Ruiz",
+            "institution": "IGSS",
+            "igss_data": {
+                "unit": "Consulta Externa Z.9",
+                "sps": "2345678",
+                "affiliation_number": "A-998877",
+                "code": "OFT-001",
+                "procedure_cost": 3500
+            },
+            "observations": "Paciente con catarata madura. Sin antecedentes relevantes.",
+            "equipment": [
+                {"id": str(uuid.uuid4()), "name": "Facoemulsificador Centurion", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Microscopio Zeiss Lumera 700", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Set instrumental cataratas", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "supplies": [
+                {"id": str(uuid.uuid4()), "name": "Lente AcrySof IQ", "category": "lente", "quantity": 1, "unit_cost": 2800, "total_cost": 2800, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Viscoelástico Healon", "category": "viscoelastico", "quantity": 1, "unit_cost": 450, "total_cost": 450, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Cuchillete 2.75mm", "category": "material", "quantity": 1, "unit_cost": 180, "total_cost": 180, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "BSS 500ml", "category": "medicamento", "quantity": 1, "unit_cost": 120, "total_cost": 120, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "status": "activo",
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "date": "2026-04-07",
+            "time": "09:30",
+            "patient_name": "José Antonio Ramírez",
+            "procedure": "Vitrectomía",
+            "surgeon": "Dr. Roberto Méndez",
+            "eye": "OI",
+            "anesthesia_type": "retrobulbar",
+            "anesthesiologist": "Dr. Carlos Ruiz",
+            "institution": "Privado",
+            "igss_data": None,
+            "observations": "Hemorragia vítrea. Diabético tipo 2 controlado.",
+            "equipment": [
+                {"id": str(uuid.uuid4()), "name": "Vitrectomo Constellation", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Microscopio Zeiss Lumera 700", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "supplies": [
+                {"id": str(uuid.uuid4()), "name": "Aceite de silicón", "category": "material", "quantity": 1, "unit_cost": 3200, "total_cost": 3200, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Triamcinolona", "category": "medicamento", "quantity": 1, "unit_cost": 280, "total_cost": 280, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Cánula de hidrodisección", "category": "descartable", "quantity": 1, "unit_cost": 95, "total_cost": 95, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "status": "activo",
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "date": "2026-04-07",
+            "time": "11:00",
+            "patient_name": "Ana Lucía Morales",
+            "procedure": "Pterigión",
+            "surgeon": "Dra. Patricia Solares",
+            "eye": "OD",
+            "anesthesia_type": "topica",
+            "anesthesiologist": "Dr. Luis Hernández",
+            "institution": "IGSS",
+            "igss_data": {
+                "unit": "Periférica Z.11",
+                "sps": "8876543",
+                "affiliation_number": "A-554433",
+                "code": "OFT-015",
+                "procedure_cost": 1800
+            },
+            "observations": "Pterigión nasal grado II. Recidiva de cirugía previa.",
+            "equipment": [
+                {"id": str(uuid.uuid4()), "name": "Microscopio Leica M822", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Set instrumental córnea", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "supplies": [
+                {"id": str(uuid.uuid4()), "name": "Mitomicina C", "category": "medicamento", "quantity": 1, "unit_cost": 220, "total_cost": 220, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Sutura nylon 10-0", "category": "sutura", "quantity": 2, "unit_cost": 120, "total_cost": 240, "notes": "", "added_at": now, "added_by": created_by},
+                {"id": str(uuid.uuid4()), "name": "Esponjas Weck-Cel", "category": "descartable", "quantity": 4, "unit_cost": 25, "total_cost": 100, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "status": "activo",
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "date": "2026-04-06",
+            "time": "14:00",
+            "patient_name": "Carlos Eduardo Pérez",
+            "procedure": "Capsulotomía YAG",
+            "surgeon": "Dra. Patricia Solares",
+            "eye": "OI",
+            "anesthesia_type": "topica",
+            "anesthesiologist": "Dr. Luis Hernández",
+            "institution": "Privado",
+            "igss_data": None,
+            "observations": "Opacidad de cápsula posterior. Procedimiento ambulatorio.",
+            "equipment": [
+                {"id": str(uuid.uuid4()), "name": "Láser YAG", "quantity": 1, "notes": "", "added_at": now, "added_by": created_by}
+            ],
+            "supplies": [],
+            "status": "activo",
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now
+        }
+    ]
+    
+    for surgery in surgeries:
+        await db.surgeries.insert_one(surgery)
+    
+    print(f"Created {len(surgeries)} sample surgeries")
 
 
 # ==================== AUTH ROUTES ====================
@@ -5120,6 +5356,370 @@ async def delete_payment_authorization(
     return {"message": "Autorización eliminada correctamente"}
 
 
+# ==================== SURGERY ROUTES (Sala de Operaciones) ====================
+
+async def enrich_surgery(surgery: dict) -> dict:
+    """Enriquecer cirugía con nombre del creador"""
+    if surgery.get("created_by"):
+        user = await db.users.find_one({"id": surgery["created_by"]}, {"_id": 0, "full_name": 1})
+        surgery["created_by_name"] = user.get("full_name") if user else None
+    return surgery
+
+@api_router.get("/surgeries", response_model=SurgeryListResponse)
+async def get_surgeries(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    surgeon: Optional[str] = None,
+    institution: Optional[str] = None,
+    eye: Optional[str] = None,
+    date_from: Optional[str] = Query(None, alias="dateFrom"),
+    date_to: Optional[str] = Query(None, alias="dateTo"),
+    sort_by: str = Query("date", alias="sortBy"),
+    sort_order: str = Query("desc", alias="sortOrder"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Listar cirugías con filtros y paginación"""
+    query = {}
+    
+    if search:
+        query["$or"] = [
+            {"patient_name": {"$regex": search, "$options": "i"}},
+            {"procedure": {"$regex": search, "$options": "i"}},
+            {"surgeon": {"$regex": search, "$options": "i"}}
+        ]
+    
+    if surgeon:
+        query["surgeon"] = {"$regex": surgeon, "$options": "i"}
+    
+    if institution:
+        query["institution"] = institution
+    
+    if eye:
+        query["eye"] = eye
+    
+    if date_from:
+        query["date"] = query.get("date", {})
+        query["date"]["$gte"] = date_from
+    
+    if date_to:
+        query["date"] = query.get("date", {})
+        query["date"]["$lte"] = date_to
+    
+    # Ordenamiento
+    sort_direction = -1 if sort_order == "desc" else 1
+    sort_field = sort_by if sort_by in ["date", "patient_name", "surgeon", "institution"] else "date"
+    
+    total = await db.surgeries.count_documents(query)
+    skip = (page - 1) * limit
+    
+    cursor = db.surgeries.find(query, {"_id": 0}).sort([(sort_field, sort_direction), ("time", sort_direction)]).skip(skip).limit(limit)
+    surgeries = await cursor.to_list(length=limit)
+    
+    # Enriquecer
+    enriched = [await enrich_surgery(s) for s in surgeries]
+    
+    return SurgeryListResponse(
+        data=enriched,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=(total + limit - 1) // limit
+    )
+
+@api_router.get("/surgeries/options")
+async def get_surgery_options(current_user: dict = Depends(get_current_user)):
+    """Obtener opciones únicas para filtros (cirujanos, instituciones, anestesiólogos)"""
+    surgeons = await db.surgeries.distinct("surgeon")
+    institutions = await db.surgeries.distinct("institution")
+    anesthesiologists = await db.surgeries.distinct("anesthesiologist")
+    
+    return {
+        "surgeons": sorted([s for s in surgeons if s]),
+        "institutions": sorted([i for i in institutions if i]),
+        "anesthesiologists": sorted([a for a in anesthesiologists if a])
+    }
+
+@api_router.get("/surgeries/{surgery_id}", response_model=SurgeryResponse)
+async def get_surgery(surgery_id: str, current_user: dict = Depends(get_current_user)):
+    """Obtener detalle de una cirugía"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    enriched = await enrich_surgery(surgery)
+    return SurgeryResponse(**enriched)
+
+@api_router.post("/surgeries", response_model=SurgeryResponse)
+async def create_surgery(
+    surgery: SurgeryCreate,
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Registrar nueva cirugía"""
+    # Validar campos IGSS si la institución es IGSS
+    if surgery.institution == "IGSS":
+        if not surgery.igss_data:
+            raise HTTPException(status_code=400, detail="Los datos IGSS son requeridos")
+        igss = surgery.igss_data
+        if not all([igss.unit, igss.sps, igss.affiliation_number, igss.code, igss.procedure_cost is not None]):
+            raise HTTPException(status_code=400, detail="Todos los campos IGSS son obligatorios")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    surgery_doc = {
+        "id": str(uuid.uuid4()),
+        **surgery.model_dump(),
+        "equipment": [],
+        "supplies": [],
+        "status": "activo",
+        "cancellation_reason": None,
+        "rescheduled_to": None,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.surgeries.insert_one(surgery_doc)
+    
+    created = await db.surgeries.find_one({"id": surgery_doc["id"]}, {"_id": 0})
+    enriched = await enrich_surgery(created)
+    return SurgeryResponse(**enriched)
+
+@api_router.put("/surgeries/{surgery_id}", response_model=SurgeryResponse)
+async def update_surgery(
+    surgery_id: str,
+    surgery: SurgeryUpdate,
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Editar cirugía"""
+    existing = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    update_data = surgery.model_dump(exclude_unset=True)
+    
+    # Validar campos IGSS si se cambia a IGSS
+    new_institution = update_data.get("institution", existing.get("institution"))
+    if new_institution == "IGSS":
+        igss = update_data.get("igss_data", existing.get("igss_data"))
+        if not igss:
+            raise HTTPException(status_code=400, detail="Los datos IGSS son requeridos")
+        if isinstance(igss, dict):
+            if not all([igss.get("unit"), igss.get("sps"), igss.get("affiliation_number"), igss.get("code"), igss.get("procedure_cost") is not None]):
+                raise HTTPException(status_code=400, detail="Todos los campos IGSS son obligatorios")
+    
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.surgeries.update_one({"id": surgery_id}, {"$set": update_data})
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+@api_router.delete("/surgeries/{surgery_id}")
+async def delete_surgery(
+    surgery_id: str,
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Eliminar cirugía (solo superadmin)"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    await db.surgeries.delete_one({"id": surgery_id})
+    return {"message": "Cirugía eliminada correctamente"}
+
+@api_router.post("/surgeries/{surgery_id}/cancel")
+async def cancel_surgery(
+    surgery_id: str,
+    reason: str = Body(..., embed=True),
+    reschedule_date: Optional[str] = Body(None, embed=True),
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Cancelar cirugía con motivo (solo superadmin)"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    update_data = {
+        "status": "cancelado",
+        "cancellation_reason": reason,
+        "rescheduled_to": reschedule_date,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.surgeries.update_one({"id": surgery_id}, {"$set": update_data})
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+# ---- Equipo ----
+
+@api_router.post("/surgeries/{surgery_id}/equipment")
+async def add_equipment(
+    surgery_id: str,
+    name: str = Body(...),
+    quantity: int = Body(1),
+    notes: str = Body(""),
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Agregar equipo a una cirugía"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    equipment_item = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "quantity": quantity,
+        "notes": notes,
+        "added_at": datetime.now(timezone.utc).isoformat(),
+        "added_by": current_user["id"]
+    }
+    
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {
+            "$push": {"equipment": equipment_item},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+@api_router.delete("/surgeries/{surgery_id}/equipment/{equipment_id}")
+async def delete_equipment(
+    surgery_id: str,
+    equipment_id: str,
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Eliminar equipo de una cirugía"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {
+            "$pull": {"equipment": {"id": equipment_id}},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+# ---- Insumos ----
+
+@api_router.post("/surgeries/{surgery_id}/supplies")
+async def add_supply(
+    surgery_id: str,
+    name: str = Body(...),
+    category: str = Body("otro"),
+    quantity: int = Body(1),
+    unit_cost: float = Body(0),
+    notes: str = Body(""),
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Agregar insumo a una cirugía"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    supply_item = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "category": category,
+        "quantity": quantity,
+        "unit_cost": unit_cost,
+        "total_cost": quantity * unit_cost,
+        "notes": notes,
+        "added_at": datetime.now(timezone.utc).isoformat(),
+        "added_by": current_user["id"]
+    }
+    
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {
+            "$push": {"supplies": supply_item},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+@api_router.put("/surgeries/{surgery_id}/supplies/{supply_id}")
+async def update_supply(
+    surgery_id: str,
+    supply_id: str,
+    quantity: Optional[int] = Body(None),
+    unit_cost: Optional[float] = Body(None),
+    notes: Optional[str] = Body(None),
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Editar insumo de una cirugía"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    supplies = surgery.get("supplies", [])
+    supply_index = next((i for i, s in enumerate(supplies) if s.get("id") == supply_id), None)
+    
+    if supply_index is None:
+        raise HTTPException(status_code=404, detail="Insumo no encontrado")
+    
+    supply = supplies[supply_index]
+    
+    if quantity is not None:
+        supply["quantity"] = quantity
+    if unit_cost is not None:
+        supply["unit_cost"] = unit_cost
+    if notes is not None:
+        supply["notes"] = notes
+    
+    supply["total_cost"] = supply["quantity"] * supply["unit_cost"]
+    
+    supplies[supply_index] = supply
+    
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {"$set": {"supplies": supplies, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+@api_router.delete("/surgeries/{surgery_id}/supplies/{supply_id}")
+async def delete_supply(
+    surgery_id: str,
+    supply_id: str,
+    current_user: dict = Depends(require_permission("manage_expenses"))
+):
+    """Eliminar insumo de una cirugía"""
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {
+            "$pull": {"supplies": {"id": supply_id}},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+    
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+
 # ==================== REPORTS ROUTES ====================
 
 @api_router.get("/reports/expenses")
@@ -5547,6 +6147,13 @@ async def startup_event():
     await db.optica_sales.create_index([("status", 1)])
     await db.optica_sales.create_index([("created_at", -1)])
     await db.optica_sale_payments.create_index([("sale_id", 1)])
+    # Índices de Sala de Operaciones
+    await db.surgeries.create_index([("date", -1)])
+    await db.surgeries.create_index([("surgeon", 1)])
+    await db.surgeries.create_index([("institution", 1)])
+    await db.surgeries.create_index([("patient_name", "text"), ("procedure", "text")])
+    # Seed de cirugías
+    await seed_surgeries_data()
     try:
         await db.users.create_index([("username", 1)], unique=True)
     except Exception:

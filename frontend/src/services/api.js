@@ -104,6 +104,38 @@ export const paymentAuthorizationApi = {
   delete: (id) => axios.delete(`${API_URL}/payment-authorizations/${id}`),
 };
 
+// Surgery API (Sala de Operaciones)
+export const surgeryApi = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.surgeon) params.append('surgeon', filters.surgeon);
+    if (filters.institution) params.append('institution', filters.institution);
+    if (filters.eye) params.append('eye', filters.eye);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+    const queryString = params.toString();
+    return axios.get(`${API_URL}/surgeries${queryString ? `?${queryString}` : ''}`);
+  },
+  getById: (id) => axios.get(`${API_URL}/surgeries/${id}`),
+  getOptions: () => axios.get(`${API_URL}/surgeries/options`),
+  create: (data) => axios.post(`${API_URL}/surgeries`, data),
+  update: (id, data) => axios.put(`${API_URL}/surgeries/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/surgeries/${id}`),
+  cancel: (id, reason, rescheduleDate) => axios.post(`${API_URL}/surgeries/${id}/cancel`, { reason, reschedule_date: rescheduleDate }),
+  // Equipment
+  addEquipment: (surgeryId, data) => axios.post(`${API_URL}/surgeries/${surgeryId}/equipment`, data),
+  deleteEquipment: (surgeryId, equipmentId) => axios.delete(`${API_URL}/surgeries/${surgeryId}/equipment/${equipmentId}`),
+  // Supplies
+  addSupply: (surgeryId, data) => axios.post(`${API_URL}/surgeries/${surgeryId}/supplies`, data),
+  updateSupply: (surgeryId, supplyId, data) => axios.put(`${API_URL}/surgeries/${surgeryId}/supplies/${supplyId}`, data),
+  deleteSupply: (surgeryId, supplyId) => axios.delete(`${API_URL}/surgeries/${surgeryId}/supplies/${supplyId}`),
+};
+
 // Suppliers API
 export const supplierApi = {
   getAll: () => axios.get(`${API_URL}/suppliers`),

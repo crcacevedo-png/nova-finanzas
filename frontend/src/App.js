@@ -18,6 +18,7 @@ import OpticaCompras from './pages/OpticaCompras';
 import Medicos from './pages/Medicos';
 import TiposLente from './pages/TiposLente';
 import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
+import SalaOperaciones from './pages/SalaOperaciones';
 import './App.css';
 
 // Protected Route Component
@@ -203,6 +204,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_payment_authorizations">
             <AutorizacionesPendientes />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Sala de Operaciones - Todos los roles */}
+      <Route 
+        path="/sala-operaciones" 
+        element={
+          <ProtectedRoute>
+            <SalaOperaciones />
           </ProtectedRoute>
         } 
       />
