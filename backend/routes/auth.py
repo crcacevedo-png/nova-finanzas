@@ -108,6 +108,14 @@ def require_permission(permission: str):
         return current_user
     return permission_checker
 
+def require_role(role: str):
+    """Requiere que el usuario tenga un rol específico"""
+    async def role_checker(current_user: dict = Depends(get_current_user)):
+        if current_user["role"] != role:
+            raise HTTPException(status_code=403, detail=f"Se requiere rol {role} para esta acción")
+        return current_user
+    return role_checker
+
 # ==================== AUTH ROUTES ====================
 
 @router.post("/login", response_model=TokenResponse)

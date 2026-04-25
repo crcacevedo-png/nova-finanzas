@@ -7,6 +7,7 @@ from routes.auth import (
     users_router,
     get_current_user,
     require_permission,
+    require_role,
     hash_password,
     verify_password,
     create_token,
@@ -87,6 +88,21 @@ from routes.igss_units import (
     IGSSUnitListResponse
 )
 
+# ==================== FASE 4 - CIRUGÍAS ====================
+from routes.surgeries import (
+    router as surgeries_router,
+    reports_router as surgery_reports_router,
+    IGSSData,
+    EquipmentItem,
+    SupplyItem,
+    SurgeryBase,
+    SurgeryCreate,
+    SurgeryUpdate,
+    SurgeryResponse,
+    SurgeryListResponse,
+    enrich_surgery
+)
+
 __all__ = [
     # ==================== Routers ====================
     'auth_router',
@@ -98,10 +114,13 @@ __all__ = [
     'suppliers_router',
     'fixed_expenses_router',
     'igss_units_router',
+    'surgeries_router',
+    'surgery_reports_router',
     
     # ==================== Auth helpers ====================
     'get_current_user',
     'require_permission',
+    'require_role',
     'hash_password',
     'verify_password',
     'create_token',
@@ -173,5 +192,16 @@ __all__ = [
     'IGSSUnitCreate',
     'IGSSUnitUpdate',
     'IGSSUnitResponse',
-    'IGSSUnitListResponse'
+    'IGSSUnitListResponse',
+    
+    # ==================== Surgery models ====================
+    'IGSSData',
+    'EquipmentItem',
+    'SupplyItem',
+    'SurgeryBase',
+    'SurgeryCreate',
+    'SurgeryUpdate',
+    'SurgeryResponse',
+    'SurgeryListResponse',
+    'enrich_surgery'
 ]
