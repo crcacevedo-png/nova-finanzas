@@ -435,6 +435,41 @@ const SalaOperaciones = () => {
     return procedureCost + suppliesTotal;
   };
 
+  // Export handler
+  const handleExport = async (format) => {
+    try {
+      toast.info(`Generando reporte ${format.toUpperCase()}...`);
+      const response = await surgeryApi.exportReport({
+        format,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        surgeon: filterSurgeon || undefined,
+        institution: filterInstitution || undefined,
+        eye: filterEye || undefined,
+      });
+      
+      // Crear blob y descargar
+      const blob = new Blob([response.data], { 
+        type: format === 'xlsx' 
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          : 'application/pdf' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `cirugias_novavision.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`Reporte ${format.toUpperCase()} descargado`);
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast.error('Error al exportar el reporte');
+    }
+  };
+
   return (
     <Layout>
       <Toaster position="top-right" richColors />
@@ -445,12 +480,34 @@ const SalaOperaciones = () => {
             <h1 className="text-xl font-bold text-slate-900 font-['Outfit']">Sala de operaciones</h1>
             <p className="text-slate-500 text-sm">Registro de cirugías oftalmológicas</p>
           </div>
-          {canEdit && (
-            <Button onClick={openCreateDialog} className="btn-primary" data-testid="register-surgery-btn">
-              <Plus className="w-4 h-4 mr-2" />
-              Registrar cirugía
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Export Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" data-testid="export-btn">
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('xlsx')} data-testid="export-excel-btn">
+                  <FileText className="w-4 h-4 mr-2 text-emerald-600" />
+                  Exportar a Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf')} data-testid="export-pdf-btn">
+                  <FileText className="w-4 h-4 mr-2 text-red-600" />
+                  Exportar a PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {canEdit && (
+              <Button onClick={openCreateDialog} className="btn-primary" data-testid="register-surgery-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Registrar cirugía
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}

@@ -134,6 +134,17 @@ export const surgeryApi = {
   addSupply: (surgeryId, data) => axios.post(`${API_URL}/surgeries/${surgeryId}/supplies`, data),
   updateSupply: (surgeryId, supplyId, data) => axios.put(`${API_URL}/surgeries/${surgeryId}/supplies/${supplyId}`, data),
   deleteSupply: (surgeryId, supplyId) => axios.delete(`${API_URL}/surgeries/${surgeryId}/supplies/${supplyId}`),
+  // Export
+  exportReport: (filters = {}) => {
+    const params = new URLSearchParams();
+    params.append('format', filters.format || 'xlsx');
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
+    if (filters.surgeon) params.append('surgeon', filters.surgeon);
+    if (filters.institution) params.append('institution', filters.institution);
+    if (filters.eye) params.append('eye', filters.eye);
+    return axios.get(`${API_URL}/reports/surgeries?${params.toString()}`, { responseType: 'blob' });
+  },
 };
 
 // Suppliers API

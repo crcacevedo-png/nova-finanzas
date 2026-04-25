@@ -5453,7 +5453,7 @@ async def get_surgery(surgery_id: str, current_user: dict = Depends(get_current_
 @api_router.post("/surgeries", response_model=SurgeryResponse)
 async def create_surgery(
     surgery: SurgeryCreate,
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("create_expenses"))
 ):
     """Registrar nueva cirugía"""
     # Validar campos IGSS si la institución es IGSS
@@ -5489,7 +5489,7 @@ async def create_surgery(
 async def update_surgery(
     surgery_id: str,
     surgery: SurgeryUpdate,
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Editar cirugía"""
     existing = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -5562,7 +5562,7 @@ async def add_equipment(
     name: str = Body(...),
     quantity: int = Body(1),
     notes: str = Body(""),
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Agregar equipo a una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -5594,7 +5594,7 @@ async def add_equipment(
 async def delete_equipment(
     surgery_id: str,
     equipment_id: str,
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Eliminar equipo de una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -5623,7 +5623,7 @@ async def add_supply(
     quantity: int = Body(1),
     unit_cost: float = Body(0),
     notes: str = Body(""),
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Agregar insumo a una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -5661,7 +5661,7 @@ async def update_supply(
     quantity: Optional[int] = Body(None),
     unit_cost: Optional[float] = Body(None),
     notes: Optional[str] = Body(None),
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Editar insumo de una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -5700,7 +5700,7 @@ async def update_supply(
 async def delete_supply(
     surgery_id: str,
     supply_id: str,
-    current_user: dict = Depends(require_permission("manage_expenses"))
+    current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Eliminar insumo de una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -5718,6 +5718,332 @@ async def delete_supply(
     updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     enriched = await enrich_surgery(updated)
     return SurgeryResponse(**enriched)
+
+
+# ==================== SURGERY REPORTS ====================
+
+@api_router.get("/reports/surgeries")
+async def export_surgeries(
+    format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
+    date_from: Optional[str] = Query(None, alias="dateFrom"),
+    date_to: Optional[str] = Query(None, alias="dateTo"),
+    surgeon: Optional[str] = None,
+    institution: Optional[str] = None,
+    eye: Optional[str] = None,
+    current_user: dict = Depends(require_permission("export_reports"))
+):
+    """Exportar cirugías a Excel o PDF"""
+    query = {"status": {"$ne": "cancelado"}}  # Excluir cirugías canceladas
+    
+    if surgeon:
+        query["surgeon"] = surgeon
+    if institution:
+        query["institution"] = institution
+    if eye:
+        query["eye"] = eye
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query["$gte"] = date_from
+        if date_to:
+            date_query["$lte"] = date_to
+        if date_query:
+            query["date"] = date_query
+    
+    surgeries = await db.surgeries.find(query, {"_id": 0}).sort([("date", -1), ("time", -1)]).to_list(10000)
+    
+    # Helper para calcular totales
+    def get_supplies_total(supplies):
+        return sum(s.get("total_cost", 0) for s in (supplies or []))
+    
+    def get_total_general(surgery):
+        procedure_cost = surgery.get("igss_data", {}).get("procedure_cost", 0) if surgery.get("igss_data") else 0
+        supplies_total = get_supplies_total(surgery.get("supplies", []))
+        return procedure_cost + supplies_total
+    
+    if format == "xlsx":
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Cirugías"
+            
+            # Estilos
+            header_fill = PatternFill(start_color="0d9488", end_color="0d9488", fill_type="solid")  # Teal
+            header_font = Font(color="FFFFFF", bold=True, size=10)
+            thin_border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            
+            # Headers
+            headers = ["Fecha", "Hora", "Paciente", "Procedimiento", "Cirujano", "Ojo", "Anestesia", "Institución", "Costo Proc.", "Insumos", "Total", "Equipo", "Observaciones"]
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = thin_border
+            
+            # Formato moneda
+            currency_format = 'Q #,##0.00'
+            
+            # Datos
+            anesthesia_labels = {
+                "local": "Local", "topica": "Tópica", "general": "General",
+                "retrobulbar": "Retrobulbar", "peribulbar": "Peribulbar", "sedacion": "Sedación"
+            }
+            
+            for row, s in enumerate(surgeries, 2):
+                ws.cell(row=row, column=1, value=s["date"]).border = thin_border
+                ws.cell(row=row, column=2, value=s["time"]).border = thin_border
+                ws.cell(row=row, column=3, value=s["patient_name"]).border = thin_border
+                ws.cell(row=row, column=4, value=s["procedure"]).border = thin_border
+                ws.cell(row=row, column=5, value=s["surgeon"]).border = thin_border
+                ws.cell(row=row, column=6, value=s["eye"]).border = thin_border
+                ws.cell(row=row, column=7, value=anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", ""))).border = thin_border
+                ws.cell(row=row, column=8, value=s["institution"]).border = thin_border
+                
+                # Costo del procedimiento
+                proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
+                cell_proc = ws.cell(row=row, column=9, value=proc_cost)
+                cell_proc.border = thin_border
+                cell_proc.number_format = currency_format
+                
+                # Total insumos
+                supplies_total = get_supplies_total(s.get("supplies", []))
+                cell_supplies = ws.cell(row=row, column=10, value=supplies_total)
+                cell_supplies.border = thin_border
+                cell_supplies.number_format = currency_format
+                
+                # Total general
+                total = get_total_general(s)
+                cell_total = ws.cell(row=row, column=11, value=total)
+                cell_total.border = thin_border
+                cell_total.number_format = currency_format
+                cell_total.font = Font(bold=True)
+                
+                # Equipo (lista separada por comas)
+                equipment_list = ", ".join([eq["name"] for eq in s.get("equipment", [])])
+                ws.cell(row=row, column=12, value=equipment_list).border = thin_border
+                
+                # Observaciones
+                ws.cell(row=row, column=13, value=s.get("observations", "")).border = thin_border
+            
+            # Ajustar anchos de columna
+            ws.column_dimensions['A'].width = 12
+            ws.column_dimensions['B'].width = 8
+            ws.column_dimensions['C'].width = 28
+            ws.column_dimensions['D'].width = 25
+            ws.column_dimensions['E'].width = 20
+            ws.column_dimensions['F'].width = 6
+            ws.column_dimensions['G'].width = 12
+            ws.column_dimensions['H'].width = 15
+            ws.column_dimensions['I'].width = 12
+            ws.column_dimensions['J'].width = 12
+            ws.column_dimensions['K'].width = 12
+            ws.column_dimensions['L'].width = 35
+            ws.column_dimensions['M'].width = 30
+            
+            # Fila de totales
+            total_row = len(surgeries) + 2
+            ws.cell(row=total_row, column=8, value="TOTALES:").font = Font(bold=True)
+            
+            total_proc = sum(s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0 for s in surgeries)
+            total_supplies = sum(get_supplies_total(s.get("supplies", [])) for s in surgeries)
+            total_general = sum(get_total_general(s) for s in surgeries)
+            
+            cell_total_proc = ws.cell(row=total_row, column=9, value=total_proc)
+            cell_total_proc.number_format = currency_format
+            cell_total_proc.font = Font(bold=True)
+            
+            cell_total_supplies = ws.cell(row=total_row, column=10, value=total_supplies)
+            cell_total_supplies.number_format = currency_format
+            cell_total_supplies.font = Font(bold=True)
+            
+            cell_total_all = ws.cell(row=total_row, column=11, value=total_general)
+            cell_total_all.number_format = currency_format
+            cell_total_all.font = Font(bold=True, color="0d9488")
+            
+            # Guardar
+            output = io.BytesIO()
+            wb.save(output)
+            output.seek(0)
+            
+            return StreamingResponse(
+                output,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment; filename=cirugias_novavision.xlsx"}
+            )
+        except ImportError:
+            raise HTTPException(status_code=500, detail="Librería openpyxl no disponible")
+    
+    else:
+        # PDF format
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter, landscape
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+            
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(
+                output, 
+                pagesize=landscape(letter),
+                rightMargin=0.4*inch,
+                leftMargin=0.4*inch,
+                topMargin=0.5*inch,
+                bottomMargin=0.5*inch
+            )
+            
+            elements = []
+            styles = getSampleStyleSheet()
+            
+            # Estilos personalizados
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                spaceAfter=8,
+                alignment=TA_CENTER,
+                textColor=colors.HexColor('#0d9488')
+            )
+            
+            subtitle_style = ParagraphStyle(
+                'CustomSubtitle',
+                parent=styles['Normal'],
+                fontSize=9,
+                spaceAfter=15,
+                alignment=TA_CENTER,
+                textColor=colors.grey
+            )
+            
+            # Título
+            elements.append(Paragraph("NovaVision — Reporte de Cirugías", title_style))
+            
+            # Subtítulo
+            generated_at = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
+            filters_text = []
+            if date_from:
+                filters_text.append(f"Desde: {date_from}")
+            if date_to:
+                filters_text.append(f"Hasta: {date_to}")
+            if surgeon:
+                filters_text.append(f"Cirujano: {surgeon}")
+            if institution:
+                filters_text.append(f"Institución: {institution}")
+            
+            filter_str = " | ".join(filters_text) if filters_text else "Todas las cirugías"
+            elements.append(Paragraph(
+                f"Generado: {generated_at} | Usuario: {current_user.get('name', 'N/A')} | {filter_str}",
+                subtitle_style
+            ))
+            
+            elements.append(Spacer(1, 0.15*inch))
+            
+            # Etiquetas
+            anesthesia_labels = {
+                "local": "Local", "topica": "Tópica", "general": "General",
+                "retrobulbar": "Retrob.", "peribulbar": "Perib.", "sedacion": "Sedación"
+            }
+            
+            # Datos de la tabla
+            table_data = [["Fecha", "Hora", "Paciente", "Procedimiento", "Cirujano", "Ojo", "Anest.", "Institución", "Costo Proc.", "Insumos", "Total"]]
+            
+            for s in surgeries:
+                proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
+                supplies_total = get_supplies_total(s.get("supplies", []))
+                total = get_total_general(s)
+                
+                table_data.append([
+                    s["date"],
+                    s["time"],
+                    s["patient_name"][:25] + "..." if len(s["patient_name"]) > 25 else s["patient_name"],
+                    s["procedure"][:20] + "..." if len(s["procedure"]) > 20 else s["procedure"],
+                    s["surgeon"][:18] + "..." if len(s["surgeon"]) > 18 else s["surgeon"],
+                    s["eye"],
+                    anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", "")[:6]),
+                    s["institution"][:12] + "..." if len(s["institution"]) > 12 else s["institution"],
+                    f'Q {proc_cost:,.2f}',
+                    f'Q {supplies_total:,.2f}',
+                    f'Q {total:,.2f}'
+                ])
+            
+            # Crear tabla
+            col_widths = [0.7*inch, 0.5*inch, 1.5*inch, 1.2*inch, 1.1*inch, 0.4*inch, 0.55*inch, 0.8*inch, 0.75*inch, 0.75*inch, 0.75*inch]
+            table = Table(table_data, colWidths=col_widths)
+            
+            # Estilo de tabla
+            table.setStyle(TableStyle([
+                # Header
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0d9488')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('TOPPADDING', (0, 0), (-1, 0), 6),
+                
+                # Data
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('ALIGN', (5, 1), (5, -1), 'CENTER'),  # Ojo
+                ('ALIGN', (8, 1), (10, -1), 'RIGHT'),  # Montos
+                ('TOPPADDING', (0, 1), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                
+                # Filas alternadas
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdfa')]),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#0d9488')),
+            ]))
+            
+            elements.append(table)
+            
+            # Resumen
+            total_proc = sum(s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0 for s in surgeries)
+            total_supplies = sum(get_supplies_total(s.get("supplies", [])) for s in surgeries)
+            total_general = sum(get_total_general(s) for s in surgeries)
+            
+            elements.append(Spacer(1, 0.2*inch))
+            
+            summary_style = ParagraphStyle(
+                'Summary',
+                parent=styles['Normal'],
+                fontSize=10,
+                alignment=TA_RIGHT
+            )
+            
+            elements.append(Paragraph(
+                f"<b>Total Procedimientos:</b> Q {total_proc:,.2f} | <b>Total Insumos:</b> Q {total_supplies:,.2f} | <b>TOTAL GENERAL:</b> Q {total_general:,.2f}",
+                summary_style
+            ))
+            
+            elements.append(Paragraph(
+                f"<b>Total de cirugías:</b> {len(surgeries)}",
+                summary_style
+            ))
+            
+            # Construir PDF
+            doc.build(elements)
+            output.seek(0)
+            
+            return StreamingResponse(
+                output,
+                media_type="application/pdf",
+                headers={"Content-Disposition": "attachment; filename=cirugias_novavision.pdf"}
+            )
+            
+        except ImportError as e:
+            raise HTTPException(status_code=500, detail=f"Librería PDF no disponible: {str(e)}")
 
 
 # ==================== REPORTS ROUTES ====================
