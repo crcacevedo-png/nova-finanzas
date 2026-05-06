@@ -5223,6 +5223,9 @@ async def update_payment_authorization(
 @api_router.post("/payment-authorizations/{auth_id}/execute", response_model=PaymentAuthorizationResponse)
 async def execute_payment_authorization(
     auth_id: str,
+    payment_method: Optional[str] = Body(None),
+    reference: Optional[str] = Body(None),
+    notes: Optional[str] = Body(None),
     current_user: dict = Depends(require_permission("execute_payment_authorizations"))
 ):
     """Ejecutar una autorización de pago - crea el pago y actualiza el gasto (Admin only)"""
@@ -5269,16 +5272,34 @@ async def execute_payment_authorization(
     
     now = datetime.now(timezone.utc).isoformat()
     
+    # Mapeo de métodos de pago a etiquetas legibles
+    payment_method_labels = {
+        "transferencia": "Transferencia bancaria",
+        "efectivo": "Efectivo",
+        "cheque": "Cheque",
+        "tarjeta": "Tarjeta de crédito/débito",
+        "otro": "Otro"
+    }
+    
+    # Usar el método de pago proporcionado o el valor por defecto
+    method_label = payment_method_labels.get(payment_method, "Transferencia bancaria")
+    
+    # Construir referencia
+    payment_reference = reference if reference else f"Auth: {auth_id[:8]} | Cuenta: {bank_ref}"
+    
     # Crear el pago real (con monto ajustado si es necesario)
     adjustment_note = f" [Ajustado de Q{auth['amount_to_pay']:.2f} a Q{amount_to_pay:.2f}]" if amount_adjusted else ""
+    user_notes = notes if notes else ""
+    combined_notes = f"Pago autorizado.{adjustment_note} {user_notes}".strip()
+    
     payment_doc = {
         "id": str(uuid.uuid4()),
         "expense_id": auth["expense_id"],
         "amount": amount_to_pay,
         "date": now.split("T")[0],  # Solo fecha
-        "method": "Transferencia bancaria",
-        "reference": f"Auth: {auth_id[:8]} | Cuenta: {bank_ref}",
-        "notes": f"Pago autorizado.{adjustment_note} {auth.get('notes', '')}".strip(),
+        "method": method_label,
+        "reference": payment_reference,
+        "notes": combined_notes,
         "created_by": current_user["id"],
         "created_at": now
     }

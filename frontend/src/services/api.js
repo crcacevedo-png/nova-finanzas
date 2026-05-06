@@ -99,7 +99,7 @@ export const paymentAuthorizationApi = {
   getExpensesPendingAuth: () => axios.get(`${API_URL}/expenses-pending-authorization`),
   create: (data) => axios.post(`${API_URL}/payment-authorizations`, data),
   update: (id, data) => axios.put(`${API_URL}/payment-authorizations/${id}`, data),
-  execute: (id) => axios.post(`${API_URL}/payment-authorizations/${id}/execute`),
+  execute: (id, paymentData = {}) => axios.post(`${API_URL}/payment-authorizations/${id}/execute`, paymentData),
   cancel: (id) => axios.post(`${API_URL}/payment-authorizations/${id}/cancel`),
   delete: (id) => axios.delete(`${API_URL}/payment-authorizations/${id}`),
 };

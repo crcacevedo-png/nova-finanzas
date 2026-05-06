@@ -9,7 +9,11 @@ import {
   Eye,
   Building2,
   Receipt,
-  AlertTriangle
+  AlertTriangle,
+  CreditCard,
+  Banknote,
+  FileText,
+  Wallet
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -38,7 +42,18 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
+import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
 import { toast, Toaster } from 'sonner';
+
+// Métodos de pago disponibles
+const PAYMENT_METHODS = [
+  { value: 'transferencia', label: 'Transferencia Bancaria', icon: Building2 },
+  { value: 'efectivo', label: 'Efectivo', icon: Banknote },
+  { value: 'cheque', label: 'Cheque', icon: FileText },
+  { value: 'tarjeta', label: 'Tarjeta de Crédito/Débito', icon: CreditCard },
+  { value: 'otro', label: 'Otro', icon: Wallet },
+];
 
 const AutorizacionesPendientes = () => {
   const { user } = useAuth();
@@ -54,10 +69,16 @@ const AutorizacionesPendientes = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [executeDialogOpen, setExecuteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
   
   // Selected
   const [selectedAuth, setSelectedAuth] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Payment form
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('transferencia');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentNotes, setPaymentNotes] = useState('');
 
   useEffect(() => {
     fetchAuthorizations();
@@ -101,6 +122,36 @@ const AutorizacionesPendientes = () => {
   const handleOpenCancel = (auth) => {
     setSelectedAuth(auth);
     setCancelDialogOpen(true);
+  };
+
+  const handleOpenPay = (auth) => {
+    setSelectedAuth(auth);
+    setSelectedPaymentMethod('transferencia');
+    setPaymentReference('');
+    setPaymentNotes('');
+    setPayDialogOpen(true);
+  };
+
+  const handlePay = async () => {
+    if (!selectedAuth) return;
+    
+    setSubmitting(true);
+    try {
+      await paymentAuthorizationApi.execute(selectedAuth.id, {
+        payment_method: selectedPaymentMethod,
+        reference: paymentReference,
+        notes: paymentNotes
+      });
+      toast.success('Pago registrado correctamente');
+      setPayDialogOpen(false);
+      setSelectedAuth(null);
+      fetchAuthorizations();
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      toast.error(error.response?.data?.detail || 'Error al procesar el pago');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleExecute = async () => {
@@ -280,18 +331,18 @@ const AutorizacionesPendientes = () => {
                               <Eye className="w-4 h-4" />
                             </Button>
                             
-                            {/* Botón Ejecutar - Solo Admin y autorizaciones pendientes */}
+                            {/* Botón Pagar - Solo Admin y autorizaciones pendientes */}
                             {isAdmin && auth.status === 'pendiente' && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleOpenExecute(auth)}
+                                onClick={() => handleOpenPay(auth)}
                                 className="h-8 px-3 bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                                title="Ejecutar pago"
-                                data-testid={`execute-auth-${auth.id}`}
+                                title="Pagar"
+                                data-testid={`pay-auth-${auth.id}`}
                               >
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Ejecutar
+                                <Wallet className="w-4 h-4 mr-1" />
+                                Pagar
                               </Button>
                             )}
                             
@@ -388,7 +439,7 @@ const AutorizacionesPendientes = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Execute Dialog */}
+        {/* Execute Dialog (legacy - mantener por compatibilidad) */}
         <Dialog open={executeDialogOpen} onOpenChange={setExecuteDialogOpen}>
           <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
@@ -420,6 +471,105 @@ const AutorizacionesPendientes = () => {
                 data-testid="confirm-execute-button"
               >
                 {submitting ? 'Ejecutando...' : 'Confirmar Ejecución'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Pay Dialog - Nuevo diálogo con opciones de pago */}
+        <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-emerald-600" />
+                Registrar Pago
+              </DialogTitle>
+              <DialogDescription>
+                Selecciona el método de pago y completa los datos para registrar el pago.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedAuth && (
+              <div className="space-y-4">
+                {/* Resumen del pago */}
+                <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <p className="font-medium text-emerald-900">{selectedAuth.expense_name}</p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(selectedAuth.amount_to_pay)}</p>
+                  <p className="text-sm text-emerald-700 mt-2">
+                    Cuenta destino: {selectedAuth.bank_account_alias}
+                  </p>
+                </div>
+
+                {/* Método de pago */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Método de Pago</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PAYMENT_METHODS.map((method) => {
+                      const Icon = method.icon;
+                      return (
+                        <button
+                          key={method.value}
+                          type="button"
+                          onClick={() => setSelectedPaymentMethod(method.value)}
+                          className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
+                            selectedPaymentMethod === method.value
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                              : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                          }`}
+                          data-testid={`payment-method-${method.value}`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span className="text-sm font-medium">{method.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Número de referencia */}
+                <div className="space-y-2">
+                  <Label htmlFor="reference" className="text-sm font-medium">
+                    Número de Referencia / Comprobante
+                  </Label>
+                  <Input
+                    id="reference"
+                    placeholder={
+                      selectedPaymentMethod === 'transferencia' ? 'Ej: TRF-123456' :
+                      selectedPaymentMethod === 'cheque' ? 'Ej: CHQ-001234' :
+                      selectedPaymentMethod === 'tarjeta' ? 'Últimos 4 dígitos' :
+                      'Número de referencia'
+                    }
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    data-testid="payment-reference-input"
+                  />
+                </div>
+
+                {/* Notas */}
+                <div className="space-y-2">
+                  <Label htmlFor="notes" className="text-sm font-medium">
+                    Notas adicionales (opcional)
+                  </Label>
+                  <Input
+                    id="notes"
+                    placeholder="Observaciones del pago..."
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    data-testid="payment-notes-input"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPayDialogOpen(false)} disabled={submitting}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handlePay}
+                disabled={submitting}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                data-testid="confirm-pay-button"
+              >
+                {submitting ? 'Procesando...' : 'Confirmar Pago'}
               </Button>
             </DialogFooter>
           </DialogContent>
