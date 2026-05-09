@@ -203,7 +203,7 @@ const Dashboard = () => {
             value={formatCurrency(stats?.total_gastos || 0)}
             icon={Wallet}
             colorClass="metric-blue"
-            subtitle="Histórico total"
+            subtitle="Mes actual"
           />
           <StatCard
             title="Pagos Pendientes"
@@ -217,7 +217,7 @@ const Dashboard = () => {
             value={formatCurrency(stats?.gastos_pagados || 0)}
             icon={CheckCircle2}
             colorClass="metric-teal"
-            subtitle="Completados"
+            subtitle="Mes actual"
           />
           <StatCard
             title="Alertas Activas"

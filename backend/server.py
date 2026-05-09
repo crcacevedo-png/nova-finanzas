@@ -2420,20 +2420,26 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
 # Legacy endpoints for backwards compatibility
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: dict = Depends(require_permission("view_dashboard"))):
-    """Legacy endpoint - redirects to summary"""
-    # Use aggregation for efficient stats calculation
+    """Estadísticas del dashboard - filtrado por mes actual"""
+    # Calcular inicio del mes actual
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
+    # Use aggregation for efficient stats calculation - filtrado por mes actual
     pipeline = [
+        {"$match": {"date": {"$gte": month_start}}},  # Filtrar solo mes actual
         {"$group": {
             "_id": None,
             "total_gastos": {"$sum": "$amount"},
-            "gastos_pendientes": {"$sum": {"$cond": [{"$eq": ["$status", "pendiente"]}, "$amount", 0]}},
-            "gastos_pagados": {"$sum": {"$cond": [{"$eq": ["$status", "pagado"]}, "$amount", 0]}},
+            "gastos_pendientes": {"$sum": {"$cond": [{"$in": ["$status", ["pendiente", "parcial"]]}, "$remaining_amount", 0]}},
+            "gastos_pagados": {"$sum": "$paid_amount"},
             "gastos_parciales": {"$sum": {"$cond": [{"$eq": ["$status", "parcial"]}, "$amount", 0]}},
-            "gastos_vencidos": {"$sum": {"$cond": [{"$eq": ["$status", "vencido"]}, "$amount", 0]}},
+            "gastos_vencidos": {"$sum": {"$cond": [{"$eq": ["$status", "vencido"]}, "$remaining_amount", 0]}},
             "total_fijos": {"$sum": {"$cond": [{"$eq": ["$type", "fijo"]}, "$amount", 0]}},
             "total_proveedores": {"$sum": {"$cond": [{"$eq": ["$type", "proveedor"]}, "$amount", 0]}},
             "total_variables": {"$sum": {"$cond": [{"$eq": ["$type", "variable"]}, "$amount", 0]}},
-            "alertas_30_dias": {"$sum": {"$cond": [{"$in": ["$status", ["pendiente", "parcial"]]}, 1, 0]}}
+            "alertas_30_dias_count": {"$sum": {"$cond": [{"$in": ["$status", ["pendiente", "parcial"]]}, 1, 0]}},
+            "vencidos_count": {"$sum": {"$cond": [{"$eq": ["$status", "vencido"]}, 1, 0]}}
         }}
     ]
     
@@ -2442,7 +2448,8 @@ async def get_dashboard_stats(current_user: dict = Depends(require_permission("v
     if result:
         stats = result[0]
         del stats["_id"]
-        stats["alertas_60_dias"] = 0
+        stats["alertas_30_dias"] = stats.pop("alertas_30_dias_count", 0)
+        stats["alertas_60_dias"] = 0  # Se puede calcular con otro query si se necesita
         return stats
     
     return {
