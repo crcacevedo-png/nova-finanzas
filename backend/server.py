@@ -524,6 +524,8 @@ class FixedExpenseBase(BaseModel):
     expense_name: str
     amount: float = Field(gt=0)
     day_of_month: int = Field(ge=1, le=31)
+    duration_type: str = "ilimitado"  # "ilimitado" o "hasta_fecha"
+    end_date: Optional[str] = None  # Fecha de último pago (YYYY-MM-DD), null si ilimitado
 
 class FixedExpenseCreate(FixedExpenseBase):
     pass
@@ -533,6 +535,8 @@ class FixedExpenseUpdate(BaseModel):
     expense_name: Optional[str] = None
     amount: Optional[float] = None
     day_of_month: Optional[int] = None
+    duration_type: Optional[str] = None
+    end_date: Optional[str] = None
     is_active: Optional[bool] = None
 
 class FixedExpenseResponse(BaseModel):
@@ -543,6 +547,8 @@ class FixedExpenseResponse(BaseModel):
     expense_name: str
     amount: float
     day_of_month: int
+    duration_type: str = "ilimitado"
+    end_date: Optional[str] = None
     is_active: bool = True
     created_by: str
     created_at: str
@@ -6374,6 +6380,7 @@ async def generate_fixed_expenses_for_today() -> int:
     today = datetime.now(timezone.utc)
     day_of_month = today.day
     current_month = today.strftime("%Y-%m")
+    today_str = today.strftime("%Y-%m-%d")
     
     logger.info(f"Ejecutando generación de gastos fijos para el día {day_of_month} del mes {current_month}")
     
@@ -6391,6 +6398,20 @@ async def generate_fixed_expenses_for_today() -> int:
         if last_generated and last_generated.startswith(current_month):
             logger.info(f"Gasto fijo {fe['id']} ya fue generado este mes, saltando...")
             continue
+        
+        # Verificar si el gasto fijo ha expirado (tiene fecha de fin y ya pasó)
+        end_date = fe.get("end_date")
+        duration_type = fe.get("duration_type", "ilimitado")
+        
+        if duration_type == "hasta_fecha" and end_date:
+            if today_str > end_date:
+                logger.info(f"Gasto fijo {fe['id']} ha expirado (fecha fin: {end_date}), desactivando...")
+                # Desactivar el gasto fijo automáticamente
+                await db.fixed_expenses.update_one(
+                    {"id": fe["id"]},
+                    {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                continue
         
         # Obtener el proveedor para el nombre
         supplier = await db.suppliers.find_one({"id": fe["supplier_id"]}, {"_id": 0})

@@ -61,7 +61,9 @@ const GastosFijos = () => {
     supplier_id: '',
     expense_name: '',
     amount: '',
-    day_of_month: ''
+    day_of_month: '',
+    duration_type: 'ilimitado',
+    end_date: ''
   });
 
   const fetchData = useCallback(async () => {
@@ -92,7 +94,9 @@ const GastosFijos = () => {
         supplier_id: expense.supplier_id,
         expense_name: expense.expense_name,
         amount: expense.amount.toString(),
-        day_of_month: expense.day_of_month.toString()
+        day_of_month: expense.day_of_month.toString(),
+        duration_type: expense.duration_type || 'ilimitado',
+        end_date: expense.end_date || ''
       });
     } else {
       setEditingExpense(null);
@@ -100,7 +104,9 @@ const GastosFijos = () => {
         supplier_id: '',
         expense_name: '',
         amount: '',
-        day_of_month: ''
+        day_of_month: '',
+        duration_type: 'ilimitado',
+        end_date: ''
       });
     }
     setDialogOpen(true);
@@ -125,12 +131,20 @@ const GastosFijos = () => {
       toast.error('El día del mes debe ser entre 1 y 31');
       return;
     }
+    
+    // Validar fecha de fin si es "hasta_fecha"
+    if (formData.duration_type === 'hasta_fecha' && !formData.end_date) {
+      toast.error('Debe seleccionar la fecha de último pago');
+      return;
+    }
 
     const payload = {
       supplier_id: formData.supplier_id,
       expense_name: formData.expense_name,
       amount: parseFloat(formData.amount),
-      day_of_month: parseInt(formData.day_of_month)
+      day_of_month: parseInt(formData.day_of_month),
+      duration_type: formData.duration_type,
+      end_date: formData.duration_type === 'hasta_fecha' ? formData.end_date : null
     };
 
     setSubmitting(true);
@@ -326,6 +340,7 @@ const GastosFijos = () => {
                       <TableHead className="table-header">Nombre del Gasto</TableHead>
                       <TableHead className="table-header text-right">Monto</TableHead>
                       <TableHead className="table-header text-center">Día del Mes</TableHead>
+                      <TableHead className="table-header text-center">Duración</TableHead>
                       <TableHead className="table-header text-center">Última Generación</TableHead>
                       <TableHead className="table-header text-right">Acciones</TableHead>
                     </TableRow>
@@ -362,6 +377,19 @@ const GastosFijos = () => {
                             <Calendar className="w-3 h-3 mr-1" />
                             Día {getDayLabel(expense.day_of_month)}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {expense.duration_type === 'hasta_fecha' && expense.end_date ? (
+                            <Badge className="bg-amber-100 text-amber-700 border-0">
+                              <CalendarClock className="w-3 h-3 mr-1" />
+                              Hasta {new Date(expense.end_date + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                              Ilimitado
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           {expense.last_generated ? (
@@ -500,6 +528,57 @@ const GastosFijos = () => {
                     Día en que se genera el gasto cada mes
                   </p>
                 </div>
+              </div>
+
+              {/* Duración del gasto fijo */}
+              <div className="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <Label className="text-sm font-medium">Duración del pago recurrente</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, duration_type: 'ilimitado', end_date: '' }))}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
+                      formData.duration_type === 'ilimitado'
+                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                    data-testid="duration-unlimited"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span className="text-sm font-medium">Ilimitado</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, duration_type: 'hasta_fecha' }))}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
+                      formData.duration_type === 'hasta_fecha'
+                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                    data-testid="duration-until-date"
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    <span className="text-sm font-medium">Hasta fecha</span>
+                  </button>
+                </div>
+                
+                {formData.duration_type === 'hasta_fecha' && (
+                  <div className="space-y-2 mt-3">
+                    <Label htmlFor="end_date">Fecha de último pago *</Label>
+                    <Input
+                      id="end_date"
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                      className="input-teal"
+                      min={new Date().toISOString().split('T')[0]}
+                      data-testid="end-date-input"
+                    />
+                    <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                      El gasto dejará de generarse después de esta fecha
+                    </p>
+                  </div>
+                )}
               </div>
 
               <DialogFooter>
