@@ -8,6 +8,41 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 
 ---
 
+## 🔒 Configuración de Seguridad (Actualizado Junio 2026)
+
+### Headers de Seguridad
+- `X-Frame-Options: DENY` - Previene clickjacking
+- `X-Content-Type-Options: nosniff` - Previene MIME sniffing
+- `X-XSS-Protection: 1; mode=block` - Protección XSS
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: geolocation=(), microphone=(), camera=()`
+- `Content-Security-Policy: frame-ancestors 'none'`
+
+### Autenticación
+- JWT con expiración de 8 horas
+- Bcrypt (costo 12) para hashing de contraseñas
+- Token blacklist persistente en MongoDB
+- Rate limiting: 5 intentos/minuto en login
+- Validación de fortaleza de contraseña (8+ chars, mayúscula, minúscula, número)
+
+### CORS
+- Orígenes permitidos configurados en `.env`
+- Solo dominios específicos (no `*`)
+
+### Audit Logging
+- Registro de logins exitosos/fallidos
+- Registro de cambios de contraseña
+- Registro de logouts
+- IP del cliente registrada
+- Endpoint `/api/security/audit-logs` (solo superadmin)
+
+### Endpoints de Seguridad
+- `GET /api/security/status` - Estado de seguridad (superadmin)
+- `GET /api/security/audit-logs` - Logs de auditoría (superadmin)
+- `POST /api/security/change-password` - Cambio de contraseña
+
+---
+
 ## Arquitectura
 
 ```

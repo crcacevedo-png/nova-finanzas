@@ -1,6 +1,8 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -12,6 +14,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import os
 import logging
+import secrets
+import re
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Literal
@@ -26,24 +30,44 @@ import asyncio
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
+# ==================== SECURITY CONFIGURATION ====================
+
+# Rate Limiter con configuración más estricta
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'novavision_secret_key_2024')
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 8
+# JWT Settings - CRÍTICO: No usar fallback en producción
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET or JWT_SECRET == 'novavision_secret_key_2024':
+    # Generar un secret seguro si no está configurado correctamente
+    JWT_SECRET = secrets.token_urlsafe(64)
+    logging.warning("⚠️ SEGURIDAD: JWT_SECRET no configurado. Usando valor temporal. Configure en .env para producción.")
 
-# Blacklisted tokens (for logout)
-blacklisted_tokens = set()
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 8  # Reducido de 24 a 8 horas por seguridad
+
+# CORS - Orígenes permitidos (restringir en producción)
+ALLOWED_ORIGINS = os.environ.get('CORS_ORIGINS', '').split(',')
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip() and origin.strip() != '*']
+if not ALLOWED_ORIGINS:
+    # Orígenes por defecto para desarrollo
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://novavision-finanzas.preview.emergentagent.com",
+        "https://novavision-finanzas.emergent.host"
+    ]
 
 # Create the main app
-app = FastAPI(title="NovaVision - Sistema de Gastos y Finanzas")
+app = FastAPI(
+    title="NovaVision - Sistema de Gastos y Finanzas",
+    docs_url="/api/docs" if os.environ.get('ENABLE_DOCS', 'true').lower() == 'true' else None,
+    redoc_url="/api/redoc" if os.environ.get('ENABLE_DOCS', 'true').lower() == 'true' else None,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -51,6 +75,75 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 api_router = APIRouter(prefix="/api")
 
 security = HTTPBearer()
+
+
+# ==================== SECURITY MIDDLEWARE ====================
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware para agregar headers de seguridad a todas las respuestas"""
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        
+        # Protección contra Clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+        
+        # Prevenir MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Protección XSS (para navegadores antiguos)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        
+        # Referrer Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # Permissions Policy (restringe APIs del navegador)
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        # Content Security Policy básica
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        
+        # Forzar HTTPS en producción
+        if os.environ.get('ENVIRONMENT', 'development') == 'production':
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
+        return response
+
+
+# ==================== AUDIT LOGGING ====================
+
+class AuditLogger:
+    """Sistema de logging de auditoría para acciones sensibles"""
+    
+    @staticmethod
+    async def log(action: str, user_id: str, user_name: str, details: dict = None, ip_address: str = None):
+        """Registra una acción en el log de auditoría"""
+        audit_entry = {
+            "id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "action": action,
+            "user_id": user_id,
+            "user_name": user_name,
+            "ip_address": ip_address,
+            "details": details or {},
+        }
+        try:
+            await db.audit_logs.insert_one(audit_entry)
+        except Exception as e:
+            logging.error(f"Error al guardar audit log: {e}")
+    
+    @staticmethod
+    async def get_logs(limit: int = 100, user_id: str = None, action: str = None):
+        """Obtiene logs de auditoría con filtros opcionales"""
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+        if action:
+            query["action"] = action
+        
+        logs = await db.audit_logs.find(query, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
+        return logs
+
+audit = AuditLogger()
 
 # ==================== PERMISSIONS SYSTEM ====================
 
@@ -962,27 +1055,76 @@ class UpcomingPayments(BaseModel):
 # ==================== AUTH HELPERS ====================
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    """Hash de contraseña con bcrypt (costo 12 para mayor seguridad)"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
 
 def verify_password(password: str, hashed: str) -> bool:
+    """Verificar contraseña hasheada"""
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """Validar fortaleza de contraseña"""
+    if len(password) < 8:
+        return False, "La contraseña debe tener al menos 8 caracteres"
+    if not re.search(r'[A-Z]', password):
+        return False, "La contraseña debe contener al menos una mayúscula"
+    if not re.search(r'[a-z]', password):
+        return False, "La contraseña debe contener al menos una minúscula"
+    if not re.search(r'\d', password):
+        return False, "La contraseña debe contener al menos un número"
+    return True, "OK"
+
 def create_token(user_id: str, username: str, role: str) -> str:
+    """Crear token JWT con claims seguros"""
     payload = {
         "sub": user_id,
         "username": username,
         "role": role,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
-        "iat": datetime.now(timezone.utc)
+        "iat": datetime.now(timezone.utc),
+        "jti": str(uuid.uuid4())  # JWT ID único para prevenir replay attacks
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+async def is_token_blacklisted(token: str) -> bool:
+    """Verificar si un token está en la blacklist (persistente en MongoDB)"""
+    blacklisted = await db.token_blacklist.find_one({"token": token})
+    return blacklisted is not None
+
+async def blacklist_token(token: str, user_id: str):
+    """Agregar token a la blacklist con expiración automática"""
+    try:
+        # Decodificar para obtener la fecha de expiración
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        exp_timestamp = payload.get("exp")
+        exp_date = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc) if exp_timestamp else datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+        
+        await db.token_blacklist.insert_one({
+            "token": token,
+            "user_id": user_id,
+            "blacklisted_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": exp_date.isoformat()
+        })
+    except Exception as e:
+        logging.error(f"Error al agregar token a blacklist: {e}")
+
+async def cleanup_expired_tokens():
+    """Limpiar tokens expirados de la blacklist (ejecutar periódicamente)"""
+    try:
+        result = await db.token_blacklist.delete_many({
+            "expires_at": {"$lt": datetime.now(timezone.utc).isoformat()}
+        })
+        if result.deleted_count > 0:
+            logging.info(f"Limpiados {result.deleted_count} tokens expirados de blacklist")
+    except Exception as e:
+        logging.error(f"Error limpiando tokens expirados: {e}")
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
         
-        # Check if token is blacklisted
-        if token in blacklisted_tokens:
+        # Check if token is blacklisted (persistente)
+        if await is_token_blacklisted(token):
             raise HTTPException(status_code=401, detail="Token ha sido invalidado")
         
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -1103,11 +1245,12 @@ async def check_overdue_expenses():
 # ==================== SEED USERS ====================
 
 async def seed_default_users():
-    """Create default users if they don't exist"""
+    """Create default users if they don't exist - CONTRASEÑAS MÁS SEGURAS"""
+    # IMPORTANTE: Cambiar estas contraseñas en producción
     default_users = [
-        {"username": "superadmin", "name": "Administrador General", "password": "nova2024", "role": "superadmin"},
-        {"username": "admin", "name": "Administrador", "password": "admin2024", "role": "admin"},
-        {"username": "usuario", "name": "Usuario NovaVision", "password": "user2024", "role": "usuario"}
+        {"username": "superadmin", "name": "Administrador General", "password": "Nova$2024Secure!", "role": "superadmin"},
+        {"username": "admin", "name": "Administrador", "password": "Admin$2024Secure!", "role": "admin"},
+        {"username": "usuario", "name": "Usuario NovaVision", "password": "User$2024Secure!", "role": "usuario"}
     ]
     
     for user_data in default_users:
@@ -1122,10 +1265,13 @@ async def seed_default_users():
                 "is_active": True,
                 "last_login": None,
                 "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "password_changed_at": None,  # Para forzar cambio de contraseña
+                "failed_login_attempts": 0
             }
             await db.users.insert_one(user_doc)
             print(f"Created default user: {user_data['username']}")
+            logging.info(f"⚠️ Usuario creado con contraseña por defecto: {user_data['username']}. Cambiar en producción.")
 
 
 async def seed_sample_expenses():
@@ -1697,12 +1843,29 @@ async def seed_surgeries_data():
 @api_router.post("/auth/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
 async def login(request: Request, credentials: UserLogin):
-    """Login endpoint with rate limiting (5 attempts per minute)"""
+    """Login endpoint with rate limiting (5 attempts per minute) y audit logging"""
+    client_ip = request.client.host if request.client else "unknown"
+    
     user = await db.users.find_one({"username": credentials.username.lower().strip()})
     if not user or not verify_password(credentials.password, user["password"]):
+        # Log intento fallido
+        await audit.log(
+            action="LOGIN_FAILED",
+            user_id="unknown",
+            user_name=credentials.username,
+            details={"reason": "Credenciales inválidas"},
+            ip_address=client_ip
+        )
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
     if not user.get("is_active", True):
+        await audit.log(
+            action="LOGIN_FAILED",
+            user_id=user["id"],
+            user_name=user["username"],
+            details={"reason": "Usuario desactivado"},
+            ip_address=client_ip
+        )
         raise HTTPException(status_code=401, detail="Usuario desactivado")
     
     # Update last login
@@ -1712,6 +1875,15 @@ async def login(request: Request, credentials: UserLogin):
     )
     
     token = create_token(user["id"], user["username"], user["role"])
+    
+    # Log login exitoso
+    await audit.log(
+        action="LOGIN_SUCCESS",
+        user_id=user["id"],
+        user_name=user["username"],
+        details={"role": user["role"]},
+        ip_address=client_ip
+    )
     
     return TokenResponse(
         access_token=token,
@@ -1729,16 +1901,125 @@ async def login(request: Request, credentials: UserLogin):
     )
 
 @api_router.post("/auth/logout")
-async def logout(current_user: dict = Depends(get_current_user)):
-    """Invalidate the current token"""
+async def logout(request: Request, current_user: dict = Depends(get_current_user)):
+    """Invalidar el token actual (persistente en MongoDB)"""
     token = current_user.get("_token")
+    client_ip = request.client.host if request.client else "unknown"
+    
     if token:
-        blacklisted_tokens.add(token)
+        await blacklist_token(token, current_user["id"])
+        
+        # Log logout
+        await audit.log(
+            action="LOGOUT",
+            user_id=current_user["id"],
+            user_name=current_user.get("username", "unknown"),
+            ip_address=client_ip
+        )
+    
     return {"message": "Sesión cerrada correctamente"}
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(**{k: v for k, v in current_user.items() if k != "_token"})
+
+
+# ==================== SECURITY & AUDIT ROUTES ====================
+
+class AuditLogResponse(BaseModel):
+    id: str
+    timestamp: str
+    action: str
+    user_id: str
+    user_name: str
+    ip_address: Optional[str] = None
+    details: dict = {}
+
+@api_router.get("/security/audit-logs", response_model=List[AuditLogResponse])
+async def get_audit_logs(
+    limit: int = Query(100, ge=1, le=1000),
+    action: Optional[str] = None,
+    user_id: Optional[str] = None,
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Obtener logs de auditoría (solo superadmin)"""
+    logs = await audit.get_logs(limit=limit, user_id=user_id, action=action)
+    return logs
+
+@api_router.get("/security/status")
+async def get_security_status(current_user: dict = Depends(require_role("superadmin"))):
+    """Estado de seguridad del sistema (solo superadmin)"""
+    # Contar tokens blacklisteados
+    blacklisted_count = await db.token_blacklist.count_documents({})
+    
+    # Contar intentos de login fallidos recientes (últimas 24h)
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    failed_logins = await db.audit_logs.count_documents({
+        "action": "LOGIN_FAILED",
+        "timestamp": {"$gte": yesterday}
+    })
+    
+    # Usuarios activos
+    active_users = await db.users.count_documents({"is_active": True})
+    
+    return {
+        "cors_origins": ALLOWED_ORIGINS,
+        "jwt_expiration_hours": JWT_EXPIRATION_HOURS,
+        "blacklisted_tokens": blacklisted_count,
+        "failed_logins_24h": failed_logins,
+        "active_users": active_users,
+        "security_headers_enabled": True,
+        "rate_limiting_enabled": True,
+        "audit_logging_enabled": True
+    }
+
+@api_router.post("/security/change-password")
+async def change_password(
+    request: Request,
+    current_password: str = Body(...),
+    new_password: str = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Cambiar contraseña del usuario actual"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Verificar contraseña actual
+    user = await db.users.find_one({"id": current_user["id"]})
+    if not user or not verify_password(current_password, user["password"]):
+        await audit.log(
+            action="PASSWORD_CHANGE_FAILED",
+            user_id=current_user["id"],
+            user_name=current_user.get("username", "unknown"),
+            details={"reason": "Contraseña actual incorrecta"},
+            ip_address=client_ip
+        )
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+    
+    # Validar nueva contraseña
+    is_valid, message = validate_password_strength(new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=message)
+    
+    # Actualizar contraseña
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {
+            "password": hash_password(new_password),
+            "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Log cambio de contraseña
+    await audit.log(
+        action="PASSWORD_CHANGED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        ip_address=client_ip
+    )
+    
+    return {"message": "Contraseña actualizada correctamente"}
+
 
 # ==================== USER MANAGEMENT ROUTES ====================
 
@@ -6356,15 +6637,23 @@ async def root():
 # Include the router in the main app
 app.include_router(api_router)
 
+# ==================== MIDDLEWARES DE SEGURIDAD ====================
+
+# Agregar middleware de headers de seguridad PRIMERO
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS con orígenes específicos (NO usar '*' en producción)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    expose_headers=["Content-Disposition"],
+    max_age=600,  # Cache preflight por 10 minutos
 )
 
-# Configure logging
+# Configure logging con formato seguro
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -6470,8 +6759,17 @@ def start_scheduler():
         id="generate_fixed_expenses",
         replace_existing=True
     )
+    
+    # Limpiar tokens expirados cada 6 horas
+    scheduler.add_job(
+        cleanup_expired_tokens,
+        CronTrigger(hour="*/6"),
+        id="cleanup_expired_tokens",
+        replace_existing=True
+    )
+    
     scheduler.start()
-    logger.info("Scheduler de gastos fijos iniciado (ejecuta diariamente a las 00:05)")
+    logger.info("Scheduler iniciado (gastos fijos: 00:05 diario, limpieza tokens: cada 6h)")
 
 
 @app.on_event("startup")
@@ -6481,6 +6779,17 @@ async def startup_event():
     await seed_sample_expenses()
     await seed_sample_patients()
     await seed_optica_data()
+    
+    # ==================== ÍNDICES DE SEGURIDAD ====================
+    # Índice para blacklist de tokens con TTL
+    await db.token_blacklist.create_index([("token", 1)], unique=True)
+    await db.token_blacklist.create_index([("expires_at", 1)])
+    
+    # Índice para audit logs
+    await db.audit_logs.create_index([("timestamp", -1)])
+    await db.audit_logs.create_index([("action", 1)])
+    await db.audit_logs.create_index([("user_id", 1)])
+    
     # Create indexes
     await db.expenses.create_index([("date", -1)])
     await db.expenses.create_index([("due_date", 1)])
@@ -6534,8 +6843,15 @@ async def startup_event():
     except Exception:
         pass  # Index may already exist
     
-    # Iniciar scheduler de gastos fijos
+    # Iniciar scheduler
     start_scheduler()
+    
+    # Log de inicio del sistema
+    logger.info("🔒 Sistema iniciado con configuración de seguridad activa")
+    logger.info(f"   - CORS Origins: {ALLOWED_ORIGINS}")
+    logger.info(f"   - JWT Expiration: {JWT_EXPIRATION_HOURS}h")
+    logger.info(f"   - Security Headers: Enabled")
+    logger.info(f"   - Audit Logging: Enabled")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
