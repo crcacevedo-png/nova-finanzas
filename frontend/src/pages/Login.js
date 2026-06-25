@@ -86,7 +86,7 @@ const Login = () => {
 
         {/* Subtitle */}
         <p className="text-center text-sm text-[#5A7A72] mb-8 tracking-wide">
-          Sistema de gastos y finanzas
+          Gestión Hospitalaria
         </p>
 
         {/* Error Message */}
@@ -162,9 +162,9 @@ const Login = () => {
           </button>
         </form>
 
-        {/* Demo users hint */}
-        <p className="text-center text-[11px] text-[#94B0A8] mt-6">
-          Usuarios demo: superadmin / admin / usuario
+        {/* Footer */}
+        <p className="text-center text-[11px] text-[#94B0A8] mt-8">
+          © 2026 NovaVision
         </p>
       </div>
     </div>
