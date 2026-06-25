@@ -10,7 +10,11 @@ import {
   User,
   ToggleLeft,
   ToggleRight,
-  Glasses
+  Glasses,
+  Pencil,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -50,15 +54,28 @@ const initialFormState = {
   role: 'usuario'
 };
 
+const initialEditFormState = {
+  name: '',
+  role: '',
+  password: '',
+  is_active: true
+};
+
 const Usuarios = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [userToEdit, setUserToEdit] = useState(null);
   const [formData, setFormData] = useState(initialFormState);
+  const [editFormData, setEditFormData] = useState(initialEditFormState);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [changePassword, setChangePassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -133,6 +150,90 @@ const Usuarios = () => {
       fetchUsers();
     } catch (error) {
       toast.error('Error al cambiar el estado del usuario');
+    }
+  };
+
+  const handleEditClick = (user) => {
+    setUserToEdit(user);
+    setEditFormData({
+      name: user.name,
+      role: user.role,
+      password: '',
+      is_active: user.is_active
+    });
+    setChangePassword(false);
+    setShowEditPassword(false);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditInputChange = (field, value) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!editFormData.name) {
+      toast.error('El nombre es requerido');
+      return;
+    }
+
+    // Validar contraseña solo si se va a cambiar
+    if (changePassword) {
+      if (!editFormData.password) {
+        toast.error('Ingresa la nueva contraseña');
+        return;
+      }
+      if (editFormData.password.length < 8) {
+        toast.error('La contraseña debe tener al menos 8 caracteres');
+        return;
+      }
+      // Validar fortaleza
+      if (!/[A-Z]/.test(editFormData.password)) {
+        toast.error('La contraseña debe contener al menos una mayúscula');
+        return;
+      }
+      if (!/[a-z]/.test(editFormData.password)) {
+        toast.error('La contraseña debe contener al menos una minúscula');
+        return;
+      }
+      if (!/\d/.test(editFormData.password)) {
+        toast.error('La contraseña debe contener al menos un número');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const updateData = {
+        name: editFormData.name,
+        role: editFormData.role,
+        is_active: editFormData.is_active
+      };
+      
+      // Solo incluir contraseña si se va a cambiar
+      if (changePassword && editFormData.password) {
+        updateData.password = editFormData.password;
+      }
+
+      await userApi.update(userToEdit.id, updateData);
+      toast.success('Usuario actualizado correctamente');
+      setEditDialogOpen(false);
+      setUserToEdit(null);
+      fetchUsers();
+    } catch (error) {
+      let message = 'Error al actualizar el usuario';
+      const detail = error.response?.data?.detail;
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        message = detail.msg || detail.message || JSON.stringify(detail);
+      }
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -273,7 +374,17 @@ const Usuarios = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           {user.id !== currentUser?.id && (
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditClick(user)}
+                                className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                                title="Editar usuario"
+                                data-testid={`edit-user-${user.id}`}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -293,11 +404,24 @@ const Usuarios = () => {
                                 size="sm"
                                 onClick={() => handleDeleteClick(user)}
                                 className="h-8 w-8 p-0 hover:bg-rose-50 hover:text-rose-700"
+                                title="Eliminar usuario"
                                 data-testid={`delete-user-${user.id}`}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
+                          )}
+                          {user.id === currentUser?.id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditClick(user)}
+                              className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                              title="Editar mi perfil"
+                              data-testid={`edit-user-${user.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -344,14 +468,25 @@ const Usuarios = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Contraseña *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                  data-testid="user-password-input"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    placeholder="Mínimo 8 caracteres"
+                    className="pr-10"
+                    data-testid="user-password-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">8+ caracteres, mayúscula, minúscula y número</p>
               </div>
 
               <div className="space-y-2">
@@ -388,6 +523,173 @@ const Usuarios = () => {
                   data-testid="user-submit-button"
                 >
                   {submitting ? 'Creando...' : 'Crear Usuario'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-[#0F6E56]" />
+                Editar Usuario
+              </DialogTitle>
+              <DialogDescription>
+                Modifica la información de <span className="font-semibold">{userToEdit?.username}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              {/* Info del usuario */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <p className="text-sm text-slate-600">
+                  <span className="font-medium">Usuario:</span> {userToEdit?.username}
+                </p>
+                <p className="text-sm text-slate-600">
+                  <span className="font-medium">Creado:</span> {userToEdit?.created_at ? formatDate(userToEdit.created_at) : 'N/A'}
+                </p>
+              </div>
+
+              {/* Nombre */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nombre Completo *</Label>
+                <Input
+                  id="edit-name"
+                  value={editFormData.name}
+                  onChange={(e) => handleEditInputChange('name', e.target.value)}
+                  placeholder="Juan Pérez"
+                  data-testid="edit-user-name-input"
+                />
+              </div>
+
+              {/* Rol - solo editable si no es el usuario actual */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-role">Rol</Label>
+                <Select
+                  value={editFormData.role}
+                  onValueChange={(value) => handleEditInputChange('role', value)}
+                  disabled={userToEdit?.id === currentUser?.id}
+                >
+                  <SelectTrigger data-testid="edit-user-role-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="usuario">Usuario</SelectItem>
+                    <SelectItem value="optica">Óptica</SelectItem>
+                  </SelectContent>
+                </Select>
+                {userToEdit?.id === currentUser?.id && (
+                  <p className="text-xs text-amber-600">No puedes cambiar tu propio rol</p>
+                )}
+              </div>
+
+              {/* Estado activo/inactivo */}
+              {userToEdit?.id !== currentUser?.id && (
+                <div className="space-y-2">
+                  <Label>Estado del Usuario</Label>
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => handleEditInputChange('is_active', true)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                        editFormData.is_active
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                      data-testid="edit-user-active-btn"
+                    >
+                      <ToggleRight className="w-4 h-4" />
+                      Activo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEditInputChange('is_active', false)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                        !editFormData.is_active
+                          ? 'border-rose-500 bg-rose-50 text-rose-700'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                      data-testid="edit-user-inactive-btn"
+                    >
+                      <ToggleLeft className="w-4 h-4" />
+                      Inactivo
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Cambiar contraseña */}
+              <div className="space-y-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-amber-800">
+                    <KeyRound className="w-4 h-4" />
+                    Cambiar Contraseña
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChangePassword(!changePassword);
+                      if (!changePassword) {
+                        handleEditInputChange('password', '');
+                      }
+                    }}
+                    className={`px-3 py-1 text-sm rounded-full transition-all ${
+                      changePassword
+                        ? 'bg-amber-200 text-amber-800'
+                        : 'bg-white text-amber-700 border border-amber-300'
+                    }`}
+                  >
+                    {changePassword ? 'Cancelar' : 'Cambiar'}
+                  </button>
+                </div>
+                
+                {changePassword && (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Input
+                        id="edit-password"
+                        type={showEditPassword ? "text" : "password"}
+                        value={editFormData.password}
+                        onChange={(e) => handleEditInputChange('password', e.target.value)}
+                        placeholder="Nueva contraseña"
+                        className="pr-10 bg-white"
+                        data-testid="edit-user-password-input"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-amber-700">
+                      Requisitos: 8+ caracteres, 1 mayúscula, 1 minúscula, 1 número
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditDialogOpen(false)}
+                  disabled={submitting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={submitting}
+                  data-testid="edit-user-submit-button"
+                >
+                  {submitting ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
               </DialogFooter>
             </form>

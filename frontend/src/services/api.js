@@ -62,6 +62,7 @@ export const paymentApi = {
 export const userApi = {
   getAll: () => axios.get(`${API_URL}/users`),
   create: (data) => axios.post(`${API_URL}/users`, data),
+  update: (id, data) => axios.put(`${API_URL}/users/${id}`, data),
   toggleActive: (id) => axios.put(`${API_URL}/users/${id}/toggle-active`),
   delete: (id) => axios.delete(`${API_URL}/users/${id}`),
 };

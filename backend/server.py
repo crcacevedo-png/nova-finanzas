@@ -2072,6 +2072,7 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
 
 @api_router.put("/users/{user_id}", response_model=UserResponse)
 async def update_user(
+    request: Request,
     user_id: str,
     user_data: UserUpdate,
     current_user: dict = Depends(require_permission("manage_users"))
@@ -2080,19 +2081,47 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
+    client_ip = request.client.host if request.client else "unknown"
     update_data = {}
-    if user_data.name is not None:
+    changes = []
+    
+    if user_data.name is not None and user_data.name != user.get("name"):
         update_data["name"] = user_data.name
-    if user_data.role is not None:
+        changes.append(f"nombre: {user.get('name')} → {user_data.name}")
+    
+    if user_data.role is not None and user_data.role != user.get("role"):
         update_data["role"] = user_data.role
+        changes.append(f"rol: {user.get('role')} → {user_data.role}")
+    
     if user_data.password is not None:
+        # Validar fortaleza de contraseña
+        is_valid, message = validate_password_strength(user_data.password)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=message)
         update_data["password"] = hash_password(user_data.password)
-    if user_data.is_active is not None:
+        update_data["password_changed_at"] = datetime.now(timezone.utc).isoformat()
+        changes.append("contraseña actualizada")
+    
+    if user_data.is_active is not None and user_data.is_active != user.get("is_active"):
         update_data["is_active"] = user_data.is_active
+        changes.append(f"estado: {'activo' if user_data.is_active else 'inactivo'}")
     
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.users.update_one({"id": user_id}, {"$set": update_data})
+        
+        # Audit log
+        await audit.log(
+            action="USER_UPDATED",
+            user_id=current_user["id"],
+            user_name=current_user.get("username", "unknown"),
+            details={
+                "target_user_id": user_id,
+                "target_username": user.get("username"),
+                "changes": changes
+            },
+            ip_address=client_ip
+        )
     
     updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
     return UserResponse(**updated, permissions=get_permissions(updated["role"]))
