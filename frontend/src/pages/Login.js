@@ -164,7 +164,7 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-center text-[11px] text-[#94B0A8] mt-8">
-          © 2026 NovaVision
+          © 2026 Novavision
         </p>
       </div>
     </div>
