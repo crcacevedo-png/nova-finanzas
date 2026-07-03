@@ -586,6 +586,7 @@ class SupplierBase(BaseModel):
     name: str
     contact_name: Optional[str] = ""
     phone: Optional[str] = ""
+    bank_account: Optional[str] = ""  # Número de cuenta bancaria
 
 class SupplierCreate(SupplierBase):
     pass
@@ -594,6 +595,7 @@ class SupplierUpdate(BaseModel):
     name: Optional[str] = None
     contact_name: Optional[str] = None
     phone: Optional[str] = None
+    bank_account: Optional[str] = None
 
 class SupplierResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -601,6 +603,7 @@ class SupplierResponse(BaseModel):
     name: str
     contact_name: Optional[str] = ""
     phone: Optional[str] = ""
+    bank_account: Optional[str] = ""
     is_active: bool = True
     created_by: str
     created_at: str

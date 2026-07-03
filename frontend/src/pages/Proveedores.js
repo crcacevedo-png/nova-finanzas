@@ -8,7 +8,8 @@ import {
   RefreshCw,
   Users,
   Phone,
-  User
+  User,
+  CreditCard
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -53,7 +54,8 @@ const Proveedores = () => {
   const [formData, setFormData] = useState({
     name: '',
     contact_name: '',
-    phone: ''
+    phone: '',
+    bank_account: ''
   });
 
   const fetchSuppliers = useCallback(async () => {
@@ -85,14 +87,16 @@ const Proveedores = () => {
       setFormData({
         name: supplier.name,
         contact_name: supplier.contact_name || '',
-        phone: supplier.phone || ''
+        phone: supplier.phone || '',
+        bank_account: supplier.bank_account || ''
       });
     } else {
       setEditingSupplier(null);
       setFormData({
         name: '',
         contact_name: '',
-        phone: ''
+        phone: '',
+        bank_account: ''
       });
     }
     setDialogOpen(true);
@@ -249,6 +253,7 @@ const Proveedores = () => {
                       <TableHead className="table-header">Nombre</TableHead>
                       <TableHead className="table-header">Contacto</TableHead>
                       <TableHead className="table-header">Teléfono</TableHead>
+                      <TableHead className="table-header">Cuenta Bancaria</TableHead>
                       {(canEdit || canDelete) && (
                         <TableHead className="table-header text-right">Acciones</TableHead>
                       )}
@@ -289,6 +294,18 @@ const Proveedores = () => {
                               <Phone className="w-4 h-4" style={{ color: 'var(--text-hint)' }} />
                               <span style={{ color: 'var(--text-secondary)' }}>
                                 {supplier.phone}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-hint)' }}>-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {supplier.bank_account ? (
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="w-4 h-4" style={{ color: 'var(--text-hint)' }} />
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                {supplier.bank_account}
                               </span>
                             </div>
                           ) : (
@@ -382,6 +399,18 @@ const Proveedores = () => {
                   className="input-teal"
                   placeholder="Ej: 5555-1234"
                   data-testid="supplier-phone-input"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="bank_account">Cuenta Bancaria</Label>
+                <Input
+                  id="bank_account"
+                  value={formData.bank_account}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bank_account: e.target.value }))}
+                  className="input-teal"
+                  placeholder="Ej: 01-0123456-7"
+                  data-testid="supplier-bank-account-input"
                 />
               </div>
 
