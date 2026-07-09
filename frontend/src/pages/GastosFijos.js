@@ -41,6 +41,7 @@ import {
 } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
+import { Checkbox } from '../components/ui/checkbox';
 import { toast, Toaster } from 'sonner';
 import { fixedExpenseApi, supplierApi, formatCurrency } from '../services/api';
 
@@ -63,7 +64,8 @@ const GastosFijos = () => {
     amount: '',
     day_of_month: '',
     duration_type: 'ilimitado',
-    end_date: ''
+    end_date: '',
+    generate_first: false  // Nueva opción para generar el primer gasto al crear
   });
 
   const fetchData = useCallback(async () => {
@@ -96,7 +98,8 @@ const GastosFijos = () => {
         amount: expense.amount.toString(),
         day_of_month: expense.day_of_month.toString(),
         duration_type: expense.duration_type || 'ilimitado',
-        end_date: expense.end_date || ''
+        end_date: expense.end_date || '',
+        generate_first: false
       });
     } else {
       setEditingExpense(null);
@@ -106,7 +109,8 @@ const GastosFijos = () => {
         amount: '',
         day_of_month: '',
         duration_type: 'ilimitado',
-        end_date: ''
+        end_date: '',
+        generate_first: true  // Por defecto activado para nuevos gastos
       });
     }
     setDialogOpen(true);
@@ -144,7 +148,8 @@ const GastosFijos = () => {
       amount: parseFloat(formData.amount),
       day_of_month: parseInt(formData.day_of_month),
       duration_type: formData.duration_type,
-      end_date: formData.duration_type === 'hasta_fecha' ? formData.end_date : null
+      end_date: formData.duration_type === 'hasta_fecha' ? formData.end_date : null,
+      generate_first: formData.generate_first  // Incluir opción de generar primer gasto
     };
 
     setSubmitting(true);
@@ -153,8 +158,14 @@ const GastosFijos = () => {
         await fixedExpenseApi.update(editingExpense.id, payload);
         toast.success('Gasto fijo actualizado exitosamente');
       } else {
-        await fixedExpenseApi.create(payload);
-        toast.success('Gasto fijo creado exitosamente');
+        const response = await fixedExpenseApi.create(payload);
+        if (formData.generate_first && response.data.first_expense_generated) {
+          toast.success('Gasto fijo creado y primer gasto generado para autorización');
+        } else if (formData.generate_first) {
+          toast.success('Gasto fijo creado. El primer gasto se generará en la fecha configurada.');
+        } else {
+          toast.success('Gasto fijo creado exitosamente');
+        }
       }
       setDialogOpen(false);
       fetchData();
@@ -580,6 +591,27 @@ const GastosFijos = () => {
                   </div>
                 )}
               </div>
+
+              {/* Opción de generar primer gasto inmediatamente - solo al crear */}
+              {!editingExpense && (
+                <div className="flex items-center space-x-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <Checkbox
+                    id="generate_first"
+                    checked={formData.generate_first}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, generate_first: checked }))}
+                    className="border-emerald-400 data-[state=checked]:bg-emerald-600"
+                    data-testid="generate-first-checkbox"
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="generate_first" className="text-emerald-800 font-medium cursor-pointer">
+                      Generar primer gasto ahora
+                    </Label>
+                    <p className="text-xs text-emerald-600">
+                      Crea inmediatamente un gasto pendiente para autorización del SuperAdmin
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <DialogFooter>
                 <Button 

@@ -624,7 +624,7 @@ class FixedExpenseBase(BaseModel):
     end_date: Optional[str] = None  # Fecha de último pago (YYYY-MM-DD), null si ilimitado
 
 class FixedExpenseCreate(FixedExpenseBase):
-    pass
+    generate_first: bool = False  # Generar el primer gasto inmediatamente
 
 class FixedExpenseUpdate(BaseModel):
     supplier_id: Optional[str] = None
@@ -650,6 +650,7 @@ class FixedExpenseResponse(BaseModel):
     created_at: str
     updated_at: Optional[str] = None
     last_generated: Optional[str] = None
+    first_expense_generated: Optional[bool] = None  # Indica si se generó el primer gasto
 
 class FixedExpenseListResponse(BaseModel):
     data: List[FixedExpenseResponse]
@@ -3070,17 +3071,22 @@ async def create_fixed_expense(fixed_expense_data: FixedExpenseCreate, current_u
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe un gasto fijo con este nombre para este proveedor")
     
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    now_str = now.isoformat()
+    current_month = now.strftime("%Y-%m")
+    
     fixed_expense_doc = {
         "id": str(uuid.uuid4()),
         "supplier_id": fixed_expense_data.supplier_id,
         "expense_name": fixed_expense_data.expense_name,
         "amount": fixed_expense_data.amount,
         "day_of_month": fixed_expense_data.day_of_month,
+        "duration_type": fixed_expense_data.duration_type,
+        "end_date": fixed_expense_data.end_date,
         "is_active": True,
         "created_by": current_user["id"],
-        "created_at": now,
-        "updated_at": now,
+        "created_at": now_str,
+        "updated_at": now_str,
         "last_generated": None
     }
     
@@ -3088,7 +3094,58 @@ async def create_fixed_expense(fixed_expense_data: FixedExpenseCreate, current_u
     if "_id" in fixed_expense_doc:
         del fixed_expense_doc["_id"]
     
+    first_expense_generated = False
+    
+    # Generar el primer gasto si se solicitó
+    if fixed_expense_data.generate_first:
+        # Obtener próximo número de gasto
+        last_expense = await db.expenses.find_one(
+            {"expense_number": {"$exists": True}},
+            sort=[("created_at", -1)]
+        )
+        if last_expense and last_expense.get("expense_number"):
+            try:
+                last_num = int(last_expense["expense_number"].split("-")[1])
+                next_num = last_num + 1
+            except (IndexError, ValueError):
+                next_num = 1
+        else:
+            next_num = 1
+        expense_number = f"GST-{next_num:04d}"
+        
+        # Crear el gasto
+        expense_doc = {
+            "id": str(uuid.uuid4()),
+            "expense_number": expense_number,
+            "date": now.strftime("%Y-%m-%d"),
+            "supplier_id": fixed_expense_data.supplier_id,
+            "name": f"{fixed_expense_data.expense_name} ({supplier['name']})",
+            "amount": fixed_expense_data.amount,
+            "type": "fijo",
+            "due_date": now.strftime("%Y-%m-%d"),  # Vence hoy
+            "status": "pendiente",
+            "paid_amount": 0,
+            "remaining_amount": fixed_expense_data.amount,
+            "is_authorized": False,
+            "notes": f"Generado automáticamente desde gasto fijo al crearlo",
+            "created_by": current_user["id"],
+            "created_at": now_str,
+            "updated_at": now_str,
+            "fixed_expense_id": fixed_expense_doc["id"]
+        }
+        
+        await db.expenses.insert_one(expense_doc)
+        
+        # Actualizar last_generated del gasto fijo
+        await db.fixed_expenses.update_one(
+            {"id": fixed_expense_doc["id"]},
+            {"$set": {"last_generated": current_month}}
+        )
+        fixed_expense_doc["last_generated"] = current_month
+        first_expense_generated = True
+    
     enriched = await enrich_fixed_expense(fixed_expense_doc)
+    enriched["first_expense_generated"] = first_expense_generated
     return FixedExpenseResponse(**enriched)
 
 
