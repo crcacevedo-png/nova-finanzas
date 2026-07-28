@@ -2504,7 +2504,7 @@ async def get_catalogo_medicamentos(
     """Autocomplete de medicamentos"""
     query = {}
     if search:
-        query["nombre"] = {"$regex": search, "$options": "i"}
+        query["nombre"] = {"$regex": re.escape(search), "$options": "i"}
     
     items = await db.catalogo_medicamentos.find(query, {"_id": 0}).sort("usos", -1).limit(limit).to_list(limit)
     return items
@@ -2519,7 +2519,7 @@ async def get_catalogo_estudios(
     """Autocomplete de estudios"""
     query = {}
     if search:
-        query["nombre"] = {"$regex": search, "$options": "i"}
+        query["nombre"] = {"$regex": re.escape(search), "$options": "i"}
     
     items = await db.catalogo_estudios.find(query, {"_id": 0}).sort("usos", -1).limit(limit).to_list(limit)
     return items
@@ -2534,7 +2534,7 @@ async def get_catalogo_diagnosticos(
     """Autocomplete de diagnósticos"""
     query = {}
     if search:
-        query["nombre"] = {"$regex": search, "$options": "i"}
+        query["nombre"] = {"$regex": re.escape(search), "$options": "i"}
     
     items = await db.catalogo_diagnosticos.find(query, {"_id": 0}).sort("usos", -1).limit(limit).to_list(limit)
     return items
@@ -4865,9 +4865,9 @@ async def export_patients_pdf(
 @api_router.get("/doctors", response_model=DoctorListResponse)
 async def get_doctors(
     search: Optional[str] = None,
-    current_user: dict = Depends(require_permission("view_optica"))
+    current_user: dict = Depends(get_current_user)
 ):
-    """Listar médicos"""
+    """Listar médicos (acceso para todos los usuarios autenticados)"""
     query = {"is_active": True}
     if search:
         search_regex = {"$regex": search, "$options": "i"}
@@ -4885,7 +4885,7 @@ async def get_doctors(
 async def search_doctors(
     q: str = Query(..., min_length=2),
     limit: int = Query(10, ge=1, le=50),
-    current_user: dict = Depends(require_permission("view_optica"))
+    current_user: dict = Depends(get_current_user)
 ):
     """Búsqueda de médicos para autocompletado"""
     search_regex = {"$regex": q, "$options": "i"}

@@ -154,11 +154,11 @@ Ver `/app/memory/test_credentials.md`
 - ✅ Exportación Excel/PDF de cirugías
 - ✅ Módulo `routes/surgeries.py` extraído
 - ✅ Módulo de Auditoría visual (solo SuperAdmin) - Julio 2026
+- ✅ **Módulo de Evaluación Oftalmológica** - Julio 2026
 
 ### P1 (Próximo)
 - Importación masiva de pacientes
 - Búsqueda de pacientes insensible a tildes
-- Campo "Motivo de consulta" en pacientes (pendiente clarificación)
 
 ### P2 (Futuro)
 - Completar refactorización de server.py
@@ -168,6 +168,33 @@ Ver `/app/memory/test_credentials.md`
 ---
 
 ## Notas Técnicas
+
+### Módulo de Evaluación Oftalmológica (Nuevo - Julio 2026)
+- **Ruta Frontend**: `/evaluacion-oftalmologica`
+- **Archivo**: `/app/frontend/src/pages/EvaluacionOftalmologica.js`
+- **Permisos**: SuperAdmin y Admin pueden editar, Usuario solo lectura
+- **Sellado**: Expedientes se sellan automáticamente 24 horas después de creados
+- **Endpoints**:
+  - `GET /api/evaluaciones` - Lista con paginación
+  - `POST /api/evaluaciones` - Crear nueva
+  - `PUT /api/evaluaciones/{id}` - Actualizar (rechaza si sellada)
+  - `PATCH /api/evaluaciones/{id}/autoguardar` - Autoguardado parcial
+  - `DELETE /api/evaluaciones/{id}` - Eliminar (solo SuperAdmin, no selladas)
+  - `GET /api/catalogos/medicamentos` - Autocomplete medicamentos
+  - `GET /api/catalogos/estudios` - Autocomplete estudios
+  - `GET /api/catalogos/diagnosticos` - Autocomplete diagnósticos
+  - `GET /api/pacientes/buscar` - Búsqueda rápida de pacientes
+- **Funcionalidades**:
+  - Layout de 3 columnas en una sola pantalla
+  - Autoguardado con debounce (2.5s)
+  - Indicador de tiempo restante para sellado
+  - 3 catálogos de autocomplete que se alimentan automáticamente
+  - Impresión de 3 tipos de recetas (Medicamentos, Anteojos, Lentes de Contacto)
+- **Catálogos precargados**:
+  - 21 medicamentos oftalmológicos comunes
+  - 22 estudios oftalmológicos
+  - 30 diagnósticos oftalmológicos
+- **Modelo de datos**: `/app/backend/models/evaluacion_oftalmologica.py`
 
 ### Módulo de Auditoría (Nuevo - Julio 2026)
 - **Ruta Frontend**: `/auditoria`
