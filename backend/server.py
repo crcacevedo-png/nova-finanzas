@@ -1850,6 +1850,319 @@ async def seed_surgeries_data():
     print(f"Created {len(surgeries)} sample surgeries")
 
 
+async def seed_catalogos_oftalmologicos():
+    """Seed de catálogos oftalmológicos y evaluación de ejemplo"""
+    # Verificar si ya existen datos
+    medicamentos_count = await db.catalogo_medicamentos.count_documents({})
+    if medicamentos_count > 0:
+        print(f"Catálogos oftalmológicos ya existen ({medicamentos_count} medicamentos), saltando seed")
+        return
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Catálogo de medicamentos oftalmológicos comunes
+    medicamentos = [
+        "Prednisolona 1% gotas", "Moxifloxacino 0.5% gotas", "Tobramicina/Dexametasona gotas",
+        "Tropicamida 1% gotas", "Fenilefrina 2.5% gotas", "Ciclopentolato 1% gotas",
+        "Dorzolamida/Timolol gotas", "Latanoprost 0.005% gotas", "Brimonidina 0.2% gotas",
+        "Lubricante ocular (carboximetilcelulosa)", "Lubricante ocular (hialuronato)",
+        "Ketorolaco 0.5% gotas", "Nepafenaco 0.1% gotas", "Ofloxacino 0.3% gotas",
+        "Eritromicina ungüento oftálmico", "Ganciclovir gel oftálmico",
+        "Acetazolamida 250mg tabletas", "Manitol 20% IV", "Prednisona 50mg tabletas",
+        "Vitamina A 50,000 UI cápsulas", "Omega 3 cápsulas"
+    ]
+    
+    for med in medicamentos:
+        try:
+            await db.catalogo_medicamentos.insert_one({
+                "id": str(uuid.uuid4()),
+                "nombre": med,
+                "usos": 5,
+                "fecha_creacion": now
+            })
+        except:
+            pass  # Duplicado
+    
+    # Catálogo de estudios oftalmológicos
+    estudios = [
+        "OCT de mácula", "OCT de nervio óptico", "OCT de segmento anterior",
+        "Campimetría computarizada", "Topografía corneal", "Paquimetría",
+        "Biometría óptica (IOL Master)", "Ecografía modo B", "Ecografía UBM",
+        "Angiografía con fluoresceína", "Angiografía con indocianina verde",
+        "Electrorretinograma (ERG)", "Potenciales visuales evocados (PVE)",
+        "Fotografía de fondo de ojo", "Aberrometría", "Microscopía especular",
+        "Test de Schirmer", "Test de Rosa de Bengala", "Meibografía",
+        "Gonioscopia", "Tonometría de aplanación", "Curva tonométrica diaria"
+    ]
+    
+    for est in estudios:
+        try:
+            await db.catalogo_estudios.insert_one({
+                "id": str(uuid.uuid4()),
+                "nombre": est,
+                "usos": 3,
+                "fecha_creacion": now
+            })
+        except:
+            pass
+    
+    # Catálogo de diagnósticos oftalmológicos comunes
+    diagnosticos = [
+        "Catarata senil nuclear", "Catarata cortical", "Catarata subcapsular posterior",
+        "Glaucoma primario de ángulo abierto", "Glaucoma de ángulo cerrado", "Hipertensión ocular",
+        "Retinopatía diabética no proliferativa", "Retinopatía diabética proliferativa",
+        "Edema macular diabético", "Degeneración macular relacionada con la edad (seca)",
+        "Degeneración macular relacionada con la edad (húmeda)",
+        "Pterigión", "Pinguécula", "Queratocono", "Queratitis bacteriana",
+        "Conjuntivitis alérgica", "Conjuntivitis viral", "Blefaritis",
+        "Ojo seco (síndrome de disfunción lagrimal)", "Uveítis anterior",
+        "Desprendimiento de vítreo posterior", "Miodesopsias",
+        "Miopía", "Hipermetropía", "Astigmatismo", "Presbicia",
+        "Oclusión de vena retiniana", "Oclusión de arteria retiniana",
+        "Neuropatía óptica isquémica", "Papiledema"
+    ]
+    
+    for diag in diagnosticos:
+        try:
+            await db.catalogo_diagnosticos.insert_one({
+                "id": str(uuid.uuid4()),
+                "nombre": diag,
+                "usos": 2,
+                "fecha_creacion": now
+            })
+        except:
+            pass
+    
+    print(f"Catálogos oftalmológicos creados: {len(medicamentos)} medicamentos, {len(estudios)} estudios, {len(diagnosticos)} diagnósticos")
+    
+    # Crear evaluación de ejemplo si hay pacientes
+    paciente = await db.patients.find_one({"is_active": True}, {"_id": 0})
+    doctor = await db.doctors.find_one({"is_active": True}, {"_id": 0})
+    superadmin = await db.users.find_one({"role": "superadmin"}, {"_id": 0})
+    
+    if paciente and superadmin:
+        # Verificar si ya existe una evaluación
+        eval_count = await db.evaluaciones_oftalmologicas.count_documents({})
+        if eval_count == 0:
+            edad = 0
+            if paciente.get("birth_date"):
+                try:
+                    birth = datetime.strptime(paciente["birth_date"], "%Y-%m-%d")
+                    today = datetime.now()
+                    edad = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+                except:
+                    pass
+            
+            # Evaluación de ejemplo completa
+            evaluacion_ejemplo = {
+                "id": str(uuid.uuid4()),
+                "paciente_id": paciente["id"],
+                "paciente_nombre": f"{paciente.get('first_name', '')} {paciente.get('last_name', '')}".strip(),
+                "paciente_edad": edad,
+                "paciente_sexo": paciente.get("gender", ""),
+                "paciente_expediente": paciente.get("record_number", ""),
+                "fecha": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "medico_id": doctor["id"] if doctor else "",
+                "medico_nombre": doctor["name"] if doctor else "Dr. Ejemplo",
+                "motivo_consulta": "Visión borrosa progresiva de 6 meses de evolución",
+                "padecimiento_actual": "Paciente refiere disminución gradual de la agudeza visual en ambos ojos, más notoria en ojo derecho. Dificultad para conducir de noche. No refiere dolor, enrojecimiento ni secreción.",
+                "antecedentes": {
+                    "personales_patologicos": "Diabetes mellitus tipo 2 diagnosticada hace 10 años, en tratamiento con metformina. Hipertensión arterial controlada.",
+                    "diabetes": True,
+                    "hipertension": True,
+                    "cardiopatia": False,
+                    "enfermedad_tiroidea": False,
+                    "otros_patologicos": False,
+                    "oftalmologicos": "Uso de lentes desde los 45 años. Última refracción hace 3 años. No cirugías oculares previas. Antecedente de retinopatía diabética no proliferativa leve hace 2 años.",
+                    "quirurgicos": "Colecistectomía laparoscópica 2018",
+                    "alergias": "Penicilina",
+                    "familiares": "Padre con glaucoma. Madre con diabetes y catarata.",
+                    "habitos": "No fuma. Alcohol ocasional."
+                },
+                "medicamentos_actuales": [
+                    {"nombre": "Metformina 850mg", "dosis": "850mg", "frecuencia": "Cada 12 horas", "via": "Oral", "desde": "2016"},
+                    {"nombre": "Losartán 50mg", "dosis": "50mg", "frecuencia": "Cada 24 horas", "via": "Oral", "desde": "2018"},
+                    {"nombre": "Lubricante ocular (carboximetilcelulosa)", "dosis": "1 gota", "frecuencia": "4 veces al día", "via": "Oftálmica", "desde": "2024"}
+                ],
+                "medicamentos_previos": [
+                    {"nombre": "Ketorolaco 0.5% gotas", "dosis": "1 gota c/6h", "motivo": "Inflamación postoperatoria (cirugía previa)", "periodo": "2018, 1 mes"}
+                ],
+                "examen": {
+                    "avsc_od": "20/80",
+                    "avsc_oi": "20/50",
+                    "avcc_od": "20/40",
+                    "avcc_oi": "20/30",
+                    "refraccion_od": {"esfera": "-1.50", "cilindro": "-0.75", "eje": "90", "adicion": "+2.50"},
+                    "refraccion_oi": {"esfera": "-1.25", "cilindro": "-0.50", "eje": "85", "adicion": "+2.50"},
+                    "queratometria_od": "43.50 x 44.25 @ 90",
+                    "queratometria_oi": "43.25 x 44.00 @ 85",
+                    "pio_od": "16",
+                    "pio_oi": "15",
+                    "pio_metodo": "Tonometría de aplanación (Goldmann)",
+                    "segmento_anterior_od": {
+                        "parpados_anexos": "Sin alteraciones",
+                        "conjuntiva": "Sin hiperemia",
+                        "cornea": "Transparente, sin opacidades",
+                        "camara_anterior": "Formada, sin células ni flare",
+                        "iris": "Sin sinequias",
+                        "cristalino": "Opacidad nuclear 2+ y cortical 1+"
+                    },
+                    "segmento_anterior_oi": {
+                        "parpados_anexos": "Sin alteraciones",
+                        "conjuntiva": "Sin hiperemia",
+                        "cornea": "Transparente",
+                        "camara_anterior": "Formada, sin células",
+                        "iris": "Normal",
+                        "cristalino": "Opacidad nuclear 1+"
+                    },
+                    "vitreo_od": "Transparente, sin opacidades",
+                    "vitreo_oi": "Transparente",
+                    "fondo_ojo_od": {
+                        "papila": "Bordes definidos, excavación 0.3, coloración normal",
+                        "macula": "Reflejo foveal presente, sin edema",
+                        "retina": "Aplicada, 2 microaneurismas temporales",
+                        "vasos": "Relación A/V 2:3, sin cruces patológicos"
+                    },
+                    "fondo_ojo_oi": {
+                        "papila": "Bordes definidos, excavación 0.3",
+                        "macula": "Sin alteraciones",
+                        "retina": "Aplicada, 1 microaneurisma",
+                        "vasos": "Sin alteraciones"
+                    },
+                    "motilidad_ocular": "Versiones y ducciones completas. Sin restricciones.",
+                    "pupilas_reflejos": "Isocóricas, reactivas a la luz. Sin defecto pupilar aferente."
+                },
+                "diagnosticos": [
+                    {"descripcion": "Catarata senil nuclear", "codigo_cie10": "H25.1", "ojo": "OD"},
+                    {"descripcion": "Catarata cortical", "codigo_cie10": "H25.0", "ojo": "OI"},
+                    {"descripcion": "Retinopatía diabética no proliferativa", "codigo_cie10": "H36.0", "ojo": "AO"},
+                    {"descripcion": "Presbicia", "codigo_cie10": "H52.4", "ojo": "AO"}
+                ],
+                "plan": "1. Se explica al paciente diagnóstico de catarata bilateral con predominio en OD, asociada a retinopatía diabética no proliferativa leve estable.\n2. Se recomienda cirugía de catarata en OD como primer tiempo.\n3. Control metabólico estricto previo a cirugía (HbA1c < 7%).\n4. Estudios preoperatorios.\n5. Seguimiento de retinopatía diabética cada 6 meses.",
+                "recomendaciones": {
+                    "estudios_a_realizar": [
+                        {"estudio": "Biometría óptica (IOL Master)", "ojo": "AO", "indicaciones": "Para cálculo de lente intraocular"},
+                        {"estudio": "OCT de mácula", "ojo": "AO", "indicaciones": "Descartar edema macular diabético subclínico"},
+                        {"estudio": "Topografía corneal", "ojo": "AO", "indicaciones": "Evaluación prequirúrgica"}
+                    ],
+                    "recomendaciones_generales": "Mantener control glucémico estricto. Evitar frotarse los ojos. Usar lubricante ocular. Acudir a cita de control en 1 mes con resultados de estudios."
+                },
+                "procedimientos": [],
+                "recetas": {
+                    "medicamentos": {
+                        "items": [
+                            {"medicamento": "Lubricante ocular (hialuronato)", "presentacion": "Frasco 10ml", "dosis": "1 gota", "frecuencia": "4 veces al día", "duracion": "Uso continuo", "via": "Oftálmica", "indicaciones": "Aplicar en ambos ojos"},
+                            {"medicamento": "Vitamina A 50,000 UI cápsulas", "presentacion": "Caja 30 cápsulas", "dosis": "1 cápsula", "frecuencia": "Cada semana", "duracion": "3 meses", "via": "Oral", "indicaciones": "Tomar con alimentos"}
+                        ]
+                    },
+                    "anteojos": {
+                        "od": {"esfera": "-1.50", "cilindro": "-0.75", "eje": "90", "adicion": "+2.50"},
+                        "oi": {"esfera": "-1.25", "cilindro": "-0.50", "eje": "85", "adicion": "+2.50"},
+                        "distancia_pupilar": "62mm",
+                        "tipo_lente": "Progresivo",
+                        "material": "Policarbonato",
+                        "tratamientos": "Antirreflejo, filtro azul",
+                        "uso": "Permanente",
+                        "observaciones": "Lentes progresivos para visión lejana y cercana. Se recomienda adaptación gradual."
+                    },
+                    "lentes_contacto": {
+                        "od": {"poder": "", "curva_base": "", "diametro": ""},
+                        "oi": {"poder": "", "curva_base": "", "diametro": ""},
+                        "marca": "",
+                        "tipo": "",
+                        "regimen_reemplazo": "",
+                        "observaciones": "No se indica uso de lentes de contacto por presencia de catarata y antecedente de ojo seco."
+                    }
+                },
+                "creado_por": superadmin["id"],
+                "creado_por_nombre": superadmin.get("name", "Super Admin"),
+                "fecha_creacion": now,
+                "actualizado_por": superadmin["id"],
+                "actualizado_por_nombre": superadmin.get("name", "Super Admin"),
+                "fecha_actualizacion": now,
+                "sellado": False,
+                "fecha_sellado": None,
+                "ultimo_autoguardado": now
+            }
+            
+            await db.evaluaciones_oftalmologicas.insert_one(evaluacion_ejemplo)
+            print("Evaluación oftalmológica de ejemplo creada")
+            
+            # Crear una evaluación sellada de ejemplo (más de 24h)
+            eval_sellada = {
+                "id": str(uuid.uuid4()),
+                "paciente_id": paciente["id"],
+                "paciente_nombre": f"{paciente.get('first_name', '')} {paciente.get('last_name', '')}".strip(),
+                "paciente_edad": edad,
+                "paciente_sexo": paciente.get("gender", ""),
+                "paciente_expediente": paciente.get("record_number", ""),
+                "fecha": (datetime.now(timezone.utc) - timedelta(days=3)).strftime("%Y-%m-%d"),
+                "medico_id": doctor["id"] if doctor else "",
+                "medico_nombre": doctor["name"] if doctor else "Dr. Ejemplo",
+                "motivo_consulta": "Control de glaucoma",
+                "padecimiento_actual": "Paciente en seguimiento por glaucoma primario de ángulo abierto. Usa tratamiento tópico con buena tolerancia.",
+                "antecedentes": {
+                    "personales_patologicos": "",
+                    "diabetes": False,
+                    "hipertension": True,
+                    "cardiopatia": False,
+                    "enfermedad_tiroidea": False,
+                    "otros_patologicos": False,
+                    "oftalmologicos": "Glaucoma diagnosticado hace 5 años",
+                    "quirurgicos": "",
+                    "alergias": "Ninguna conocida",
+                    "familiares": "Madre con glaucoma",
+                    "habitos": ""
+                },
+                "medicamentos_actuales": [
+                    {"nombre": "Dorzolamida/Timolol gotas", "dosis": "1 gota", "frecuencia": "Cada 12 horas", "via": "Oftálmica", "desde": "2021"}
+                ],
+                "medicamentos_previos": [],
+                "examen": {
+                    "avsc_od": "20/25", "avsc_oi": "20/25",
+                    "avcc_od": "20/20", "avcc_oi": "20/20",
+                    "refraccion_od": {"esfera": "-0.50", "cilindro": "", "eje": "", "adicion": ""},
+                    "refraccion_oi": {"esfera": "-0.50", "cilindro": "", "eje": "", "adicion": ""},
+                    "queratometria_od": "", "queratometria_oi": "",
+                    "pio_od": "14", "pio_oi": "15", "pio_metodo": "Goldmann",
+                    "segmento_anterior_od": {"parpados_anexos": "Normal", "conjuntiva": "Normal", "cornea": "Clara", "camara_anterior": "Profunda", "iris": "Normal", "cristalino": "Transparente"},
+                    "segmento_anterior_oi": {"parpados_anexos": "Normal", "conjuntiva": "Normal", "cornea": "Clara", "camara_anterior": "Profunda", "iris": "Normal", "cristalino": "Transparente"},
+                    "vitreo_od": "Normal", "vitreo_oi": "Normal",
+                    "fondo_ojo_od": {"papila": "Excavación 0.6, palidez temporal", "macula": "Normal", "retina": "Aplicada", "vasos": "Normales"},
+                    "fondo_ojo_oi": {"papila": "Excavación 0.5", "macula": "Normal", "retina": "Aplicada", "vasos": "Normales"},
+                    "motilidad_ocular": "Normal", "pupilas_reflejos": "Normales"
+                },
+                "diagnosticos": [
+                    {"descripcion": "Glaucoma primario de ángulo abierto", "codigo_cie10": "H40.1", "ojo": "AO"}
+                ],
+                "plan": "Continuar tratamiento actual. Control en 4 meses con campimetría.",
+                "recomendaciones": {
+                    "estudios_a_realizar": [
+                        {"estudio": "Campimetría computarizada", "ojo": "AO", "indicaciones": "Control de progresión"}
+                    ],
+                    "recomendaciones_generales": "No suspender tratamiento. Acudir a urgencias si presenta dolor ocular o visión borrosa súbita."
+                },
+                "procedimientos": [],
+                "recetas": {
+                    "medicamentos": {"items": []},
+                    "anteojos": {"od": {}, "oi": {}, "distancia_pupilar": "", "tipo_lente": "", "material": "", "tratamientos": "", "uso": "", "observaciones": ""},
+                    "lentes_contacto": {"od": {}, "oi": {}, "marca": "", "tipo": "", "regimen_reemplazo": "", "observaciones": ""}
+                },
+                "creado_por": superadmin["id"],
+                "creado_por_nombre": superadmin.get("name", "Super Admin"),
+                "fecha_creacion": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
+                "actualizado_por": superadmin["id"],
+                "actualizado_por_nombre": superadmin.get("name", "Super Admin"),
+                "fecha_actualizacion": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
+                "sellado": True,
+                "fecha_sellado": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
+                "ultimo_autoguardado": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+            }
+            
+            await db.evaluaciones_oftalmologicas.insert_one(eval_sellada)
+            print("Evaluación sellada de ejemplo creada")
+
+
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/login", response_model=TokenResponse)
@@ -2081,6 +2394,452 @@ async def change_password(
     )
     
     return {"message": "Contraseña actualizada correctamente"}
+
+
+# ==================== EVALUACIÓN OFTALMOLÓGICA - MODELS & ROUTES ====================
+
+from models.evaluacion_oftalmologica import (
+    EvaluacionOftalmologicaCreate,
+    EvaluacionOftalmologicaUpdate,
+    EvaluacionOftalmologicaResponse,
+    EvaluacionOftalmologicaListResponse,
+    CatalogoItemResponse
+)
+
+# Tiempo límite para sellado (24 horas)
+SELLADO_HORAS = 24
+
+
+def calcular_edad(fecha_nacimiento: str) -> int:
+    """Calcula la edad a partir de fecha de nacimiento"""
+    try:
+        birth = datetime.strptime(fecha_nacimiento, "%Y-%m-%d")
+        today = datetime.now()
+        age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+        return age
+    except:
+        return 0
+
+
+def verificar_sellado(evaluacion: dict) -> tuple[bool, str]:
+    """Verifica si una evaluación debe estar sellada"""
+    if evaluacion.get("sellado", False):
+        return True, "Expediente sellado"
+    
+    fecha_creacion = evaluacion.get("fecha_creacion", "")
+    if fecha_creacion:
+        try:
+            creacion = datetime.fromisoformat(fecha_creacion.replace("Z", "+00:00"))
+            ahora = datetime.now(timezone.utc)
+            if (ahora - creacion).total_seconds() > SELLADO_HORAS * 3600:
+                return True, "Expediente sellado por tiempo (24h)"
+        except:
+            pass
+    return False, ""
+
+
+async def actualizar_catalogo(coleccion: str, nombre: str):
+    """Actualiza o inserta un item en el catálogo"""
+    if not nombre or not nombre.strip():
+        return
+    
+    nombre_normalizado = nombre.strip()
+    existente = await db[coleccion].find_one(
+        {"nombre": {"$regex": f"^{re.escape(nombre_normalizado)}$", "$options": "i"}}
+    )
+    
+    if existente:
+        await db[coleccion].update_one(
+            {"id": existente["id"]},
+            {"$inc": {"usos": 1}}
+        )
+    else:
+        await db[coleccion].insert_one({
+            "id": str(uuid.uuid4()),
+            "nombre": nombre_normalizado,
+            "usos": 1,
+            "fecha_creacion": datetime.now(timezone.utc).isoformat()
+        })
+
+
+async def procesar_catalogos_evaluacion(evaluacion_data: dict):
+    """Procesa y actualiza los catálogos con datos de la evaluación"""
+    # Medicamentos actuales
+    for med in evaluacion_data.get("medicamentos_actuales", []):
+        if med.get("nombre"):
+            await actualizar_catalogo("catalogo_medicamentos", med["nombre"])
+    
+    # Medicamentos previos
+    for med in evaluacion_data.get("medicamentos_previos", []):
+        if med.get("nombre"):
+            await actualizar_catalogo("catalogo_medicamentos", med["nombre"])
+    
+    # Diagnósticos
+    for diag in evaluacion_data.get("diagnosticos", []):
+        if diag.get("descripcion"):
+            await actualizar_catalogo("catalogo_diagnosticos", diag["descripcion"])
+    
+    # Estudios
+    recomendaciones = evaluacion_data.get("recomendaciones", {})
+    for estudio in recomendaciones.get("estudios_a_realizar", []):
+        if estudio.get("estudio"):
+            await actualizar_catalogo("catalogo_estudios", estudio["estudio"])
+    
+    # Medicamentos de receta
+    recetas = evaluacion_data.get("recetas", {})
+    medicamentos_receta = recetas.get("medicamentos", {})
+    for item in medicamentos_receta.get("items", []):
+        if item.get("medicamento"):
+            await actualizar_catalogo("catalogo_medicamentos", item["medicamento"])
+
+
+# --- Catálogos Endpoints ---
+
+@api_router.get("/catalogos/medicamentos")
+async def get_catalogo_medicamentos(
+    search: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Autocomplete de medicamentos"""
+    query = {}
+    if search:
+        query["nombre"] = {"$regex": search, "$options": "i"}
+    
+    items = await db.catalogo_medicamentos.find(query, {"_id": 0}).sort("usos", -1).limit(limit).to_list(limit)
+    return items
+
+
+@api_router.get("/catalogos/estudios")
+async def get_catalogo_estudios(
+    search: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Autocomplete de estudios"""
+    query = {}
+    if search:
+        query["nombre"] = {"$regex": search, "$options": "i"}
+    
+    items = await db.catalogo_estudios.find(query, {"_id": 0}).sort("usos", -1).limit(limit).to_list(limit)
+    return items
+
+
+@api_router.get("/catalogos/diagnosticos")
+async def get_catalogo_diagnosticos(
+    search: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Autocomplete de diagnósticos"""
+    query = {}
+    if search:
+        query["nombre"] = {"$regex": search, "$options": "i"}
+    
+    items = await db.catalogo_diagnosticos.find(query, {"_id": 0}).sort("usos", -1).limit(limit).to_list(limit)
+    return items
+
+
+# --- Evaluaciones Endpoints ---
+
+@api_router.get("/evaluaciones", response_model=EvaluacionOftalmologicaListResponse)
+async def get_evaluaciones(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    paciente_id: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Listar evaluaciones oftalmológicas"""
+    query = {}
+    
+    if paciente_id:
+        query["paciente_id"] = paciente_id
+    if fecha_desde:
+        query["fecha"] = {"$gte": fecha_desde}
+    if fecha_hasta:
+        if "fecha" in query:
+            query["fecha"]["$lte"] = fecha_hasta
+        else:
+            query["fecha"] = {"$lte": fecha_hasta}
+    if search:
+        query["$or"] = [
+            {"paciente_nombre": {"$regex": search, "$options": "i"}},
+            {"paciente_expediente": {"$regex": search, "$options": "i"}},
+            {"motivo_consulta": {"$regex": search, "$options": "i"}}
+        ]
+    
+    total = await db.evaluaciones_oftalmologicas.count_documents(query)
+    total_pages = (total + limit - 1) // limit if total > 0 else 1
+    skip = (page - 1) * limit
+    
+    evaluaciones = await db.evaluaciones_oftalmologicas.find(query, {"_id": 0}).sort("fecha_creacion", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Verificar y actualizar sellado para cada evaluación
+    for eval in evaluaciones:
+        debe_sellar, _ = verificar_sellado(eval)
+        if debe_sellar and not eval.get("sellado"):
+            await db.evaluaciones_oftalmologicas.update_one(
+                {"id": eval["id"]},
+                {"$set": {"sellado": True, "fecha_sellado": datetime.now(timezone.utc).isoformat()}}
+            )
+            eval["sellado"] = True
+            eval["fecha_sellado"] = datetime.now(timezone.utc).isoformat()
+    
+    return {
+        "data": evaluaciones,
+        "total": total,
+        "page": page,
+        "total_pages": total_pages
+    }
+
+
+@api_router.get("/evaluaciones/{evaluacion_id}", response_model=EvaluacionOftalmologicaResponse)
+async def get_evaluacion(
+    evaluacion_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Obtener una evaluación por ID"""
+    evaluacion = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    if not evaluacion:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # Verificar y actualizar sellado
+    debe_sellar, _ = verificar_sellado(evaluacion)
+    if debe_sellar and not evaluacion.get("sellado"):
+        await db.evaluaciones_oftalmologicas.update_one(
+            {"id": evaluacion_id},
+            {"$set": {"sellado": True, "fecha_sellado": datetime.now(timezone.utc).isoformat()}}
+        )
+        evaluacion["sellado"] = True
+        evaluacion["fecha_sellado"] = datetime.now(timezone.utc).isoformat()
+    
+    return evaluacion
+
+
+@api_router.post("/evaluaciones", response_model=EvaluacionOftalmologicaResponse)
+async def create_evaluacion(
+    evaluacion: EvaluacionOftalmologicaCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Crear nueva evaluación (solo Admin y SuperAdmin)"""
+    if current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear evaluaciones")
+    
+    # Obtener datos del paciente si existe
+    paciente = await db.patients.find_one({"id": evaluacion.paciente_id}, {"_id": 0})
+    
+    now = datetime.now(timezone.utc).isoformat()
+    evaluacion_dict = evaluacion.model_dump()
+    
+    # Enriquecer con datos del paciente
+    if paciente:
+        evaluacion_dict["paciente_nombre"] = f"{paciente.get('first_name', '')} {paciente.get('last_name', '')}".strip()
+        evaluacion_dict["paciente_expediente"] = paciente.get("record_number", "")
+        evaluacion_dict["paciente_sexo"] = paciente.get("gender", "")
+        if paciente.get("birth_date"):
+            evaluacion_dict["paciente_edad"] = calcular_edad(paciente["birth_date"])
+    
+    evaluacion_dict["id"] = str(uuid.uuid4())
+    evaluacion_dict["creado_por"] = current_user["id"]
+    evaluacion_dict["creado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
+    evaluacion_dict["fecha_creacion"] = now
+    evaluacion_dict["actualizado_por"] = current_user["id"]
+    evaluacion_dict["actualizado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
+    evaluacion_dict["fecha_actualizacion"] = now
+    evaluacion_dict["sellado"] = False
+    evaluacion_dict["fecha_sellado"] = None
+    evaluacion_dict["ultimo_autoguardado"] = now
+    
+    if not evaluacion_dict.get("fecha"):
+        evaluacion_dict["fecha"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    await db.evaluaciones_oftalmologicas.insert_one(evaluacion_dict)
+    
+    # Procesar catálogos
+    await procesar_catalogos_evaluacion(evaluacion_dict)
+    
+    # Audit log
+    await audit.log(
+        action="EVALUACION_CREATED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={"evaluacion_id": evaluacion_dict["id"], "paciente": evaluacion_dict.get("paciente_nombre")}
+    )
+    
+    if "_id" in evaluacion_dict:
+        del evaluacion_dict["_id"]
+    return evaluacion_dict
+
+
+@api_router.put("/evaluaciones/{evaluacion_id}", response_model=EvaluacionOftalmologicaResponse)
+async def update_evaluacion(
+    evaluacion_id: str,
+    evaluacion: EvaluacionOftalmologicaUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Actualizar evaluación (solo Admin y SuperAdmin, solo si no está sellada)"""
+    if current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar evaluaciones")
+    
+    existing = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # Verificar sellado
+    debe_sellar, mensaje = verificar_sellado(existing)
+    if debe_sellar:
+        if not existing.get("sellado"):
+            await db.evaluaciones_oftalmologicas.update_one(
+                {"id": evaluacion_id},
+                {"$set": {"sellado": True, "fecha_sellado": datetime.now(timezone.utc).isoformat()}}
+            )
+        raise HTTPException(status_code=423, detail=f"Expediente sellado. {mensaje}")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    update_data = evaluacion.model_dump(exclude_unset=True)
+    
+    # Si se actualiza paciente_id, enriquecer datos
+    if "paciente_id" in update_data:
+        paciente = await db.patients.find_one({"id": update_data["paciente_id"]}, {"_id": 0})
+        if paciente:
+            update_data["paciente_nombre"] = f"{paciente.get('first_name', '')} {paciente.get('last_name', '')}".strip()
+            update_data["paciente_expediente"] = paciente.get("record_number", "")
+            update_data["paciente_sexo"] = paciente.get("gender", "")
+            if paciente.get("birth_date"):
+                update_data["paciente_edad"] = calcular_edad(paciente["birth_date"])
+    
+    update_data["actualizado_por"] = current_user["id"]
+    update_data["actualizado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
+    update_data["fecha_actualizacion"] = now
+    
+    await db.evaluaciones_oftalmologicas.update_one(
+        {"id": evaluacion_id},
+        {"$set": update_data}
+    )
+    
+    # Procesar catálogos con datos actualizados
+    merged_data = {**existing, **update_data}
+    await procesar_catalogos_evaluacion(merged_data)
+    
+    updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    return updated
+
+
+@api_router.patch("/evaluaciones/{evaluacion_id}/autoguardar", response_model=EvaluacionOftalmologicaResponse)
+async def autoguardar_evaluacion(
+    evaluacion_id: str,
+    data: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Autoguardado parcial de evaluación (solo si no está sellada)"""
+    if current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar evaluaciones")
+    
+    existing = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # Verificar sellado
+    debe_sellar, mensaje = verificar_sellado(existing)
+    if debe_sellar:
+        if not existing.get("sellado"):
+            await db.evaluaciones_oftalmologicas.update_one(
+                {"id": evaluacion_id},
+                {"$set": {"sellado": True, "fecha_sellado": datetime.now(timezone.utc).isoformat()}}
+            )
+        raise HTTPException(status_code=423, detail=f"Expediente sellado. {mensaje}")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Filtrar campos permitidos
+    allowed_fields = [
+        "paciente_id", "paciente_nombre", "paciente_edad", "paciente_sexo", "paciente_expediente",
+        "fecha", "medico_id", "medico_nombre", "motivo_consulta", "padecimiento_actual",
+        "antecedentes", "medicamentos_actuales", "medicamentos_previos", "examen",
+        "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas"
+    ]
+    
+    update_data = {k: v for k, v in data.items() if k in allowed_fields}
+    update_data["actualizado_por"] = current_user["id"]
+    update_data["actualizado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
+    update_data["fecha_actualizacion"] = now
+    update_data["ultimo_autoguardado"] = now
+    
+    await db.evaluaciones_oftalmologicas.update_one(
+        {"id": evaluacion_id},
+        {"$set": update_data}
+    )
+    
+    # Procesar catálogos
+    merged_data = {**existing, **update_data}
+    await procesar_catalogos_evaluacion(merged_data)
+    
+    updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/evaluaciones/{evaluacion_id}")
+async def delete_evaluacion(
+    evaluacion_id: str,
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Eliminar evaluación (solo SuperAdmin, solo si no está sellada)"""
+    existing = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # Verificar sellado
+    debe_sellar, mensaje = verificar_sellado(existing)
+    if debe_sellar:
+        raise HTTPException(status_code=423, detail=f"Expediente sellado. No se puede eliminar. {mensaje}")
+    
+    await db.evaluaciones_oftalmologicas.delete_one({"id": evaluacion_id})
+    
+    await audit.log(
+        action="EVALUACION_DELETED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={"evaluacion_id": evaluacion_id, "paciente": existing.get("paciente_nombre")}
+    )
+    
+    return {"message": "Evaluación eliminada"}
+
+
+# --- Pacientes búsqueda rápida para evaluaciones ---
+
+@api_router.get("/pacientes/buscar")
+async def buscar_pacientes_rapido(
+    search: str = Query("", min_length=0),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user)
+):
+    """Búsqueda rápida de pacientes para autocomplete"""
+    query = {"is_active": True}
+    if search:
+        query["$or"] = [
+            {"first_name": {"$regex": search, "$options": "i"}},
+            {"last_name": {"$regex": search, "$options": "i"}},
+            {"record_number": {"$regex": search, "$options": "i"}},
+            {"dpi": {"$regex": search, "$options": "i"}}
+        ]
+    
+    pacientes = await db.patients.find(
+        query, 
+        {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "record_number": 1, "birth_date": 1, "gender": 1, "phone": 1}
+    ).limit(limit).to_list(limit)
+    
+    # Enriquecer con edad y nombre completo
+    for p in pacientes:
+        p["nombre_completo"] = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+        if p.get("birth_date"):
+            p["edad"] = calcular_edad(p["birth_date"])
+        else:
+            p["edad"] = 0
+    
+    return pacientes
 
 
 # ==================== USER MANAGEMENT ROUTES ====================
@@ -6985,6 +7744,25 @@ async def startup_event():
     await db.surgeries.create_index([("patient_name", "text"), ("procedure", "text")])
     # Seed de cirugías
     await seed_surgeries_data()
+    
+    # Índices de Evaluaciones Oftalmológicas
+    await db.evaluaciones_oftalmologicas.create_index([("paciente_id", 1)])
+    await db.evaluaciones_oftalmologicas.create_index([("fecha", -1)])
+    await db.evaluaciones_oftalmologicas.create_index([("fecha_creacion", -1)])
+    await db.evaluaciones_oftalmologicas.create_index([("sellado", 1)])
+    await db.evaluaciones_oftalmologicas.create_index([("medico_id", 1)])
+    
+    # Índices de Catálogos
+    await db.catalogo_medicamentos.create_index([("nombre", 1)], unique=True)
+    await db.catalogo_medicamentos.create_index([("usos", -1)])
+    await db.catalogo_estudios.create_index([("nombre", 1)], unique=True)
+    await db.catalogo_estudios.create_index([("usos", -1)])
+    await db.catalogo_diagnosticos.create_index([("nombre", 1)], unique=True)
+    await db.catalogo_diagnosticos.create_index([("usos", -1)])
+    
+    # Seed de catálogos oftalmológicos
+    await seed_catalogos_oftalmologicos()
+    
     try:
         await db.users.create_index([("username", 1)], unique=True)
     except Exception:

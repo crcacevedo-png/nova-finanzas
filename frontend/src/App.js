@@ -20,6 +20,7 @@ import TiposLente from './pages/TiposLente';
 import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import SalaOperaciones from './pages/SalaOperaciones';
 import AuditLogs from './pages/AuditLogs';
+import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import './App.css';
 
 // Protected Route Component
@@ -225,6 +226,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_audit_logs">
             <AuditLogs />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Evaluación Oftalmológica - Admin y SuperAdmin pueden editar, Usuario solo lectura */}
+      <Route 
+        path="/evaluacion-oftalmologica" 
+        element={
+          <ProtectedRoute>
+            <EvaluacionOftalmologica />
           </ProtectedRoute>
         } 
       />

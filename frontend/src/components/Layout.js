@@ -70,6 +70,9 @@ const Layout = ({ children }) => {
   // Pacientes - Visible para todos
   navItems.push({ path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' });
   
+  // Evaluación Oftalmológica - Visible para todos (Admin/SuperAdmin editan, Usuario solo lectura)
+  navItems.push({ path: '/evaluacion-oftalmologica', icon: Eye, label: 'Evaluación Oftalmológica', testId: 'nav-evaluacion' });
+  
   // Sala de Operaciones - Visible para todos
   navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
 

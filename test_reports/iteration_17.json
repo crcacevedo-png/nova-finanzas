@@ -1,0 +1,49 @@
+{
+  "summary": "Tested the new Evaluación Oftalmológica module (backend + frontend). Backend: 12/12 pytest tests passed covering catalogos (medicamentos/estudios/diagnosticos with search + sorting by usos), evaluaciones list/CRUD, sellado (423 on sealed PUT/PATCH autoguardar), and role restrictions (usuario 403 on PUT). Frontend: sidebar item visible for admin & usuario, /evaluacion-oftalmologica page renders 3-column layout, Historial modal opens with 3 sample rows including 'Sellado' badge, paciente search dropdown works, 'Se sella en 23h 59m' countdown shown, Imprimir buttons present. One issue: /api/doctors requires superadmin — Admin gets 403 so the 'Seleccionar médico' dropdown is empty for admin users (console error 'Error fetching médicos: 403').",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/doctors", "issue": "Returns 403 for admin role. EvaluacionOftalmologica.js frontend calls this to populate the médico dropdown but admin (who per spec must be able to edit) cannot access it. Only superadmin gets 200. Endpoint should allow admin (and probably usuario in read mode) to view doctors list.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Selección de médico en Evaluación Oftalmológica (Admin)", "issue": "Dropdown 'Seleccionar médico' queda vacío para admin porque GET /api/doctors devuelve 403. La UI muestra placeholder pero no hay opciones.", "affected_selectors": ["Select trigger 'Seleccionar médico'"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_evaluacion_oftalmologica.py",
+    "/app/test_reports/pytest/pytest_evaluacion.xml"
+  ],
+  "action_items": [
+    "Fix /api/doctors permissions: allow role 'admin' (and consider 'usuario' for read-only) to GET the doctors list, so médico dropdown in Evaluación Oftalmológica works for Admin users as required by the spec ('SuperAdmin y Admin pueden editar').",
+    "Consider adding more data-testid attributes on EvaluacionOftalmologica.js (only 2 found: evaluacion-page, search-paciente). Suggest: medico-select, historial-btn, nueva-btn, guardar-btn, imprimir-btn, hist-row-{id}, sellado-badge, agregar-medicamento-actual, etc. to improve testability."
+  ],
+  "critical_code_review_comments": [
+    "Backend server.py: verificar_sellado logic correctly seals >24h automatically and returns 423 on further edits — good.",
+    "Backend: /api/catalogos/* $regex uses raw user input; if search contains regex metachars there is ReDoS potential. Use re.escape().",
+    "Backend: /api/doctors permission is too strict — breaks the Evaluación Oftalmológica médico selector for Admin role.",
+    "Frontend EvaluacionOftalmologica.js is 1857 lines — should be split into smaller components (Antecedentes, ExamenOD/OI, Recetas, HistorialModal) for maintainability.",
+    "Frontend: only 2 data-testid attributes in a large module — insufficient for robust automated testing.",
+    "Backend endpoints correctly exclude MongoDB _id via projection {'_id': 0}."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_evaluacion_oftalmologica.py"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 pytest passed)",
+    "frontend": "~90% (all main flows work; médico dropdown broken for admin)"
+  },
+  "test_credentials": {
+    "superadmin": "superadmin / nova2024",
+    "admin": "admin / Admin2024Nuevo!",
+    "usuario": "usuario / user2024"
+  },
+  "seed_data_creation": "Test creates one temporary evaluation and deletes it in finally block (TEST_ prefix). No permanent data created.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Evaluación Oftalmológica module endpoints: GET/POST /api/evaluaciones, GET/PUT /api/evaluaciones/{id}, PATCH /api/evaluaciones/{id}/autoguardar, GET /api/catalogos/{medicamentos|estudios|diagnosticos}?search=&limit=. Sealing at 24h returns 423. 3 preloaded evaluations for patient 'María García López' (one TEST-created might remain if a prior test failed cleanup — check). Frontend page at /evaluacion-oftalmologica. Main pending bug: /api/doctors is superadmin-only, breaks médico dropdown for admin.",
+  "rca of the issue": "GET /api/doctors endpoint in backend/server.py enforces role check that excludes 'admin'. The Evaluación Oftalmológica module needs Admin to edit and select médico. Fix: relax permission on /api/doctors to include 'admin' (and optionally 'usuario' since usuario is read-only and may need to view médico name). Reproduce: login as admin, open /evaluacion-oftalmologica — dropdown 'Seleccionar médico' has no options; console shows 'Error fetching médicos: AxiosError' with HTTP 403."
+}
