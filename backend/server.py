@@ -178,7 +178,9 @@ PERMISSIONS = {
         "manage_optica_expenses": True,
         "view_optica_reports": True,
         "manage_doctors": True,
-        "manage_lens_catalog": True
+        "manage_lens_catalog": True,
+        # Permisos de Auditoría (Solo SuperAdmin)
+        "view_audit_logs": True
     },
     "admin": {
         "view_dashboard": True,
@@ -211,7 +213,9 @@ PERMISSIONS = {
         "manage_optica_expenses": False,
         "view_optica_reports": False,
         "manage_doctors": False,
-        "manage_lens_catalog": False
+        "manage_lens_catalog": False,
+        # Sin acceso a Auditoría
+        "view_audit_logs": False
     },
     "usuario": {
         "view_dashboard": True,
@@ -244,7 +248,9 @@ PERMISSIONS = {
         "manage_optica_expenses": False,
         "view_optica_reports": False,
         "manage_doctors": False,
-        "manage_lens_catalog": False
+        "manage_lens_catalog": False,
+        # Sin acceso a Auditoría
+        "view_audit_logs": False
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
@@ -283,7 +289,9 @@ PERMISSIONS = {
         "manage_optica_expenses": True,
         "view_optica_reports": True,
         "manage_doctors": True,
-        "manage_lens_catalog": True
+        "manage_lens_catalog": True,
+        # Sin acceso a Auditoría
+        "view_audit_logs": False
     }
 }
 
@@ -1939,16 +1947,66 @@ class AuditLogResponse(BaseModel):
     ip_address: Optional[str] = None
     details: dict = {}
 
-@api_router.get("/security/audit-logs", response_model=List[AuditLogResponse])
+class AuditLogListResponse(BaseModel):
+    data: List[AuditLogResponse]
+    total: int
+    page: int
+    total_pages: int
+
+
+@api_router.get("/security/audit-logs", response_model=AuditLogListResponse)
 async def get_audit_logs(
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
     action: Optional[str] = None,
     user_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
     current_user: dict = Depends(require_role("superadmin"))
 ):
-    """Obtener logs de auditoría (solo superadmin)"""
-    logs = await audit.get_logs(limit=limit, user_id=user_id, action=action)
-    return logs
+    """Obtener logs de auditoría con paginación (solo superadmin)"""
+    query = {}
+    
+    if action and action != "all":
+        query["action"] = action
+    if user_id:
+        query["user_id"] = user_id
+    if date_from:
+        query["timestamp"] = {"$gte": date_from}
+    if date_to:
+        if "timestamp" in query:
+            query["timestamp"]["$lte"] = date_to + "T23:59:59"
+        else:
+            query["timestamp"] = {"$lte": date_to + "T23:59:59"}
+    if search:
+        query["$or"] = [
+            {"user_name": {"$regex": search, "$options": "i"}},
+            {"action": {"$regex": search, "$options": "i"}},
+            {"ip_address": {"$regex": search, "$options": "i"}}
+        ]
+    
+    # Total count
+    total = await db.audit_logs.count_documents(query)
+    total_pages = (total + limit - 1) // limit if total > 0 else 1
+    
+    # Paginated results
+    skip = (page - 1) * limit
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "data": logs,
+        "total": total,
+        "page": page,
+        "total_pages": total_pages
+    }
+
+
+@api_router.get("/security/audit-actions")
+async def get_audit_actions(current_user: dict = Depends(require_role("superadmin"))):
+    """Obtener lista de acciones únicas para filtros"""
+    actions = await db.audit_logs.distinct("action")
+    return {"actions": sorted(actions)}
 
 @api_router.get("/security/status")
 async def get_security_status(current_user: dict = Depends(require_role("superadmin"))):

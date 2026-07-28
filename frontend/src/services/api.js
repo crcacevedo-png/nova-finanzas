@@ -417,3 +417,48 @@ export const saleStatusLabels = {
   pagado: 'Pagado',
   cancelado: 'Cancelado',
 };
+
+// Security / Audit API (Solo SuperAdmin)
+export const securityApi = {
+  getAuditLogs: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page.toString());
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.action) params.append('action', filters.action);
+    if (filters.user_id) params.append('user_id', filters.user_id);
+    if (filters.date_from) params.append('date_from', filters.date_from);
+    if (filters.date_to) params.append('date_to', filters.date_to);
+    if (filters.search) params.append('search', filters.search);
+    return axios.get(`${API_URL}/security/audit-logs?${params.toString()}`);
+  },
+  getAuditActions: () => axios.get(`${API_URL}/security/audit-actions`),
+  getSecurityStatus: () => axios.get(`${API_URL}/security/status`),
+};
+
+// Audit Action Labels (Etiquetas en español)
+export const auditActionLabels = {
+  LOGIN_SUCCESS: 'Inicio de sesión exitoso',
+  LOGIN_FAILED: 'Intento de login fallido',
+  LOGOUT: 'Cierre de sesión',
+  PASSWORD_CHANGE: 'Cambio de contraseña',
+  USER_CREATED: 'Usuario creado',
+  USER_UPDATED: 'Usuario actualizado',
+  USER_DELETED: 'Usuario eliminado',
+  USER_ACTIVATED: 'Usuario activado',
+  USER_DEACTIVATED: 'Usuario desactivado',
+  EXPENSE_CREATED: 'Gasto creado',
+  EXPENSE_UPDATED: 'Gasto actualizado',
+  EXPENSE_DELETED: 'Gasto eliminado',
+  PAYMENT_CREATED: 'Pago registrado',
+  PAYMENT_DELETED: 'Pago eliminado',
+  AUTHORIZATION_EXECUTED: 'Autorización ejecutada',
+  FIXED_EXPENSE_CREATED: 'Gasto fijo creado',
+  FIXED_EXPENSE_UPDATED: 'Gasto fijo actualizado',
+  FIXED_EXPENSE_DELETED: 'Gasto fijo eliminado',
+  SURGERY_CREATED: 'Cirugía creada',
+  SURGERY_UPDATED: 'Cirugía actualizada',
+  SURGERY_CANCELLED: 'Cirugía cancelada',
+  PATIENT_CREATED: 'Paciente creado',
+  PATIENT_UPDATED: 'Paciente actualizado',
+  PATIENT_DELETED: 'Paciente eliminado',
+};

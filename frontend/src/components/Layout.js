@@ -25,7 +25,8 @@ import {
   Package,
   Wallet,
   ClipboardCheck,
-  Scissors
+  Scissors,
+  Shield
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -274,8 +275,13 @@ const Layout = ({ children }) => {
           {canViewUserManagement() && (
             <NavLink item={{ path: '/usuarios', icon: Users, label: 'Gestión de usuarios', testId: 'nav-usuarios' }} />
           )}
+
+          {/* 7. Registro de Auditoría - Solo SuperAdmin */}
+          {hasPermission('view_audit_logs') && (
+            <NavLink item={{ path: '/auditoria', icon: Shield, label: 'Auditoría', testId: 'nav-auditoria' }} />
+          )}
           
-          {/* 7. Configuration Section - Admin, SuperAdmin y Optica (si tiene items) */}
+          {/* 8. Configuration Section - Admin, SuperAdmin y Optica (si tiene items) */}
           {configItems.length > 0 && (
             <div className="mt-4">
               <button

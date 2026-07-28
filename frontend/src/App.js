@@ -19,6 +19,7 @@ import Medicos from './pages/Medicos';
 import TiposLente from './pages/TiposLente';
 import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import SalaOperaciones from './pages/SalaOperaciones';
+import AuditLogs from './pages/AuditLogs';
 import './App.css';
 
 // Protected Route Component
@@ -214,6 +215,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SalaOperaciones />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Registro de Auditoría - Solo SuperAdmin */}
+      <Route 
+        path="/auditoria" 
+        element={
+          <ProtectedRoute requiredPermission="view_audit_logs">
+            <AuditLogs />
           </ProtectedRoute>
         } 
       />
