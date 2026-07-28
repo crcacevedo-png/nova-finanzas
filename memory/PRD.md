@@ -153,10 +153,12 @@ Ver `/app/memory/test_credentials.md`
 - ✅ Módulo Sala de Operaciones
 - ✅ Exportación Excel/PDF de cirugías
 - ✅ Módulo `routes/surgeries.py` extraído
+- ✅ Módulo de Auditoría visual (solo SuperAdmin) - Julio 2026
 
 ### P1 (Próximo)
 - Importación masiva de pacientes
 - Búsqueda de pacientes insensible a tildes
+- Campo "Motivo de consulta" en pacientes (pendiente clarificación)
 
 ### P2 (Futuro)
 - Completar refactorización de server.py
@@ -166,6 +168,19 @@ Ver `/app/memory/test_credentials.md`
 ---
 
 ## Notas Técnicas
+
+### Módulo de Auditoría (Nuevo - Julio 2026)
+- **Ruta Frontend**: `/auditoria`
+- **Archivo**: `/app/frontend/src/pages/AuditLogs.js`
+- **Permiso**: `view_audit_logs` (solo superadmin)
+- **Endpoints**:
+  - `GET /api/security/audit-logs` - Logs con paginación y filtros
+  - `GET /api/security/audit-actions` - Lista de acciones únicas
+  - `GET /api/security/status` - Métricas de seguridad
+- **Funcionalidades**:
+  - Cards de métricas (total registros, logins fallidos, usuarios activos, tokens revocados)
+  - Tabla paginada con filtros por acción, usuario, fechas
+  - Búsqueda por usuario, acción o IP
 
 ### Importante para Refactorización:
 1. Los módulos en `/routes/` ya funcionan pero **no están activos** en producción
@@ -183,4 +198,4 @@ Ver `/app/memory/test_credentials.md`
 
 ---
 
-## Última Actualización: 25 Abril 2026
+## Última Actualización: 28 Julio 2026
