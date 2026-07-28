@@ -84,38 +84,45 @@ class FondoOjoDetalle(BaseModel):
 class ExamenOftalmologico(BaseModel):
     # Agudeza visual
     avsc_od: str = ""  # Sin corrección OD
-    avsc_oi: str = ""  # Sin corrección OI
+    avsc_os: str = ""  # Sin corrección OS
     avcc_od: str = ""  # Con corrección OD
-    avcc_oi: str = ""  # Con corrección OI
+    avcc_os: str = ""  # Con corrección OS
     
     # Refracción
     refraccion_od: RefraccionOjo = Field(default_factory=RefraccionOjo)
-    refraccion_oi: RefraccionOjo = Field(default_factory=RefraccionOjo)
+    refraccion_os: RefraccionOjo = Field(default_factory=RefraccionOjo)
     
     # Queratometría
     queratometria_od: str = ""
-    queratometria_oi: str = ""
+    queratometria_os: str = ""
     
     # Presión intraocular
     pio_od: str = ""
-    pio_oi: str = ""
+    pio_os: str = ""
     pio_metodo: str = ""
     
-    # Segmento anterior
-    segmento_anterior_od: SegmentoAnteriorOjo = Field(default_factory=SegmentoAnteriorOjo)
-    segmento_anterior_oi: SegmentoAnteriorOjo = Field(default_factory=SegmentoAnteriorOjo)
+    # Segmento anterior (simplificado a un solo campo de texto)
+    segmento_anterior: str = ""
     
-    # Vítreo
-    vitreo_od: str = ""
-    vitreo_oi: str = ""
-    
-    # Fondo de ojo
-    fondo_ojo_od: FondoOjoDetalle = Field(default_factory=FondoOjoDetalle)
-    fondo_ojo_oi: FondoOjoDetalle = Field(default_factory=FondoOjoDetalle)
+    # Segmento posterior (simplificado, incluye vítreo y fondo de ojo)
+    segmento_posterior: str = ""
     
     # Motilidad y pupilas
     motilidad_ocular: str = ""
     pupilas_reflejos: str = ""
+    
+    # Campos legacy para compatibilidad con datos antiguos
+    avsc_oi: Optional[str] = ""
+    avcc_oi: Optional[str] = ""
+    refraccion_oi: Optional[RefraccionOjo] = None
+    queratometria_oi: Optional[str] = ""
+    pio_oi: Optional[str] = ""
+    segmento_anterior_od: Optional[SegmentoAnteriorOjo] = None
+    segmento_anterior_oi: Optional[SegmentoAnteriorOjo] = None
+    vitreo_od: Optional[str] = ""
+    vitreo_oi: Optional[str] = ""
+    fondo_ojo_od: Optional[FondoOjoDetalle] = None
+    fondo_ojo_oi: Optional[FondoOjoDetalle] = None
 
 
 # ==================== DIAGNÓSTICO Y PLAN ====================
@@ -123,12 +130,12 @@ class ExamenOftalmologico(BaseModel):
 class Diagnostico(BaseModel):
     descripcion: str = ""
     codigo_cie10: str = ""
-    ojo: str = "AO"  # OD, OI, AO
+    ojo: str = "OU"  # OD, OS, OU
 
 
 class EstudioARealizar(BaseModel):
     estudio: str = ""
-    ojo: str = "AO"  # OD, OI, AO
+    ojo: str = "OU"  # OD, OS, OU
     indicaciones: str = ""
 
 
@@ -142,7 +149,7 @@ class Recomendaciones(BaseModel):
 class Procedimiento(BaseModel):
     categoria: str = "Clínico"  # Clínico o Quirúrgico
     tipo_nombre: str = ""
-    ojo: str = "AO"  # OD, OI, AO
+    ojo: str = "OU"  # OD, OS, OU
     fecha: str = ""
     descripcion: str = ""
     resultado_notas: str = ""
@@ -173,7 +180,8 @@ class RecetaAnteojosOjo(BaseModel):
 
 class RecetaAnteojos(BaseModel):
     od: RecetaAnteojosOjo = Field(default_factory=RecetaAnteojosOjo)
-    oi: RecetaAnteojosOjo = Field(default_factory=RecetaAnteojosOjo)
+    os: RecetaAnteojosOjo = Field(default_factory=RecetaAnteojosOjo)
+    oi: Optional[RecetaAnteojosOjo] = None  # Legacy para compatibilidad
     distancia_pupilar: str = ""
     tipo_lente: str = ""  # Monofocal, Bifocal, Progresivo
     material: str = ""
@@ -190,7 +198,8 @@ class RecetaLentesContactoOjo(BaseModel):
 
 class RecetaLentesContacto(BaseModel):
     od: RecetaLentesContactoOjo = Field(default_factory=RecetaLentesContactoOjo)
-    oi: RecetaLentesContactoOjo = Field(default_factory=RecetaLentesContactoOjo)
+    os: RecetaLentesContactoOjo = Field(default_factory=RecetaLentesContactoOjo)
+    oi: Optional[RecetaLentesContactoOjo] = None  # Legacy para compatibilidad
     marca: str = ""
     tipo: str = ""  # Blando, Rígido, Tórico, Multifocal
     regimen_reemplazo: str = ""  # Diario, Quincenal, Mensual

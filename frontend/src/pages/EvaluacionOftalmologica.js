@@ -147,8 +147,8 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, b
   );
 };
 
-// Componente para campos OD/OI
-const CampoODOI = ({ label, valueOD, valueOI, onChangeOD, onChangeOI, disabled, type = "text", placeholder = "" }) => (
+// Componente para campos OD/OS
+const CampoODOS = ({ label, valueOD, valueOS, onChangeOD, onChangeOS, disabled, type = "text", placeholder = "" }) => (
   <div className="grid grid-cols-3 gap-2 items-center">
     <Label className="text-xs text-right pr-2">{label}</Label>
     <Input
@@ -160,11 +160,11 @@ const CampoODOI = ({ label, valueOD, valueOI, onChangeOD, onChangeOI, disabled, 
       className="input-teal text-sm h-8"
     />
     <Input
-      value={valueOI}
-      onChange={(e) => onChangeOI(e.target.value)}
+      value={valueOS}
+      onChange={(e) => onChangeOS(e.target.value)}
       disabled={disabled}
       type={type}
-      placeholder={placeholder || "OI"}
+      placeholder={placeholder || "OS"}
       className="input-teal text-sm h-8"
     />
   </div>
@@ -220,17 +220,14 @@ const EvaluacionOftalmologica = () => {
     medicamentos_actuales: [],
     medicamentos_previos: [],
     examen: {
-      avsc_od: '', avsc_oi: '',
-      avcc_od: '', avcc_oi: '',
+      avsc_od: '', avsc_os: '',
+      avcc_od: '', avcc_os: '',
       refraccion_od: { esfera: '', cilindro: '', eje: '', adicion: '' },
-      refraccion_oi: { esfera: '', cilindro: '', eje: '', adicion: '' },
-      queratometria_od: '', queratometria_oi: '',
-      pio_od: '', pio_oi: '', pio_metodo: '',
-      segmento_anterior_od: { parpados_anexos: '', conjuntiva: '', cornea: '', camara_anterior: '', iris: '', cristalino: '' },
-      segmento_anterior_oi: { parpados_anexos: '', conjuntiva: '', cornea: '', camara_anterior: '', iris: '', cristalino: '' },
-      vitreo_od: '', vitreo_oi: '',
-      fondo_ojo_od: { papila: '', macula: '', retina: '', vasos: '' },
-      fondo_ojo_oi: { papila: '', macula: '', retina: '', vasos: '' },
+      refraccion_os: { esfera: '', cilindro: '', eje: '', adicion: '' },
+      queratometria_od: '', queratometria_os: '',
+      pio_od: '', pio_os: '', pio_metodo: '',
+      segmento_anterior: '',  // Simplificado a un solo campo de texto
+      segmento_posterior: '', // Antes "fondo de ojo", simplificado
       motilidad_ocular: '',
       pupilas_reflejos: ''
     },
@@ -245,7 +242,7 @@ const EvaluacionOftalmologica = () => {
       medicamentos: { items: [] },
       anteojos: {
         od: { esfera: '', cilindro: '', eje: '', adicion: '' },
-        oi: { esfera: '', cilindro: '', eje: '', adicion: '' },
+        os: { esfera: '', cilindro: '', eje: '', adicion: '' },
         distancia_pupilar: '',
         tipo_lente: '',
         material: '',
@@ -255,7 +252,7 @@ const EvaluacionOftalmologica = () => {
       },
       lentes_contacto: {
         od: { poder: '', curva_base: '', diametro: '' },
-        oi: { poder: '', curva_base: '', diametro: '' },
+        os: { poder: '', curva_base: '', diametro: '' },
         marca: '',
         tipo: '',
         regimen_reemplazo: '',
@@ -395,26 +392,53 @@ const EvaluacionOftalmologica = () => {
   // Cargar evaluación
   const cargarEvaluacion = async (evaluacion) => {
     setEvaluacionActual(evaluacion);
+    
+    // Migrar datos antiguos (oi → os) si es necesario
+    const examenData = evaluacion.examen || {};
+    const migratedExamen = {
+      ...evaluacionVacia.examen,
+      avsc_od: examenData.avsc_od || '',
+      avsc_os: examenData.avsc_os || examenData.avsc_oi || '',
+      avcc_od: examenData.avcc_od || '',
+      avcc_os: examenData.avcc_os || examenData.avcc_oi || '',
+      refraccion_od: { ...evaluacionVacia.examen.refraccion_od, ...examenData.refraccion_od },
+      refraccion_os: { ...evaluacionVacia.examen.refraccion_os, ...(examenData.refraccion_os || examenData.refraccion_oi) },
+      queratometria_od: examenData.queratometria_od || '',
+      queratometria_os: examenData.queratometria_os || examenData.queratometria_oi || '',
+      pio_od: examenData.pio_od || '',
+      pio_os: examenData.pio_os || examenData.pio_oi || '',
+      pio_metodo: examenData.pio_metodo || '',
+      segmento_anterior: examenData.segmento_anterior || '',
+      segmento_posterior: examenData.segmento_posterior || '',
+      motilidad_ocular: examenData.motilidad_ocular || '',
+      pupilas_reflejos: examenData.pupilas_reflejos || ''
+    };
+    
+    // Migrar recetas (oi → os)
+    const recetasData = evaluacion.recetas || {};
+    const migratedRecetas = {
+      medicamentos: { items: recetasData.medicamentos?.items || [] },
+      anteojos: {
+        ...evaluacionVacia.recetas.anteojos,
+        ...recetasData.anteojos,
+        od: { ...evaluacionVacia.recetas.anteojos.od, ...recetasData.anteojos?.od },
+        os: { ...evaluacionVacia.recetas.anteojos.os, ...(recetasData.anteojos?.os || recetasData.anteojos?.oi) }
+      },
+      lentes_contacto: {
+        ...evaluacionVacia.recetas.lentes_contacto,
+        ...recetasData.lentes_contacto,
+        od: { ...evaluacionVacia.recetas.lentes_contacto.od, ...recetasData.lentes_contacto?.od },
+        os: { ...evaluacionVacia.recetas.lentes_contacto.os, ...(recetasData.lentes_contacto?.os || recetasData.lentes_contacto?.oi) }
+      }
+    };
+    
     setFormData({
       ...evaluacionVacia,
       ...evaluacion,
       antecedentes: { ...evaluacionVacia.antecedentes, ...evaluacion.antecedentes },
-      examen: { 
-        ...evaluacionVacia.examen, 
-        ...evaluacion.examen,
-        refraccion_od: { ...evaluacionVacia.examen.refraccion_od, ...evaluacion.examen?.refraccion_od },
-        refraccion_oi: { ...evaluacionVacia.examen.refraccion_oi, ...evaluacion.examen?.refraccion_oi },
-        segmento_anterior_od: { ...evaluacionVacia.examen.segmento_anterior_od, ...evaluacion.examen?.segmento_anterior_od },
-        segmento_anterior_oi: { ...evaluacionVacia.examen.segmento_anterior_oi, ...evaluacion.examen?.segmento_anterior_oi },
-        fondo_ojo_od: { ...evaluacionVacia.examen.fondo_ojo_od, ...evaluacion.examen?.fondo_ojo_od },
-        fondo_ojo_oi: { ...evaluacionVacia.examen.fondo_ojo_oi, ...evaluacion.examen?.fondo_ojo_oi }
-      },
+      examen: migratedExamen,
       recomendaciones: { ...evaluacionVacia.recomendaciones, ...evaluacion.recomendaciones },
-      recetas: {
-        medicamentos: { items: evaluacion.recetas?.medicamentos?.items || [] },
-        anteojos: { ...evaluacionVacia.recetas.anteojos, ...evaluacion.recetas?.anteojos },
-        lentes_contacto: { ...evaluacionVacia.recetas.lentes_contacto, ...evaluacion.recetas?.lentes_contacto }
-      }
+      recetas: migratedRecetas
     });
     setSearchPaciente(evaluacion.paciente_nombre || '');
     setAutoguardadoStatus('');
@@ -1022,31 +1046,31 @@ const EvaluacionOftalmologica = () => {
           <div className="space-y-4">
             <CollapsibleSection title="Examen Oftalmológico" icon={Eye} defaultOpen={true}>
               <div className="space-y-4">
-                {/* Encabezado OD/OI */}
+                {/* Encabezado OD/OS */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div></div>
                   <div className="bg-teal-100 rounded py-1 text-xs font-semibold text-teal-700">OD (Derecho)</div>
-                  <div className="bg-teal-100 rounded py-1 text-xs font-semibold text-teal-700">OI (Izquierdo)</div>
+                  <div className="bg-teal-100 rounded py-1 text-xs font-semibold text-teal-700">OS (Izquierdo)</div>
                 </div>
                 
                 {/* Agudeza Visual */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-teal-700">Agudeza Visual</Label>
-                  <CampoODOI
+                  <CampoODOS
                     label="Sin Corrección"
                     valueOD={formData.examen.avsc_od}
-                    valueOI={formData.examen.avsc_oi}
+                    valueOS={formData.examen.avsc_os}
                     onChangeOD={(v) => updateNestedField('examen.avsc_od', v)}
-                    onChangeOI={(v) => updateNestedField('examen.avsc_oi', v)}
+                    onChangeOS={(v) => updateNestedField('examen.avsc_os', v)}
                     disabled={isReadOnly}
                     placeholder="20/..."
                   />
-                  <CampoODOI
+                  <CampoODOS
                     label="Con Corrección"
                     valueOD={formData.examen.avcc_od}
-                    valueOI={formData.examen.avcc_oi}
+                    valueOS={formData.examen.avcc_os}
                     onChangeOD={(v) => updateNestedField('examen.avcc_od', v)}
-                    onChangeOI={(v) => updateNestedField('examen.avcc_oi', v)}
+                    onChangeOS={(v) => updateNestedField('examen.avcc_os', v)}
                     disabled={isReadOnly}
                     placeholder="20/..."
                   />
@@ -1075,12 +1099,12 @@ const EvaluacionOftalmologica = () => {
                     ))}
                   </div>
                   <div className="grid grid-cols-5 gap-1 items-center">
-                    <Label className="text-xs text-right">OI</Label>
+                    <Label className="text-xs text-right">OS</Label>
                     {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
                       <Input
                         key={field}
-                        value={formData.examen.refraccion_oi[field]}
-                        onChange={(e) => updateNestedField(`examen.refraccion_oi.${field}`, e.target.value)}
+                        value={formData.examen.refraccion_os[field]}
+                        onChange={(e) => updateNestedField(`examen.refraccion_os.${field}`, e.target.value)}
                         disabled={isReadOnly}
                         className="input-teal text-xs h-7"
                       />
@@ -1102,10 +1126,10 @@ const EvaluacionOftalmologica = () => {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">OI (mmHg)</Label>
+                      <Label className="text-xs">OS (mmHg)</Label>
                       <Input
-                        value={formData.examen.pio_oi}
-                        onChange={(e) => updateNestedField('examen.pio_oi', e.target.value)}
+                        value={formData.examen.pio_os}
+                        onChange={(e) => updateNestedField('examen.pio_os', e.target.value)}
                         disabled={isReadOnly}
                         className="input-teal text-sm h-8"
                       />
@@ -1123,46 +1147,28 @@ const EvaluacionOftalmologica = () => {
                   </div>
                 </div>
                 
-                {/* Segmento Anterior */}
+                {/* Segmento Anterior - Simplificado a un solo textarea */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-teal-700">Segmento Anterior</Label>
-                  {['parpados_anexos', 'conjuntiva', 'cornea', 'camara_anterior', 'iris', 'cristalino'].map(campo => (
-                    <CampoODOI
-                      key={campo}
-                      label={campo.replace('_', ' ').charAt(0).toUpperCase() + campo.replace('_', ' ').slice(1)}
-                      valueOD={formData.examen.segmento_anterior_od[campo]}
-                      valueOI={formData.examen.segmento_anterior_oi[campo]}
-                      onChangeOD={(v) => updateNestedField(`examen.segmento_anterior_od.${campo}`, v)}
-                      onChangeOI={(v) => updateNestedField(`examen.segmento_anterior_oi.${campo}`, v)}
-                      disabled={isReadOnly}
-                    />
-                  ))}
+                  <Textarea
+                    value={formData.examen.segmento_anterior}
+                    onChange={(e) => updateNestedField('examen.segmento_anterior', e.target.value)}
+                    disabled={isReadOnly}
+                    placeholder="Párpados, conjuntiva, córnea, cámara anterior, iris, cristalino..."
+                    className="input-teal min-h-[100px] text-sm"
+                  />
                 </div>
                 
-                {/* Vítreo */}
-                <CampoODOI
-                  label="Vítreo"
-                  valueOD={formData.examen.vitreo_od}
-                  valueOI={formData.examen.vitreo_oi}
-                  onChangeOD={(v) => updateNestedField('examen.vitreo_od', v)}
-                  onChangeOI={(v) => updateNestedField('examen.vitreo_oi', v)}
-                  disabled={isReadOnly}
-                />
-                
-                {/* Fondo de Ojo */}
+                {/* Segmento Posterior - Simplificado a un solo textarea */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Fondo de Ojo</Label>
-                  {['papila', 'macula', 'retina', 'vasos'].map(campo => (
-                    <CampoODOI
-                      key={campo}
-                      label={campo.charAt(0).toUpperCase() + campo.slice(1)}
-                      valueOD={formData.examen.fondo_ojo_od[campo]}
-                      valueOI={formData.examen.fondo_ojo_oi[campo]}
-                      onChangeOD={(v) => updateNestedField(`examen.fondo_ojo_od.${campo}`, v)}
-                      onChangeOI={(v) => updateNestedField(`examen.fondo_ojo_oi.${campo}`, v)}
-                      disabled={isReadOnly}
-                    />
-                  ))}
+                  <Label className="text-xs font-semibold text-teal-700">Segmento Posterior</Label>
+                  <Textarea
+                    value={formData.examen.segmento_posterior}
+                    onChange={(e) => updateNestedField('examen.segmento_posterior', e.target.value)}
+                    disabled={isReadOnly}
+                    placeholder="Vítreo, papila, mácula, retina, vasos..."
+                    className="input-teal min-h-[100px] text-sm"
+                  />
                 </div>
                 
                 {/* Motilidad y Pupilas */}
@@ -1199,7 +1205,7 @@ const EvaluacionOftalmologica = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => addArrayItem('diagnosticos', { descripcion: '', codigo_cie10: '', ojo: 'AO' })}
+                        onClick={() => addArrayItem('diagnosticos', { descripcion: '', codigo_cie10: '', ojo: 'OU' })}
                         className="h-6 text-xs text-teal-600 hover:text-teal-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
@@ -1229,8 +1235,8 @@ const EvaluacionOftalmologica = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="OD">OD</SelectItem>
-                            <SelectItem value="OI">OI</SelectItem>
-                            <SelectItem value="AO">AO</SelectItem>
+                            <SelectItem value="OS">OS</SelectItem>
+                            <SelectItem value="OU">OU</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1274,7 +1280,7 @@ const EvaluacionOftalmologica = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => addArrayItem('recomendaciones.estudios_a_realizar', { estudio: '', ojo: 'AO', indicaciones: '' })}
+                        onClick={() => addArrayItem('recomendaciones.estudios_a_realizar', { estudio: '', ojo: 'OU', indicaciones: '' })}
                         className="h-6 text-xs text-teal-600 hover:text-teal-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
@@ -1312,8 +1318,8 @@ const EvaluacionOftalmologica = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="OD">OD</SelectItem>
-                            <SelectItem value="OI">OI</SelectItem>
-                            <SelectItem value="AO">AO</SelectItem>
+                            <SelectItem value="OS">OS</SelectItem>
+                            <SelectItem value="OU">OU</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1463,12 +1469,12 @@ const EvaluacionOftalmologica = () => {
                   ))}
                 </div>
                 <div className="grid grid-cols-5 gap-1 items-center">
-                  <Label className="text-xs text-right">OI</Label>
+                  <Label className="text-xs text-right">OS</Label>
                   {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
                     <Input
                       key={field}
-                      value={formData.recetas.anteojos.oi[field]}
-                      onChange={(e) => updateNestedField(`recetas.anteojos.oi.${field}`, e.target.value)}
+                      value={formData.recetas.anteojos.os[field]}
+                      onChange={(e) => updateNestedField(`recetas.anteojos.os.${field}`, e.target.value)}
                       disabled={isReadOnly}
                       className="input-teal text-xs h-7"
                     />
@@ -1575,12 +1581,12 @@ const EvaluacionOftalmologica = () => {
                   ))}
                 </div>
                 <div className="grid grid-cols-4 gap-1 items-center">
-                  <Label className="text-xs text-right">OI</Label>
+                  <Label className="text-xs text-right">OS</Label>
                   {['poder', 'curva_base', 'diametro'].map(field => (
                     <Input
                       key={field}
-                      value={formData.recetas.lentes_contacto.oi[field]}
-                      onChange={(e) => updateNestedField(`recetas.lentes_contacto.oi.${field}`, e.target.value)}
+                      value={formData.recetas.lentes_contacto.os[field]}
+                      onChange={(e) => updateNestedField(`recetas.lentes_contacto.os.${field}`, e.target.value)}
                       disabled={isReadOnly}
                       className="input-teal text-xs h-7"
                     />
@@ -1770,11 +1776,11 @@ const EvaluacionOftalmologica = () => {
                       <td className="text-center">{formData.recetas.anteojos.od.adicion}</td>
                     </tr>
                     <tr className="border-b">
-                      <td className="py-2 font-medium">OI</td>
-                      <td className="text-center">{formData.recetas.anteojos.oi.esfera}</td>
-                      <td className="text-center">{formData.recetas.anteojos.oi.cilindro}</td>
-                      <td className="text-center">{formData.recetas.anteojos.oi.eje}</td>
-                      <td className="text-center">{formData.recetas.anteojos.oi.adicion}</td>
+                      <td className="py-2 font-medium">OS</td>
+                      <td className="text-center">{formData.recetas.anteojos.os.esfera}</td>
+                      <td className="text-center">{formData.recetas.anteojos.os.cilindro}</td>
+                      <td className="text-center">{formData.recetas.anteojos.os.eje}</td>
+                      <td className="text-center">{formData.recetas.anteojos.os.adicion}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1810,10 +1816,10 @@ const EvaluacionOftalmologica = () => {
                       <td className="text-center">{formData.recetas.lentes_contacto.od.diametro}</td>
                     </tr>
                     <tr className="border-b">
-                      <td className="py-2 font-medium">OI</td>
-                      <td className="text-center">{formData.recetas.lentes_contacto.oi.poder}</td>
-                      <td className="text-center">{formData.recetas.lentes_contacto.oi.curva_base}</td>
-                      <td className="text-center">{formData.recetas.lentes_contacto.oi.diametro}</td>
+                      <td className="py-2 font-medium">OS</td>
+                      <td className="text-center">{formData.recetas.lentes_contacto.os.poder}</td>
+                      <td className="text-center">{formData.recetas.lentes_contacto.os.curva_base}</td>
+                      <td className="text-center">{formData.recetas.lentes_contacto.os.diametro}</td>
                     </tr>
                   </tbody>
                 </table>
