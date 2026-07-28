@@ -3,16 +3,15 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { 
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
-  ChevronDown, ChevronUp, Lock, Clock, AlertTriangle,
+  ChevronDown, ChevronUp, Lock, Clock,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
-  Glasses, Contact, X, Check
+  Glasses, Contact
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Checkbox } from '../components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -20,14 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -184,7 +175,6 @@ const EvaluacionOftalmologica = () => {
   const [tiempoRestante, setTiempoRestante] = useState(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printType, setPrintType] = useState('');
-  const [listDialogOpen, setListDialogOpen] = useState(false);
   
   const autoguardadoRef = useRef(null);
   const lastSavedRef = useRef(null);
@@ -442,7 +432,6 @@ const EvaluacionOftalmologica = () => {
     });
     setSearchPaciente(evaluacion.paciente_nombre || '');
     setAutoguardadoStatus('');
-    setListDialogOpen(false);
   };
 
   // Nueva evaluación
@@ -742,15 +731,45 @@ const EvaluacionOftalmologica = () => {
                 </Badge>
               )}
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setListDialogOpen(true)}
-                className="btn-outline"
-              >
-                <FileText className="w-4 h-4 mr-1" />
-                Historial
-              </Button>
+              {/* Dropdown de Historial */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="btn-outline">
+                    <FileText className="w-4 h-4 mr-1" />
+                    Historial
+                    <ChevronDown className="w-3 h-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
+                  {evaluaciones.length === 0 ? (
+                    <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                      No hay evaluaciones registradas
+                    </div>
+                  ) : (
+                    evaluaciones.map((ev) => (
+                      <DropdownMenuItem 
+                        key={ev.id}
+                        onClick={() => cargarEvaluacion(ev)}
+                        className={`flex flex-col items-start py-2 cursor-pointer ${
+                          evaluacionActual?.id === ev.id ? 'bg-teal-50' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-medium text-sm truncate max-w-[200px]">
+                            {ev.paciente_nombre}
+                          </span>
+                          {ev.sellado && (
+                            <Lock className="w-3 h-3 text-red-500 ml-2" />
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {ev.fecha} | {ev.paciente_expediente}
+                        </span>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               
               <Button
                 variant="outline"
@@ -844,27 +863,9 @@ const EvaluacionOftalmologica = () => {
                     value={formData.antecedentes.personales_patologicos}
                     onChange={(e) => updateNestedField('antecedentes.personales_patologicos', e.target.value)}
                     disabled={isReadOnly}
-                    placeholder="Enfermedades crónicas, hospitalizaciones..."
-                    className="input-teal min-h-[50px] text-sm"
+                    placeholder="Diabetes, hipertensión, cardiopatía, tiroides, otras enfermedades crónicas..."
+                    className="input-teal min-h-[60px] text-sm"
                   />
-                  <div className="flex flex-wrap gap-3 mt-2">
-                    {[
-                      { key: 'diabetes', label: 'Diabetes' },
-                      { key: 'hipertension', label: 'Hipertensión' },
-                      { key: 'cardiopatia', label: 'Cardiopatía' },
-                      { key: 'enfermedad_tiroidea', label: 'Tiroides' },
-                      { key: 'otros_patologicos', label: 'Otros' }
-                    ].map(({ key, label }) => (
-                      <label key={key} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                        <Checkbox
-                          checked={formData.antecedentes[key]}
-                          onCheckedChange={(checked) => updateNestedField(`antecedentes.${key}`, checked)}
-                          disabled={isReadOnly}
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
                 </div>
                 
                 <div>
@@ -1652,52 +1653,6 @@ const EvaluacionOftalmologica = () => {
           </div>
         </div>
       </div>
-
-      {/* Dialog de Historial de Evaluaciones */}
-      <Dialog open={listDialogOpen} onOpenChange={setListDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Historial de Evaluaciones</DialogTitle>
-            <DialogDescription>
-              Seleccione una evaluación para cargar
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            {evaluaciones.map((ev) => (
-              <div
-                key={ev.id}
-                className={`p-3 border rounded-lg cursor-pointer hover:bg-teal-50 transition-colors ${
-                  evaluacionActual?.id === ev.id ? 'border-teal-500 bg-teal-50' : ''
-                }`}
-                onClick={() => cargarEvaluacion(ev)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">{ev.paciente_nombre}</div>
-                    <div className="text-xs text-gray-500">
-                      {ev.fecha} | {ev.paciente_expediente} | {ev.medico_nombre}
-                    </div>
-                    <div className="text-xs text-gray-400 truncate max-w-md">
-                      {ev.motivo_consulta}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {ev.sellado && (
-                      <Badge className="bg-red-100 text-red-700 text-xs">
-                        <Lock className="w-3 h-3 mr-1" />
-                        Sellado
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {evaluaciones.length === 0 && (
-              <p className="text-center text-gray-500 py-8">No hay evaluaciones registradas</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Área de Impresión (oculta normalmente) */}
       {printDialogOpen && (
