@@ -1,0 +1,43 @@
+{
+  "summary": "Tested Caja module (Caja Diaria, CxC, Cierres Financieros) end-to-end. Backend endpoints work well (16/17 tests passing). Login OK, tabs load, Caja Diaria shows Estado 'Abierta', Ingresos Hoy Q625, Egresos Hoy Q50, Saldo Efectivo Q775, and movimientos table renders (including the created test movements). Two CRITICAL frontend bugs found: (1) 'Historial de Cierres' crashes the entire Caja component with 'historialCierres.map is not a function' because the endpoint returns {data, total} but the code sets the whole object. (2) Abono endpoint mismatch — frontend calls /cxc/{id}/abonos (plural) but backend exposes /abono (singular), so abono registration from UI will 404. Backend endpoints for apertura, movimientos (create/update), CxC create, resumen, abono (singular), pagadores CRUD and cierres-financieros creation all pass with data validation and origen='clinica'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/caja/cierres", "issue": "Returns wrapped object {data, total} while frontend code expects a plain list -> mismatch causes UI crash. Either change backend to return list, or fix frontend. Recommend aligning frontend to backend paginated shape."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Caja.js - fetchHistorialCierres", "issue": "setHistorialCierres(response.data || []) sets the wrapped object {data:[...], total:N} instead of the array. When 'Historial de Cierres' modal opens, historialCierres.map throws TypeError and crashes the whole Caja screen (Uncaught runtime error). Fix: setHistorialCierres(response.data?.data || []).", "selector": "[data-testid=\"btn-historial-cierres\"]", "priority": "CRITICAL"},
+      {"component": "Caja.js - handleSaveAbono", "issue": "POSTs to /api/cxc/{id}/abonos (plural) but backend route is /api/cxc/{cuenta_id}/abono (singular). Any attempt to register an abono from the UI will fail with 404. Fix: change URL to /abono (or add plural route on backend).", "selector": "abonoDialog submit", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "Historial de cierres diarios", "issue": "Full component crash upon opening historial dialog due to shape mismatch", "affected_selectors": ["[data-testid=\"btn-historial-cierres\"]"]},
+      {"flow": "Registrar abono en CxC", "issue": "Endpoint 404 - plural vs singular URL", "affected_selectors": ["abono submit button"]}
+    ],
+    "design_issues": [
+      {"screen": "Caja Diaria", "issues": ["Header sin acciones globales de refresh visibles; ok en general", "Los DialogContent muestran warning de accesibilidad: Missing Description/aria-describedby - agregar DialogDescription o aria attribute"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_caja.py", "/app/test_reports/pytest/caja_results.xml"],
+  "action_items": [
+    "FIX (frontend Caja.js): in fetchHistorialCierres, use setHistorialCierres(response.data?.data || []) to unwrap the {data,total} response.",
+    "FIX (frontend Caja.js handleSaveAbono): change POST URL from /cxc/${id}/abonos to /cxc/${id}/abono to match backend route.",
+    "Add DialogDescription (or aria-describedby) to Historial de Cierres and Detalle dialogs to remove Radix a11y warnings."
+  ],
+  "critical_code_review_comments": [
+    "Caja.js file is very large (>1600 lines). Split into subcomponents (CajaDiariaTab, CxCTab, CierresFinancierosTab, dialogs) for maintainability.",
+    "API shape inconsistency: /caja/cierres returns list-wrapped object {data,total}; /caja/movimientos, /cxc, /cierres-financieros all also wrap. Standardize response wrappers and consumer unwrapping across the app.",
+    "handleDeletePagador uses native confirm() while other flows use Dialog — inconsistent UX.",
+    "Frontend uses global axios without an explicit Authorization header setup here; ensure AuthContext installs default header, otherwise 401s could occur silently.",
+    "Missing error boundary around Caja component; a single malformed response takes the whole page down."
+  ],
+  "updated_files": ["/app/backend/tests/test_caja.py"],
+  "success_rate": {"backend": "94% (16/17; the 1 failure was a test-side assertion adjusted for wrapped response, not a backend bug)", "frontend": "~60% (main tab and movimientos work; historial and abono flows broken)"},
+  "test_credentials": "superadmin / nova2024 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created a few TEST_ movimientos (Ingreso Q250 later updated to Q275; Egreso Q50) and one TEST CxC of Q1000 with a Q300 abono via /abono singular endpoint. Also a temporary TEST_Pagador (cleaned up).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes the two frontend URL/shape bugs in /app/frontend/src/pages/Caja.js, re-run: (a) click 'Historial de Cierres' button and confirm the dialog opens without crashing and shows the previously closed cierre rows, (b) open a CxC detail from the CxC tab, click 'Registrar abono', submit — confirm 200 and saldo_pendiente updates, and if registrar_en_caja=true, that a caja movimiento is created. Backend tests: pytest /app/backend/tests/test_caja.py.",
+  "rca of the issue": "Bug A (historial crash): GET /api/caja/cierres returns {data:[...], total:N} (server.py line ~3222) but Caja.js fetchHistorialCierres does setHistorialCierres(response.data || []). React then calls .map on the object literal -> TypeError -> uncaught, crashes the whole Caja page. Repro: login as superadmin, go to /caja, click 'Historial de Cierres' button. Mitigation: change to response.data?.data || [] (or align backend to return a list). Bug B (abono 404): Frontend URL is /cxc/{id}/abonos, backend router registers /cxc/{cuenta_id}/abono (server.py ~3538). Reproduce by opening a CxC and posting an abono. Mitigation: rename URL in Caja.js handleSaveAbono to /abono or add plural alias in server.py."
+}

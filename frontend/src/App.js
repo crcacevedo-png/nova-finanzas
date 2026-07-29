@@ -21,6 +21,7 @@ import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import SalaOperaciones from './pages/SalaOperaciones';
 import AuditLogs from './pages/AuditLogs';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
+import Caja from './pages/Caja';
 import './App.css';
 
 // Protected Route Component
@@ -236,6 +237,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <EvaluacionOftalmologica />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Caja - Control financiero del área clínica */}
+      <Route 
+        path="/caja" 
+        element={
+          <ProtectedRoute requiredPermission="view_payment_authorizations">
+            <Caja />
           </ProtectedRoute>
         } 
       />
