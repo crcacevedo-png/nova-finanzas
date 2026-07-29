@@ -1,0 +1,37 @@
+{
+  "summary": "Verified 'OI' → 'OS' terminology fix in Sala de Operaciones module. Frontend UI changes are correct (filter and modal), but pre-existing surgery records in the database still contain eye='OI' and render as 'OI' badges in the table. Data migration was not performed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SalaOperaciones table (getEyeBadge)",
+        "issue": "Existing records with eye='OI' still display as 'OI' in the OJO column (e.g., 'José Antonio Ramírez' and 'Carlos Eduardo Pérez' rows). The frontend renaming did not migrate existing DB data. Additionally, getEyeBadge has no styles entry for 'OI', so it falls back to Badge's default (dark green) styling, making it inconsistent with the OD/OS/AO color scheme.",
+        "selector": "table row OJO column badge",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Run a one-time DB migration to update all surgeries where eye='OI' to eye='OS' (collection likely 'surgeries' in MongoDB).",
+    "OPTIONAL as a defense-in-depth: In getEyeBadge, map legacy 'OI' → display as 'OS' (or add a fallback style) so any un-migrated data still renders correctly.",
+    "Verify backend Pydantic/enum validation for the 'eye' field only accepts ['OD','OS','AO'] to prevent regression."
+  ],
+  "critical_code_review_comments": [
+    "getEyeBadge lacks a fallback: when eye value is not in the styles map, `styles[eye]` is undefined and the badge renders with default styles — silent visual bug. Add a default style or normalize the value.",
+    "No data migration script was included with the terminology rename. Renaming enums/labels without migrating existing documents leaves stale data visible to users."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "67% (2 of 3 checks pass; existing data still shows OI)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Verified: (1) Eye filter dropdown shows Todos/OD/OS/AO ✅  (2) 'Registrar cirugía' modal shows OD/OS/AO buttons ✅  (3) Table still shows 'OI' for pre-existing rows ❌ — needs DB migration. After main agent migrates, retest by loading /sala-operaciones and confirming no 'OI' text appears in the OJO column.",
+  "rca of the issue": "Root cause: The terminology change was applied only at the presentation layer (SalaOperaciones.js: getEyeBadge styles map, filter SelectItems, and modal buttons). No corresponding migration was run on the MongoDB `surgeries` collection to update existing records where `eye` was persisted as 'OI'. As a result, rendered rows read the raw DB value and display 'OI', while getEyeBadge's styles map has no 'OI' key so the badge uses the default (dark green) Badge appearance. Mitigation: perform a DB update (e.g., db.surgeries.updateMany({eye:'OI'}, {$set:{eye:'OS'}})) and optionally add a defensive normalization in getEyeBadge."
+}

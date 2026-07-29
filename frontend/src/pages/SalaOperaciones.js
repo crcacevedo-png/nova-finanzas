@@ -108,7 +108,7 @@ const formatDateDisplay = (dateStr) => {
 const getEyeBadge = (eye) => {
   const styles = {
     OD: 'bg-blue-50 text-blue-700 border border-blue-200',
-    OI: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    OS: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     AO: 'bg-amber-50 text-amber-700 border border-amber-200',
   };
   return <Badge className={`${styles[eye]} font-medium`}>{eye}</Badge>;
@@ -559,7 +559,7 @@ const SalaOperaciones = () => {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="OD">OD</SelectItem>
-                  <SelectItem value="OI">OI</SelectItem>
+                  <SelectItem value="OS">OS</SelectItem>
                   <SelectItem value="AO">AO</SelectItem>
                 </SelectContent>
               </Select>
@@ -941,7 +941,7 @@ const SalaOperaciones = () => {
                   <div>
                     <Label>Ojo a operar *</Label>
                     <div className="flex gap-2 mt-1">
-                      {['OD', 'OI', 'AO'].map(eye => (
+                      {['OD', 'OS', 'AO'].map(eye => (
                         <button
                           key={eye}
                           type="button"
@@ -949,7 +949,7 @@ const SalaOperaciones = () => {
                           className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
                             formData.eye === eye
                               ? eye === 'OD' ? 'bg-blue-50 border-blue-300 text-blue-700'
-                                : eye === 'OI' ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                                : eye === 'OS' ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                                 : 'bg-amber-50 border-amber-300 text-amber-700'
                               : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
                           }`}
