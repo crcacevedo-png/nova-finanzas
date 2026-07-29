@@ -103,6 +103,15 @@ from routes.surgeries import (
     enrich_surgery
 )
 
+# ==================== FASE 5 - CAJA CLÍNICA ====================
+from routes.caja import (
+    router as caja_router,
+    catalogos_router as caja_catalogos_router,
+    cxc_router as caja_cxc_router,
+    cierres_financieros_router as caja_cierres_financieros_router,
+    init_caja_routes
+)
+
 __all__ = [
     # ==================== Routers ====================
     'auth_router',
@@ -116,6 +125,10 @@ __all__ = [
     'igss_units_router',
     'surgeries_router',
     'surgery_reports_router',
+    'caja_router',
+    'caja_catalogos_router',
+    'caja_cxc_router',
+    'caja_cierres_financieros_router',
     
     # ==================== Auth helpers ====================
     'get_current_user',
@@ -203,5 +216,8 @@ __all__ = [
     'SurgeryUpdate',
     'SurgeryResponse',
     'SurgeryListResponse',
-    'enrich_surgery'
+    'enrich_surgery',
+    
+    # ==================== Caja helpers ====================
+    'init_caja_routes'
 ]

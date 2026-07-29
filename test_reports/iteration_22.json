@@ -1,0 +1,45 @@
+{
+  "summary": "Tested refactored Caja module (backend/routes/caja.py). Ran pytest suite (17 tests) + Playwright UI smoke test. CRITICAL: All POST/PUT/DELETE endpoints in caja.py return 500 due to broken FastAPI dependency injection. GET endpoints work and frontend loads correctly showing the 3 tabs, but write operations from the UI would fail once user tries them. 6/17 backend tests pass (all GETs). Frontend renders Caja Diaria (Estado Abierta, Q625/Q50/Q775), CxC tab, and Cierres Financieros tab correctly.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "ALL POST/PUT/DELETE in /api/caja/*, /api/catalogos/pagadores, /api/cxc/*, /api/cierres-financieros/*", "issue": "TypeError: 'function' object is not subscriptable at current_user['id']. Root cause: routes/caja.py uses Depends(lambda: get_current_user) — the lambda returns the function REFERENCE instead of invoking the FastAPI dependency. Same pattern used ~40+ times for get_current_user, require_permission, require_role. Confirmed via /var/log/supervisor/backend.err.log traceback pointing to /app/backend/routes/caja.py:836 (crear_cierre_financiero) and reproduced for /caja/movimientos POST, /catalogos/pagadores POST, /cxc POST, /cierres-financieros POST.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/cxc/{id}/abono vs /abonos", "issue": "Backend exposes /abono (singular) while previous test iteration noted frontend may call /abonos (plural). Verify frontend path matches backend.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/caja/cierres", "issue": "Returns dict {data: [...], total: N} instead of a plain list — inconsistent with typical list endpoint contract; harmless if intentional but should be documented."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Nuevo Movimiento / Cerrar Caja / Generar Cierre / Registrar Abono / Crear Pagador", "issue": "All these UI actions POST to endpoints that currently 500. UI will fail once user attempts them (couldn't reach modal to submit but backend proves it).", "affected_selectors": ["Nuevo Movimiento button", "Cerrar Caja", "Generar Cierre"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_caja.py",
+    "/app/test_reports/pytest/caja_results.xml"
+  ],
+  "action_items": [
+    "FIX CRITICAL: Replace all `Depends(lambda: get_current_user)` in /app/backend/routes/caja.py with a proper dependency. Recommended approach: define module-level async wrappers, e.g. `async def _current_user(credentials: HTTPAuthorizationCredentials = Depends(security)): return await get_current_user(credentials)` and use `Depends(_current_user)`. Same wrapper pattern needed for require_permission(perm) and require_role(role) (they are factory functions returning a dependency). Occurrences: lines 84,114,172,197,241,262,280,340,354,366,410,422,446,462,482,506,541,586,599,627,705,782,802,851,864,883,912 (~30+).",
+    "After fix, re-run: pytest /app/backend/tests/test_caja.py -v",
+    "Verify frontend endpoint /api/cxc/{id}/abono vs /abonos naming matches between Caja.js and routes/caja.py"
+  ],
+  "critical_code_review_comments": [
+    "routes/caja.py: broken dependency injection pattern (lambda wrapping globals) — this is the root cause of all 500 errors and must be redesigned.",
+    "The 'globals set by init_caja_routes' pattern is fragile. Consider moving get_current_user/require_permission/require_role into a shared /app/backend/auth.py module and importing them directly to avoid the lazy-injection dance.",
+    "caja.py is 922 lines — after adding wrappers, consider splitting into caja_diaria.py, cxc.py, cierres.py, catalogos.py.",
+    "GET /api/caja/cierres inconsistency (dict vs list) — pick one contract project-wide.",
+    "server.py is still 7811 lines — continue extraction."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_caja.py (already existed; kept as-is)"
+  ],
+  "success_rate": {"backend": "35% (6/17 pytest cases passing — all GETs)", "frontend": "GETs render 100%; write flows blocked by backend bug"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None new. Existing TEST_papeleria and TEST_consulta_editada rows from prior test iteration still present in DB.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After main agent fixes the Depends(lambda: get_current_user) pattern in /app/backend/routes/caja.py, rerun `pytest /app/backend/tests/test_caja.py -v`. All 17 tests should pass except maybe test_list_historial (dict vs list — trivial to update) and test_create_cierre_mensual which may return 400 if a Mensual cierre for the current month already exists.",
+  "rca of the issue": "In /app/backend/routes/caja.py, the module-level `get_current_user`, `require_permission`, `require_role` are None at import time and are assigned by init_caja_routes(). To defer resolution, the developer used `Depends(lambda: get_current_user)`. BUT this lambda takes no args and returns the function reference itself — it does NOT invoke it. FastAPI stores the lambda's return value as `current_user`, so `current_user` ends up being the function object, and any `current_user['id']` raises TypeError: 'function' object is not subscriptable. Mitigation: define proper async wrapper deps that call the injected globals with the correct FastAPI-managed arguments (HTTPAuthorizationCredentials = Depends(security))."
+}
