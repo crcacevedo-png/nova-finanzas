@@ -92,7 +92,7 @@ const CATEGORIAS_EGRESO = [
   'Otro'
 ];
 
-const METODOS_PAGO = ['Efectivo', 'Tarjeta', 'Transferencia', 'Cheque'];
+const METODOS_PAGO = ['Efectivo', 'Tarjeta', 'Transferencia', 'Cheque', 'Cuenta por Cobrar'];
 
 // Formularios iniciales
 const initialMovimientoForm = {
@@ -103,7 +103,14 @@ const initialMovimientoForm = {
   metodo_pago: 'Efectivo',
   referencia: '',
   paciente_id: '',
-  paciente_nombre: ''
+  paciente_nombre: '',
+  // Campos adicionales para Cuenta por Cobrar
+  tipo_pagador_id: '',
+  tipo_pagador_nombre: '',
+  pagador_nombre: '',
+  es_aseguradora: false,
+  monto_deducible: '',
+  metodo_pago_deducible: 'Efectivo'
 };
 
 const initialCxCForm = {
@@ -323,12 +330,14 @@ const Caja = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (pacienteSearch) {
+      // Solo buscar si no hay un paciente ya seleccionado (en movimiento o cxc)
+      const pacienteYaSeleccionado = movimientoForm.paciente_id || cxcForm.paciente_id;
+      if (pacienteSearch && !pacienteYaSeleccionado) {
         searchPacientes(pacienteSearch);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [pacienteSearch, searchPacientes]);
+  }, [pacienteSearch, searchPacientes, movimientoForm.paciente_id, cxcForm.paciente_id]);
 
   // ==================== APERTURA / CIERRE ====================
 
@@ -403,19 +412,89 @@ const Caja = () => {
       toast.error('Complete los campos obligatorios');
       return;
     }
+    
+    // Validaciones para Cuenta por Cobrar
+    if (movimientoForm.metodo_pago === 'Cuenta por Cobrar') {
+      if (!movimientoForm.paciente_id || !movimientoForm.paciente_nombre) {
+        toast.error('Debe seleccionar un paciente para Cuenta por Cobrar');
+        return;
+      }
+      if (!movimientoForm.tipo_pagador_id) {
+        toast.error('Debe seleccionar el tipo de pagador');
+        return;
+      }
+      // Si es aseguradora y tiene deducible, validar
+      if (movimientoForm.es_aseguradora && movimientoForm.monto_deducible) {
+        const deducible = parseFloat(movimientoForm.monto_deducible);
+        const montoTotal = parseFloat(movimientoForm.monto);
+        if (deducible >= montoTotal) {
+          toast.error('El deducible debe ser menor al monto total');
+          return;
+        }
+      }
+    }
+    
     setSubmitting(true);
     try {
-      const data = {
-        ...movimientoForm,
-        monto: parseFloat(movimientoForm.monto)
-      };
+      const montoTotal = parseFloat(movimientoForm.monto);
       
-      if (editingMovimiento) {
-        await axios.put(`${API_URL}/caja/movimientos/${editingMovimiento.id}`, data);
-        toast.success('Movimiento actualizado');
+      // Caso especial: Cuenta por Cobrar
+      if (movimientoForm.metodo_pago === 'Cuenta por Cobrar' && !editingMovimiento) {
+        const deducible = movimientoForm.es_aseguradora && movimientoForm.monto_deducible 
+          ? parseFloat(movimientoForm.monto_deducible) 
+          : 0;
+        const montoCxC = montoTotal - deducible;
+        
+        // 1. Si hay deducible, registrar el pago del deducible en caja
+        if (deducible > 0) {
+          await axios.post(`${API_URL}/caja/movimientos`, {
+            tipo: 'Ingreso',
+            categoria: movimientoForm.categoria,
+            concepto: `${movimientoForm.concepto} (Deducible)`,
+            monto: deducible,
+            metodo_pago: movimientoForm.metodo_pago_deducible,
+            referencia: movimientoForm.referencia,
+            paciente_id: movimientoForm.paciente_id,
+            paciente_nombre: movimientoForm.paciente_nombre
+          });
+        }
+        
+        // 2. Crear la cuenta por cobrar con el monto restante (o total si no hay deducible)
+        await axios.post(`${API_URL}/cxc`, {
+          paciente_id: movimientoForm.paciente_id,
+          paciente_nombre: movimientoForm.paciente_nombre,
+          tipo_pagador_id: movimientoForm.tipo_pagador_id,
+          tipo_pagador_nombre: movimientoForm.tipo_pagador_nombre,
+          pagador_nombre: movimientoForm.pagador_nombre || '',
+          concepto: movimientoForm.concepto,
+          referencia: movimientoForm.referencia,
+          monto_total: montoCxC
+        });
+        
+        toast.success(deducible > 0 
+          ? `Deducible Q${deducible.toFixed(2)} registrado en caja y Q${montoCxC.toFixed(2)} agregado a Cuentas por Cobrar`
+          : 'Cuenta por Cobrar creada exitosamente'
+        );
       } else {
-        await axios.post(`${API_URL}/caja/movimientos`, data);
-        toast.success('Movimiento registrado');
+        // Caso normal: movimiento regular
+        const data = {
+          tipo: movimientoForm.tipo,
+          categoria: movimientoForm.categoria,
+          concepto: movimientoForm.concepto,
+          monto: montoTotal,
+          metodo_pago: movimientoForm.metodo_pago,
+          referencia: movimientoForm.referencia,
+          paciente_id: movimientoForm.paciente_id || '',
+          paciente_nombre: movimientoForm.paciente_nombre || ''
+        };
+        
+        if (editingMovimiento) {
+          await axios.put(`${API_URL}/caja/movimientos/${editingMovimiento.id}`, data);
+          toast.success('Movimiento actualizado');
+        } else {
+          await axios.post(`${API_URL}/caja/movimientos`, data);
+          toast.success('Movimiento registrado');
+        }
       }
       
       setMovimientoDialogOpen(false);
@@ -425,6 +504,11 @@ const Caja = () => {
       setPacientesResults([]);
       fetchMovimientos();
       fetchCajaEstado();
+      // También actualizar CxC si se creó una
+      if (movimientoForm.metodo_pago === 'Cuenta por Cobrar') {
+        fetchCuentasCobrar();
+        fetchResumenCxC();
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al guardar movimiento');
     } finally {
@@ -783,20 +867,21 @@ const Caja = () => {
   };
 
   const selectPaciente = (paciente, formType) => {
+    const nombrePaciente = paciente.nombre || paciente.nombre_completo || `${paciente.first_name} ${paciente.last_name}`;
     if (formType === 'movimiento') {
       setMovimientoForm(prev => ({
         ...prev,
         paciente_id: paciente.id,
-        paciente_nombre: paciente.nombre
+        paciente_nombre: nombrePaciente
       }));
     } else if (formType === 'cxc') {
       setCxcForm(prev => ({
         ...prev,
         paciente_id: paciente.id,
-        paciente_nombre: paciente.nombre
+        paciente_nombre: nombrePaciente
       }));
     }
-    setPacienteSearch(paciente.nombre);
+    setPacienteSearch(nombrePaciente);
     setPacientesResults([]);
   };
 
@@ -1401,7 +1486,13 @@ const Caja = () => {
               <Label>Tipo *</Label>
               <Select 
                 value={movimientoForm.tipo} 
-                onValueChange={(v) => setMovimientoForm(prev => ({ ...prev, tipo: v, categoria: '' }))}
+                onValueChange={(v) => setMovimientoForm(prev => ({ 
+                  ...prev, 
+                  tipo: v, 
+                  categoria: '',
+                  // Limpiar CxC si cambia a Egreso
+                  ...(v === 'Egreso' ? { metodo_pago: 'Efectivo', tipo_pagador_id: '', es_aseguradora: false } : {})
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -1437,7 +1528,7 @@ const Caja = () => {
               />
             </div>
             <div>
-              <Label>Monto (GTQ) *</Label>
+              <Label>Monto Total (GTQ) *</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -1451,27 +1542,182 @@ const Caja = () => {
               <Label>Método de Pago *</Label>
               <Select 
                 value={movimientoForm.metodo_pago} 
-                onValueChange={(v) => setMovimientoForm(prev => ({ ...prev, metodo_pago: v }))}
+                onValueChange={(v) => setMovimientoForm(prev => ({ 
+                  ...prev, 
+                  metodo_pago: v,
+                  // Si no es CxC, limpiar los campos relacionados
+                  ...(v !== 'Cuenta por Cobrar' ? { 
+                    tipo_pagador_id: '', 
+                    tipo_pagador_nombre: '',
+                    es_aseguradora: false,
+                    monto_deducible: ''
+                  } : {})
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {METODOS_PAGO.map(m => (
+                  {/* Solo mostrar CxC para Ingresos */}
+                  {(movimientoForm.tipo === 'Ingreso' ? METODOS_PAGO : METODOS_PAGO.filter(m => m !== 'Cuenta por Cobrar')).map(m => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Campos adicionales para Cuenta por Cobrar */}
+            {movimientoForm.metodo_pago === 'Cuenta por Cobrar' && (
+              <>
+                {/* Paciente - Requerido para CxC */}
+                <div>
+                  <Label>Paciente *</Label>
+                  <div className="relative">
+                    <Input
+                      value={pacienteSearch}
+                      onChange={(e) => {
+                        setPacienteSearch(e.target.value);
+                        setMovimientoForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }));
+                      }}
+                      placeholder="Buscar paciente..."
+                      className={movimientoForm.paciente_id ? 'border-green-500' : ''}
+                    />
+                    {movimientoForm.paciente_id && (
+                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 text-sm">✓</span>
+                    )}
+                    {pacientesResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                        {pacientesResults.map(p => (
+                          <div
+                            key={p.id}
+                            className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                            onClick={() => selectPaciente(p, 'movimiento')}
+                          >
+                            {p.nombre || p.nombre_completo || `${p.first_name} ${p.last_name}`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tipo de Pagador */}
+                <div>
+                  <Label>Adjudicar a *</Label>
+                  <Select 
+                    value={movimientoForm.tipo_pagador_id || "select"} 
+                    onValueChange={(v) => {
+                      if (v === "select") return;
+                      const pag = pagadores.find(p => p.id === v);
+                      const esAseguradora = pag?.nombre?.toLowerCase().includes('asegura') || 
+                                           pag?.nombre?.toLowerCase().includes('seguro');
+                      setMovimientoForm(prev => ({ 
+                        ...prev, 
+                        tipo_pagador_id: v,
+                        tipo_pagador_nombre: pag?.nombre || '',
+                        es_aseguradora: esAseguradora,
+                        monto_deducible: esAseguradora ? prev.monto_deducible : ''
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione tipo de pagador..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="select" disabled>Seleccione...</SelectItem>
+                      {pagadores.filter(p => p.activo).map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Nombre del Pagador Específico */}
+                <div>
+                  <Label>Nombre del Pagador / Aseguradora</Label>
+                  <Input
+                    value={movimientoForm.pagador_nombre}
+                    onChange={(e) => setMovimientoForm(prev => ({ ...prev, pagador_nombre: e.target.value }))}
+                    placeholder="Ej: Seguros G&T, IGSS Zona 1, etc."
+                  />
+                </div>
+
+                {/* Si es Aseguradora, mostrar campo de deducible */}
+                {movimientoForm.es_aseguradora && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                    <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4" />
+                      Pago con Seguro
+                    </p>
+                    <div>
+                      <Label className="text-blue-700">Monto Deducible (pago del día)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={movimientoForm.monto_deducible}
+                        onChange={(e) => setMovimientoForm(prev => ({ ...prev, monto_deducible: e.target.value }))}
+                        placeholder="0.00"
+                        className="bg-white"
+                      />
+                      <p className="text-xs text-blue-600 mt-1">
+                        El deducible se registra en caja, el resto va a CxC
+                      </p>
+                    </div>
+                    {movimientoForm.monto_deducible && parseFloat(movimientoForm.monto_deducible) > 0 && (
+                      <>
+                        <div>
+                          <Label className="text-blue-700">Método de Pago del Deducible</Label>
+                          <Select 
+                            value={movimientoForm.metodo_pago_deducible} 
+                            onValueChange={(v) => setMovimientoForm(prev => ({ ...prev, metodo_pago_deducible: v }))}
+                          >
+                            <SelectTrigger className="bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Efectivo">Efectivo</SelectItem>
+                              <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                              <SelectItem value="Transferencia">Transferencia</SelectItem>
+                              <SelectItem value="Cheque">Cheque</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="text-sm bg-white p-2 rounded border">
+                          <div className="flex justify-between">
+                            <span>Monto Total:</span>
+                            <span className="font-medium">{formatCurrency(parseFloat(movimientoForm.monto) || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-green-600">
+                            <span>Deducible (a caja):</span>
+                            <span className="font-medium">{formatCurrency(parseFloat(movimientoForm.monto_deducible) || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-yellow-600 border-t pt-1 mt-1">
+                            <span>A Cuenta por Cobrar:</span>
+                            <span className="font-medium">
+                              {formatCurrency((parseFloat(movimientoForm.monto) || 0) - (parseFloat(movimientoForm.monto_deducible) || 0))}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Referencia */}
             <div>
               <Label>Referencia</Label>
               <Input
                 value={movimientoForm.referencia}
                 onChange={(e) => setMovimientoForm(prev => ({ ...prev, referencia: e.target.value }))}
-                placeholder="No. recibo, factura, etc."
+                placeholder="No. recibo, factura, autorización, etc."
               />
             </div>
-            {movimientoForm.tipo === 'Ingreso' && (
+
+            {/* Paciente - Solo mostrar si NO es CxC (para CxC se muestra arriba) */}
+            {movimientoForm.tipo === 'Ingreso' && movimientoForm.metodo_pago !== 'Cuenta por Cobrar' && (
               <div>
                 <Label>Paciente (opcional)</Label>
                 <div className="relative">
@@ -1491,7 +1737,7 @@ const Caja = () => {
                           className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
                           onClick={() => selectPaciente(p, 'movimiento')}
                         >
-                          {p.nombre}
+                          {p.nombre || p.nombre_completo || `${p.first_name} ${p.last_name}`}
                         </div>
                       ))}
                     </div>
@@ -1503,7 +1749,7 @@ const Caja = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setMovimientoDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveMovimiento} disabled={submitting} className="bg-teal-600 hover:bg-teal-700">
-              {submitting ? 'Guardando...' : 'Guardar'}
+              {submitting ? 'Guardando...' : (movimientoForm.metodo_pago === 'Cuenta por Cobrar' ? 'Crear CxC' : 'Guardar')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1758,7 +2004,7 @@ const Caja = () => {
                         className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
                         onClick={() => selectPaciente(p, 'cxc')}
                       >
-                        {p.nombre}
+                        {p.nombre || p.nombre_completo || `${p.first_name} ${p.last_name}`}
                       </div>
                     ))}
                   </div>

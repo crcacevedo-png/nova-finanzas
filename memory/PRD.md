@@ -208,6 +208,10 @@ Ver `/app/memory/test_credentials.md`
   - **Caja Diaria**:
     - Apertura de caja con monto inicial
     - Registro de movimientos (ingresos/egresos por categoría)
+    - **Método de pago "Cuenta por Cobrar"**: Al seleccionarlo:
+      - Requiere seleccionar paciente y tipo de pagador
+      - Si es Aseguradora: permite dividir pago entre deducible (caja) y CxC
+      - Muestra resumen visual de distribución del pago
     - Cierre de caja con arqueo y diferencia
     - Reapertura de caja solo para SuperAdmin
     - Historial de cierres con impresión
