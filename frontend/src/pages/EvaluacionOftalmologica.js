@@ -234,11 +234,11 @@ const EvaluacionOftalmologica = () => {
       pio_od: '', pio_os: '', pio_metodo: '',
       segmento_anterior: '',  // Simplificado a un solo campo de texto
       segmento_posterior: '', // Antes "fondo de ojo", simplificado
-      motilidad_ocular: '',
-      pupilas_reflejos: ''
+      motilidad_ocular: ''
     },
     diagnosticos: [],
     plan: '',
+    lectura_examenes: '',
     recomendaciones: {
       estudios_a_realizar: [],
       recomendaciones_generales: ''
@@ -418,8 +418,7 @@ const EvaluacionOftalmologica = () => {
       pio_metodo: examenData.pio_metodo || '',
       segmento_anterior: examenData.segmento_anterior || '',
       segmento_posterior: examenData.segmento_posterior || '',
-      motilidad_ocular: examenData.motilidad_ocular || '',
-      pupilas_reflejos: examenData.pupilas_reflejos || ''
+      motilidad_ocular: examenData.motilidad_ocular || ''
     };
     
     // Migrar recetas (oi → os)
@@ -445,6 +444,7 @@ const EvaluacionOftalmologica = () => {
       ...evaluacion,
       antecedentes: { ...evaluacionVacia.antecedentes, ...evaluacion.antecedentes },
       examen: migratedExamen,
+      lectura_examenes: evaluacion.lectura_examenes || '',
       recomendaciones: { ...evaluacionVacia.recomendaciones, ...evaluacion.recomendaciones },
       recetas: migratedRecetas
     });
@@ -1225,22 +1225,13 @@ const EvaluacionOftalmologica = () => {
                   />
                 </div>
                 
-                {/* Motilidad y Pupilas */}
+                {/* Motilidad Ocular */}
                 <div className="space-y-2">
                   <div>
                     <Label className="text-xs">Motilidad Ocular</Label>
                     <Textarea
                       value={formData.examen.motilidad_ocular}
                       onChange={(e) => updateNestedField('examen.motilidad_ocular', e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal min-h-[40px] text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Pupilas y Reflejos</Label>
-                    <Textarea
-                      value={formData.examen.pupilas_reflejos}
-                      onChange={(e) => updateNestedField('examen.pupilas_reflejos', e.target.value)}
                       disabled={isReadOnly}
                       className="input-teal min-h-[40px] text-sm"
                     />
@@ -1383,6 +1374,17 @@ const EvaluacionOftalmologica = () => {
                     onChange={(e) => updateNestedField('plan', e.target.value)}
                     disabled={isReadOnly}
                     placeholder="Conducta a seguir, indicaciones..."
+                    className="input-teal min-h-[80px] text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-semibold">Lectura de Exámenes</Label>
+                  <Textarea
+                    value={formData.lectura_examenes}
+                    onChange={(e) => updateNestedField('lectura_examenes', e.target.value)}
+                    disabled={isReadOnly}
+                    placeholder="Interpretación de estudios auxiliares, laboratorios, imágenes..."
                     className="input-teal min-h-[80px] text-sm"
                   />
                 </div>
