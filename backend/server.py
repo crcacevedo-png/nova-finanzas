@@ -2868,6 +2868,19 @@ api_router.include_router(caja_catalogos_router, tags=["Caja - Catálogos"])
 api_router.include_router(caja_cxc_router, tags=["Caja - CxC"])
 api_router.include_router(caja_cierres_financieros_router, tags=["Caja - Cierres Financieros"])
 
+# ==================== MÓDULO DE AGENDA - PACIENTES ====================
+# Rutas para la agenda de citas de pacientes (INDEPENDIENTE de Sala de Operaciones)
+from routes.agenda import (
+    router as agenda_router,
+    medicos_agenda_router,
+    config_router as agenda_config_router
+)
+
+# Incluir routers de agenda en api_router
+api_router.include_router(agenda_router, tags=["Agenda"])
+api_router.include_router(medicos_agenda_router, tags=["Agenda - Médicos"])
+api_router.include_router(agenda_config_router, tags=["Agenda - Configuración"])
+
 # ==================== USER MANAGEMENT ROUTES ====================
 
 @api_router.get("/users", response_model=List[UserResponse])

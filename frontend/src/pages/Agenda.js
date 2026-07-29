@@ -1,0 +1,1227 @@
+// /app/frontend/src/pages/Agenda.js
+// Módulo de Agenda de Pacientes - Vista principal con submenú
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
+import { 
+  Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
+  RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
+  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays
+} from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Textarea } from '../components/ui/textarea';
+import { Skeleton } from '../components/ui/skeleton';
+import { toast, Toaster } from 'sonner';
+import { agendaApi } from '../services/agendaApi';
+import { patientApi } from '../services/api';
+
+// Estados de cita con colores
+const ESTADOS_CITA = {
+  'Agendada': { color: 'bg-slate-100 text-slate-700 border-slate-300', icon: Calendar },
+  'Confirmada': { color: 'bg-blue-100 text-blue-700 border-blue-300', icon: CheckCircle },
+  'Presente': { color: 'bg-amber-100 text-amber-700 border-amber-300', icon: UserCheck },
+  'En consulta': { color: 'bg-purple-100 text-purple-700 border-purple-300', icon: Play },
+  'Atendida': { color: 'bg-green-100 text-green-700 border-green-300', icon: CheckCircle },
+  'No asistió': { color: 'bg-red-100 text-red-700 border-red-300', icon: XCircle },
+  'Cancelada': { color: 'bg-gray-100 text-gray-500 border-gray-300', icon: XCircle }
+};
+
+const TIPOS_CITA = [
+  'Primera vez', 'Subsecuente', 'Control post-operatorio', 'Estudio', 'Otro'
+];
+
+// Helper para formatear fecha
+const formatDate = (date) => {
+  return new Date(date).toLocaleDateString('es-GT', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+};
+
+const formatTime = (time) => {
+  if (!time) return '';
+  const [h, m] = time.split(':');
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${m} ${ampm}`;
+};
+
+// Componente de tarjeta de cita compacta
+const CitaCard = ({ cita, onEstadoChange, onAsignar, onEdit, onVerPaciente, compact = false }) => {
+  const estadoConfig = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
+  const IconoEstado = estadoConfig.icon;
+  
+  return (
+    <div 
+      className={`
+        rounded-lg border p-2 mb-1 cursor-pointer transition-all hover:shadow-md
+        ${estadoConfig.color} ${compact ? 'text-xs' : 'text-sm'}
+      `}
+      style={{ borderLeftWidth: '3px', borderLeftColor: cita.medico_color || '#0F6E56' }}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium truncate">{cita.paciente_nombre}</div>
+          <div className="text-xs opacity-75 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatTime(cita.hora_inicio)}
+            {cita.tipo_cita && <span className="ml-1">• {cita.tipo_cita}</span>}
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+              <MoreVertical className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {cita.estado === 'Agendada' && (
+              <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'Confirmada')}>
+                <CheckCircle className="w-4 h-4 mr-2" /> Confirmar
+              </DropdownMenuItem>
+            )}
+            {['Agendada', 'Confirmada'].includes(cita.estado) && (
+              <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'Presente')}>
+                <UserCheck className="w-4 h-4 mr-2" /> Marcar llegada
+              </DropdownMenuItem>
+            )}
+            {cita.estado === 'Presente' && (
+              <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'En consulta')}>
+                <Play className="w-4 h-4 mr-2" /> Iniciar consulta
+              </DropdownMenuItem>
+            )}
+            {cita.estado === 'En consulta' && (
+              <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'Atendida')}>
+                <CheckCircle className="w-4 h-4 mr-2" /> Marcar atendida
+              </DropdownMenuItem>
+            )}
+            {!['Atendida', 'No asistió', 'Cancelada'].includes(cita.estado) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'No asistió')}>
+                  <XCircle className="w-4 h-4 mr-2" /> No asistió
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'Cancelada')}>
+                  <XCircle className="w-4 h-4 mr-2" /> Cancelar
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onVerPaciente(cita.paciente_id)}>
+              <Eye className="w-4 h-4 mr-2" /> Ver paciente
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(cita)}>
+              <Calendar className="w-4 h-4 mr-2" /> Editar cita
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+};
+
+// Componente de paciente presente
+const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvaluacion, medicos }) => {
+  const tiempoEspera = paciente.tiempo_espera_minutos;
+  const colorEspera = tiempoEspera > 60 ? 'text-red-600' : tiempoEspera > 30 ? 'text-amber-600' : 'text-green-600';
+  
+  return (
+    <Card className="mb-2 border-l-4" style={{ borderLeftColor: paciente.medico_color || '#0F6E56' }}>
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold">{paciente.paciente_nombre}</div>
+            <div className="text-xs text-gray-500 flex items-center gap-2">
+              <span>Llegó: {new Date(paciente.hora_llegada).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className={`font-medium ${colorEspera}`}>
+                • Espera: {tiempoEspera} min
+              </span>
+            </div>
+            <Badge variant="outline" className="mt-1 text-xs">{paciente.tipo_cita}</Badge>
+          </div>
+          <div className="flex gap-1">
+            {paciente.estado === 'Presente' && (
+              <Button 
+                size="sm" 
+                className="bg-purple-600 hover:bg-purple-700"
+                onClick={() => onEstadoChange(paciente.cita_id, 'En consulta')}
+              >
+                <Play className="w-3 h-3 mr-1" /> Iniciar
+              </Button>
+            )}
+            {paciente.estado === 'En consulta' && (
+              <Button 
+                size="sm" 
+                className="bg-green-600 hover:bg-green-700"
+                onClick={() => onEstadoChange(paciente.cita_id, 'Atendida')}
+              >
+                <CheckCircle className="w-3 h-3 mr-1" /> Atendida
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => onVerEvaluacion(paciente.paciente_id)}>
+                  <Eye className="w-4 h-4 mr-2" /> Ver evaluación
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onEstadoChange(paciente.cita_id, 'No asistió')}>
+                  <XCircle className="w-4 h-4 mr-2" /> No asistió
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ==================== COMPONENTE PRINCIPAL ====================
+const Agenda = () => {
+  const { user, hasPermission } = useAuth();
+  const [activeTab, setActiveTab] = useState('calendario');
+  const [loading, setLoading] = useState(true);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Datos
+  const [citas, setCitas] = useState([]);
+  const [medicos, setMedicos] = useState([]);
+  const [contadores, setContadores] = useState(null);
+  const [presentes, setPresentes] = useState({ por_medico: [], total_presentes: 0 });
+  const [miAgenda, setMiAgenda] = useState(null);
+  const [config, setConfig] = useState(null);
+  
+  // Filtros
+  const [medicoFiltro, setMedicoFiltro] = useState('todos');
+  const [estadoFiltro, setEstadoFiltro] = useState('todos');
+  
+  // Modal de cita
+  const [citaDialogOpen, setCitaDialogOpen] = useState(false);
+  const [editingCita, setEditingCita] = useState(null);
+  const [citaForm, setCitaForm] = useState({
+    paciente_id: '',
+    paciente_nombre: '',
+    medico_id: '',
+    medico_nombre: '',
+    fecha: '',
+    hora_inicio: '08:00',
+    tipo_cita: 'Subsecuente',
+    duracion_minutos: 20,
+    notas: ''
+  });
+  
+  // Búsqueda de pacientes
+  const [pacienteSearch, setPacienteSearch] = useState('');
+  const [pacienteResults, setPacienteResults] = useState([]);
+  const [searchingPaciente, setSearchingPaciente] = useState(false);
+  
+  // Walk-in dialog
+  const [walkInDialogOpen, setWalkInDialogOpen] = useState(false);
+  
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
+  
+  // ==================== FETCH DATA ====================
+  const fetchMedicos = useCallback(async () => {
+    try {
+      const response = await agendaApi.getMedicosAgenda();
+      setMedicos(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching médicos:', error);
+    }
+  }, []);
+  
+  const fetchCitas = useCallback(async () => {
+    try {
+      const medicoId = medicoFiltro !== 'todos' ? medicoFiltro : undefined;
+      const estado = estadoFiltro !== 'todos' ? estadoFiltro : undefined;
+      const response = await agendaApi.getCitas(fechaSeleccionada, medicoId, estado);
+      setCitas(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching citas:', error);
+      toast.error('Error al cargar citas');
+    }
+  }, [fechaSeleccionada, medicoFiltro, estadoFiltro]);
+  
+  const fetchContadores = useCallback(async () => {
+    try {
+      const response = await agendaApi.getContadores(fechaSeleccionada);
+      setContadores(response.data);
+    } catch (error) {
+      console.error('Error fetching contadores:', error);
+    }
+  }, [fechaSeleccionada]);
+  
+  const fetchPresentes = useCallback(async () => {
+    try {
+      const response = await agendaApi.getPresentes(fechaSeleccionada);
+      setPresentes(response.data);
+    } catch (error) {
+      console.error('Error fetching presentes:', error);
+    }
+  }, [fechaSeleccionada]);
+  
+  const fetchMiAgenda = useCallback(async () => {
+    try {
+      const response = await agendaApi.getMiDia();
+      setMiAgenda(response.data);
+    } catch (error) {
+      console.error('Error fetching mi agenda:', error);
+    }
+  }, []);
+  
+  const fetchConfig = useCallback(async () => {
+    try {
+      const response = await agendaApi.getConfig();
+      setConfig(response.data);
+    } catch (error) {
+      console.error('Error fetching config:', error);
+    }
+  }, []);
+  
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchMedicos(),
+      fetchCitas(),
+      fetchContadores(),
+      fetchPresentes(),
+      fetchConfig()
+    ]);
+    if (activeTab === 'mi-agenda') {
+      await fetchMiAgenda();
+    }
+    setLoading(false);
+  }, [fetchMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, activeTab]);
+  
+  useEffect(() => {
+    fetchAll();
+    // Polling cada 30 segundos para actualizar presentes y contadores
+    const interval = setInterval(() => {
+      fetchContadores();
+      fetchPresentes();
+      if (activeTab === 'mi-agenda') fetchMiAgenda();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAll, fetchContadores, fetchPresentes, fetchMiAgenda, activeTab]);
+  
+  // ==================== BÚSQUEDA DE PACIENTES ====================
+  const searchPacientes = useCallback(async (query) => {
+    if (query.length < 2) {
+      setPacienteResults([]);
+      return;
+    }
+    setSearchingPaciente(true);
+    try {
+      const response = await patientApi.search(query);
+      setPacienteResults(response.data || []);
+    } catch (error) {
+      console.error('Error searching pacientes:', error);
+    } finally {
+      setSearchingPaciente(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      searchPacientes(pacienteSearch);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [pacienteSearch, searchPacientes]);
+  
+  // ==================== HANDLERS ====================
+  const handleCambiarEstado = async (citaId, nuevoEstado) => {
+    try {
+      await agendaApi.cambiarEstado(citaId, nuevoEstado);
+      toast.success(`Estado cambiado a "${nuevoEstado}"`);
+      fetchCitas();
+      fetchContadores();
+      fetchPresentes();
+      if (activeTab === 'mi-agenda') fetchMiAgenda();
+    } catch (error) {
+      toast.error('Error al cambiar estado');
+    }
+  };
+  
+  const handleAsignarMedico = async (citaId, medicoId, medicoNombre) => {
+    try {
+      await agendaApi.asignarCita(citaId, medicoId, medicoNombre);
+      toast.success('Paciente asignado');
+      fetchPresentes();
+    } catch (error) {
+      toast.error('Error al asignar');
+    }
+  };
+  
+  const handleOpenCitaDialog = (cita = null) => {
+    if (cita) {
+      setEditingCita(cita);
+      setCitaForm({
+        paciente_id: cita.paciente_id,
+        paciente_nombre: cita.paciente_nombre,
+        medico_id: cita.medico_id,
+        medico_nombre: cita.medico_nombre,
+        fecha: cita.fecha,
+        hora_inicio: cita.hora_inicio,
+        tipo_cita: cita.tipo_cita,
+        duracion_minutos: cita.duracion_minutos,
+        notas: cita.notas || ''
+      });
+    } else {
+      setEditingCita(null);
+      setCitaForm({
+        paciente_id: '',
+        paciente_nombre: '',
+        medico_id: medicos[0]?.id || '',
+        medico_nombre: medicos[0]?.name || '',
+        fecha: fechaSeleccionada,
+        hora_inicio: '08:00',
+        tipo_cita: 'Subsecuente',
+        duracion_minutos: 20,
+        notas: ''
+      });
+    }
+    setPacienteSearch('');
+    setPacienteResults([]);
+    setCitaDialogOpen(true);
+  };
+  
+  const handleSaveCita = async () => {
+    if (!citaForm.paciente_id || !citaForm.medico_id) {
+      toast.error('Seleccione paciente y médico');
+      return;
+    }
+    
+    try {
+      if (editingCita) {
+        await agendaApi.updateCita(editingCita.id, citaForm);
+        toast.success('Cita actualizada');
+      } else {
+        await agendaApi.createCita(citaForm);
+        toast.success('Cita creada');
+      }
+      setCitaDialogOpen(false);
+      fetchCitas();
+      fetchContadores();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al guardar cita');
+    }
+  };
+  
+  const handleWalkIn = async () => {
+    if (!citaForm.paciente_id || !citaForm.medico_id) {
+      toast.error('Seleccione paciente y médico');
+      return;
+    }
+    
+    try {
+      await agendaApi.createWalkIn({
+        paciente_id: citaForm.paciente_id,
+        paciente_nombre: citaForm.paciente_nombre,
+        medico_id: citaForm.medico_id,
+        medico_nombre: citaForm.medico_nombre,
+        tipo_cita: citaForm.tipo_cita,
+        notas: citaForm.notas
+      });
+      toast.success('Paciente registrado como presente');
+      setWalkInDialogOpen(false);
+      fetchCitas();
+      fetchContadores();
+      fetchPresentes();
+    } catch (error) {
+      toast.error('Error al registrar');
+    }
+  };
+  
+  const handleVerPaciente = (pacienteId) => {
+    window.open(`/pacientes?id=${pacienteId}`, '_blank');
+  };
+  
+  const handleVerEvaluacion = (pacienteId) => {
+    window.open(`/evaluacion-oftalmologica?paciente=${pacienteId}`, '_blank');
+  };
+  
+  const navegarFecha = (dias) => {
+    const fecha = new Date(fechaSeleccionada);
+    fecha.setDate(fecha.getDate() + dias);
+    setFechaSeleccionada(fecha.toISOString().split('T')[0]);
+  };
+  
+  // ==================== GENERAR SLOTS DE TIEMPO ====================
+  const generarSlots = () => {
+    if (!config) return [];
+    const slots = [];
+    const [horaInicio] = config.hora_apertura.split(':').map(Number);
+    const [horaFin] = config.hora_cierre.split(':').map(Number);
+    const intervalo = config.duracion_slot_minutos || 15;
+    
+    for (let hora = horaInicio; hora < horaFin; hora++) {
+      for (let min = 0; min < 60; min += intervalo) {
+        slots.push(`${hora.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  };
+  
+  // Agrupar citas por médico y slot
+  const citasPorMedicoYSlot = () => {
+    const resultado = {};
+    const slots = generarSlots();
+    const medicosToShow = medicoFiltro === 'todos' ? medicos : medicos.filter(m => m.id === medicoFiltro);
+    
+    medicosToShow.forEach(medico => {
+      resultado[medico.id] = {
+        medico,
+        slots: {}
+      };
+      slots.forEach(slot => {
+        resultado[medico.id].slots[slot] = [];
+      });
+    });
+    
+    citas.forEach(cita => {
+      const medicoId = cita.medico_id;
+      if (resultado[medicoId]) {
+        const slotKey = cita.hora_inicio;
+        if (resultado[medicoId].slots[slotKey]) {
+          resultado[medicoId].slots[slotKey].push({
+            ...cita,
+            medico_color: resultado[medicoId].medico.color
+          });
+        }
+      }
+    });
+    
+    return resultado;
+  };
+  
+  // ==================== RENDER ====================
+  return (
+    <Layout>
+      <Toaster position="top-right" richColors />
+      
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <CalendarDays className="w-7 h-7 text-teal-600" />
+              Agenda de Pacientes
+            </h1>
+            <p className="text-slate-500 text-sm">Gestión de citas y flujo de pacientes</p>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button onClick={fetchAll} variant="outline" size="sm">
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+            <Button onClick={() => handleOpenCitaDialog()} className="bg-teal-600 hover:bg-teal-700">
+              <Plus className="w-4 h-4 mr-1" />
+              Nueva Cita
+            </Button>
+          </div>
+        </div>
+        
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="calendario" className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              <span className="hidden sm:inline">Calendario</span>
+            </TabsTrigger>
+            <TabsTrigger value="tablero" className="flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Tablero del Día</span>
+            </TabsTrigger>
+            <TabsTrigger value="mi-agenda" className="flex items-center gap-1">
+              <User className="w-4 h-4" />
+              <span className="hidden sm:inline">Mi Agenda</span>
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* ==================== TAB: CALENDARIO ==================== */}
+          <TabsContent value="calendario" className="mt-4">
+            {/* Controles de fecha y filtros */}
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Navegación de fecha */}
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => navegarFecha(-1)}>
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Input
+                      type="date"
+                      value={fechaSeleccionada}
+                      onChange={(e) => setFechaSeleccionada(e.target.value)}
+                      className="w-40"
+                    />
+                    <Button variant="outline" size="sm" onClick={() => navegarFecha(1)}>
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setFechaSeleccionada(new Date().toISOString().split('T')[0])}
+                    >
+                      Hoy
+                    </Button>
+                  </div>
+                  
+                  <div className="text-sm font-medium text-slate-700 capitalize">
+                    {formatDate(fechaSeleccionada)}
+                  </div>
+                  
+                  {/* Filtros */}
+                  <div className="flex gap-2 ml-auto">
+                    <Select value={medicoFiltro} onValueChange={setMedicoFiltro}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Médico" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos los médicos</SelectItem>
+                        {medicos.map(m => (
+                          <SelectItem key={m.id} value={m.id}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
+                              {m.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {Object.keys(ESTADOS_CITA).map(estado => (
+                          <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Vista de calendario por columnas */}
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <Card key={i}>
+                    <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+                    <CardContent><Skeleton className="h-96 w-full" /></CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="flex gap-4 min-w-max pb-4">
+                  {Object.entries(citasPorMedicoYSlot()).map(([medicoId, data]) => (
+                    <Card key={medicoId} className="w-64 flex-shrink-0">
+                      <CardHeader className="py-3 px-4" style={{ backgroundColor: `${data.medico.color}15` }}>
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: data.medico.color }}
+                          />
+                          {data.medico.name}
+                          <Badge variant="outline" className="ml-auto">
+                            {citas.filter(c => c.medico_id === medicoId).length}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-2 max-h-[600px] overflow-y-auto">
+                        {generarSlots().map(slot => {
+                          const citasSlot = data.slots[slot] || [];
+                          return (
+                            <div key={slot} className="border-b border-dashed border-gray-200 min-h-[40px] py-1">
+                              <div className="text-xs text-gray-400 mb-1">{formatTime(slot)}</div>
+                              {citasSlot.map(cita => (
+                                <CitaCard
+                                  key={cita.id}
+                                  cita={cita}
+                                  compact
+                                  onEstadoChange={handleCambiarEstado}
+                                  onEdit={handleOpenCitaDialog}
+                                  onVerPaciente={handleVerPaciente}
+                                />
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+          
+          {/* ==================== TAB: TABLERO DEL DÍA ==================== */}
+          <TabsContent value="tablero" className="mt-4">
+            {/* Contadores */}
+            {contadores && (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+                <Card className="bg-slate-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-slate-700">{contadores.total_agendados}</div>
+                    <div className="text-xs text-slate-500">Agendados</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-blue-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-700">{contadores.total_confirmados}</div>
+                    <div className="text-xs text-blue-600">Confirmados</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-amber-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-amber-700">{contadores.total_presentes}</div>
+                    <div className="text-xs text-amber-600">Presentes</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-purple-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-purple-700">{contadores.total_en_consulta}</div>
+                    <div className="text-xs text-purple-600">En consulta</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-green-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-green-700">{contadores.total_atendidos}</div>
+                    <div className="text-xs text-green-600">Atendidos</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-red-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-red-700">{contadores.total_no_asistio}</div>
+                    <div className="text-xs text-red-600">No asistió</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-50">
+                  <CardContent className="p-3 text-center">
+                    <div className="text-2xl font-bold text-gray-700">{contadores.total_cancelados}</div>
+                    <div className="text-xs text-gray-600">Cancelados</div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Lista de citas del día */}
+              <Card>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-lg flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      Citas del día
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setWalkInDialogOpen(true)}>
+                      <Plus className="w-4 h-4 mr-1" /> Walk-in
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-[500px] overflow-y-auto">
+                  {citas.filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado)).length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No hay citas pendientes</p>
+                  ) : (
+                    citas
+                      .filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado))
+                      .map(cita => (
+                        <CitaCard
+                          key={cita.id}
+                          cita={{...cita, medico_color: medicos.find(m => m.id === cita.medico_id)?.color}}
+                          onEstadoChange={handleCambiarEstado}
+                          onEdit={handleOpenCitaDialog}
+                          onVerPaciente={handleVerPaciente}
+                        />
+                      ))
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Pacientes presentes en clínica */}
+              <Card>
+                <CardHeader className="py-3 bg-amber-50">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-amber-600" />
+                    Pacientes Presentes en Clínica
+                    <Badge className="ml-auto bg-amber-600">{presentes.total_presentes}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 max-h-[500px] overflow-y-auto">
+                  {presentes.por_medico.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">No hay pacientes presentes</p>
+                  ) : (
+                    presentes.por_medico.map(grupo => (
+                      <div key={grupo.medico_id} className="mb-4">
+                        <div 
+                          className="text-sm font-semibold mb-2 flex items-center gap-2 p-2 rounded"
+                          style={{ backgroundColor: `${grupo.medico_color}15` }}
+                        >
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: grupo.medico_color }}
+                          />
+                          {grupo.medico_nombre}
+                          <Badge variant="outline" className="ml-auto">{grupo.total}</Badge>
+                        </div>
+                        {grupo.pacientes.map(paciente => (
+                          <PacientePresenteCard
+                            key={paciente.cita_id}
+                            paciente={{...paciente, medico_color: grupo.medico_color}}
+                            onEstadoChange={handleCambiarEstado}
+                            onVerEvaluacion={handleVerEvaluacion}
+                            medicos={medicos}
+                          />
+                        ))}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          {/* ==================== TAB: MI AGENDA ==================== */}
+          <TabsContent value="mi-agenda" className="mt-4">
+            {miAgenda ? (
+              <div className="space-y-4">
+                {/* Header de mi agenda */}
+                <Card className="bg-gradient-to-r from-teal-500 to-teal-600 text-white">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold">{miAgenda.medico_nombre}</h2>
+                        <p className="text-teal-100">Mi agenda del {formatDate(miAgenda.fecha)}</p>
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="text-center">
+                          <div className="text-3xl font-bold">{miAgenda.contadores.total}</div>
+                          <div className="text-xs text-teal-100">Citas hoy</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-3xl font-bold">{miAgenda.contadores.presentes + miAgenda.contadores.en_consulta}</div>
+                          <div className="text-xs text-teal-100">Presentes</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-3xl font-bold">{miAgenda.contadores.atendidos}</div>
+                          <div className="text-xs text-teal-100">Atendidos</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Pacientes presentes (destacado) */}
+                  <Card className="border-2 border-amber-200">
+                    <CardHeader className="py-3 bg-amber-50">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <UserCheck className="w-5 h-5 text-amber-600" />
+                        Mis Pacientes Presentes
+                        <Badge className="ml-auto bg-amber-600">{miAgenda.pacientes_presentes.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                      {miAgenda.pacientes_presentes.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">No hay pacientes esperando</p>
+                      ) : (
+                        miAgenda.pacientes_presentes.map(paciente => (
+                          <PacientePresenteCard
+                            key={paciente.cita_id}
+                            paciente={paciente}
+                            onEstadoChange={handleCambiarEstado}
+                            onVerEvaluacion={handleVerEvaluacion}
+                            medicos={medicos}
+                          />
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Mis citas del día */}
+                  <Card>
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Calendar className="w-5 h-5" />
+                        Mis Citas del Día
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="max-h-[400px] overflow-y-auto">
+                      {miAgenda.citas_del_dia.length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">No hay citas programadas</p>
+                      ) : (
+                        miAgenda.citas_del_dia.map(cita => (
+                          <CitaCard
+                            key={cita.id}
+                            cita={cita}
+                            onEstadoChange={handleCambiarEstado}
+                            onEdit={handleOpenCitaDialog}
+                            onVerPaciente={handleVerPaciente}
+                          />
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Usuario no vinculado a médico</h3>
+                  <p className="text-gray-500">
+                    Tu usuario no está vinculado a un médico. 
+                    Contacta al administrador para configurar tu perfil.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+      
+      {/* ==================== DIALOG: NUEVA/EDITAR CITA ==================== */}
+      <Dialog open={citaDialogOpen} onOpenChange={setCitaDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingCita ? 'Editar Cita' : 'Nueva Cita'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingCita ? 'Modifica los datos de la cita' : 'Programa una nueva cita para un paciente'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Búsqueda de paciente */}
+            <div className="space-y-2">
+              <Label>Paciente *</Label>
+              {citaForm.paciente_nombre ? (
+                <div className="flex items-center gap-2 p-2 bg-teal-50 rounded border border-teal-200">
+                  <User className="w-4 h-4 text-teal-600" />
+                  <span className="flex-1">{citaForm.paciente_nombre}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setCitaForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }))}
+                  >
+                    Cambiar
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    placeholder="Buscar paciente por nombre o expediente..."
+                    value={pacienteSearch}
+                    onChange={(e) => setPacienteSearch(e.target.value)}
+                    className="input-teal"
+                  />
+                  {pacienteResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {pacienteResults.map(p => (
+                        <div
+                          key={p.id}
+                          className="p-2 hover:bg-teal-50 cursor-pointer"
+                          onClick={() => {
+                            setCitaForm(prev => ({
+                              ...prev,
+                              paciente_id: p.id,
+                              paciente_nombre: `${p.first_name} ${p.last_name}`
+                            }));
+                            setPacienteSearch('');
+                            setPacienteResults([]);
+                          }}
+                        >
+                          <div className="font-medium">{p.first_name} {p.last_name}</div>
+                          <div className="text-xs text-gray-500">Exp: {p.record_number}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Médico */}
+            <div className="space-y-2">
+              <Label>Médico *</Label>
+              <Select
+                value={citaForm.medico_id}
+                onValueChange={(value) => {
+                  const medico = medicos.find(m => m.id === value);
+                  setCitaForm(prev => ({
+                    ...prev,
+                    medico_id: value,
+                    medico_nombre: medico?.name || ''
+                  }));
+                }}
+              >
+                <SelectTrigger className="input-teal">
+                  <SelectValue placeholder="Seleccionar médico" />
+                </SelectTrigger>
+                <SelectContent>
+                  {medicos.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
+                        {m.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Fecha y hora */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Fecha *</Label>
+                <Input
+                  type="date"
+                  value={citaForm.fecha}
+                  onChange={(e) => setCitaForm(prev => ({ ...prev, fecha: e.target.value }))}
+                  className="input-teal"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Hora *</Label>
+                <Input
+                  type="time"
+                  value={citaForm.hora_inicio}
+                  onChange={(e) => setCitaForm(prev => ({ ...prev, hora_inicio: e.target.value }))}
+                  className="input-teal"
+                />
+              </div>
+            </div>
+            
+            {/* Tipo y duración */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de cita</Label>
+                <Select
+                  value={citaForm.tipo_cita}
+                  onValueChange={(value) => setCitaForm(prev => ({ ...prev, tipo_cita: value }))}
+                >
+                  <SelectTrigger className="input-teal">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_CITA.map(tipo => (
+                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Duración (min)</Label>
+                <Input
+                  type="number"
+                  value={citaForm.duracion_minutos}
+                  onChange={(e) => setCitaForm(prev => ({ ...prev, duracion_minutos: parseInt(e.target.value) || 20 }))}
+                  className="input-teal"
+                  min={5}
+                  max={120}
+                />
+              </div>
+            </div>
+            
+            {/* Notas */}
+            <div className="space-y-2">
+              <Label>Notas</Label>
+              <Textarea
+                value={citaForm.notas}
+                onChange={(e) => setCitaForm(prev => ({ ...prev, notas: e.target.value }))}
+                className="input-teal"
+                placeholder="Notas adicionales..."
+                rows={2}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCitaDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveCita} className="bg-teal-600 hover:bg-teal-700">
+              {editingCita ? 'Guardar cambios' : 'Crear cita'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* ==================== DIALOG: WALK-IN ==================== */}
+      <Dialog open={walkInDialogOpen} onOpenChange={setWalkInDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Registrar Paciente sin Cita (Walk-in)</DialogTitle>
+            <DialogDescription>
+              Registra un paciente que llegó sin cita previa
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Búsqueda de paciente */}
+            <div className="space-y-2">
+              <Label>Paciente *</Label>
+              {citaForm.paciente_nombre ? (
+                <div className="flex items-center gap-2 p-2 bg-teal-50 rounded border border-teal-200">
+                  <User className="w-4 h-4 text-teal-600" />
+                  <span className="flex-1">{citaForm.paciente_nombre}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setCitaForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }))}
+                  >
+                    Cambiar
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Input
+                    placeholder="Buscar paciente..."
+                    value={pacienteSearch}
+                    onChange={(e) => setPacienteSearch(e.target.value)}
+                    className="input-teal"
+                  />
+                  {pacienteResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {pacienteResults.map(p => (
+                        <div
+                          key={p.id}
+                          className="p-2 hover:bg-teal-50 cursor-pointer"
+                          onClick={() => {
+                            setCitaForm(prev => ({
+                              ...prev,
+                              paciente_id: p.id,
+                              paciente_nombre: `${p.first_name} ${p.last_name}`
+                            }));
+                            setPacienteSearch('');
+                            setPacienteResults([]);
+                          }}
+                        >
+                          <div className="font-medium">{p.first_name} {p.last_name}</div>
+                          <div className="text-xs text-gray-500">Exp: {p.record_number}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Médico */}
+            <div className="space-y-2">
+              <Label>Asignar a médico *</Label>
+              <Select
+                value={citaForm.medico_id}
+                onValueChange={(value) => {
+                  const medico = medicos.find(m => m.id === value);
+                  setCitaForm(prev => ({
+                    ...prev,
+                    medico_id: value,
+                    medico_nombre: medico?.name || ''
+                  }));
+                }}
+              >
+                <SelectTrigger className="input-teal">
+                  <SelectValue placeholder="Seleccionar médico" />
+                </SelectTrigger>
+                <SelectContent>
+                  {medicos.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
+                        {m.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Tipo */}
+            <div className="space-y-2">
+              <Label>Tipo de cita</Label>
+              <Select
+                value={citaForm.tipo_cita}
+                onValueChange={(value) => setCitaForm(prev => ({ ...prev, tipo_cita: value }))}
+              >
+                <SelectTrigger className="input-teal">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_CITA.map(tipo => (
+                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Notas */}
+            <div className="space-y-2">
+              <Label>Notas</Label>
+              <Textarea
+                value={citaForm.notas}
+                onChange={(e) => setCitaForm(prev => ({ ...prev, notas: e.target.value }))}
+                className="input-teal"
+                placeholder="Motivo de visita..."
+                rows={2}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWalkInDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleWalkIn} className="bg-amber-600 hover:bg-amber-700">
+              <UserCheck className="w-4 h-4 mr-1" />
+              Registrar como presente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Layout>
+  );
+};
+
+export default Agenda;

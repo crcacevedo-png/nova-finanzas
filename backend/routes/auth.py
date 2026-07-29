@@ -108,11 +108,13 @@ def require_permission(permission: str):
         return current_user
     return permission_checker
 
-def require_role(role: str):
-    """Requiere que el usuario tenga un rol específico"""
+def require_role(roles):
+    """Requiere que el usuario tenga uno de los roles especificados"""
+    if isinstance(roles, str):
+        roles = [roles]
     async def role_checker(current_user: dict = Depends(get_current_user)):
-        if current_user["role"] != role:
-            raise HTTPException(status_code=403, detail=f"Se requiere rol {role} para esta acción")
+        if current_user["role"] not in roles:
+            raise HTTPException(status_code=403, detail=f"Se requiere rol {roles} para esta acción")
         return current_user
     return role_checker
 

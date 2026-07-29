@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { 
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
-  ChevronDown, ChevronUp, Lock, Clock,
+  ChevronDown, ChevronUp, Lock, Clock, Calendar,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
   Glasses, Contact
 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Checkbox } from '../components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import axios from 'axios';
+import { agendaApi } from '../services/agendaApi';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -242,6 +244,15 @@ const EvaluacionOftalmologica = () => {
     recomendaciones: {
       estudios_a_realizar: [],
       recomendaciones_generales: ''
+    },
+    proxima_cita: {
+      agendar: false,
+      medico_id: '',
+      medico_nombre: '',
+      fecha: '',
+      hora: '',
+      tipo_cita: 'Subsecuente',
+      notas: ''
     },
     procedimientos: [],
     recetas: {
@@ -471,6 +482,7 @@ const EvaluacionOftalmologica = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
+      let evaluacionId = evaluacionActual?.id;
       
       if (evaluacionActual?.id) {
         // Actualizar
@@ -480,6 +492,7 @@ const EvaluacionOftalmologica = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setEvaluacionActual(response.data);
+        evaluacionId = response.data.id;
         toast.success('Evaluación guardada correctamente');
       } else {
         // Crear nueva
@@ -489,7 +502,32 @@ const EvaluacionOftalmologica = () => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setEvaluacionActual(response.data);
+        evaluacionId = response.data.id;
         toast.success('Evaluación creada correctamente');
+      }
+      
+      // Crear próxima cita si está habilitada
+      if (formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && formData.proxima_cita?.hora && formData.proxima_cita?.medico_id) {
+        try {
+          await agendaApi.createProximaCita({
+            paciente_id: formData.paciente_id,
+            paciente_nombre: formData.paciente_nombre,
+            medico_id: formData.proxima_cita.medico_id,
+            medico_nombre: formData.proxima_cita.medico_nombre,
+            fecha: formData.proxima_cita.fecha,
+            hora_inicio: formData.proxima_cita.hora,
+            tipo_cita: formData.proxima_cita.tipo_cita || 'Subsecuente',
+            notas: formData.proxima_cita.notas,
+            evaluacion_id: evaluacionId
+          });
+          toast.success('Próxima cita agendada');
+        } catch (citaError) {
+          if (citaError.response?.status === 400) {
+            toast.info('Ya existe una cita para esa fecha y hora');
+          } else {
+            console.error('Error al crear cita:', citaError);
+          }
+        }
       }
       
       const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
@@ -1405,6 +1443,102 @@ const EvaluacionOftalmologica = () => {
               </div>
             </CollapsibleSection>
 
+            {/* Próxima Cita */}
+            <CollapsibleSection title="Próxima Cita" icon={Calendar}>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="agendar_cita"
+                    checked={formData.proxima_cita?.agendar || false}
+                    onCheckedChange={(checked) => updateNestedField('proxima_cita.agendar', checked)}
+                    disabled={isReadOnly}
+                  />
+                  <Label htmlFor="agendar_cita" className="text-sm cursor-pointer">
+                    Agendar próxima cita para este paciente
+                  </Label>
+                </div>
+                
+                {formData.proxima_cita?.agendar && (
+                  <div className="pl-6 space-y-3 border-l-2 border-teal-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Médico</Label>
+                        <Select
+                          value={formData.proxima_cita?.medico_id || ''}
+                          onValueChange={(value) => {
+                            const med = medicos.find(m => m.id === value);
+                            updateNestedField('proxima_cita.medico_id', value);
+                            updateNestedField('proxima_cita.medico_nombre', med?.name || '');
+                          }}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs">
+                            <SelectValue placeholder="Seleccionar médico" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {medicos.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tipo de cita</Label>
+                        <Select
+                          value={formData.proxima_cita?.tipo_cita || 'Subsecuente'}
+                          onValueChange={(value) => updateNestedField('proxima_cita.tipo_cita', value)}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Subsecuente">Subsecuente</SelectItem>
+                            <SelectItem value="Control post-operatorio">Control post-operatorio</SelectItem>
+                            <SelectItem value="Estudio">Estudio</SelectItem>
+                            <SelectItem value="Otro">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Fecha</Label>
+                        <Input
+                          type="date"
+                          value={formData.proxima_cita?.fecha || ''}
+                          onChange={(e) => updateNestedField('proxima_cita.fecha', e.target.value)}
+                          disabled={isReadOnly}
+                          className="input-teal h-8 text-xs"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Hora</Label>
+                        <Input
+                          type="time"
+                          value={formData.proxima_cita?.hora || ''}
+                          onChange={(e) => updateNestedField('proxima_cita.hora', e.target.value)}
+                          disabled={isReadOnly}
+                          className="input-teal h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Notas</Label>
+                      <Input
+                        value={formData.proxima_cita?.notas || ''}
+                        onChange={(e) => updateNestedField('proxima_cita.notas', e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="Indicaciones para la próxima cita..."
+                        className="input-teal h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CollapsibleSection>
+
             {/* Receta de Medicamentos */}
             <CollapsibleSection 
               title="Receta de Medicamentos" 
@@ -1837,6 +1971,22 @@ const EvaluacionOftalmologica = () => {
                   <div><strong>Marca:</strong> {formData.recetas.lentes_contacto.marca}</div>
                   <div><strong>Tipo:</strong> {formData.recetas.lentes_contacto.tipo}</div>
                   <div><strong>Reemplazo:</strong> {formData.recetas.lentes_contacto.regimen_reemplazo}</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Próxima Cita (si está agendada) */}
+            {formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && (
+              <div className="mt-6 p-4 border-2 border-teal-200 rounded-lg bg-teal-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-5 h-5 text-teal-600" />
+                  <span className="font-bold text-teal-700">PRÓXIMA CITA</span>
+                </div>
+                <div className="text-sm">
+                  <p><strong>Fecha:</strong> {new Date(formData.proxima_cita.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  <p><strong>Hora:</strong> {formData.proxima_cita.hora}</p>
+                  <p><strong>Médico:</strong> {formData.proxima_cita.medico_nombre}</p>
+                  {formData.proxima_cita.tipo_cita && <p><strong>Tipo:</strong> {formData.proxima_cita.tipo_cita}</p>}
                 </div>
               </div>
             )}

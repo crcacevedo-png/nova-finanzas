@@ -22,6 +22,7 @@ import SalaOperaciones from './pages/SalaOperaciones';
 import AuditLogs from './pages/AuditLogs';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
+import Agenda from './pages/Agenda';
 import './App.css';
 
 // Protected Route Component
@@ -247,6 +248,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_payment_authorizations">
             <Caja />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Agenda - Citas de pacientes */}
+      <Route 
+        path="/agenda" 
+        element={
+          <ProtectedRoute>
+            <Agenda />
           </ProtectedRoute>
         } 
       />

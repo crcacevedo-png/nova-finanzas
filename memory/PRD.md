@@ -105,11 +105,12 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 3. **Autorizaciones de pago** (~350 líneas)
 4. **Reportes generales** (~400 líneas)
 5. **Evaluaciones Oftalmológicas** (~600 líneas)
+6. **Agenda** (~700 líneas) - Nuevo módulo
 
 ### 📊 Progreso de Refactorización:
 - **Antes**: server.py ~8800 líneas
 - **Después de Caja**: server.py ~7800 líneas
-- **Extraído**: ~3500 líneas (en `/routes/`)
+- **Extraído**: ~4200 líneas (en `/routes/`)
 - **Pendiente**: ~4300 líneas
 
 ---
@@ -138,6 +139,42 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 - Campos IGSS específicos
 - Gestión de equipo e insumos
 - Cálculo automático de costos
+
+### 5. Agenda de Pacientes (✅ NUEVO 29/07/2026)
+**IMPORTANTE: Separada de la agenda de Sala de Operaciones (tipoAgenda: "pacientes")**
+
+#### Modelo de Datos:
+- **medicos**: nombre, especialidad, color, usuario_id (vínculo), activo
+- **citas**: paciente, médico, fecha, hora, estado, tipo_cita, hora_llegada, etc.
+- **agenda_config**: horarios, slots, tipos de cita configurables
+
+#### Estados de Cita:
+Agendada → Confirmada → Presente → En consulta → Atendida / No asistió / Cancelada
+
+#### Vistas Frontend:
+1. **Calendario**: Columnas por médico, slots de tiempo, color-coded por estado
+2. **Tablero del Día**: Contadores en vivo, lista de citas, panel de presentes por médico
+3. **Mi Agenda**: Vista del médico autenticado (vinculado via usuario_id)
+
+#### Endpoints:
+- `GET /api/agenda/citas` - Listar citas del día
+- `POST /api/agenda/citas` - Crear cita
+- `PATCH /api/agenda/citas/:id/estado` - Cambiar estado
+- `PATCH /api/agenda/citas/:id/asignar` - Reasignar paciente a otro médico
+- `GET /api/agenda/presentes` - Pacientes presentes agrupados por médico
+- `GET /api/agenda/mi-dia` - Agenda del médico autenticado
+- `POST /api/agenda/walk-in` - Registrar paciente sin cita
+- `POST /api/agenda/proxima-cita` - Crear cita desde evaluación
+
+#### Integración con Evaluación Oftalmológica:
+- Sección "Próxima Cita" en el formulario
+- Checkbox para agendar con médico, fecha, hora, tipo
+- Se imprime en las recetas (medicamentos, anteojos, lentes de contacto)
+
+#### Google Calendar:
+- Preparado para integración (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+- Campo googleEventId en citas
+- Pendiente de credenciales
 - Exportación Excel/PDF
 - Cancelación con motivo
 

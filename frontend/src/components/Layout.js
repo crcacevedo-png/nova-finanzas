@@ -26,7 +26,8 @@ import {
   Wallet,
   ClipboardCheck,
   Scissors,
-  Shield
+  Shield,
+  CalendarDays
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -75,6 +76,9 @@ const Layout = ({ children }) => {
   
   // Sala de Operaciones - Visible para todos
   navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
+  
+  // Agenda de Pacientes - Visible para todos (NO es la de Sala de Operaciones)
+  navItems.push({ path: '/agenda', icon: CalendarDays, label: 'Agenda', testId: 'nav-agenda' });
 
   // Finanzas sub-items (visible para todos los roles autenticados)
   // Finanzas sub-items (NO visible para optica)
