@@ -117,7 +117,7 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
 };
 
 // Componente de sección colapsable
-const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, badge }) => {
+const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, badge, onPrint }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
   return (
@@ -131,7 +131,21 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, b
           <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{title}</span>
           {badge && <Badge className="ml-2 bg-teal-100 text-teal-700 text-xs">{badge}</Badge>}
         </div>
-        {isOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        <div className="flex items-center gap-2">
+          {onPrint && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onPrint();
+              }}
+              className="p-1.5 rounded-md hover:bg-teal-100 text-teal-600 cursor-pointer transition-colors"
+              title="Imprimir receta"
+            >
+              <Printer className="w-4 h-4" />
+            </span>
+          )}
+          {isOpen ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        </div>
       </button>
       {isOpen && <div className="p-4 bg-white">{children}</div>}
     </div>
@@ -1355,6 +1369,7 @@ const EvaluacionOftalmologica = () => {
               title="Receta de Medicamentos" 
               icon={Pill}
               badge={`${formData.recetas.medicamentos.items.length}`}
+              onPrint={() => handlePrint('medicamentos')}
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1447,7 +1462,7 @@ const EvaluacionOftalmologica = () => {
             </CollapsibleSection>
 
             {/* Receta de Anteojos */}
-            <CollapsibleSection title="Receta de Anteojos" icon={Glasses} defaultOpen={false}>
+            <CollapsibleSection title="Receta de Anteojos" icon={Glasses} defaultOpen={false} onPrint={() => handlePrint('anteojos')}>
               <div className="space-y-3">
                 <div className="grid grid-cols-5 gap-1 text-center text-xs">
                   <div></div>
@@ -1560,7 +1575,7 @@ const EvaluacionOftalmologica = () => {
             </CollapsibleSection>
 
             {/* Receta de Lentes de Contacto */}
-            <CollapsibleSection title="Receta de Lentes de Contacto" icon={Contact} defaultOpen={false}>
+            <CollapsibleSection title="Receta de Lentes de Contacto" icon={Contact} defaultOpen={false} onPrint={() => handlePrint('lentes_contacto')}>
               <div className="space-y-3">
                 <div className="grid grid-cols-4 gap-1 text-center text-xs">
                   <div></div>

@@ -988,14 +988,31 @@ const Caja = () => {
             {/* Acciones de Caja */}
             <div className="flex flex-wrap gap-2">
               {!cajaEstado?.caja_abierta ? (
-                <Button 
-                  onClick={() => setAperturaDialogOpen(true)}
-                  className="bg-green-600 hover:bg-green-700"
-                  data-testid="btn-abrir-caja"
-                >
-                  <Unlock className="w-4 h-4 mr-2" />
-                  Abrir Caja
-                </Button>
+                // Caja cerrada o no existe
+                cajaEstado?.cierre?.estado === 'Cerrado' ? (
+                  // Hay cierre del día pero está cerrado - mostrar Reabrir (solo SuperAdmin)
+                  isSuperAdmin && (
+                    <Button 
+                      onClick={() => handleReabrirCaja(cajaEstado.cierre.id)}
+                      disabled={submitting}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                      data-testid="btn-reabrir-caja"
+                    >
+                      <Unlock className="w-4 h-4 mr-2" />
+                      {submitting ? 'Reabriendo...' : 'Reabrir Caja del Día'}
+                    </Button>
+                  )
+                ) : (
+                  // No hay cierre del día - mostrar Abrir
+                  <Button 
+                    onClick={() => setAperturaDialogOpen(true)}
+                    className="bg-green-600 hover:bg-green-700"
+                    data-testid="btn-abrir-caja"
+                  >
+                    <Unlock className="w-4 h-4 mr-2" />
+                    Abrir Caja
+                  </Button>
+                )
               ) : (
                 <>
                   <Button 
