@@ -72,31 +72,18 @@ import {
 } from '../components/ui/tabs';
 import { toast, Toaster } from 'sonner';
 
-// Categorías predefinidas para movimientos
+// Categorías predefinidas para movimientos de caja (solo ingresos)
 const CATEGORIAS_INGRESO = [
   'Consulta',
-  'Procedimiento',
   'Cirugía',
-  'Estudios',
-  'Lentes',
-  'Medicamentos',
-  'Otro'
-];
-
-const CATEGORIAS_EGRESO = [
-  'Gasto menor',
-  'Insumos',
-  'Servicios',
-  'Personal',
-  'Mantenimiento',
-  'Otro'
+  'Procedimiento',
+  'Medicamentos'
 ];
 
 const METODOS_PAGO = ['Efectivo', 'Tarjeta', 'Transferencia', 'Cheque', 'Cuenta por Cobrar'];
 
 // Formularios iniciales
 const initialMovimientoForm = {
-  tipo: 'Ingreso',
   categoria: '',
   concepto: '',
   monto: '',
@@ -408,6 +395,10 @@ const Caja = () => {
   // ==================== MOVIMIENTOS ====================
 
   const handleSaveMovimiento = async () => {
+    if (!movimientoForm.paciente_id || !movimientoForm.paciente_nombre) {
+      toast.error('Debe seleccionar un paciente');
+      return;
+    }
     if (!movimientoForm.categoria || !movimientoForm.concepto || !movimientoForm.monto) {
       toast.error('Complete los campos obligatorios');
       return;
@@ -415,10 +406,6 @@ const Caja = () => {
     
     // Validaciones para Cuenta por Cobrar
     if (movimientoForm.metodo_pago === 'Cuenta por Cobrar') {
-      if (!movimientoForm.paciente_id || !movimientoForm.paciente_nombre) {
-        toast.error('Debe seleccionar un paciente para Cuenta por Cobrar');
-        return;
-      }
       if (!movimientoForm.tipo_pagador_id) {
         toast.error('Debe seleccionar el tipo de pagador');
         return;
@@ -476,16 +463,16 @@ const Caja = () => {
           : 'Cuenta por Cobrar creada exitosamente'
         );
       } else {
-        // Caso normal: movimiento regular
+        // Caso normal: movimiento de ingreso regular
         const data = {
-          tipo: movimientoForm.tipo,
+          tipo: 'Ingreso', // Siempre es ingreso
           categoria: movimientoForm.categoria,
           concepto: movimientoForm.concepto,
           monto: montoTotal,
           metodo_pago: movimientoForm.metodo_pago,
           referencia: movimientoForm.referencia,
-          paciente_id: movimientoForm.paciente_id || '',
-          paciente_nombre: movimientoForm.paciente_nombre || ''
+          paciente_id: movimientoForm.paciente_id,
+          paciente_nombre: movimientoForm.paciente_nombre
         };
         
         if (editingMovimiento) {
@@ -536,14 +523,19 @@ const Caja = () => {
   const openEditMovimiento = (mov) => {
     setEditingMovimiento(mov);
     setMovimientoForm({
-      tipo: mov.tipo,
       categoria: mov.categoria,
       concepto: mov.concepto,
       monto: mov.monto.toString(),
       metodo_pago: mov.metodo_pago,
       referencia: mov.referencia || '',
       paciente_id: mov.paciente_id || '',
-      paciente_nombre: mov.paciente_nombre || ''
+      paciente_nombre: mov.paciente_nombre || '',
+      tipo_pagador_id: '',
+      tipo_pagador_nombre: '',
+      pagador_nombre: '',
+      es_aseguradora: false,
+      monto_deducible: '',
+      metodo_pago_deducible: 'Efectivo'
     });
     setPacienteSearch(mov.paciente_nombre || '');
     setMovimientoDialogOpen(true);
@@ -1069,7 +1061,6 @@ const Caja = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Hora</TableHead>
-                          <TableHead>Tipo</TableHead>
                           <TableHead>Categoría</TableHead>
                           <TableHead>Concepto</TableHead>
                           <TableHead>Paciente</TableHead>
@@ -1085,18 +1076,15 @@ const Caja = () => {
                               {mov.fecha?.split('T')[1]?.substring(0, 5) || '-'}
                             </TableCell>
                             <TableCell>
-                              <Badge className={mov.tipo === 'Ingreso' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                                {mov.tipo}
-                              </Badge>
+                              <Badge variant="outline">{mov.categoria}</Badge>
                             </TableCell>
-                            <TableCell>{mov.categoria}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{mov.concepto}</TableCell>
                             <TableCell className="text-sm">{mov.paciente_nombre || '-'}</TableCell>
                             <TableCell>
                               <Badge variant="outline">{mov.metodo_pago}</Badge>
                             </TableCell>
-                            <TableCell className={`text-right font-medium ${mov.tipo === 'Ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                              {mov.tipo === 'Ingreso' ? '+' : '-'}{formatCurrency(mov.monto)}
+                            <TableCell className="text-right font-medium text-green-600">
+                              +{formatCurrency(mov.monto)}
                             </TableCell>
                             <TableCell className="text-center">
                               {!mov.bloqueado && cajaEstado?.caja_abierta && (
@@ -1477,56 +1465,72 @@ const Caja = () => {
 
       {/* Dialog: Nuevo/Editar Movimiento */}
       <Dialog open={movimientoDialogOpen} onOpenChange={setMovimientoDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingMovimiento ? 'Editar Movimiento' : 'Nuevo Movimiento'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="space-y-4 overflow-y-auto pr-2">
+            {/* 1. PACIENTE - Siempre primero */}
             <div>
-              <Label>Tipo *</Label>
-              <Select 
-                value={movimientoForm.tipo} 
-                onValueChange={(v) => setMovimientoForm(prev => ({ 
-                  ...prev, 
-                  tipo: v, 
-                  categoria: '',
-                  // Limpiar CxC si cambia a Egreso
-                  ...(v === 'Egreso' ? { metodo_pago: 'Efectivo', tipo_pagador_id: '', es_aseguradora: false } : {})
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Ingreso">Ingreso</SelectItem>
-                  <SelectItem value="Egreso">Egreso</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Paciente *</Label>
+              <div className="relative">
+                <Input
+                  value={pacienteSearch}
+                  onChange={(e) => {
+                    setPacienteSearch(e.target.value);
+                    setMovimientoForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }));
+                  }}
+                  placeholder="Buscar paciente..."
+                  className={movimientoForm.paciente_id ? 'border-green-500' : ''}
+                />
+                {movimientoForm.paciente_id && (
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 text-sm">✓</span>
+                )}
+                {pacientesResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                    {pacientesResults.map(p => (
+                      <div
+                        key={p.id}
+                        className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                        onClick={() => selectPaciente(p, 'movimiento')}
+                      >
+                        {p.nombre || p.nombre_completo || `${p.first_name} ${p.last_name}`}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <Label>Categoría *</Label>
-              <Select 
-                value={movimientoForm.categoria} 
-                onValueChange={(v) => setMovimientoForm(prev => ({ ...prev, categoria: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {(movimientoForm.tipo === 'Ingreso' ? CATEGORIAS_INGRESO : CATEGORIAS_EGRESO).map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            {/* 2. CATEGORÍA Y CONCEPTO - En fila */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Categoría *</Label>
+                <Select 
+                  value={movimientoForm.categoria} 
+                  onValueChange={(v) => setMovimientoForm(prev => ({ ...prev, categoria: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIAS_INGRESO.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Concepto *</Label>
+                <Input
+                  value={movimientoForm.concepto}
+                  onChange={(e) => setMovimientoForm(prev => ({ ...prev, concepto: e.target.value }))}
+                  placeholder="Descripción del servicio"
+                />
+              </div>
             </div>
-            <div>
-              <Label>Concepto *</Label>
-              <Input
-                value={movimientoForm.concepto}
-                onChange={(e) => setMovimientoForm(prev => ({ ...prev, concepto: e.target.value }))}
-                placeholder="Descripción del movimiento"
-              />
-            </div>
+
+            {/* 3. MONTO TOTAL */}
             <div>
               <Label>Monto Total (GTQ) *</Label>
               <Input
@@ -1536,138 +1540,121 @@ const Caja = () => {
                 value={movimientoForm.monto}
                 onChange={(e) => setMovimientoForm(prev => ({ ...prev, monto: e.target.value }))}
                 placeholder="0.00"
+                className="text-lg font-medium"
               />
             </div>
-            <div>
-              <Label>Método de Pago *</Label>
-              <Select 
-                value={movimientoForm.metodo_pago} 
-                onValueChange={(v) => setMovimientoForm(prev => ({ 
-                  ...prev, 
-                  metodo_pago: v,
-                  // Si no es CxC, limpiar los campos relacionados
-                  ...(v !== 'Cuenta por Cobrar' ? { 
-                    tipo_pagador_id: '', 
-                    tipo_pagador_nombre: '',
-                    es_aseguradora: false,
-                    monto_deducible: ''
-                  } : {})
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Solo mostrar CxC para Ingresos */}
-                  {(movimientoForm.tipo === 'Ingreso' ? METODOS_PAGO : METODOS_PAGO.filter(m => m !== 'Cuenta por Cobrar')).map(m => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            {/* 4. MÉTODO DE PAGO Y REFERENCIA - En fila */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Método de Pago *</Label>
+                <Select 
+                  value={movimientoForm.metodo_pago} 
+                  onValueChange={(v) => setMovimientoForm(prev => ({ 
+                    ...prev, 
+                    metodo_pago: v,
+                    // Si no es CxC, limpiar los campos relacionados
+                    ...(v !== 'Cuenta por Cobrar' ? { 
+                      tipo_pagador_id: '', 
+                      tipo_pagador_nombre: '',
+                      es_aseguradora: false,
+                      monto_deducible: ''
+                    } : {})
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METODOS_PAGO.map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Referencia</Label>
+                <Input
+                  value={movimientoForm.referencia}
+                  onChange={(e) => setMovimientoForm(prev => ({ ...prev, referencia: e.target.value }))}
+                  placeholder="No. recibo, factura, etc."
+                />
+              </div>
             </div>
 
-            {/* Campos adicionales para Cuenta por Cobrar */}
+            {/* CAMPOS ADICIONALES PARA CUENTA POR COBRAR */}
             {movimientoForm.metodo_pago === 'Cuenta por Cobrar' && (
-              <>
-                {/* Paciente - Requerido para CxC */}
-                <div>
-                  <Label>Paciente *</Label>
-                  <div className="relative">
-                    <Input
-                      value={pacienteSearch}
-                      onChange={(e) => {
-                        setPacienteSearch(e.target.value);
-                        setMovimientoForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }));
+              <div className="border-t pt-4 space-y-4">
+                <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Información de Cuenta por Cobrar
+                </p>
+                
+                {/* Tipo de Pagador y Nombre en fila */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Adjudicar a *</Label>
+                    <Select 
+                      value={movimientoForm.tipo_pagador_id || "select"} 
+                      onValueChange={(v) => {
+                        if (v === "select") return;
+                        const pag = pagadores.find(p => p.id === v);
+                        const esAseguradora = pag?.nombre?.toLowerCase().includes('asegura') || 
+                                             pag?.nombre?.toLowerCase().includes('seguro');
+                        setMovimientoForm(prev => ({ 
+                          ...prev, 
+                          tipo_pagador_id: v,
+                          tipo_pagador_nombre: pag?.nombre || '',
+                          es_aseguradora: esAseguradora,
+                          monto_deducible: esAseguradora ? prev.monto_deducible : ''
+                        }));
                       }}
-                      placeholder="Buscar paciente..."
-                      className={movimientoForm.paciente_id ? 'border-green-500' : ''}
-                    />
-                    {movimientoForm.paciente_id && (
-                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 text-sm">✓</span>
-                    )}
-                    {pacientesResults.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                        {pacientesResults.map(p => (
-                          <div
-                            key={p.id}
-                            className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
-                            onClick={() => selectPaciente(p, 'movimiento')}
-                          >
-                            {p.nombre || p.nombre_completo || `${p.first_name} ${p.last_name}`}
-                          </div>
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="select" disabled>Seleccione...</SelectItem>
+                        {pagadores.filter(p => p.activo).map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
                         ))}
-                      </div>
-                    )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-
-                {/* Tipo de Pagador */}
-                <div>
-                  <Label>Adjudicar a *</Label>
-                  <Select 
-                    value={movimientoForm.tipo_pagador_id || "select"} 
-                    onValueChange={(v) => {
-                      if (v === "select") return;
-                      const pag = pagadores.find(p => p.id === v);
-                      const esAseguradora = pag?.nombre?.toLowerCase().includes('asegura') || 
-                                           pag?.nombre?.toLowerCase().includes('seguro');
-                      setMovimientoForm(prev => ({ 
-                        ...prev, 
-                        tipo_pagador_id: v,
-                        tipo_pagador_nombre: pag?.nombre || '',
-                        es_aseguradora: esAseguradora,
-                        monto_deducible: esAseguradora ? prev.monto_deducible : ''
-                      }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione tipo de pagador..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="select" disabled>Seleccione...</SelectItem>
-                      {pagadores.filter(p => p.activo).map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Nombre del Pagador Específico */}
-                <div>
-                  <Label>Nombre del Pagador / Aseguradora</Label>
-                  <Input
-                    value={movimientoForm.pagador_nombre}
-                    onChange={(e) => setMovimientoForm(prev => ({ ...prev, pagador_nombre: e.target.value }))}
-                    placeholder="Ej: Seguros G&T, IGSS Zona 1, etc."
-                  />
+                  <div>
+                    <Label>Nombre del Pagador</Label>
+                    <Input
+                      value={movimientoForm.pagador_nombre}
+                      onChange={(e) => setMovimientoForm(prev => ({ ...prev, pagador_nombre: e.target.value }))}
+                      placeholder="Ej: Seguros G&T, IGSS Zona 1"
+                    />
+                  </div>
                 </div>
 
                 {/* Si es Aseguradora, mostrar campo de deducible */}
                 {movimientoForm.es_aseguradora && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
                     <p className="text-sm font-medium text-blue-800 flex items-center gap-2">
                       <CreditCard className="w-4 h-4" />
                       Pago con Seguro
                     </p>
-                    <div>
-                      <Label className="text-blue-700">Monto Deducible (pago del día)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={movimientoForm.monto_deducible}
-                        onChange={(e) => setMovimientoForm(prev => ({ ...prev, monto_deducible: e.target.value }))}
-                        placeholder="0.00"
-                        className="bg-white"
-                      />
-                      <p className="text-xs text-blue-600 mt-1">
-                        El deducible se registra en caja, el resto va a CxC
-                      </p>
-                    </div>
-                    {movimientoForm.monto_deducible && parseFloat(movimientoForm.monto_deducible) > 0 && (
-                      <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-blue-700">Monto Deducible</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={movimientoForm.monto_deducible}
+                          onChange={(e) => setMovimientoForm(prev => ({ ...prev, monto_deducible: e.target.value }))}
+                          placeholder="0.00"
+                          className="bg-white"
+                        />
+                        <p className="text-xs text-blue-600 mt-1">Se registra en caja del día</p>
+                      </div>
+                      {movimientoForm.monto_deducible && parseFloat(movimientoForm.monto_deducible) > 0 && (
                         <div>
-                          <Label className="text-blue-700">Método de Pago del Deducible</Label>
+                          <Label className="text-blue-700">Método de Pago</Label>
                           <Select 
                             value={movimientoForm.metodo_pago_deducible} 
                             onValueChange={(v) => setMovimientoForm(prev => ({ ...prev, metodo_pago_deducible: v }))}
@@ -1683,70 +1670,32 @@ const Caja = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="text-sm bg-white p-2 rounded border">
-                          <div className="flex justify-between">
-                            <span>Monto Total:</span>
-                            <span className="font-medium">{formatCurrency(parseFloat(movimientoForm.monto) || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-green-600">
-                            <span>Deducible (a caja):</span>
-                            <span className="font-medium">{formatCurrency(parseFloat(movimientoForm.monto_deducible) || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-yellow-600 border-t pt-1 mt-1">
-                            <span>A Cuenta por Cobrar:</span>
-                            <span className="font-medium">
-                              {formatCurrency((parseFloat(movimientoForm.monto) || 0) - (parseFloat(movimientoForm.monto_deducible) || 0))}
-                            </span>
-                          </div>
+                      )}
+                    </div>
+                    {movimientoForm.monto_deducible && parseFloat(movimientoForm.monto_deducible) > 0 && (
+                      <div className="text-sm bg-white p-3 rounded border grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                          <p className="text-slate-500 text-xs">Monto Total</p>
+                          <p className="font-bold">{formatCurrency(parseFloat(movimientoForm.monto) || 0)}</p>
                         </div>
-                      </>
+                        <div className="text-center border-x">
+                          <p className="text-green-600 text-xs">Deducible (Caja)</p>
+                          <p className="font-bold text-green-600">{formatCurrency(parseFloat(movimientoForm.monto_deducible) || 0)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-yellow-600 text-xs">A CxC</p>
+                          <p className="font-bold text-yellow-600">
+                            {formatCurrency((parseFloat(movimientoForm.monto) || 0) - (parseFloat(movimientoForm.monto_deducible) || 0))}
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
-              </>
-            )}
-
-            {/* Referencia */}
-            <div>
-              <Label>Referencia</Label>
-              <Input
-                value={movimientoForm.referencia}
-                onChange={(e) => setMovimientoForm(prev => ({ ...prev, referencia: e.target.value }))}
-                placeholder="No. recibo, factura, autorización, etc."
-              />
-            </div>
-
-            {/* Paciente - Solo mostrar si NO es CxC (para CxC se muestra arriba) */}
-            {movimientoForm.tipo === 'Ingreso' && movimientoForm.metodo_pago !== 'Cuenta por Cobrar' && (
-              <div>
-                <Label>Paciente (opcional)</Label>
-                <div className="relative">
-                  <Input
-                    value={pacienteSearch}
-                    onChange={(e) => {
-                      setPacienteSearch(e.target.value);
-                      setMovimientoForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }));
-                    }}
-                    placeholder="Buscar paciente..."
-                  />
-                  {pacientesResults.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                      {pacientesResults.map(p => (
-                        <div
-                          key={p.id}
-                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
-                          onClick={() => selectPaciente(p, 'movimiento')}
-                        >
-                          {p.nombre || p.nombre_completo || `${p.first_name} ${p.last_name}`}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setMovimientoDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveMovimiento} disabled={submitting} className="bg-teal-600 hover:bg-teal-700">
               {submitting ? 'Guardando...' : (movimientoForm.metodo_pago === 'Cuenta por Cobrar' ? 'Crear CxC' : 'Guardar')}
