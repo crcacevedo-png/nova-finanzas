@@ -239,7 +239,7 @@ const Agenda = () => {
     fecha: '',
     hora_inicio: '08:00',
     tipo_cita: 'Subsecuente',
-    duracion_minutos: 20,
+    duracion_minutos: 15,
     notas: ''
   });
   
@@ -409,7 +409,7 @@ const Agenda = () => {
         fecha: fechaSeleccionada,
         hora_inicio: '08:00',
         tipo_cita: 'Subsecuente',
-        duracion_minutos: 20,
+        duracion_minutos: 15,
         notas: ''
       });
     }
@@ -1052,15 +1052,20 @@ const Agenda = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Duración (min)</Label>
-                <Input
-                  type="number"
-                  value={citaForm.duracion_minutos}
-                  onChange={(e) => setCitaForm(prev => ({ ...prev, duracion_minutos: parseInt(e.target.value) || 20 }))}
-                  className="input-teal"
-                  min={5}
-                  max={120}
-                />
+                <Label>Duración</Label>
+                <Select
+                  value={citaForm.duracion_minutos.toString()}
+                  onValueChange={(value) => setCitaForm(prev => ({ ...prev, duracion_minutos: parseInt(value) }))}
+                >
+                  <SelectTrigger className="input-teal">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 minutos</SelectItem>
+                    <SelectItem value="15">15 minutos</SelectItem>
+                    <SelectItem value="30">30 minutos</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             
