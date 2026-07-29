@@ -226,6 +226,8 @@ const EvaluacionOftalmologica = () => {
     examen: {
       avsc_od: '', avsc_os: '',
       avcc_od: '', avcc_os: '',
+      lensometria_od: { esfera: '', cilindro: '', eje: '' },
+      lensometria_os: { esfera: '', cilindro: '', eje: '' },
       refraccion_od: { esfera: '', cilindro: '', eje: '', adicion: '' },
       refraccion_os: { esfera: '', cilindro: '', eje: '', adicion: '' },
       queratometria_od: '', queratometria_os: '',
@@ -405,6 +407,8 @@ const EvaluacionOftalmologica = () => {
       avsc_os: examenData.avsc_os || examenData.avsc_oi || '',
       avcc_od: examenData.avcc_od || '',
       avcc_os: examenData.avcc_os || examenData.avcc_oi || '',
+      lensometria_od: { ...evaluacionVacia.examen.lensometria_od, ...examenData.lensometria_od },
+      lensometria_os: { ...evaluacionVacia.examen.lensometria_os, ...(examenData.lensometria_os || examenData.lensometria_oi) },
       refraccion_od: { ...evaluacionVacia.examen.refraccion_od, ...examenData.refraccion_od },
       refraccion_os: { ...evaluacionVacia.examen.refraccion_os, ...(examenData.refraccion_os || examenData.refraccion_oi) },
       queratometria_od: examenData.queratometria_od || '',
@@ -1089,6 +1093,41 @@ const EvaluacionOftalmologica = () => {
                     disabled={isReadOnly}
                     placeholder="20/..."
                   />
+                </div>
+                
+                {/* Lensometría */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-teal-700">Lensometría</Label>
+                  <div className="grid grid-cols-4 gap-1 text-center text-xs">
+                    <div></div>
+                    <div className="text-gray-500">Esfera</div>
+                    <div className="text-gray-500">Cilindro</div>
+                    <div className="text-gray-500">Eje</div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1 items-center">
+                    <Label className="text-xs text-right">OD</Label>
+                    {['esfera', 'cilindro', 'eje'].map(field => (
+                      <Input
+                        key={field}
+                        value={formData.examen.lensometria_od[field]}
+                        onChange={(e) => updateNestedField(`examen.lensometria_od.${field}`, e.target.value)}
+                        disabled={isReadOnly}
+                        className="input-teal text-xs h-7"
+                      />
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1 items-center">
+                    <Label className="text-xs text-right">OS</Label>
+                    {['esfera', 'cilindro', 'eje'].map(field => (
+                      <Input
+                        key={field}
+                        value={formData.examen.lensometria_os[field]}
+                        onChange={(e) => updateNestedField(`examen.lensometria_os.${field}`, e.target.value)}
+                        disabled={isReadOnly}
+                        className="input-teal text-xs h-7"
+                      />
+                    ))}
+                  </div>
                 </div>
                 
                 {/* Refracción */}
