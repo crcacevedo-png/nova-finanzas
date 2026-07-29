@@ -240,13 +240,18 @@ const Agenda = () => {
     hora_inicio: '08:00',
     tipo_cita: 'Subsecuente',
     duracion_minutos: 15,
-    notas: ''
+    notas: '',
+    // Campos para paciente nuevo
+    es_paciente_nuevo: false,
+    nuevo_paciente_telefono: '',
+    nuevo_paciente_edad: ''
   });
   
   // Búsqueda de pacientes
   const [pacienteSearch, setPacienteSearch] = useState('');
   const [pacienteResults, setPacienteResults] = useState([]);
   const [searchingPaciente, setSearchingPaciente] = useState(false);
+  const [creandoPaciente, setCreandoPaciente] = useState(false);
   
   // Walk-in dialog
   const [walkInDialogOpen, setWalkInDialogOpen] = useState(false);
@@ -397,7 +402,10 @@ const Agenda = () => {
         hora_inicio: cita.hora_inicio,
         tipo_cita: cita.tipo_cita,
         duracion_minutos: cita.duracion_minutos,
-        notas: cita.notas || ''
+        notas: cita.notas || '',
+        es_paciente_nuevo: false,
+        nuevo_paciente_telefono: '',
+        nuevo_paciente_edad: ''
       });
     } else {
       setEditingCita(null);
@@ -410,7 +418,10 @@ const Agenda = () => {
         hora_inicio: '08:00',
         tipo_cita: 'Subsecuente',
         duracion_minutos: 15,
-        notas: ''
+        notas: '',
+        es_paciente_nuevo: false,
+        nuevo_paciente_telefono: '',
+        nuevo_paciente_edad: ''
       });
     }
     setPacienteSearch('');
@@ -419,23 +430,81 @@ const Agenda = () => {
   };
   
   const handleSaveCita = async () => {
-    if (!citaForm.paciente_id || !citaForm.medico_id) {
-      toast.error('Seleccione paciente y médico');
-      return;
+    // Si es paciente nuevo, validar campos adicionales
+    if (citaForm.es_paciente_nuevo) {
+      if (!citaForm.paciente_nombre.trim()) {
+        toast.error('Ingrese el nombre del paciente');
+        return;
+      }
+      if (!citaForm.medico_id) {
+        toast.error('Seleccione un médico');
+        return;
+      }
+    } else {
+      if (!citaForm.paciente_id || !citaForm.medico_id) {
+        toast.error('Seleccione paciente y médico');
+        return;
+      }
     }
     
     try {
+      let pacienteId = citaForm.paciente_id;
+      let pacienteNombre = citaForm.paciente_nombre;
+      
+      // Si es paciente nuevo, crearlo primero
+      if (citaForm.es_paciente_nuevo && !citaForm.paciente_id) {
+        setCreandoPaciente(true);
+        
+        // Separar nombre y apellido
+        const nombreParts = citaForm.paciente_nombre.trim().split(' ');
+        const firstName = nombreParts[0] || '';
+        const lastName = nombreParts.slice(1).join(' ') || '';
+        
+        // Calcular fecha de nacimiento aproximada si se proporcionó edad
+        let birthDate = '';
+        if (citaForm.nuevo_paciente_edad) {
+          const edad = parseInt(citaForm.nuevo_paciente_edad);
+          if (!isNaN(edad)) {
+            const hoy = new Date();
+            const anioNacimiento = hoy.getFullYear() - edad;
+            birthDate = `${anioNacimiento}-01-01`;
+          }
+        }
+        
+        const newPatientData = {
+          first_name: firstName,
+          last_name: lastName,
+          phone: citaForm.nuevo_paciente_telefono || '',
+          birth_date: birthDate,
+          gender: '',
+          referral_institution: 'particular'
+        };
+        
+        const response = await patientApi.create(newPatientData);
+        pacienteId = response.data.id;
+        pacienteNombre = `${response.data.first_name} ${response.data.last_name}`;
+        toast.success('Paciente creado');
+        setCreandoPaciente(false);
+      }
+      
+      const citaData = {
+        ...citaForm,
+        paciente_id: pacienteId,
+        paciente_nombre: pacienteNombre
+      };
+      
       if (editingCita) {
-        await agendaApi.updateCita(editingCita.id, citaForm);
+        await agendaApi.updateCita(editingCita.id, citaData);
         toast.success('Cita actualizada');
       } else {
-        await agendaApi.createCita(citaForm);
+        await agendaApi.createCita(citaData);
         toast.success('Cita creada');
       }
       setCitaDialogOpen(false);
       fetchCitas();
       fetchContadores();
     } catch (error) {
+      setCreandoPaciente(false);
       toast.error(error.response?.data?.detail || 'Error al guardar cita');
     }
   };
@@ -935,48 +1004,116 @@ const Agenda = () => {
             {/* Búsqueda de paciente */}
             <div className="space-y-2">
               <Label>Paciente *</Label>
-              {citaForm.paciente_nombre ? (
+              {citaForm.paciente_nombre && !citaForm.es_paciente_nuevo ? (
                 <div className="flex items-center gap-2 p-2 bg-teal-50 rounded border border-teal-200">
                   <User className="w-4 h-4 text-teal-600" />
                   <span className="flex-1">{citaForm.paciente_nombre}</span>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={() => setCitaForm(prev => ({ ...prev, paciente_id: '', paciente_nombre: '' }))}
+                    onClick={() => setCitaForm(prev => ({ 
+                      ...prev, 
+                      paciente_id: '', 
+                      paciente_nombre: '',
+                      es_paciente_nuevo: false 
+                    }))}
                   >
                     Cambiar
                   </Button>
                 </div>
-              ) : (
-                <div className="relative">
-                  <Input
-                    placeholder="Buscar paciente por nombre o expediente..."
-                    value={pacienteSearch}
-                    onChange={(e) => setPacienteSearch(e.target.value)}
-                    className="input-teal"
-                  />
-                  {pacienteResults.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {pacienteResults.map(p => (
-                        <div
-                          key={p.id}
-                          className="p-2 hover:bg-teal-50 cursor-pointer"
-                          onClick={() => {
-                            setCitaForm(prev => ({
-                              ...prev,
-                              paciente_id: p.id,
-                              paciente_nombre: `${p.first_name} ${p.last_name}`
-                            }));
-                            setPacienteSearch('');
-                            setPacienteResults([]);
-                          }}
-                        >
-                          <div className="font-medium">{p.first_name} {p.last_name}</div>
-                          <div className="text-xs text-gray-500">Exp: {p.record_number}</div>
-                        </div>
-                      ))}
+              ) : citaForm.es_paciente_nuevo ? (
+                <div className="space-y-3 p-3 bg-amber-50 rounded border border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-amber-700 flex items-center gap-1">
+                      <Plus className="w-4 h-4" /> Nuevo paciente
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setCitaForm(prev => ({ 
+                        ...prev, 
+                        es_paciente_nuevo: false,
+                        paciente_nombre: '',
+                        nuevo_paciente_telefono: '',
+                        nuevo_paciente_edad: ''
+                      }))}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Nombre completo del paciente *"
+                      value={citaForm.paciente_nombre}
+                      onChange={(e) => setCitaForm(prev => ({ ...prev, paciente_nombre: e.target.value }))}
+                      className="input-teal"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Teléfono"
+                        value={citaForm.nuevo_paciente_telefono}
+                        onChange={(e) => setCitaForm(prev => ({ ...prev, nuevo_paciente_telefono: e.target.value }))}
+                        className="input-teal"
+                      />
+                      <Input
+                        placeholder="Edad (años)"
+                        type="number"
+                        min="0"
+                        max="120"
+                        value={citaForm.nuevo_paciente_edad}
+                        onChange={(e) => setCitaForm(prev => ({ ...prev, nuevo_paciente_edad: e.target.value }))}
+                        className="input-teal"
+                      />
                     </div>
-                  )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Input
+                      placeholder="Buscar paciente por nombre o expediente..."
+                      value={pacienteSearch}
+                      onChange={(e) => setPacienteSearch(e.target.value)}
+                      className="input-teal"
+                    />
+                    {pacienteResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {pacienteResults.map(p => (
+                          <div
+                            key={p.id}
+                            className="p-2 hover:bg-teal-50 cursor-pointer"
+                            onClick={() => {
+                              setCitaForm(prev => ({
+                                ...prev,
+                                paciente_id: p.id,
+                                paciente_nombre: `${p.first_name} ${p.last_name}`,
+                                es_paciente_nuevo: false
+                              }));
+                              setPacienteSearch('');
+                              setPacienteResults([]);
+                            }}
+                          >
+                            <div className="font-medium">{p.first_name} {p.last_name}</div>
+                            <div className="text-xs text-gray-500">Exp: {p.record_number}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full text-amber-600 border-amber-300 hover:bg-amber-50"
+                    onClick={() => setCitaForm(prev => ({ 
+                      ...prev, 
+                      es_paciente_nuevo: true,
+                      paciente_id: '',
+                      paciente_nombre: pacienteSearch // Usar lo que ya escribió
+                    }))}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Crear paciente nuevo
+                  </Button>
                 </div>
               )}
             </div>
@@ -1083,11 +1220,15 @@ const Agenda = () => {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCitaDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setCitaDialogOpen(false)} disabled={creandoPaciente}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveCita} className="bg-teal-600 hover:bg-teal-700">
-              {editingCita ? 'Guardar cambios' : 'Crear cita'}
+            <Button 
+              onClick={handleSaveCita} 
+              className="bg-teal-600 hover:bg-teal-700"
+              disabled={creandoPaciente}
+            >
+              {creandoPaciente ? 'Creando paciente...' : editingCita ? 'Guardar cambios' : citaForm.es_paciente_nuevo ? 'Crear paciente y cita' : 'Crear cita'}
             </Button>
           </DialogFooter>
         </DialogContent>
