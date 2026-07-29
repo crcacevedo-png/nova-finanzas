@@ -1195,8 +1195,11 @@ const EvaluacionOftalmologica = () => {
                 </div>
               </div>
             </CollapsibleSection>
+          </div>
 
-            {/* Diagnósticos y Plan */}
+          {/* COLUMNA DERECHA: Diagnóstico, Recomendaciones y Recetas */}
+          <div className="space-y-4">
+            {/* Diagnósticos y Plan (movido de columna central) */}
             <CollapsibleSection title="Diagnóstico y Plan" icon={Activity} badge={`${formData.diagnosticos.length}`}>
               <div className="space-y-4">
                 <div>
@@ -1255,25 +1258,7 @@ const EvaluacionOftalmologica = () => {
                   ))}
                 </div>
                 
-                <div>
-                  <Label className="text-xs font-semibold">Plan</Label>
-                  <Textarea
-                    value={formData.plan}
-                    onChange={(e) => updateNestedField('plan', e.target.value)}
-                    disabled={isReadOnly}
-                    placeholder="Conducta a seguir, indicaciones..."
-                    className="input-teal min-h-[80px] text-sm"
-                  />
-                </div>
-              </div>
-            </CollapsibleSection>
-          </div>
-
-          {/* COLUMNA DERECHA: Recomendaciones y Recetas */}
-          <div className="space-y-4">
-            {/* Recomendaciones */}
-            <CollapsibleSection title="Recomendaciones" icon={FileText}>
-              <div className="space-y-4">
+                {/* Estudios a Realizar (movido aquí desde Recomendaciones) */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-xs font-semibold">Estudios a Realizar</Label>
@@ -1337,17 +1322,31 @@ const EvaluacionOftalmologica = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 <div>
-                  <Label className="text-xs">Recomendaciones Generales</Label>
+                  <Label className="text-xs font-semibold">Plan</Label>
                   <Textarea
-                    value={formData.recomendaciones.recomendaciones_generales}
-                    onChange={(e) => updateNestedField('recomendaciones.recomendaciones_generales', e.target.value)}
+                    value={formData.plan}
+                    onChange={(e) => updateNestedField('plan', e.target.value)}
                     disabled={isReadOnly}
-                    placeholder="Indicaciones generales para el paciente..."
-                    className="input-teal min-h-[60px] text-sm"
+                    placeholder="Conducta a seguir, indicaciones..."
+                    className="input-teal min-h-[80px] text-sm"
                   />
                 </div>
+              </div>
+            </CollapsibleSection>
+
+            {/* Recomendaciones Generales */}
+            <CollapsibleSection title="Recomendaciones" icon={FileText}>
+              <div>
+                <Label className="text-xs">Recomendaciones Generales</Label>
+                <Textarea
+                  value={formData.recomendaciones.recomendaciones_generales}
+                  onChange={(e) => updateNestedField('recomendaciones.recomendaciones_generales', e.target.value)}
+                  disabled={isReadOnly}
+                  placeholder="Indicaciones generales para el paciente..."
+                  className="input-teal min-h-[60px] text-sm"
+                />
               </div>
             </CollapsibleSection>
 
