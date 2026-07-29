@@ -298,7 +298,7 @@ const Caja = () => {
   const fetchHistorialCierres = async () => {
     try {
       const response = await axios.get(`${API_URL}/caja/cierres?limit=30`);
-      setHistorialCierres(response.data || []);
+      setHistorialCierres(response.data?.data || response.data || []);
     } catch (error) {
       console.error('Error fetching historial cierres:', error);
     }
@@ -570,7 +570,7 @@ const Caja = () => {
     }
     setSubmitting(true);
     try {
-      await axios.post(`${API_URL}/cxc/${cxcDetalle.id}/abonos`, {
+      await axios.post(`${API_URL}/cxc/${cxcDetalle.id}/abono`, {
         monto: parseFloat(abonoForm.monto),
         metodo_pago: abonoForm.metodo_pago,
         referencia: abonoForm.referencia,

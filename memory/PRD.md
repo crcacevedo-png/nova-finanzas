@@ -155,6 +155,7 @@ Ver `/app/memory/test_credentials.md`
 - ✅ Módulo `routes/surgeries.py` extraído
 - ✅ Módulo de Auditoría visual (solo SuperAdmin) - Julio 2026
 - ✅ **Módulo de Evaluación Oftalmológica** - Julio 2026
+- ✅ **Módulo de Caja** (Caja Diaria, Cuentas por Cobrar, Cierres Financieros) - 29 Julio 2026
 
 ### P1 (Próximo)
 - Importación masiva de pacientes
@@ -164,6 +165,7 @@ Ver `/app/memory/test_credentials.md`
 - Completar refactorización de server.py
 - Módulo de Citas
 - Extraer módulos: Pacientes, Óptica, Autorizaciones
+- Exportar evaluación oftalmológica a PDF
 
 ---
 
@@ -196,6 +198,43 @@ Ver `/app/memory/test_credentials.md`
   - 30 diagnósticos oftalmológicos
 - **Modelo de datos**: `/app/backend/models/evaluacion_oftalmologica.py`
 
+### Módulo de Caja (Nuevo - 29 Julio 2026)
+- **Ruta Frontend**: `/caja`
+- **Archivo**: `/app/frontend/src/pages/Caja.js`
+- **Modelo Backend**: `/app/backend/models/caja.py`
+- **Permisos**: `view_payment_authorizations` (Admin y SuperAdmin)
+- **Características**:
+  - **Aislamiento total de Óptica**: Todas las transacciones usan `origen: "clinica"`
+  - **Caja Diaria**:
+    - Apertura de caja con monto inicial
+    - Registro de movimientos (ingresos/egresos por categoría)
+    - Cierre de caja con arqueo y diferencia
+    - Reapertura de caja solo para SuperAdmin
+    - Historial de cierres con impresión
+  - **Cuentas por Cobrar (CxC)**:
+    - Catálogo de tipos de pagador editable (IGSS, Aseguradora, Particular, Empresa)
+    - Crear cuentas por cobrar asociadas a pacientes
+    - Registro de abonos con opción de afectar caja diaria
+    - Resumen por tipo de pagador
+  - **Cierres Financieros**:
+    - Cierres mensuales y semestrales
+    - Resumen de ingresos, egresos y CxC del período
+    - Recálculo de totales
+    - Reportes imprimibles
+- **Endpoints**:
+  - `GET /api/caja/estado` - Estado de caja del día
+  - `POST /api/caja/apertura` - Abrir caja
+  - `GET/POST/PUT/DELETE /api/caja/movimientos` - CRUD movimientos
+  - `POST /api/caja/cierre` - Cerrar caja
+  - `GET /api/caja/cierres` - Historial de cierres
+  - `POST /api/caja/cierres/{id}/reabrir` - Reabrir caja (SuperAdmin)
+  - `GET/POST/PUT/DELETE /api/catalogos/pagadores` - Catálogo pagadores
+  - `GET/POST/PUT /api/cxc` - Cuentas por cobrar
+  - `POST /api/cxc/{id}/abono` - Registrar abono
+  - `GET /api/cxc/resumen` - Resumen CxC por tipo
+  - `GET/POST/DELETE /api/cierres-financieros` - Cierres financieros
+  - `POST /api/cierres-financieros/{id}/recalcular` - Recalcular cierre
+
 ### Módulo de Auditoría (Nuevo - Julio 2026)
 - **Ruta Frontend**: `/auditoria`
 - **Archivo**: `/app/frontend/src/pages/AuditLogs.js`
@@ -225,4 +264,4 @@ Ver `/app/memory/test_credentials.md`
 
 ---
 
-## Última Actualización: 28 Julio 2026
+## Última Actualización: 29 Julio 2026
