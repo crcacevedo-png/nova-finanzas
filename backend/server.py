@@ -2859,8 +2859,8 @@ async def caja_log_action(user_id: str, action: str, collection: str, doc_id: st
     user_name = user.get("name", "Sistema") if user else "Sistema"
     await audit.log(action, user_id, user_name, details)
 
-# Inicializar módulo de caja con dependencias
-init_caja_routes(db, get_current_user, require_permission, require_role, caja_log_action)
+# Inicializar módulo de caja con función de audit
+init_caja_routes(caja_log_action)
 
 # Incluir routers de caja en api_router
 api_router.include_router(caja_router, tags=["Caja"])

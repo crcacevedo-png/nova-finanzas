@@ -92,18 +92,25 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 6. **suppliers.py** - Proveedores
 7. **fixed_expenses.py** - Gastos fijos
 8. **igss_units.py** - Unidades IGSS
-9. **surgeries.py** - ✅ NEW: CRUD completo + reportes Excel/PDF
+9. **surgeries.py** - CRUD completo + reportes Excel/PDF
+10. **caja.py** - ✅ NEW: Módulo de Caja completo (29 Julio 2026)
+    - Caja Diaria (apertura, movimientos, cierre, reapertura SuperAdmin)
+    - Cuentas por Cobrar (CRUD, abonos, estados de cuenta)
+    - Cierres Financieros (mensuales/semestrales)
+    - Catálogo de Pagadores
 
 ### 🟡 Módulos Pendientes de Extracción:
 1. **Pacientes** (~600 líneas) - Incluye importación/exportación masiva
 2. **Óptica** (~1200 líneas) - Inventario, ventas, compras, médicos
 3. **Autorizaciones de pago** (~350 líneas)
 4. **Reportes generales** (~400 líneas)
+5. **Evaluaciones Oftalmológicas** (~600 líneas)
 
 ### 📊 Progreso de Refactorización:
-- **Antes**: server.py ~6500 líneas
-- **Extraído**: ~2500 líneas (en `/routes/`)
-- **Pendiente**: ~4000 líneas
+- **Antes**: server.py ~8800 líneas
+- **Después de Caja**: server.py ~7800 líneas
+- **Extraído**: ~3500 líneas (en `/routes/`)
+- **Pendiente**: ~4300 líneas
 
 ---
 
