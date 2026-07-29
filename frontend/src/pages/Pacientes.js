@@ -167,6 +167,8 @@ const Pacientes = () => {
       phone: '',
       email: '',
       dpi: '',
+      address: '',
+      marital_status: '',
       emergency_phone: '',
       emergency_contact_name: '',
       emergency_contact_relationship: '',
@@ -174,6 +176,10 @@ const Pacientes = () => {
       insurance_name: '',
       other_institution_name: '',
       igss_unit_id: '',
+      igss_afiliacion: '',
+      igss_no_sps: '',
+      igss_codigo: '',
+      igss_tipo_compra: '',
       comments: ''
     });
     setEditingPatient(null);
@@ -191,6 +197,8 @@ const Pacientes = () => {
         phone: patient.phone,
         email: patient.email || '',
         dpi: patient.dpi || '',
+        address: patient.address || '',
+        marital_status: patient.marital_status || '',
         emergency_phone: patient.emergency_phone || '',
         emergency_contact_name: patient.emergency_contact_name || '',
         emergency_contact_relationship: patient.emergency_contact_relationship || '',
@@ -198,6 +206,10 @@ const Pacientes = () => {
         insurance_name: patient.insurance_name || '',
         other_institution_name: patient.other_institution_name || '',
         igss_unit_id: patient.igss_unit_id || '',
+        igss_afiliacion: patient.igss_afiliacion || '',
+        igss_no_sps: patient.igss_no_sps || '',
+        igss_codigo: patient.igss_codigo || '',
+        igss_tipo_compra: patient.igss_tipo_compra || '',
         comments: patient.comments || ''
       });
     } else {
@@ -876,6 +888,39 @@ const Pacientes = () => {
                 </div>
               </div>
 
+              {/* Estado Civil y Dirección */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="marital_status">Estado Civil</Label>
+                  <Select
+                    value={formData.marital_status}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, marital_status: value }))}
+                  >
+                    <SelectTrigger className="input-teal" data-testid="patient-marital-status">
+                      <SelectValue placeholder="Seleccionar estado civil" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="soltero">Soltero(a)</SelectItem>
+                      <SelectItem value="casado">Casado(a)</SelectItem>
+                      <SelectItem value="unido">Unido(a)</SelectItem>
+                      <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                      <SelectItem value="viudo">Viudo(a)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Dirección</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                    className="input-teal"
+                    placeholder="Dirección completa del paciente"
+                    data-testid="patient-address"
+                  />
+                </div>
+              </div>
+
               {/* Contacto */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -951,6 +996,10 @@ const Pacientes = () => {
                         ...prev, 
                         referral_institution: value,
                         igss_unit_id: value !== 'igss' ? '' : prev.igss_unit_id,
+                        igss_afiliacion: value !== 'igss' ? '' : prev.igss_afiliacion,
+                        igss_no_sps: value !== 'igss' ? '' : prev.igss_no_sps,
+                        igss_codigo: value !== 'igss' ? '' : prev.igss_codigo,
+                        igss_tipo_compra: value !== 'igss' ? '' : prev.igss_tipo_compra,
                         insurance_name: value !== 'seguro_privado' ? '' : prev.insurance_name,
                         other_institution_name: value !== 'otra' ? '' : prev.other_institution_name
                       }))}
@@ -993,6 +1042,61 @@ const Pacientes = () => {
                         </p>
                       )}
                     </div>
+                  )}
+
+                  {/* Campos adicionales IGSS */}
+                  {formData.referral_institution === 'igss' && (
+                    <>
+                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Afiliación</Label>
+                          <Input
+                            value={formData.igss_afiliacion}
+                            onChange={(e) => setFormData(prev => ({ ...prev, igss_afiliacion: e.target.value }))}
+                            className="input-teal"
+                            placeholder="No. Afiliación"
+                            data-testid="patient-igss-afiliacion"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">No. SPS</Label>
+                          <Input
+                            value={formData.igss_no_sps}
+                            onChange={(e) => setFormData(prev => ({ ...prev, igss_no_sps: e.target.value }))}
+                            className="input-teal"
+                            placeholder="No. SPS"
+                            data-testid="patient-igss-sps"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Código</Label>
+                          <Input
+                            value={formData.igss_codigo}
+                            onChange={(e) => setFormData(prev => ({ ...prev, igss_codigo: e.target.value }))}
+                            className="input-teal"
+                            placeholder="Código"
+                            data-testid="patient-igss-codigo"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Tipo de Compra</Label>
+                          <Select
+                            value={formData.igss_tipo_compra}
+                            onValueChange={(value) => setFormData(prev => ({ ...prev, igss_tipo_compra: value }))}
+                          >
+                            <SelectTrigger className="input-teal" data-testid="patient-igss-tipo-compra">
+                              <SelectValue placeholder="Seleccionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="compra_directa">Compra Directa</SelectItem>
+                              <SelectItem value="baja_cuantia">Baja Cuantía</SelectItem>
+                              <SelectItem value="contrato">Contrato</SelectItem>
+                              <SelectItem value="convenio">Convenio</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </>
                   )}
 
                   {/* Campo condicional: Nombre de aseguradora */}
