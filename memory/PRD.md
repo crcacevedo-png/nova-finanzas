@@ -312,4 +312,16 @@ Ver `/app/memory/test_credentials.md`
 
 ---
 
-## Última Actualización: 29 Julio 2026
+## Bugs Corregidos
+
+### ✅ P2: Búsqueda de pacientes con tildes/acentos (30 Julio 2026)
+- **Problema**: La búsqueda de pacientes fallaba cuando el término contenía tildes (ej: buscar "María" no encontraba resultados)
+- **Causa raíz**: Pipeline de MongoDB usaba `$split` con separador vacío (no soportado)
+- **Solución**: Se implementó `generate_accent_regex()` que genera clases de caracteres regex `[aáàäâ]` para buscar ignorando diacríticos
+- **Endpoints afectados**: `GET /api/patients`, `GET /api/pacientes/buscar`
+- **Testing**: 18/18 tests pasaron (pytest), frontend verificado
+- **Archivo de tests**: `/app/backend/tests/test_accent_search.py`
+
+---
+
+## Última Actualización: 30 Julio 2026
