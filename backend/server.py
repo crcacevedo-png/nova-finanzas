@@ -2817,11 +2817,35 @@ async def buscar_pacientes_rapido(
     current_user: dict = Depends(get_current_user)
 ):
     """Búsqueda rápida de pacientes para autocomplete"""
+    
+    # Función para generar regex que coincida con variantes acentuadas
+    def generate_accent_variants(text):
+        """Genera un patrón regex que ignora diacríticos en la búsqueda"""
+        accent_map = {
+            'a': '[aáàäâ]', 'e': '[eéèëê]', 'i': '[iíìïî]', 
+            'o': '[oóòöô]', 'u': '[uúùüû]', 'n': '[nñ]'
+        }
+        regex_pattern = ""
+        for char in text:
+            lower_char = char.lower()
+            if lower_char in accent_map:
+                # Clase de caracteres funciona con case-insensitive flag
+                regex_pattern += accent_map[lower_char]
+            else:
+                # Escapar caracteres especiales de regex
+                if char in r'\.^$*+?{}[]|()':
+                    regex_pattern += '\\' + char
+                else:
+                    regex_pattern += char
+        return regex_pattern
+    
     query = {"is_active": True}
     if search:
+        search_pattern = generate_accent_variants(search)
+        search_regex = {"$regex": search_pattern, "$options": "i"}
         query["$or"] = [
-            {"first_name": {"$regex": search, "$options": "i"}},
-            {"last_name": {"$regex": search, "$options": "i"}},
+            {"first_name": search_regex},
+            {"last_name": search_regex},
             {"record_number": {"$regex": search, "$options": "i"}},
             {"dpi": {"$regex": search, "$options": "i"}}
         ]
@@ -4295,17 +4319,42 @@ async def get_patients(
     current_user: dict = Depends(require_permission("view_patients"))
 ):
     """Listar pacientes con filtros y paginación"""
+    
+    # Función para generar regex que coincida con variantes acentuadas
+    def generate_accent_regex(text):
+        """Genera un patrón regex que ignora diacríticos en la búsqueda"""
+        accent_map = {
+            'a': '[aáàäâ]', 'e': '[eéèëê]', 'i': '[iíìïî]', 
+            'o': '[oóòöô]', 'u': '[uúùüû]', 'n': '[nñ]',
+            'A': '[AÁÀÄÂ]', 'E': '[EÉÈËÊ]', 'I': '[IÍÌÏÎ]',
+            'O': '[OÓÒÖÔ]', 'U': '[UÚÙÜÛ]', 'N': '[NÑ]'
+        }
+        regex_pattern = ""
+        for char in text:
+            lower_char = char.lower()
+            if lower_char in accent_map:
+                # Usar clase de caracteres que incluye todas las variantes
+                regex_pattern += accent_map[lower_char]
+            else:
+                # Escapar caracteres especiales de regex
+                if char in r'\.^$*+?{}[]|()':
+                    regex_pattern += '\\' + char
+                else:
+                    regex_pattern += char
+        return regex_pattern
+    
     query = {"is_active": is_active}
     
-    # Búsqueda por texto
+    # Búsqueda por texto con soporte para acentos
     if search:
-        search_regex = {"$regex": search, "$options": "i"}
+        search_pattern = generate_accent_regex(search)
+        search_regex = {"$regex": search_pattern, "$options": "i"}
         query["$or"] = [
             {"first_name": search_regex},
             {"last_name": search_regex},
-            {"dpi": search_regex},
-            {"phone": search_regex},
-            {"record_number": search_regex}
+            {"dpi": {"$regex": search, "$options": "i"}},
+            {"phone": {"$regex": search, "$options": "i"}},
+            {"record_number": {"$regex": search, "$options": "i"}}
         ]
     
     # Filtros
@@ -4361,29 +4410,64 @@ async def search_patients(
     current_user: dict = Depends(require_permission("view_patients"))
 ):
     """Búsqueda de pacientes para autocompletado en otros módulos"""
-    search_regex = {"$regex": q, "$options": "i"}
+    import unicodedata
+    
+    # Función para normalizar texto (remover diacríticos)
+    def normalize_text(text):
+        if not text:
+            return ""
+        normalized = unicodedata.normalize('NFD', text)
+        return ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    
+    # Función para generar variantes con/sin acentos
+    def generate_accent_variants(text):
+        """Genera variantes del texto con y sin acentos comunes en español"""
+        variants = [text]
+        # Mapeo de caracteres acentuados a no acentuados y viceversa
+        accent_map = {
+            'a': '[aáàäâ]', 'e': '[eéèëê]', 'i': '[iíìïî]', 
+            'o': '[oóòöô]', 'u': '[uúùüû]', 'n': '[nñ]',
+            'A': '[AÁÀÄÂ]', 'E': '[EÉÈËÊ]', 'I': '[IÍÌÏÎ]',
+            'O': '[OÓÒÖÔ]', 'U': '[UÚÙÜÛ]', 'N': '[NÑ]'
+        }
+        # Crear regex que coincida con cualquier variante
+        regex_pattern = ""
+        for char in text:
+            if char.lower() in accent_map:
+                regex_pattern += accent_map.get(char.lower(), char) if char.islower() else accent_map.get(char.lower(), char).upper()
+            else:
+                regex_pattern += char
+        return regex_pattern
+    
+    # Generar patrón regex que coincida con variantes acentuadas
+    search_pattern = generate_accent_variants(q)
+    search_regex = {"$regex": search_pattern, "$options": "i"}
+    
     query = {
         "is_active": True,
         "$or": [
             {"first_name": search_regex},
             {"last_name": search_regex},
-            {"dpi": search_regex},
-            {"phone": search_regex},
-            {"record_number": search_regex}
+            {"dpi": {"$regex": q, "$options": "i"}},
+            {"phone": {"$regex": q, "$options": "i"}},
+            {"record_number": {"$regex": q, "$options": "i"}}
         ]
     }
     
     patients = await db.patients.find(query, {"_id": 0}).limit(limit).to_list(limit)
     
     results = []
+    seen_ids = set()
     for p in patients:
-        results.append(PatientSearchResponse(
-            id=p["id"],
-            record_number=p["record_number"],
-            full_name=f"{p['first_name']} {p['last_name']}",
-            dpi=p.get("dpi", ""),
-            phone=p["phone"]
-        ))
+        if p["id"] not in seen_ids:
+            seen_ids.add(p["id"])
+            results.append(PatientSearchResponse(
+                id=p["id"],
+                record_number=p["record_number"],
+                full_name=f"{p['first_name']} {p['last_name']}",
+                dpi=p.get("dpi", ""),
+                phone=p["phone"]
+            ))
     
     return results
 
