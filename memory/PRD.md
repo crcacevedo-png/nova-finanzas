@@ -324,4 +324,23 @@ Ver `/app/memory/test_credentials.md`
 
 ---
 
-## Última Actualización: 30 Julio 2026
+## Mejoras Implementadas
+
+### ✅ Gastos Fijos - Fecha de inicio completa (31 Julio 2026)
+- **Cambio**: El formulario de Gastos Fijos ahora incluye campo "Fecha de inicio del cobro" (día/mes/año completo) además del día del mes
+- **Nuevo campo**: `start_date` (YYYY-MM-DD) en modelo `FixedExpense` - Obligatorio
+- **Lógica**: La generación automática de gastos solo inicia cuando `fecha_actual >= start_date`
+- **UI**: Nueva columna "FECHA INICIO" en tabla de gastos fijos
+- **Testing**: 6/6 tests en `/app/backend/tests/test_fixed_expense_start_date.py`
+
+### ✅ Formato de fechas estandarizado dd/mm/yy (31 Julio 2026)
+- **Cambio**: Todas las fechas del sistema ahora se muestran en formato `dd/mm/yy` (estándar Guatemala)
+- **Archivos actualizados**: 
+  - `services/api.js` - formatDate() global
+  - `SalaOperaciones.js` - formatDateDisplay()
+  - `AuditLogs.js` - formatDate() local (incluye hora: dd/mm/yy HH:mm:ss)
+- **Fix adicional**: Se corrigió problema de zona horaria agregando `T00:00:00` a fechas YYYY-MM-DD
+
+---
+
+## Última Actualización: 31 Julio 2026

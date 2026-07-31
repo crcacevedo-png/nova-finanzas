@@ -326,7 +326,9 @@ export const formatCurrency = (amount) => {
 // Format date helper - Formato dd/mm/yy (estándar Guatemala)
 export const formatDate = (dateString) => {
   if (!dateString) return '-';
-  const date = new Date(dateString);
+  // Agregar T00:00:00 para evitar problemas de zona horaria con fechas YYYY-MM-DD
+  const dateStr = dateString.includes('T') ? dateString : dateString + 'T00:00:00';
+  const date = new Date(dateStr);
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear().toString().slice(-2); // Solo últimos 2 dígitos

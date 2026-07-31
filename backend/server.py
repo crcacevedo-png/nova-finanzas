@@ -628,7 +628,7 @@ class FixedExpenseBase(BaseModel):
     expense_name: str
     amount: float = Field(gt=0)
     day_of_month: int = Field(ge=1, le=31)
-    start_date: Optional[str] = None  # Fecha de inicio del cobro (YYYY-MM-DD)
+    start_date: str  # Fecha de inicio del cobro (YYYY-MM-DD) - Obligatorio
     duration_type: str = "ilimitado"  # "ilimitado" o "hasta_fecha"
     end_date: Optional[str] = None  # Fecha de último pago (YYYY-MM-DD), null si ilimitado
 
