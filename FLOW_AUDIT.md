@@ -277,8 +277,10 @@ origen: str              # ✅ "clinica" para aislamiento
 | 31/07/2026 | Auditoría inicial | FLOW_AUDIT.md creado |
 | 31/07/2026 | Agregar paciente_id y evaluacion_id a surgeries | server.py (modelos Surgery*) |
 | 31/07/2026 | Agregar cita_id a evaluaciones | models/evaluacion_oftalmologica.py |
-| 31/07/2026 | Endpoint GET /api/admin/integridad-pacientes | server.py |
-| 31/07/2026 | Endpoint GET /api/admin/integridad-datos | server.py |
-| 31/07/2026 | Dashboard Financiero (backend + frontend) | server.py, DashboardFinanciero.js |
+| 31/07/2026 | Endpoint GET /api/admin/integridad-pacientes | routes/admin.py |
+| 31/07/2026 | Endpoint GET /api/admin/integridad-datos | routes/admin.py |
+| 31/07/2026 | Dashboard Financiero (backend + frontend) | routes/dashboard_financiero.py, DashboardFinanciero.js |
 | 31/07/2026 | Menú Dashboard Financiero solo SuperAdmin | Layout.js, App.js |
+| 31/07/2026 | Endpoints vinculación de cirugías | routes/admin.py |
+| 31/07/2026 | Refactorización server.py (8580→7974 líneas) | server.py, routes/admin.py, routes/dashboard_financiero.py |
 
