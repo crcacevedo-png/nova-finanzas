@@ -3998,6 +3998,7 @@ async def create_fixed_expense(fixed_expense_data: FixedExpenseCreate, current_u
             "id": str(uuid.uuid4()),
             "expense_number": expense_number,
             "date": now.strftime("%Y-%m-%d"),
+            "provider": supplier["name"],  # Nombre del proveedor para mostrar en UI
             "supplier_id": fixed_expense_data.supplier_id,
             "name": f"{fixed_expense_data.expense_name} ({supplier['name']})",
             "amount": fixed_expense_data.amount,
@@ -4097,6 +4098,47 @@ async def generate_fixed_expenses_now(current_user: dict = Depends(get_current_u
     
     generated = await generate_fixed_expenses_for_today()
     return {"message": f"Se generaron {generated} gastos fijos", "count": generated}
+
+
+# Endpoint de migración para corregir gastos sin proveedor
+@api_router.post("/expenses/fix-missing-providers")
+async def fix_missing_providers(current_user: dict = Depends(get_current_user)):
+    """Corrige gastos que tienen supplier_id pero no tienen provider (solo SuperAdmin)"""
+    if current_user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo el SuperAdmin puede ejecutar esta acción")
+    
+    # Buscar gastos que tienen supplier_id pero provider vacío o null
+    expenses_to_fix = await db.expenses.find({
+        "$or": [
+            {"provider": None},
+            {"provider": ""},
+            {"provider": {"$exists": False}}
+        ],
+        "supplier_id": {"$exists": True, "$ne": None}
+    }, {"_id": 0}).to_list(1000)
+    
+    fixed_count = 0
+    fixed_details = []
+    
+    for expense in expenses_to_fix:
+        supplier = await db.suppliers.find_one({"id": expense["supplier_id"]}, {"_id": 0, "name": 1})
+        if supplier:
+            await db.expenses.update_one(
+                {"id": expense["id"]},
+                {"$set": {"provider": supplier["name"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            fixed_count += 1
+            fixed_details.append({
+                "expense_number": expense.get("expense_number", "Sin número"),
+                "name": expense.get("name", ""),
+                "provider_added": supplier["name"]
+            })
+    
+    return {
+        "message": f"Se corrigieron {fixed_count} gastos",
+        "fixed_count": fixed_count,
+        "details": fixed_details
+    }
 
 
 # ==================== IGSS UNIT ROUTES (Catálogo) ====================
