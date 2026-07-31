@@ -221,6 +221,7 @@ class EvaluacionOftalmologicaBase(BaseModel):
     paciente_edad: int = 0
     paciente_sexo: str = ""
     paciente_expediente: str = ""
+    cita_id: Optional[str] = None  # Referencia a la cita que originó la evaluación
     fecha: str = ""
     medico_id: str = ""
     medico_nombre: str = ""
@@ -261,6 +262,7 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
     paciente_edad: Optional[int] = None
     paciente_sexo: Optional[str] = None
     paciente_expediente: Optional[str] = None
+    cita_id: Optional[str] = None
     fecha: Optional[str] = None
     medico_id: Optional[str] = None
     medico_nombre: Optional[str] = None
@@ -280,6 +282,7 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
 class EvaluacionOftalmologicaResponse(EvaluacionOftalmologicaBase):
     model_config = ConfigDict(extra="ignore")
     id: str
+    cita_id: Optional[str] = None
     creado_por: str = ""
     creado_por_nombre: str = ""
     fecha_creacion: str = ""

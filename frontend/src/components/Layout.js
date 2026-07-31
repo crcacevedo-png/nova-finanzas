@@ -27,7 +27,8 @@ import {
   ClipboardCheck,
   Scissors,
   Shield,
-  CalendarDays
+  CalendarDays,
+  TrendingUp
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -66,6 +67,11 @@ const Layout = ({ children }) => {
   // Dashboard - Solo para roles que no sean optica
   if (user?.role !== 'optica') {
     navItems.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' });
+  }
+  
+  // Dashboard Financiero - Solo SuperAdmin
+  if (isSuperAdmin) {
+    navItems.push({ path: '/dashboard-financiero', icon: TrendingUp, label: 'Dashboard Financiero', testId: 'nav-dashboard-financiero' });
   }
   
   // Pacientes - Visible para todos

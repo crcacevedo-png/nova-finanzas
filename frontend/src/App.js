@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import DashboardFinanciero from './pages/DashboardFinanciero';
 import Gastos from './pages/Gastos';
 import Usuarios from './pages/Usuarios';
 import HistorialPagos from './pages/HistorialPagos';
@@ -92,6 +93,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/dashboard-financiero" 
+        element={
+          <ProtectedRoute>
+            <DashboardFinanciero />
           </ProtectedRoute>
         } 
       />

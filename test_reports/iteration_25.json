@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 25 - Tested Dashboard Financiero (SuperAdmin only), endpoints de integridad, y modelos con nuevas referencias (Surgery.paciente_id/evaluacion_id, Evaluacion.cita_id). Backend: 15/15 pytest tests PASS in test_dashboard_financiero.py cubriendo (a) /api/dashboard/financiero para períodos mes_actual/semestre/anual/personalizado con schema completo (ingresos, gastos, balance, cuentas_por_cobrar, evolucion_mensual de 12 meses) + verificación aritmética de balance neto = ingresos-gastos, (b) 403 para admin y 401/403 sin token, (c) exportación Excel (content-type spreadsheet, >500 bytes) y PDF (magic bytes %PDF) + 403 admin en exportar, (d) /api/admin/integridad-pacientes e /api/admin/integridad-datos con schema completo y 403 para admin, (e) Surgery acepta y persiste paciente_id y evaluacion_id, Evaluacion acepta y persiste cita_id. Frontend: SuperAdmin ve el link 'Dashboard Financiero' en sidebar (data-testid=nav-dashboard-financiero); página renderiza 4 KPIs (kpi-ingresos/gastos/balance/cxc), 6 SVGs recharts (BarChart Ingresos vs Gastos, LineChart Balance Mensual, 2 PieCharts Pagador/Categoría), botones export-excel-btn/export-pdf-btn y selector Período. Admin: link ausente en sidebar; navegación directa a /dashboard-financiero muestra 'No se pudieron cargar los datos del dashboard' (backend responde 403). Balance Neto Q1,225.00 se ve en verde (texto 'Ganancia'). Datos reales del período actual: Ingresos Q1,225 (Caja Q925 + CxC Q300), Gastos Q0 pagados / Q750 pendiente, CxC pendiente Q1,200.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_financiero.py",
+    "/app/test_reports/pytest/dashboard_financiero.xml"
+  ],
+  "action_items": [
+    "MENOR / hardening: La ruta /dashboard-financiero en App.js sólo está protegida por <ProtectedRoute> (auth). Un usuario admin autenticado que teclee la URL directamente ve el layout de la página (aunque los datos se bloquean con 403 y aparece 'No se pudieron cargar los datos'). Considera envolver esa ruta con una guard de rol (isSuperAdmin) que redirija a /dashboard o muestre 'No autorizado', o crear un componente <SuperAdminRoute>. La seguridad real está en el backend (require_role('superadmin')) — esto sería sólo UX/consistencia."
+  ],
+  "critical_code_review_comments": [
+    "backend/server.py está en 8580 líneas: excede ampliamente el límite recomendado (>700). Se debería refactorizar en módulos (routers/dashboard.py, routers/admin_integridad.py, routers/surgeries.py, etc.) para mejorar mantenibilidad. Riesgo actual: dificultad para localizar código, mayor superficie de conflictos y regresiones.",
+    "El endpoint GET /api/dashboard/financiero/exportar llama internamente a get_dashboard_financiero(...) pasando current_user. Esto funciona porque ambos usan el mismo Depends(require_role('superadmin')), pero acopla la firma. Preferible extraer la lógica de cálculo a una función helper (build_financiero_data) sin dependencia FastAPI, y que ambos endpoints la invoquen.",
+    "La evolución mensual usa `mes_dt = now - timedelta(days=30*i)` para retroceder meses. 30 días fijos causa desalineación de meses (13 iteraciones podrían caer en el mismo mes o saltar uno) en meses de 28/31 días. Recomendable usar dateutil.relativedelta(months=i) o cálculo aritmético mes/año.",
+    "En get_dashboard_financiero, `fecha_fin_dt = date(now.year, now.month, now.day)` para mes_actual/semestre/anual funciona pero es más claro usar `now.date()`. Además, no cubre el día completo (podría perder movimientos futuros del mismo día si se ingresan durante el día — se resuelve con T23:59:59 en el query, ok).",
+    "Frontend: la ruta /dashboard-financiero en App.js no valida rol; sólo el sidebar oculta el link (ver action_items).",
+    "get_integridad_pacientes carga TODAS las colecciones en memoria (find(...).to_list(10000)) sin paginación. En una BD con miles de pacientes/citas/movimientos podría degradar. Aceptable para diagnóstico manual esporádico, pero documentarlo o agregar límites."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dashboard_financiero.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024, admin / Admin2024Nuevo!",
+  "seed_data_creation": "Fixtures crean/eliminan 1 paciente TEST_REF (dpi aleatorio 13 dígitos) + 1 evaluación con cita_id='TEST-CITA-REF-123' + 1 surgery con paciente_id/evaluacion_id 'TEST-*-REF-999'. Todo se limpia in-line con DELETE.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Los 3 entregables funcionan correctamente. Dashboard Financiero está en /dashboard-financiero con menú visible sólo para superadmin (Layout.js:73-74). Endpoints protegidos por require_role('superadmin'). Modelos Surgery (server.py L528-580) y Evaluacion (models/evaluacion_oftalmologica.py L224,265,285) incluyen los campos de referencia. La ruta frontend NO valida rol (sólo backend 403 + sidebar). Test suite reusable: /app/backend/tests/test_dashboard_financiero.py (15 tests).",
+  "rca of the issue": "N/A - Verificación de features. Todas las funcionalidades solicitadas funcionan. Única recomendación de hardening: agregar guard de rol en la ruta React /dashboard-financiero para bloquear render por URL directa a no-superadmin (backend ya lo bloquea correctamente con 403)."
+}
