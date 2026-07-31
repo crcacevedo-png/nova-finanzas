@@ -341,6 +341,35 @@ Ver `/app/memory/test_credentials.md`
   - `AuditLogs.js` - formatDate() local (incluye hora: dd/mm/yy HH:mm:ss)
 - **Fix adicional**: Se corrigió problema de zona horaria agregando `T00:00:00` a fechas YYYY-MM-DD
 
+### ✅ Auditoría y Sincronización del Flujo Clínico (31 Julio 2026)
+- **Documento creado**: `/app/FLOW_AUDIT.md` - Auditoría completa del flujo Cita→Paciente→Evaluación→Óptica→Sala
+- **Modelos actualizados**:
+  - `Surgery`: Agregados campos `paciente_id` y `evaluacion_id` opcionales para vincular cirugías con pacientes
+  - `EvaluacionOftalmologica`: Agregado campo `cita_id` para trazabilidad cita→evaluación
+- **Endpoints de integridad** (solo SuperAdmin):
+  - `GET /api/admin/integridad-pacientes` - Detecta pacientes sin referencias, referencias huérfanas, duplicados por DPI
+  - `GET /api/admin/integridad-datos` - Verifica documentos sin tag origen, catálogos duplicados
+- **Testing**: 15/15 tests en `/app/backend/tests/test_dashboard_financiero.py`
+
+### ✅ Dashboard Financiero (31 Julio 2026)
+- **Acceso**: Solo SuperAdmin (protegido en frontend y backend)
+- **Ruta**: `/dashboard-financiero`
+- **KPIs**:
+  - Ingresos Cobrados (Caja + Abonos CxC)
+  - Gastos Pagados
+  - Balance Neto (verde si positivo, rojo si negativo)
+  - CxC Pendientes
+- **Gráficos** (recharts):
+  - Barras: Ingresos vs Gastos mensual (12 meses)
+  - Línea: Balance mensual
+  - Pie: Ingresos por tipo de pagador
+  - Pie: Gastos por categoría
+- **Filtros**: Mes actual, Semestre, Anual, Personalizado (fechas)
+- **Exportación**: Excel (openpyxl) y PDF (reportlab)
+- **Endpoints**:
+  - `GET /api/dashboard/financiero` - Datos del dashboard
+  - `GET /api/dashboard/financiero/exportar?formato=excel|pdf` - Exportación
+
 ---
 
 ## Última Actualización: 31 Julio 2026

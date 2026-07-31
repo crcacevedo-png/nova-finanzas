@@ -3,6 +3,8 @@
 // Muestra ingresos de Caja y gastos de la empresa
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -12,7 +14,7 @@ import { toast, Toaster } from 'sonner';
 import { 
   TrendingUp, TrendingDown, DollarSign, CreditCard, 
   Download, FileSpreadsheet, FileText, Calendar,
-  ArrowUpRight, ArrowDownRight, Wallet, Receipt
+  ArrowUpRight, ArrowDownRight, Wallet, Receipt, ShieldAlert
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
@@ -21,8 +23,11 @@ import {
 import api, { formatCurrency, formatDate } from '../services/api';
 
 const DashboardFinanciero = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [datos, setDatos] = useState(null);
+  const [noAutorizado, setNoAutorizado] = useState(false);
   const [periodo, setPeriodo] = useState('mes_actual');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -33,6 +38,13 @@ const DashboardFinanciero = () => {
   const COLORS_GASTOS = ['#DC2626', '#F97316', '#EAB308', '#84CC16'];
 
   const cargarDatos = useCallback(async () => {
+    // Verificar rol antes de cargar
+    if (user?.role !== 'superadmin') {
+      setNoAutorizado(true);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       const params = new URLSearchParams({ periodo });
@@ -46,14 +58,14 @@ const DashboardFinanciero = () => {
     } catch (error) {
       console.error('Error cargando dashboard:', error);
       if (error.response?.status === 403) {
-        toast.error('No tiene permisos para acceder al Dashboard Financiero');
+        setNoAutorizado(true);
       } else {
         toast.error('Error al cargar datos del dashboard');
       }
     } finally {
       setLoading(false);
     }
-  }, [periodo, fechaInicio, fechaFin]);
+  }, [periodo, fechaInicio, fechaFin, user]);
 
   useEffect(() => {
     cargarDatos();
@@ -94,6 +106,29 @@ const DashboardFinanciero = () => {
       setExportando(false);
     }
   };
+
+  // Pantalla de no autorizado
+  if (noAutorizado) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="text-center p-8 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <ShieldAlert className="w-16 h-16 mx-auto mb-4" style={{ color: '#EF4444' }} />
+          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            Acceso Restringido
+          </h2>
+          <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+            El Dashboard Financiero está disponible solo para SuperAdmin.
+          </p>
+          <Button 
+            onClick={() => navigate('/dashboard')}
+            style={{ backgroundColor: 'var(--accent-primary)', color: 'white' }}
+          >
+            Volver al Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
