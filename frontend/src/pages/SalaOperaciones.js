@@ -99,10 +99,9 @@ const formatDateDisplay = (dateStr) => {
   if (!dateStr) return '-';
   const date = new Date(dateStr + 'T00:00:00');
   const day = date.getDate().toString().padStart(2, '0');
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  return `${day} ${month} ${year}`;
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear().toString().slice(-2);
+  return `${day}/${month}/${year}`;
 };
 
 const getEyeBadge = (eye) => {

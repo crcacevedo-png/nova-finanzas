@@ -628,6 +628,7 @@ class FixedExpenseBase(BaseModel):
     expense_name: str
     amount: float = Field(gt=0)
     day_of_month: int = Field(ge=1, le=31)
+    start_date: Optional[str] = None  # Fecha de inicio del cobro (YYYY-MM-DD)
     duration_type: str = "ilimitado"  # "ilimitado" o "hasta_fecha"
     end_date: Optional[str] = None  # Fecha de último pago (YYYY-MM-DD), null si ilimitado
 
@@ -639,6 +640,7 @@ class FixedExpenseUpdate(BaseModel):
     expense_name: Optional[str] = None
     amount: Optional[float] = None
     day_of_month: Optional[int] = None
+    start_date: Optional[str] = None
     duration_type: Optional[str] = None
     end_date: Optional[str] = None
     is_active: Optional[bool] = None
@@ -651,6 +653,7 @@ class FixedExpenseResponse(BaseModel):
     expense_name: str
     amount: float
     day_of_month: int
+    start_date: Optional[str] = None
     duration_type: str = "ilimitado"
     end_date: Optional[str] = None
     is_active: bool = True
@@ -3961,6 +3964,7 @@ async def create_fixed_expense(fixed_expense_data: FixedExpenseCreate, current_u
         "expense_name": fixed_expense_data.expense_name,
         "amount": fixed_expense_data.amount,
         "day_of_month": fixed_expense_data.day_of_month,
+        "start_date": fixed_expense_data.start_date,  # Fecha de inicio del cobro
         "duration_type": fixed_expense_data.duration_type,
         "end_date": fixed_expense_data.end_date,
         "is_active": True,
@@ -7757,6 +7761,12 @@ async def generate_fixed_expenses_for_today() -> int:
         last_generated = fe.get("last_generated")
         if last_generated and last_generated.startswith(current_month):
             logger.info(f"Gasto fijo {fe['id']} ya fue generado este mes, saltando...")
+            continue
+        
+        # Verificar si el gasto fijo aún no ha iniciado (tiene fecha de inicio y aún no llega)
+        start_date = fe.get("start_date")
+        if start_date and today_str < start_date:
+            logger.info(f"Gasto fijo {fe['id']} aún no inicia (fecha inicio: {start_date}), saltando...")
             continue
         
         # Verificar si el gasto fijo ha expirado (tiene fecha de fin y ya pasó)

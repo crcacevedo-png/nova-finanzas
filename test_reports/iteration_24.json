@@ -1,0 +1,30 @@
+{
+  "summary": "Tested new start_date field on Fixed Expenses (Gastos Fijos) and dd/mm/yy date format across the ERP. Backend: 6/6 pytest tests passed in test_fixed_expense_start_date.py: POST accepts start_date, GET list/by-id returns start_date, PUT updates start_date, POST allows start_date=null (Optional in model), and generate-now correctly skips a fixed expense when today < start_date. Frontend: FECHA INICIO column present in /configuracion/gastos-fijos table; modal 'Nuevo Gasto Fijo' shows a required 'Fecha de inicio del cobro *' input type=date with today prefilled (2026-07-31). Date formatting verified as dd/mm/yy on /gastos (9 tokens, e.g. 09/07/26), /sala-operaciones (3 tokens, e.g. 07/04/26) and dd/mm/yy HH:mm:ss on /auditoria (30 tokens, e.g. 31/07/26 18:16:33). Zero occurrences of the old dd/mm/yyyy 4-digit-year format on any tested page.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixed_expense_start_date.py",
+    "/app/test_reports/pytest/start_date.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend model FixedExpenseCreate.start_date is Optional[str]=None; the requirement states start_date should be obligatorio. Frontend enforces it via JS check in GastosFijos.js (line 144), but backend still accepts null. Consider making start_date required (`start_date: str`) at the Pydantic level so any API client (not only the UI) must send it. Currently a malicious/careless API caller can create a fixed expense without start_date; generate_fixed_expenses_for_today() will then generate the expense immediately since the `if start_date and today_str < start_date` guard is skipped when start_date is None.",
+    "start_date is validated only as a string (YYYY-MM-DD) without Pydantic format validation. A malformed value (e.g. '2026/07/15' or 'not-a-date') would be persisted and the string comparison `today_str < start_date` may behave unexpectedly. Recommend using `datetime.date` or a Field regex validator.",
+    "formatDate in api.js uses `new Date(dateString)`; for YYYY-MM-DD strings JS parses as UTC which can shift the displayed day by -1 in negative-UTC timezones. SalaOperaciones already mitigates this by appending 'T00:00:00'. Consider standardizing the same fix inside the shared formatDate helper.",
+    "GastosFijos list rows for pre-existing fixed expenses show FECHA INICIO='-' (legacy rows have no start_date). A one-time backfill migration might be useful to set start_date = created_at date for legacy records."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixed_expense_start_date.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Test fixtures create/delete a TEST_SD_Supplier_* and several TEST_SD_* fixed expenses per test; all cleaned up in-line via DELETE calls.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New pytest module test_fixed_expense_start_date.py covers start_date CRUD + generate-now guard. Existing legacy fixed expenses have start_date=null and display '-' in the FECHA INICIO column (expected). start_date default in the Nuevo Gasto Fijo modal is today's ISO date. The formatDate helper (services/api.js) produces dd/mm/yy; SalaOperaciones has its own formatDateDisplay (adds T00:00:00 to avoid TZ shift); AuditLogs has its own formatDate producing dd/mm/yy HH:mm:ss.",
+  "rca of the issue": "N/A - feature verification, no bug found. Only recommendation: backend should enforce start_date as required (currently only frontend enforces it)."
+}

@@ -43,7 +43,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast, Toaster } from 'sonner';
-import { fixedExpenseApi, supplierApi, formatCurrency } from '../services/api';
+import { fixedExpenseApi, supplierApi, formatCurrency, formatDate } from '../services/api';
 
 const GastosFijos = () => {
   const { user } = useAuth();
@@ -63,6 +63,7 @@ const GastosFijos = () => {
     expense_name: '',
     amount: '',
     day_of_month: '',
+    start_date: '',  // Fecha de inicio del cobro
     duration_type: 'ilimitado',
     end_date: '',
     generate_first: false  // Nueva opción para generar el primer gasto al crear
@@ -97,17 +98,22 @@ const GastosFijos = () => {
         expense_name: expense.expense_name,
         amount: expense.amount.toString(),
         day_of_month: expense.day_of_month.toString(),
+        start_date: expense.start_date || '',
         duration_type: expense.duration_type || 'ilimitado',
         end_date: expense.end_date || '',
         generate_first: false
       });
     } else {
       setEditingExpense(null);
+      // Calcular fecha de inicio por defecto (hoy)
+      const today = new Date();
+      const defaultStartDate = today.toISOString().split('T')[0];
       setFormData({
         supplier_id: '',
         expense_name: '',
         amount: '',
         day_of_month: '',
+        start_date: defaultStartDate,
         duration_type: 'ilimitado',
         end_date: '',
         generate_first: true  // Por defecto activado para nuevos gastos
@@ -135,6 +141,10 @@ const GastosFijos = () => {
       toast.error('El día del mes debe ser entre 1 y 31');
       return;
     }
+    if (!formData.start_date) {
+      toast.error('Debe seleccionar la fecha de inicio del cobro');
+      return;
+    }
     
     // Validar fecha de fin si es "hasta_fecha"
     if (formData.duration_type === 'hasta_fecha' && !formData.end_date) {
@@ -147,6 +157,7 @@ const GastosFijos = () => {
       expense_name: formData.expense_name,
       amount: parseFloat(formData.amount),
       day_of_month: parseInt(formData.day_of_month),
+      start_date: formData.start_date,  // Fecha de inicio
       duration_type: formData.duration_type,
       end_date: formData.duration_type === 'hasta_fecha' ? formData.end_date : null,
       generate_first: formData.generate_first  // Incluir opción de generar primer gasto
@@ -350,7 +361,8 @@ const GastosFijos = () => {
                       <TableHead className="table-header">Proveedor</TableHead>
                       <TableHead className="table-header">Nombre del Gasto</TableHead>
                       <TableHead className="table-header text-right">Monto</TableHead>
-                      <TableHead className="table-header text-center">Día del Mes</TableHead>
+                      <TableHead className="table-header text-center">Día de Cobro</TableHead>
+                      <TableHead className="table-header text-center">Fecha Inicio</TableHead>
                       <TableHead className="table-header text-center">Duración</TableHead>
                       <TableHead className="table-header text-center">Última Generación</TableHead>
                       <TableHead className="table-header text-right">Acciones</TableHead>
@@ -390,10 +402,15 @@ const GastosFijos = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            {expense.start_date ? formatDate(expense.start_date) : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
                           {expense.duration_type === 'hasta_fecha' && expense.end_date ? (
                             <Badge className="bg-amber-100 text-amber-700 border-0">
                               <CalendarClock className="w-3 h-3 mr-1" />
-                              Hasta {new Date(expense.end_date + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              Hasta {formatDate(expense.end_date)}
                             </Badge>
                           ) : (
                             <Badge className="bg-emerald-100 text-emerald-700 border-0">
@@ -523,7 +540,7 @@ const GastosFijos = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="day_of_month">Día del mes *</Label>
+                  <Label htmlFor="day_of_month">Día de cobro mensual *</Label>
                   <Input
                     id="day_of_month"
                     type="number"
@@ -535,10 +552,23 @@ const GastosFijos = () => {
                     placeholder="1-31"
                     data-testid="day-of-month-input"
                   />
-                  <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
-                    Día en que se genera el gasto cada mes
-                  </p>
                 </div>
+              </div>
+
+              {/* Fecha de inicio del cobro */}
+              <div className="space-y-2">
+                <Label htmlFor="start_date">Fecha de inicio del cobro *</Label>
+                <Input
+                  id="start_date"
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                  className="input-teal"
+                  data-testid="start-date-input"
+                />
+                <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                  A partir de esta fecha se comenzará a generar el gasto recurrente
+                </p>
               </div>
 
               {/* Duración del gasto fijo */}
