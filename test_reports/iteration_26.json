@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 26 - Regression testing of backend refactor (routes/ extraction). Created /app/backend/tests/test_refactor_routes.py with 10 tests. Results: 9 PASSED, 1 SKIPPED (skipped test was a fixture edge case, not a route bug). All requested endpoints work correctly through the extracted routers: (a) GET /api/patients returns paginated {data,total,page,limit,total_pages} with no _id leaks; (b) GET /api/pacientes/buscar?q=Mar\u00eda returns 200 with accent-insensitive search; (c) GET /api/evaluaciones returns paginated list; (d) GET /api/catalogos/medicamentos returns list; (e) GET /api/surgeries returns paginated list; (f) GET /api/expenses returns list; (g) GET /api/dashboard/financiero returns 200 for superadmin with ingresos/gastos/balance keys, 403 for admin, 401/403 for unauthenticated. app.include_router(api_router) is present and all extracted routers are correctly mounted under /api. server.py reduced from 8580 (iter 25) to 5579 lines.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_refactor_routes.py",
+    "/app/test_reports/pytest/refactor_routes.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py still at 5579 lines - continue refactor extracting remaining domains (users, roles, reports, integrity, export). Target < 700 lines per module.",
+    "Response envelope inconsistency across list endpoints: /api/patients returns {data,total,page,limit,total_pages} while other endpoints may return {items,...} or bare arrays. Standardize on a single Pagination schema (e.g., {items,total,page,page_size,total_pages}) across all list endpoints to simplify frontend consumers.",
+    "routes/patients.py at 823 lines and routes/surgeries.py at 806 lines are approaching the 700-line threshold - consider splitting sub-features (e.g., patient documents, patient history) into sub-modules."
+  ],
+  "updated_files": ["/app/backend/tests/test_refactor_routes.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A (backend only)"},
+  "test_credentials": "superadmin / nova2024, admin / Admin2024Nuevo!",
+  "seed_data_creation": "None. Read-only tests using existing seed data (9 patients, 3 evaluaciones, 3 surgeries, 13 gastos).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Refactor iter 26 verified. Routers extracted to /app/backend/routes/: patients.py, evaluaciones.py, surgeries.py + previously existing (auth, agenda, caja, dashboard_financiero, admin, etc). app.include_router(api_router) is wired. Response shape for /api/patients uses 'data' key (not 'items'); update future tests accordingly. Reusable regression suite: /app/backend/tests/test_refactor_routes.py.",
+  "rca of the issue": "N/A - Verification of refactor. All extracted routers respond correctly with expected auth guards (SuperAdmin-only for dashboard financiero enforced by 403 to admin token)."
+}

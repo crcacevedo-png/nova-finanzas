@@ -1,0 +1,823 @@
+# /app/backend/routes/patients.py
+# Módulo de Pacientes - CRUD completo y exportación
+
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi.responses import StreamingResponse
+from typing import Optional, List, Literal
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field, ConfigDict
+import uuid
+import io
+
+from config.database import db
+from routes.auth import get_current_user, require_role, require_permission
+
+router = APIRouter(prefix="/patients", tags=["Pacientes"])
+pacientes_router = APIRouter(prefix="/pacientes", tags=["Pacientes - Búsqueda rápida"])
+
+
+# ==================== MODELS ====================
+
+class PatientBase(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    gender: Literal["masculino", "femenino", "otro"]
+    birth_date: str  # YYYY-MM-DD
+    profession: Optional[str] = ""
+    phone: str = Field(..., min_length=8, max_length=20)
+    email: Optional[str] = ""
+    dpi: Optional[str] = Field(None, min_length=13, max_length=13)
+    emergency_phone: Optional[str] = ""
+    emergency_contact_name: Optional[str] = ""
+    emergency_contact_relationship: Optional[str] = ""
+    referral_institution: Literal["particular", "igss", "seguro_privado", "otra"]
+    insurance_name: Optional[str] = ""
+    other_institution_name: Optional[str] = ""
+    igss_unit_id: Optional[str] = None
+    comments: Optional[str] = ""
+
+
+class PatientCreate(PatientBase):
+    pass
+
+
+class PatientUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    gender: Optional[Literal["masculino", "femenino", "otro"]] = None
+    birth_date: Optional[str] = None
+    profession: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    dpi: Optional[str] = None
+    emergency_phone: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_relationship: Optional[str] = None
+    referral_institution: Optional[Literal["particular", "igss", "seguro_privado", "otra"]] = None
+    insurance_name: Optional[str] = None
+    other_institution_name: Optional[str] = None
+    igss_unit_id: Optional[str] = None
+    comments: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class PatientResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    record_number: str
+    first_name: str
+    last_name: str
+    full_name: Optional[str] = ""
+    gender: str
+    birth_date: str
+    age: int
+    profession: Optional[str] = ""
+    phone: str
+    email: Optional[str] = ""
+    dpi: Optional[str] = ""
+    emergency_phone: Optional[str] = ""
+    emergency_contact_name: Optional[str] = ""
+    emergency_contact_relationship: Optional[str] = ""
+    referral_institution: str
+    referral_institution_label: Optional[str] = ""
+    insurance_name: Optional[str] = ""
+    other_institution_name: Optional[str] = ""
+    igss_unit_id: Optional[str] = ""
+    igss_unit_name: Optional[str] = ""
+    comments: Optional[str] = ""
+    is_active: bool = True
+    created_by: str
+    created_by_name: Optional[str] = ""
+    created_at: str
+    updated_by: Optional[str] = ""
+    updated_by_name: Optional[str] = ""
+    updated_at: Optional[str] = None
+
+
+class PatientListResponse(BaseModel):
+    data: List[PatientResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+
+class PatientSearchResponse(BaseModel):
+    """Respuesta para autocompletado en otros módulos"""
+    id: str
+    record_number: str
+    full_name: str
+    dpi: Optional[str] = ""
+    phone: str
+
+
+class PatientDuplicateCheck(BaseModel):
+    exists: bool
+    match_type: Optional[str] = None
+    patient_id: Optional[str] = None
+    patient_name: Optional[str] = None
+    patient_record_number: Optional[str] = None
+
+
+# ==================== HELPERS ====================
+
+INSTITUTION_LABELS = {
+    "particular": "Particular",
+    "igss": "IGSS",
+    "seguro_privado": "Seguro Privado",
+    "otra": "Otra Institución"
+}
+
+
+def validate_phone(phone: str) -> bool:
+    """Validar formato de teléfono guatemalteco"""
+    import re
+    phone_clean = re.sub(r'[\s\-\(\)]', '', phone)
+    return len(phone_clean) >= 8 and phone_clean.isdigit()
+
+
+def validate_email(email: str) -> bool:
+    """Validar formato de email"""
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+
+def validate_dpi(dpi: str) -> bool:
+    """Validar DPI guatemalteco (13 dígitos)"""
+    return len(dpi) == 13 and dpi.isdigit()
+
+
+def calcular_edad(birth_date: str) -> int:
+    """Calcular edad a partir de fecha de nacimiento"""
+    try:
+        birth = datetime.strptime(birth_date[:10], "%Y-%m-%d")
+        today = datetime.now(timezone.utc).replace(tzinfo=None)
+        age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+        return max(0, age)
+    except:
+        return 0
+
+
+async def get_next_record_number() -> str:
+    """Generar siguiente número de expediente correlativo"""
+    now = datetime.now(timezone.utc)
+    prefix = f"EXP-{now.strftime('%Y%m')}-"
+    
+    last = await db.patients.find_one(
+        {"record_number": {"$regex": f"^{prefix}"}},
+        sort=[("record_number", -1)]
+    )
+    
+    if last:
+        try:
+            last_num = int(last["record_number"].split("-")[-1])
+            next_num = last_num + 1
+        except:
+            next_num = 1
+    else:
+        next_num = 1
+    
+    return f"{prefix}{next_num:04d}"
+
+
+async def enrich_patient(patient: dict) -> dict:
+    """Enriquecer paciente con datos calculados y relaciones"""
+    patient["full_name"] = f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip()
+    patient["age"] = calcular_edad(patient.get("birth_date", ""))
+    patient["referral_institution_label"] = INSTITUTION_LABELS.get(patient.get("referral_institution", ""), "")
+    
+    # Obtener nombre de unidad IGSS
+    if patient.get("igss_unit_id"):
+        unit = await db.igss_units.find_one({"id": patient["igss_unit_id"]}, {"_id": 0, "name": 1})
+        patient["igss_unit_name"] = unit["name"] if unit else ""
+    else:
+        patient["igss_unit_name"] = ""
+    
+    # Obtener nombres de usuarios
+    if patient.get("created_by"):
+        creator = await db.users.find_one({"id": patient["created_by"]}, {"_id": 0, "name": 1})
+        patient["created_by_name"] = creator["name"] if creator else ""
+    
+    if patient.get("updated_by"):
+        updater = await db.users.find_one({"id": patient["updated_by"]}, {"_id": 0, "name": 1})
+        patient["updated_by_name"] = updater["name"] if updater else ""
+    
+    return patient
+
+
+def generate_accent_regex(text: str) -> str:
+    """Genera un patrón regex que ignora diacríticos en la búsqueda"""
+    accent_map = {
+        'a': '[aáàäâ]', 'e': '[eéèëê]', 'i': '[iíìïî]', 
+        'o': '[oóòöô]', 'u': '[uúùüû]', 'n': '[nñ]',
+        'A': '[AÁÀÄÂ]', 'E': '[EÉÈËÊ]', 'I': '[IÍÌÏÎ]',
+        'O': '[OÓÒÖÔ]', 'U': '[UÚÙÜÛ]', 'N': '[NÑ]'
+    }
+    regex_pattern = ""
+    for char in text:
+        lower_char = char.lower()
+        if lower_char in accent_map:
+            regex_pattern += accent_map[lower_char]
+        else:
+            if char in r'\.^$*+?{}[]|()':
+                regex_pattern += '\\' + char
+            else:
+                regex_pattern += char
+    return regex_pattern
+
+
+# ==================== BÚSQUEDA RÁPIDA (para autocomplete) ====================
+
+@pacientes_router.get("/buscar")
+async def buscar_pacientes_rapido(
+    search: str = Query("", min_length=0),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user)
+):
+    """Búsqueda rápida de pacientes para autocomplete"""
+    query = {"is_active": True}
+    if search:
+        search_pattern = generate_accent_regex(search)
+        search_regex = {"$regex": search_pattern, "$options": "i"}
+        query["$or"] = [
+            {"first_name": search_regex},
+            {"last_name": search_regex},
+            {"record_number": {"$regex": search, "$options": "i"}},
+            {"dpi": {"$regex": search, "$options": "i"}}
+        ]
+    
+    pacientes = await db.patients.find(
+        query, 
+        {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "record_number": 1, "birth_date": 1, "gender": 1, "phone": 1}
+    ).limit(limit).to_list(limit)
+    
+    for p in pacientes:
+        p["nombre_completo"] = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+        p["edad"] = calcular_edad(p.get("birth_date", "")) if p.get("birth_date") else 0
+    
+    return pacientes
+
+
+# ==================== CRUD ENDPOINTS ====================
+
+@router.get("", response_model=PatientListResponse)
+async def get_patients(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    referral_institution: Optional[str] = None,
+    igss_unit_id: Optional[str] = None,
+    gender: Optional[str] = None,
+    age_from: Optional[int] = None,
+    age_to: Optional[int] = None,
+    date_from: Optional[str] = Query(None, alias="dateFrom"),
+    date_to: Optional[str] = Query(None, alias="dateTo"),
+    is_active: bool = True,
+    current_user: dict = Depends(require_permission("view_patients"))
+):
+    """Listar pacientes con filtros y paginación"""
+    query = {"is_active": is_active}
+    
+    if search:
+        search_pattern = generate_accent_regex(search)
+        search_regex = {"$regex": search_pattern, "$options": "i"}
+        query["$or"] = [
+            {"first_name": search_regex},
+            {"last_name": search_regex},
+            {"dpi": {"$regex": search, "$options": "i"}},
+            {"phone": {"$regex": search, "$options": "i"}},
+            {"record_number": {"$regex": search, "$options": "i"}}
+        ]
+    
+    if referral_institution:
+        query["referral_institution"] = referral_institution
+    if igss_unit_id:
+        query["igss_unit_id"] = igss_unit_id
+    if gender:
+        query["gender"] = gender
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query["$gte"] = date_from
+        if date_to:
+            date_query["$lte"] = date_to
+        if date_query:
+            query["created_at"] = date_query
+    
+    total = await db.patients.count_documents(query)
+    total_pages = (total + limit - 1) // limit
+    
+    skip = (page - 1) * limit
+    patients = await db.patients.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    enriched_patients = []
+    for patient in patients:
+        enriched = await enrich_patient(patient)
+        if age_from is not None and enriched["age"] < age_from:
+            continue
+        if age_to is not None and enriched["age"] > age_to:
+            continue
+        enriched_patients.append(enriched)
+    
+    return PatientListResponse(
+        data=enriched_patients,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=total_pages
+    )
+
+
+@router.get("/search", response_model=List[PatientSearchResponse])
+async def search_patients(
+    q: str = Query(..., min_length=2),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(require_permission("view_patients"))
+):
+    """Búsqueda de pacientes para autocompletado en otros módulos"""
+    search_pattern = generate_accent_regex(q)
+    search_regex = {"$regex": search_pattern, "$options": "i"}
+    
+    query = {
+        "is_active": True,
+        "$or": [
+            {"first_name": search_regex},
+            {"last_name": search_regex},
+            {"dpi": {"$regex": q, "$options": "i"}},
+            {"phone": {"$regex": q, "$options": "i"}},
+            {"record_number": {"$regex": q, "$options": "i"}}
+        ]
+    }
+    
+    patients = await db.patients.find(query, {"_id": 0}).limit(limit).to_list(limit)
+    
+    results = []
+    seen_ids = set()
+    for p in patients:
+        if p["id"] not in seen_ids:
+            seen_ids.add(p["id"])
+            results.append(PatientSearchResponse(
+                id=p["id"],
+                record_number=p["record_number"],
+                full_name=f"{p['first_name']} {p['last_name']}",
+                dpi=p.get("dpi", ""),
+                phone=p["phone"]
+            ))
+    
+    return results
+
+
+@router.get("/check-duplicate", response_model=PatientDuplicateCheck)
+async def check_patient_duplicate(
+    dpi: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    birth_date: Optional[str] = None,
+    exclude_id: Optional[str] = None,
+    current_user: dict = Depends(require_permission("view_patients"))
+):
+    """Verificar si existe un paciente duplicado"""
+    if dpi and len(dpi) == 13:
+        query = {"dpi": dpi, "is_active": True}
+        if exclude_id:
+            query["id"] = {"$ne": exclude_id}
+        
+        existing = await db.patients.find_one(query, {"_id": 0})
+        if existing:
+            return PatientDuplicateCheck(
+                exists=True,
+                match_type="dpi",
+                patient_id=existing["id"],
+                patient_name=f"{existing['first_name']} {existing['last_name']}",
+                patient_record_number=existing["record_number"]
+            )
+    
+    if first_name and last_name and birth_date:
+        query = {
+            "first_name": {"$regex": f"^{first_name}$", "$options": "i"},
+            "last_name": {"$regex": f"^{last_name}$", "$options": "i"},
+            "birth_date": birth_date,
+            "is_active": True
+        }
+        if exclude_id:
+            query["id"] = {"$ne": exclude_id}
+        
+        existing = await db.patients.find_one(query, {"_id": 0})
+        if existing:
+            return PatientDuplicateCheck(
+                exists=True,
+                match_type="name_birthdate",
+                patient_id=existing["id"],
+                patient_name=f"{existing['first_name']} {existing['last_name']}",
+                patient_record_number=existing["record_number"]
+            )
+    
+    return PatientDuplicateCheck(exists=False)
+
+
+@router.get("/{patient_id}", response_model=PatientResponse)
+async def get_patient(patient_id: str, current_user: dict = Depends(require_permission("view_patients"))):
+    """Obtener detalle de un paciente"""
+    patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    enriched = await enrich_patient(patient)
+    return PatientResponse(**enriched)
+
+
+@router.post("", response_model=PatientResponse)
+async def create_patient(patient_data: PatientCreate, current_user: dict = Depends(require_permission("create_patients"))):
+    """Crear nuevo paciente"""
+    if not validate_phone(patient_data.phone):
+        raise HTTPException(status_code=400, detail="Formato de teléfono inválido")
+    
+    if patient_data.email and not validate_email(patient_data.email):
+        raise HTTPException(status_code=400, detail="Formato de email inválido")
+    
+    if patient_data.dpi and not validate_dpi(patient_data.dpi):
+        raise HTTPException(status_code=400, detail="DPI debe tener exactamente 13 dígitos numéricos")
+    
+    try:
+        birth_date = datetime.strptime(patient_data.birth_date[:10], "%Y-%m-%d")
+        if birth_date > datetime.now(timezone.utc).replace(tzinfo=None):
+            raise HTTPException(status_code=400, detail="La fecha de nacimiento no puede ser futura")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha de nacimiento inválido (YYYY-MM-DD)")
+    
+    if patient_data.referral_institution == "igss":
+        if not patient_data.igss_unit_id:
+            raise HTTPException(status_code=400, detail="Debe seleccionar una unidad IGSS")
+        unit = await db.igss_units.find_one({"id": patient_data.igss_unit_id, "is_active": True})
+        if not unit:
+            raise HTTPException(status_code=400, detail="Unidad IGSS no encontrada")
+    
+    if patient_data.dpi:
+        existing_dpi = await db.patients.find_one({"dpi": patient_data.dpi, "is_active": True})
+        if existing_dpi:
+            raise HTTPException(status_code=400, detail="Ya existe un paciente con este DPI")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    record_number = await get_next_record_number()
+    
+    patient_doc = {
+        "id": str(uuid.uuid4()),
+        "record_number": record_number,
+        "first_name": patient_data.first_name.strip(),
+        "last_name": patient_data.last_name.strip(),
+        "gender": patient_data.gender,
+        "birth_date": patient_data.birth_date[:10],
+        "profession": patient_data.profession or "",
+        "phone": patient_data.phone,
+        "email": patient_data.email or "",
+        "dpi": patient_data.dpi or "",
+        "emergency_phone": patient_data.emergency_phone or "",
+        "emergency_contact_name": patient_data.emergency_contact_name or "",
+        "emergency_contact_relationship": patient_data.emergency_contact_relationship or "",
+        "referral_institution": patient_data.referral_institution,
+        "insurance_name": patient_data.insurance_name or "",
+        "other_institution_name": patient_data.other_institution_name or "",
+        "igss_unit_id": patient_data.igss_unit_id if patient_data.referral_institution == "igss" else "",
+        "comments": patient_data.comments or "",
+        "is_active": True,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_by": "",
+        "updated_at": now
+    }
+    
+    await db.patients.insert_one(patient_doc)
+    if "_id" in patient_doc:
+        del patient_doc["_id"]
+    
+    enriched = await enrich_patient(patient_doc)
+    return PatientResponse(**enriched)
+
+
+@router.put("/{patient_id}", response_model=PatientResponse)
+async def update_patient(patient_id: str, patient_data: PatientUpdate, current_user: dict = Depends(require_permission("edit_patients"))):
+    """Actualizar paciente"""
+    patient = await db.patients.find_one({"id": patient_id})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    update_data = {k: v for k, v in patient_data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    
+    if "phone" in update_data and not validate_phone(update_data["phone"]):
+        raise HTTPException(status_code=400, detail="Formato de teléfono inválido")
+    
+    if "email" in update_data and update_data["email"] and not validate_email(update_data["email"]):
+        raise HTTPException(status_code=400, detail="Formato de email inválido")
+    
+    if "dpi" in update_data and update_data["dpi"] and not validate_dpi(update_data["dpi"]):
+        raise HTTPException(status_code=400, detail="DPI debe tener exactamente 13 dígitos numéricos")
+    
+    if "birth_date" in update_data:
+        try:
+            birth_date = datetime.strptime(update_data["birth_date"][:10], "%Y-%m-%d")
+            if birth_date > datetime.now(timezone.utc).replace(tzinfo=None):
+                raise HTTPException(status_code=400, detail="La fecha de nacimiento no puede ser futura")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha de nacimiento inválido")
+    
+    if "dpi" in update_data and update_data["dpi"]:
+        existing_dpi = await db.patients.find_one({
+            "dpi": update_data["dpi"],
+            "is_active": True,
+            "id": {"$ne": patient_id}
+        })
+        if existing_dpi:
+            raise HTTPException(status_code=400, detail="Ya existe un paciente con este DPI")
+    
+    referral = update_data.get("referral_institution", patient["referral_institution"])
+    if referral == "igss":
+        igss_unit = update_data.get("igss_unit_id", patient.get("igss_unit_id"))
+        if not igss_unit:
+            raise HTTPException(status_code=400, detail="Debe seleccionar una unidad IGSS")
+        unit = await db.igss_units.find_one({"id": igss_unit, "is_active": True})
+        if not unit:
+            raise HTTPException(status_code=400, detail="Unidad IGSS no encontrada")
+    
+    if "referral_institution" in update_data:
+        if update_data["referral_institution"] != "igss":
+            update_data["igss_unit_id"] = ""
+        if update_data["referral_institution"] != "seguro_privado":
+            update_data["insurance_name"] = ""
+        if update_data["referral_institution"] != "otra":
+            update_data["other_institution_name"] = ""
+    
+    update_data["updated_by"] = current_user["id"]
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.patients.update_one({"id": patient_id}, {"$set": update_data})
+    updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    
+    enriched = await enrich_patient(updated)
+    return PatientResponse(**enriched)
+
+
+@router.delete("/{patient_id}")
+async def delete_patient(patient_id: str, current_user: dict = Depends(require_permission("delete_patients"))):
+    """Desactivar paciente (soft delete)"""
+    patient = await db.patients.find_one({"id": patient_id, "is_active": True})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    await db.patients.update_one(
+        {"id": patient_id},
+        {"$set": {
+            "is_active": False,
+            "updated_by": current_user["id"],
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    return {"message": "Paciente desactivado correctamente"}
+
+
+@router.post("/{patient_id}/reactivate", response_model=PatientResponse)
+async def reactivate_patient(patient_id: str, current_user: dict = Depends(require_permission("delete_patients"))):
+    """Reactivar un paciente desactivado"""
+    patient = await db.patients.find_one({"id": patient_id, "is_active": False})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado o ya está activo")
+    
+    await db.patients.update_one(
+        {"id": patient_id},
+        {"$set": {
+            "is_active": True,
+            "updated_by": current_user["id"],
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    enriched = await enrich_patient(updated)
+    return PatientResponse(**enriched)
+
+
+# ==================== EXPORT ENDPOINTS ====================
+
+@router.get("/export/template")
+async def download_import_template(current_user: dict = Depends(require_permission("import_patients"))):
+    """Descargar plantilla para importación de pacientes"""
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Pacientes"
+        
+        headers = [
+            "Nombre*", "Apellido*", "Género* (masculino/femenino/otro)",
+            "Fecha Nacimiento* (YYYY-MM-DD)", "Profesión", "Teléfono*",
+            "Email", "DPI (13 dígitos)", "Teléfono Emergencia",
+            "Nombre Contacto Emergencia", "Parentesco",
+            "Institución* (particular/igss/seguro_privado/otra)",
+            "Nombre Aseguradora", "Otra Institución", "Código Unidad IGSS",
+            "Comentarios"
+        ]
+        
+        header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', wrap_text=True)
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+        
+        example = [
+            "Juan", "Pérez García", "masculino", "1985-03-15", "Ingeniero",
+            "55551234", "juan@email.com", "1234567890123", "55559876",
+            "María Pérez", "Esposa", "particular", "", "", "", "Paciente de ejemplo"
+        ]
+        for col, value in enumerate(example, 1):
+            ws.cell(row=2, column=col, value=value)
+        
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=plantilla_pacientes.xlsx"}
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Librería Excel no disponible")
+
+
+@router.post("/import")
+async def import_patients(current_user: dict = Depends(require_permission("import_patients"))):
+    """Importar pacientes desde Excel (placeholder)"""
+    raise HTTPException(status_code=501, detail="Funcionalidad de importación en desarrollo")
+
+
+@router.get("/export/excel")
+async def export_patients_excel(
+    search: Optional[str] = None,
+    referral_institution: Optional[str] = None,
+    igss_unit_id: Optional[str] = None,
+    gender: Optional[str] = None,
+    date_from: Optional[str] = Query(None, alias="dateFrom"),
+    date_to: Optional[str] = Query(None, alias="dateTo"),
+    current_user: dict = Depends(require_permission("export_patients"))
+):
+    """Exportar pacientes a Excel"""
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        
+        query = {"is_active": True}
+        if search:
+            search_regex = {"$regex": search, "$options": "i"}
+            query["$or"] = [{"first_name": search_regex}, {"last_name": search_regex}, {"dpi": search_regex}]
+        if referral_institution:
+            query["referral_institution"] = referral_institution
+        if igss_unit_id:
+            query["igss_unit_id"] = igss_unit_id
+        if gender:
+            query["gender"] = gender
+        if date_from or date_to:
+            date_query = {}
+            if date_from:
+                date_query["$gte"] = date_from
+            if date_to:
+                date_query["$lte"] = date_to
+            if date_query:
+                query["created_at"] = date_query
+        
+        patients = await db.patients.find(query, {"_id": 0}).sort("record_number", 1).to_list(10000)
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Pacientes"
+        
+        headers = [
+            "No. Expediente", "Nombre", "Apellido", "Género", "Fecha Nacimiento",
+            "Edad", "Profesión", "Teléfono", "Email", "DPI", "Institución",
+            "Unidad IGSS", "Fecha Registro"
+        ]
+        
+        header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
+            cell.border = thin_border
+        
+        for row, patient in enumerate(patients, 2):
+            enriched = await enrich_patient(patient)
+            data = [
+                enriched["record_number"], enriched["first_name"], enriched["last_name"],
+                enriched["gender"].capitalize(), enriched["birth_date"], enriched["age"],
+                enriched.get("profession", ""), enriched["phone"], enriched.get("email", ""),
+                enriched.get("dpi", ""), enriched["referral_institution_label"],
+                enriched.get("igss_unit_name", ""), enriched["created_at"][:10]
+            ]
+            for col, value in enumerate(data, 1):
+                cell = ws.cell(row=row, column=col, value=value)
+                cell.border = thin_border
+        
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 15
+        
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=pacientes_novavision.xlsx"}
+        )
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Librería Excel no disponible")
+
+
+@router.get("/export/pdf")
+async def export_patients_pdf(
+    search: Optional[str] = None,
+    referral_institution: Optional[str] = None,
+    gender: Optional[str] = None,
+    current_user: dict = Depends(require_permission("export_patients"))
+):
+    """Exportar pacientes a PDF"""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.enums import TA_CENTER
+        
+        query = {"is_active": True}
+        if search:
+            search_regex = {"$regex": search, "$options": "i"}
+            query["$or"] = [{"first_name": search_regex}, {"last_name": search_regex}, {"dpi": search_regex}]
+        if referral_institution:
+            query["referral_institution"] = referral_institution
+        if gender:
+            query["gender"] = gender
+        
+        patients = await db.patients.find(query, {"_id": 0}).sort("record_number", 1).to_list(10000)
+        
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=landscape(letter), rightMargin=0.5*inch,
+                                leftMargin=0.5*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16,
+                                     alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#0F6E56'))
+        elements.append(Paragraph("NovaVision - Lista de Pacientes", title_style))
+        elements.append(Paragraph(f"Generado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+        elements.append(Spacer(1, 0.3*inch))
+        
+        table_data = [["Expediente", "Nombre Completo", "Género", "Edad", "Teléfono", "DPI", "Institución"]]
+        
+        for patient in patients:
+            enriched = await enrich_patient(patient)
+            table_data.append([
+                enriched["record_number"], enriched["full_name"], enriched["gender"].capitalize(),
+                str(enriched["age"]), enriched["phone"], enriched.get("dpi", "-"),
+                enriched["referral_institution_label"]
+            ])
+        
+        table = Table(table_data, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0F6E56')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ]))
+        
+        elements.append(table)
+        doc.build(elements)
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=pacientes_novavision.pdf"}
+        )
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Librería PDF no disponible: {str(e)}")
