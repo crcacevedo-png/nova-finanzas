@@ -85,33 +85,34 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 
 ### ✅ Módulos Completamente Extraídos a `/routes/`:
 1. **auth.py** - Autenticación, usuarios, tokens JWT
-2. **expenses.py** - CRUD gastos manuales
+2. **expenses.py** - CRUD gastos manuales (modelos, helpers, stub - endpoints en server.py)
 3. **payments.py** - CRUD pagos
 4. **dashboard.py** - Dashboard y estadísticas
 5. **bank_accounts.py** - Cuentas bancarias
 6. **suppliers.py** - Proveedores
 7. **fixed_expenses.py** - Gastos fijos
 8. **igss_units.py** - Unidades IGSS
-9. **surgeries.py** - CRUD completo + reportes Excel/PDF
-10. **caja.py** - ✅ NEW: Módulo de Caja completo (29 Julio 2026)
-    - Caja Diaria (apertura, movimientos, cierre, reapertura SuperAdmin)
-    - Cuentas por Cobrar (CRUD, abonos, estados de cuenta)
-    - Cierres Financieros (mensuales/semestrales)
-    - Catálogo de Pagadores
+9. **surgeries.py** - ✅ CRUD completo + reportes Excel/PDF (806 líneas)
+10. **caja.py** - Módulo de Caja completo (29 Julio 2026)
+11. **agenda.py** - Módulo de Agenda de Pacientes
+12. **admin.py** - ✅ NEW: Endpoints de integridad y administración (1 Agosto 2026)
+13. **dashboard_financiero.py** - ✅ NEW: Dashboard exclusivo SuperAdmin (1 Agosto 2026)
+14. **patients.py** - ✅ NEW: CRUD completo de pacientes + búsqueda (823 líneas, 1 Agosto 2026)
+15. **evaluaciones.py** - ✅ NEW: Evaluaciones oftalmológicas + catálogos (480 líneas, 1 Agosto 2026)
 
 ### 🟡 Módulos Pendientes de Extracción:
-1. **Pacientes** (~600 líneas) - Incluye importación/exportación masiva
-2. **Óptica** (~1200 líneas) - Inventario, ventas, compras, médicos
-3. **Autorizaciones de pago** (~350 líneas)
-4. **Reportes generales** (~400 líneas)
-5. **Evaluaciones Oftalmológicas** (~600 líneas)
-6. **Agenda** (~700 líneas) - Nuevo módulo
+1. **Gastos (endpoints completos)** (~350 líneas) - expenses.py tiene modelos, falta mover endpoints
+2. **Pagos (endpoints)** (~200 líneas)
+3. **Óptica** (~1200 líneas) - Inventario, ventas, compras, médicos
+4. **Autorizaciones de pago** (~350 líneas)
+5. **Reportes generales** (~200 líneas)
 
 ### 📊 Progreso de Refactorización:
-- **Antes**: server.py ~8800 líneas
-- **Después de Caja**: server.py ~7800 líneas
-- **Extraído**: ~4200 líneas (en `/routes/`)
-- **Pendiente**: ~4300 líneas
+- **Antes (Julio 2026)**: server.py ~8000 líneas
+- **Después (1 Agosto 2026)**: server.py ~5580 líneas
+- **Reducción total**: ~2420 líneas extraídas
+- **Módulos extraídos**: patients.py (823), evaluaciones.py (480), surgeries.py (806)
+- **Routers activos**: 15 módulos en `/routes/`
 
 ---
 
@@ -200,10 +201,14 @@ Ver `/app/memory/test_credentials.md`
 - ✅ Módulo de Auditoría visual (solo SuperAdmin) - Julio 2026
 - ✅ **Módulo de Evaluación Oftalmológica** - Julio 2026
 - ✅ **Módulo de Caja** (Caja Diaria, Cuentas por Cobrar, Cierres Financieros) - 29 Julio 2026
+- ✅ **Refactorización P0: Pacientes** - 1 Agosto 2026 (routes/patients.py)
+- ✅ **Refactorización P1: Evaluaciones** - 1 Agosto 2026 (routes/evaluaciones.py)
+- ✅ **Refactorización P1: Cirugías registradas** - 1 Agosto 2026
 
 ### P1 (Próximo)
-- Importación masiva de pacientes
-- Búsqueda de pacientes insensible a tildes
+- Extraer módulo de Gastos completo a routes/expenses.py (endpoints)
+- Extraer módulo de Óptica a routes/optica.py
+- Importación masiva de pacientes (template Excel existe)
 
 ### P2 (Futuro)
 - Completar refactorización de server.py
@@ -372,4 +377,18 @@ Ver `/app/memory/test_credentials.md`
 
 ---
 
-## Última Actualización: 31 Julio 2026
+## Última Actualización: 1 Agosto 2026
+
+### Refactorización Completada (1 Agosto 2026):
+- **P0 - Pacientes**: Extraído a `/app/backend/routes/patients.py` (823 líneas)
+  - CRUD completo de pacientes
+  - Búsqueda rápida con soporte de tildes
+  - Exportación Excel/PDF
+  - Importación masiva
+- **P1 - Evaluaciones**: Extraído a `/app/backend/routes/evaluaciones.py` (480 líneas)
+  - CRUD evaluaciones oftalmológicas
+  - Catálogos de autocomplete (medicamentos, estudios, diagnósticos)
+  - Autoguardado y sellado automático
+- **P1 - Cirugías**: Router registrado correctamente en server.py
+- **server.py reducido**: De ~8000 a ~5580 líneas (-30%)
+- **Testing**: 100% éxito en iteration_26 (9/9 tests)
