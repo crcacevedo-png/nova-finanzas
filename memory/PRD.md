@@ -85,33 +85,33 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 
 ### ✅ Módulos Completamente Extraídos a `/routes/`:
 1. **auth.py** - Autenticación, usuarios, tokens JWT
-2. **expenses.py** - ✅ CRUD gastos + pagos completo (640 líneas, 1 Agosto 2026)
-3. **payments.py** - (Incluido en expenses.py)
-4. **dashboard.py** - Dashboard y estadísticas
-5. **bank_accounts.py** - Cuentas bancarias (modelos, rutas en server.py)
-6. **suppliers.py** - Proveedores
-7. **fixed_expenses.py** - Gastos fijos
-8. **igss_units.py** - Unidades IGSS
-9. **surgeries.py** - ✅ CRUD completo + reportes Excel/PDF (806 líneas)
-10. **caja.py** - Módulo de Caja completo (29 Julio 2026)
-11. **agenda.py** - Módulo de Agenda de Pacientes
-12. **admin.py** - ✅ Endpoints de integridad y administración (1 Agosto 2026)
-13. **dashboard_financiero.py** - ✅ Dashboard exclusivo SuperAdmin (1 Agosto 2026)
-14. **patients.py** - ✅ CRUD completo de pacientes + búsqueda (823 líneas, 1 Agosto 2026)
-15. **evaluaciones.py** - ✅ Evaluaciones oftalmológicas + catálogos (480 líneas, 1 Agosto 2026)
+2. **expenses.py** - ✅ CRUD gastos + pagos completo (640 líneas)
+3. **dashboard.py** - Dashboard y estadísticas
+4. **bank_accounts.py** - Cuentas bancarias (modelos en server.py)
+5. **suppliers.py** - Proveedores
+6. **fixed_expenses.py** - Gastos fijos
+7. **igss_units.py** - Unidades IGSS
+8. **surgeries.py** - ✅ CRUD completo + reportes Excel/PDF (806 líneas)
+9. **caja.py** - Módulo de Caja completo
+10. **agenda.py** - Módulo de Agenda de Pacientes
+11. **admin.py** - Endpoints de integridad y administración
+12. **dashboard_financiero.py** - Dashboard exclusivo SuperAdmin
+13. **patients.py** - ✅ CRUD completo de pacientes + búsqueda (823 líneas)
+14. **evaluaciones.py** - ✅ Evaluaciones oftalmológicas + catálogos (448 líneas)
+15. **optica.py** - ✅ NEW: Médicos, Aros, Lentes, Ventas, Compras, Dashboard (1322 líneas)
+16. **payment_authorizations.py** - ✅ NEW: Autorizaciones de pago (401 líneas)
 
 ### 🟡 Módulos Pendientes de Extracción:
-1. **Óptica** (~1200 líneas) - Inventario, ventas, compras, médicos
-2. **Autorizaciones de pago** (~350 líneas)
-3. **Cuentas bancarias (rutas)** (~100 líneas) - Modelos ya extraídos
-4. **Reportes generales** (~200 líneas)
+- Cuentas bancarias (rutas) - ~100 líneas aún en server.py
+- Proveedores (rutas) - ~100 líneas aún en server.py
+- Dashboard general (rutas) - ~150 líneas aún en server.py
 
-### 📊 Progreso de Refactorización:
+### 📊 Progreso de Refactorización FINAL:
 - **Antes (Julio 2026)**: server.py ~8000 líneas
-- **Después (1 Agosto 2026)**: server.py ~4978 líneas
-- **Reducción total**: ~3022 líneas extraídas (~38%)
-- **Módulos extraídos**: patients.py (823), evaluaciones.py (480), surgeries.py (806), expenses.py (640)
-- **Routers activos**: 16 módulos en `/routes/`
+- **Después (1 Agosto 2026)**: server.py **3029 líneas**
+- **Reducción total**: ~4971 líneas extraídas (**62%**)
+- **Módulos extraídos**: 16 archivos en `/routes/`
+- **Total código modularizado**: ~4440 líneas
 
 ---
 
@@ -384,14 +384,20 @@ Ver `/app/memory/test_credentials.md`
   - Búsqueda rápida con soporte de tildes
   - Exportación Excel/PDF
   - Importación masiva
-- **P1 - Evaluaciones**: Extraído a `/app/backend/routes/evaluaciones.py` (480 líneas)
+- **P1 - Evaluaciones**: Extraído a `/app/backend/routes/evaluaciones.py` (448 líneas)
   - CRUD evaluaciones oftalmológicas
   - Catálogos de autocomplete (medicamentos, estudios, diagnósticos)
   - Autoguardado y sellado automático
-- **P1 - Cirugías**: Router registrado correctamente en server.py
 - **P1 - Gastos y Pagos**: Extraído a `/app/backend/routes/expenses.py` (640 líneas)
   - CRUD completo de gastos
   - CRUD de pagos
   - Autorizaciones y estados (pendiente, parcial, pagado, vencido)
-- **server.py reducido**: De ~8000 a ~4978 líneas (-38%)
-- **Testing**: 100% éxito en iteraciones 26-27
+- **P1 - Óptica**: Extraído a `/app/backend/routes/optica.py` (1322 líneas)
+  - CRUD Médicos, Aros, Lentes de contacto, Tipos de lente
+  - Ventas con abonos y pagos parciales
+  - Compras y Dashboard de óptica
+- **P1 - Autorizaciones**: Extraído a `/app/backend/routes/payment_authorizations.py` (401 líneas)
+  - CRUD autorizaciones de pago
+  - Ejecución y cancelación de autorizaciones
+- **server.py reducido**: De ~8000 a **3029 líneas (-62%)**
+- **Testing**: Todos los endpoints verificados (8/8 tests)
