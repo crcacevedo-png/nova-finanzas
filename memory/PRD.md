@@ -85,34 +85,33 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 
 ### ✅ Módulos Completamente Extraídos a `/routes/`:
 1. **auth.py** - Autenticación, usuarios, tokens JWT
-2. **expenses.py** - CRUD gastos manuales (modelos, helpers, stub - endpoints en server.py)
-3. **payments.py** - CRUD pagos
+2. **expenses.py** - ✅ CRUD gastos + pagos completo (640 líneas, 1 Agosto 2026)
+3. **payments.py** - (Incluido en expenses.py)
 4. **dashboard.py** - Dashboard y estadísticas
-5. **bank_accounts.py** - Cuentas bancarias
+5. **bank_accounts.py** - Cuentas bancarias (modelos, rutas en server.py)
 6. **suppliers.py** - Proveedores
 7. **fixed_expenses.py** - Gastos fijos
 8. **igss_units.py** - Unidades IGSS
 9. **surgeries.py** - ✅ CRUD completo + reportes Excel/PDF (806 líneas)
 10. **caja.py** - Módulo de Caja completo (29 Julio 2026)
 11. **agenda.py** - Módulo de Agenda de Pacientes
-12. **admin.py** - ✅ NEW: Endpoints de integridad y administración (1 Agosto 2026)
-13. **dashboard_financiero.py** - ✅ NEW: Dashboard exclusivo SuperAdmin (1 Agosto 2026)
-14. **patients.py** - ✅ NEW: CRUD completo de pacientes + búsqueda (823 líneas, 1 Agosto 2026)
-15. **evaluaciones.py** - ✅ NEW: Evaluaciones oftalmológicas + catálogos (480 líneas, 1 Agosto 2026)
+12. **admin.py** - ✅ Endpoints de integridad y administración (1 Agosto 2026)
+13. **dashboard_financiero.py** - ✅ Dashboard exclusivo SuperAdmin (1 Agosto 2026)
+14. **patients.py** - ✅ CRUD completo de pacientes + búsqueda (823 líneas, 1 Agosto 2026)
+15. **evaluaciones.py** - ✅ Evaluaciones oftalmológicas + catálogos (480 líneas, 1 Agosto 2026)
 
 ### 🟡 Módulos Pendientes de Extracción:
-1. **Gastos (endpoints completos)** (~350 líneas) - expenses.py tiene modelos, falta mover endpoints
-2. **Pagos (endpoints)** (~200 líneas)
-3. **Óptica** (~1200 líneas) - Inventario, ventas, compras, médicos
-4. **Autorizaciones de pago** (~350 líneas)
-5. **Reportes generales** (~200 líneas)
+1. **Óptica** (~1200 líneas) - Inventario, ventas, compras, médicos
+2. **Autorizaciones de pago** (~350 líneas)
+3. **Cuentas bancarias (rutas)** (~100 líneas) - Modelos ya extraídos
+4. **Reportes generales** (~200 líneas)
 
 ### 📊 Progreso de Refactorización:
 - **Antes (Julio 2026)**: server.py ~8000 líneas
-- **Después (1 Agosto 2026)**: server.py ~5580 líneas
-- **Reducción total**: ~2420 líneas extraídas
-- **Módulos extraídos**: patients.py (823), evaluaciones.py (480), surgeries.py (806)
-- **Routers activos**: 15 módulos en `/routes/`
+- **Después (1 Agosto 2026)**: server.py ~4978 líneas
+- **Reducción total**: ~3022 líneas extraídas (~38%)
+- **Módulos extraídos**: patients.py (823), evaluaciones.py (480), surgeries.py (806), expenses.py (640)
+- **Routers activos**: 16 módulos en `/routes/`
 
 ---
 
@@ -390,5 +389,9 @@ Ver `/app/memory/test_credentials.md`
   - Catálogos de autocomplete (medicamentos, estudios, diagnósticos)
   - Autoguardado y sellado automático
 - **P1 - Cirugías**: Router registrado correctamente en server.py
-- **server.py reducido**: De ~8000 a ~5580 líneas (-30%)
-- **Testing**: 100% éxito en iteration_26 (9/9 tests)
+- **P1 - Gastos y Pagos**: Extraído a `/app/backend/routes/expenses.py` (640 líneas)
+  - CRUD completo de gastos
+  - CRUD de pagos
+  - Autorizaciones y estados (pendiente, parcial, pagado, vencido)
+- **server.py reducido**: De ~8000 a ~4978 líneas (-38%)
+- **Testing**: 100% éxito en iteraciones 26-27
