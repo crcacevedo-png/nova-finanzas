@@ -424,16 +424,17 @@ class PaymentAuthorizationListResponse(BaseModel):
 from routes.optica import DoctorResponse, DoctorListResponse, DoctorCreate, DoctorUpdate
 
 # ==================== DASHBOARD MODELS ====================
+class TypeBreakdown(BaseModel):
+    type: str
+    total: float
+    percentage: float
+
 class DashboardSummary(BaseModel):
-    total_expenses: float
-    total_expenses_paid: float
-    total_expenses_pending: float
-    total_surgeries: int
-    total_surgeries_month: int
-    total_patients: int
-    total_patients_month: int
-    recent_expenses: List[dict] = []
-    recent_surgeries: List[dict] = []
+    total_month: float = 0
+    total_paid: float = 0
+    total_pending: float = 0
+    overdue_count: int = 0
+    by_type: List[TypeBreakdown] = []
 
 class MonthlyChartItem(BaseModel):
     month: str
@@ -1884,7 +1885,7 @@ api_router.include_router(surgeries_router, tags=["Cirugías"])
 api_router.include_router(surgeries_reports_router, tags=["Reportes de Cirugías"])
 
 # ==================== MÓDULO DE GASTOS Y PAGOS (Refactorizado) ====================
-from routes.expenses import router as expenses_router, payments_router
+from routes.expenses import router as expenses_router, payments_router, check_overdue_expenses
 
 # Incluir routers de gastos y pagos
 api_router.include_router(expenses_router, tags=["Gastos"])
