@@ -1,0 +1,29 @@
+{
+  "summary": "Verified /api/dashboard/financiero (SuperAdmin exclusivo) does NOT have the same date-format bug previously fixed in /api/dashboard/stats. Created /app/backend/tests/test_dashboard_financiero_date_filter.py with 8 tests covering mes_actual, semestre, anual, personalizado (Aug 2026 + full year) and consistency with /api/dashboard/stats. Result: 8/8 PASSED. Root cause of correctness: route uses date.isoformat() on datetime.date objects, producing 'YYYY-MM-DD' strings that lexically match the storage format in expenses.date (also 'YYYY-MM-DD'). Ranges tested: mes_actual (2026-08-01..2026-08-03) -> gastos.total=Q100.00 matches sum of month expenses. anual (2026-01-01..2026-08-03) -> Q45,967.00 matches YTD sum. Consistency: financiero.gastos.total (Q100.00) == /api/dashboard/stats.total_gastos (Q100.00). Bug from iteration 27 does NOT reproduce here.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/expenses", "issue": "?limit values > 100 silently return an empty 'data' array with total=None (no validation error). This is a minor UX/validation issue - the endpoint should either clamp to max or return 422."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_financiero_date_filter.py",
+    "/app/test_reports/pytest/dashboard_financiero_datefix.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/dashboard_financiero.py L155-159 evolucion_mensual iterates months via now - timedelta(days=30*i). This approximates months and can skip/duplicate a month around 31-day boundaries or leap years. Recommend relativedelta(months=i) or explicit (year, month) arithmetic - same issue flagged in iter 27 for server.py monthly-chart still applies here.",
+    "L159 uses min(ultimo_dia, mes_dt.day) if i == 0 - for the current month this uses now.day (from the 30*i-approximated mes_dt), which may not equal today's date when the approximation drifts. Prefer computing 'today' cleanly.",
+    "The route uses lexical string comparison against expenses.date (YYYY-MM-DD strings). Works but fragile if any legacy record has a datetime/ISO-with-time value. Consider normalizing the column to a native BSON Date and switching to datetime-based queries.",
+    "L221 exportar_dashboard_financiero calls the async function get_dashboard_financiero directly (as a coroutine) - happens to work because FastAPI resolves Depends via current_user passed manually, but re-invoking route handlers is a code smell. Extract computation into a service function."
+  ],
+  "updated_files": ["/app/backend/tests/test_dashboard_financiero_date_filter.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "N/A"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None - used existing 14 expenses (1 in Aug 2026 for Q100, 45,867 total prior in 2026).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Dashboard Financiero (SuperAdmin) confirmed correct on all periods. Regression tests at /app/backend/tests/test_dashboard_financiero_date_filter.py. NOTE: /api/expenses has a pagination quirk - use limit<=100 or omit limit to get results (limit=10000 returns empty data). Pre-existing bug from iter 27 (/api/dashboard/summary 500 due to DashboardSummary/TypeBreakdown mismatch) is still unresolved.",
+  "rca of the issue": "No bug present in this endpoint. Correctness reasoning: In /app/backend/routes/dashboard_financiero.py L69-70, fecha_inicio_str = fecha_inicio_dt.isoformat() where fecha_inicio_dt is a datetime.date (not datetime.datetime). date.isoformat() returns 'YYYY-MM-DD' WITHOUT a time component, so the Mongo lexical string comparison against expenses.date (also stored as 'YYYY-MM-DD') matches correctly. This differs from the earlier /api/dashboard/stats bug where isoformat() was called on a datetime.datetime, producing 'YYYY-MM-DDTHH:MM:SS+00:00', which lexically excluded plain 'YYYY-MM-DD' values. All 8 pytest cases verify equality between financiero.gastos.total and client-side sum over /api/expenses within the same range."
+}
