@@ -401,3 +401,25 @@ Ver `/app/memory/test_credentials.md`
   - Ejecución y cancelación de autorizaciones
 - **server.py reducido**: De ~8000 a **3029 líneas (-62%)**
 - **Testing**: Todos los endpoints verificados (8/8 tests)
+
+---
+
+## Historial de Cambios Recientes
+
+### 2026-08-03 - Bug Fix: Cards de Gastos Pendientes mostraban Q0.00
+**Problema**: El endpoint `/api/dashboard/upcoming` devolvía error 500 Internal Server Error. Las cards de "Resumen de Montos Pendientes" mostraban Q0.00 en producción.
+
+**Causa Raíz**: El modelo Pydantic `UpcomingPayments` en `server.py` estaba definido incorrectamente con campos `data`, `total`, `total_amount` cuando debería usar `overdue`, `due30`, `due60`. Además, el modelo `AlertResponse` no estaba definido antes de ser usado.
+
+**Solución**:
+1. Se agregó el modelo `AlertResponse` en `server.py` (línea 447-458)
+2. Se corrigió el modelo `UpcomingPayments` para usar `overdue`, `due30`, `due60`
+3. Se eliminó la importación duplicada de `AlertResponse` desde `routes/dashboard.py`
+
+**Archivos modificados**:
+- `/app/backend/server.py`
+
+**Verificación**: Las cards ahora muestran correctamente:
+- Total Vencido (9): Q 38,467.00
+- Por vencer -30 días (0): Q 0.00
+- Por vencer 30-60 días (0): Q 0.00

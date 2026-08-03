@@ -441,10 +441,23 @@ class MonthlyChartItem(BaseModel):
     expenses: float
     payments: float
 
+class AlertResponse(BaseModel):
+    """Modelo para alertas de pagos pendientes/vencidos"""
+    id: str
+    name: str
+    provider: Optional[str] = ""
+    amount: float
+    remaining_amount: float
+    due_date: Optional[str] = None
+    days_remaining: int
+    type: str
+    status: str
+    invoice_number: Optional[str] = ""
+
 class UpcomingPayments(BaseModel):
-    data: List[dict]
-    total: int
-    total_amount: float
+    overdue: List[AlertResponse] = []
+    due30: List[AlertResponse] = []
+    due60: List[AlertResponse] = []
 
 # ==================== CÓDIGO MOVIDO A routes/surgeries.py ====================
 
@@ -1858,7 +1871,6 @@ api_router.include_router(agenda_config_router, tags=["Agenda - Configuración"]
 # ==================== MÓDULO DE ADMINISTRACIÓN Y DASHBOARD ====================
 from routes.admin import router as admin_router
 from routes.dashboard_financiero import router as dashboard_financiero_router
-from routes.dashboard import AlertResponse
 
 # Incluir routers de admin y dashboard
 api_router.include_router(admin_router, tags=["Administración"])
