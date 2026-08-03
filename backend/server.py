@@ -1858,6 +1858,7 @@ api_router.include_router(agenda_config_router, tags=["Agenda - Configuración"]
 # ==================== MÓDULO DE ADMINISTRACIÓN Y DASHBOARD ====================
 from routes.admin import router as admin_router
 from routes.dashboard_financiero import router as dashboard_financiero_router
+from routes.dashboard import AlertResponse
 
 # Incluir routers de admin y dashboard
 api_router.include_router(admin_router, tags=["Administración"])
@@ -1885,7 +1886,7 @@ api_router.include_router(surgeries_router, tags=["Cirugías"])
 api_router.include_router(surgeries_reports_router, tags=["Reportes de Cirugías"])
 
 # ==================== MÓDULO DE GASTOS Y PAGOS (Refactorizado) ====================
-from routes.expenses import router as expenses_router, payments_router, check_overdue_expenses
+from routes.expenses import router as expenses_router, payments_router, check_overdue_expenses, get_next_expense_number
 
 # Incluir routers de gastos y pagos
 api_router.include_router(expenses_router, tags=["Gastos"])
@@ -2079,25 +2080,35 @@ async def get_dashboard_summary(current_user: dict = Depends(require_permission(
 
 @api_router.get("/dashboard/monthly-chart", response_model=List[MonthlyChartItem])
 async def get_monthly_chart(current_user: dict = Depends(require_permission("view_dashboard"))):
-    expenses = await db.expenses.find({}, {"_id": 0, "date": 1, "amount": 1}).to_list(10000)
+    expenses = await db.expenses.find({}, {"_id": 0, "date": 1, "amount": 1, "paid_amount": 1}).to_list(10000)
     
-    # Group by month (last 6 months)
+    # Group by month (last 6 months) - usando cálculo explícito de (año, mes)
     now = datetime.now(timezone.utc)
+    current_year = now.year
+    current_month = now.month
     monthly_data = {}
     
     for i in range(6):
-        month_date = now - timedelta(days=30 * i)
-        month_key = month_date.strftime("%Y-%m")
-        month_name = month_date.strftime("%b")
-        year = month_date.year
-        monthly_data[month_key] = {"month": month_name, "year": year, "total": 0}
+        # Calcular el mes correcto restando i meses
+        target_month = current_month - i
+        target_year = current_year
+        
+        # Ajustar año si el mes es <= 0
+        while target_month <= 0:
+            target_month += 12
+            target_year -= 1
+        
+        month_key = f"{target_year}-{target_month:02d}"
+        month_name = datetime(target_year, target_month, 1).strftime("%b")
+        monthly_data[month_key] = {"month": month_name, "expenses": 0, "payments": 0}
     
     for e in expenses:
         try:
             date = datetime.fromisoformat(e["date"])
             month_key = date.strftime("%Y-%m")
             if month_key in monthly_data:
-                monthly_data[month_key]["total"] += e["amount"]
+                monthly_data[month_key]["expenses"] += e.get("amount", 0)
+                monthly_data[month_key]["payments"] += e.get("paid_amount", 0)
         except Exception:
             pass
     

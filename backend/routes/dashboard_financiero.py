@@ -151,12 +151,29 @@ async def get_dashboard_financiero(
     balance_neto = total_ingresos_cobrado - gastos_pagados
     
     # ========== EVOLUCIÓN MENSUAL (últimos 12 meses) ==========
+    # Usar cálculo explícito de (año, mes) para evitar problemas con meses de diferentes longitudes
     evolucion = []
+    current_year = now.year
+    current_month = now.month
+    
     for i in range(11, -1, -1):
-        mes_dt = now - timedelta(days=30 * i)
-        mes_inicio = date(mes_dt.year, mes_dt.month, 1)
-        ultimo_dia = monthrange(mes_dt.year, mes_dt.month)[1]
-        mes_fin = date(mes_dt.year, mes_dt.month, min(ultimo_dia, mes_dt.day) if i == 0 else ultimo_dia)
+        # Calcular el mes correcto restando i meses
+        target_month = current_month - i
+        target_year = current_year
+        
+        # Ajustar año si el mes es <= 0
+        while target_month <= 0:
+            target_month += 12
+            target_year -= 1
+        
+        mes_inicio = date(target_year, target_month, 1)
+        ultimo_dia = monthrange(target_year, target_month)[1]
+        
+        # Para el mes actual, usar el día de hoy; para meses anteriores, usar el último día
+        if i == 0:
+            mes_fin = date(current_year, current_month, now.day)
+        else:
+            mes_fin = date(target_year, target_month, ultimo_dia)
         
         # Ingresos del mes
         ingresos_mes = await db.caja_movimientos.aggregate([
