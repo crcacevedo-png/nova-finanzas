@@ -1,0 +1,30 @@
+{
+  "summary": "Iter 27 - Verified backend fix for Dashboard 'Q 0.00' bug. Filters in /api/dashboard/stats (server.py L2174-2176) and /api/dashboard/summary (L2044-2046) now use strftime('%Y-%m-%d') instead of isoformat(), matching the YYYY-MM-DD format stored in expenses.date. Created /app/backend/tests/test_dashboard_stats_fix.py (5 tests): 4 PASSED, 1 FAILED (dashboard/summary 500 - pre-existing, unrelated). Key evidence: month_start=2026-08-01, 1 expense in current month (Q100), dashboard/stats.total_gastos=100.0 (matches sum). Bug is FIXED for /dashboard/stats, /dashboard/chart-data and /expenses as requested.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/dashboard/summary", "issue": "Returns 500. The handler builds DashboardSummary(total_month=..., total_paid=..., total_pending=..., overdue_count=..., by_type=[TypeBreakdown(...)]) but the DashboardSummary Pydantic model at server.py L427-436 declares different required fields (total_expenses, total_expenses_paid, total_expenses_pending, total_surgeries, total_surgeries_month, total_patients, total_patients_month) and does not include total_month/by_type/overdue_count. Also TypeBreakdown class is not defined in server.py. This is a pre-existing bug independent of the date-filter fix. Fix: align DashboardSummary model with actual returned payload (or vice versa), and define/import TypeBreakdown."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_stats_fix.py",
+    "/app/test_reports/pytest/dashboard_stats_fix.xml"
+  ],
+  "action_items": [
+    "Fix /api/dashboard/summary 500 error: reconcile DashboardSummary Pydantic model with actual response payload and define/import TypeBreakdown. This did not regress with the current fix but blocks the summary endpoint entirely."
+  ],
+  "critical_code_review_comments": [
+    "Date field 'date' is stored as YYYY-MM-DD string in expenses collection - lexical string comparison $gte works for same-format strings but is fragile. Consider migrating to native BSON Date and using datetime objects consistently across queries.",
+    "/dashboard/monthly-chart at L2079-2105 groups months by subtracting 30 days per iteration (approximate) - this can skip or duplicate months in edge cases (February/leap years). Use relativedelta(months=i) or explicit month arithmetic.",
+    "DashboardSummary model at L427-436 is completely out of sync with /dashboard/summary handler return (L2071-2077). Pydantic response_model=DashboardSummary silently causes 500 in production. Remove response_model or align schema."
+  ],
+  "updated_files": ["/app/backend/tests/test_dashboard_stats_fix.py"],
+  "success_rate": {"backend": "80% (4/5 in this run; requested-scope endpoints 100%)", "frontend": "N/A (backend only)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None - used existing 14 expenses (1 in current month Q100).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bug fix for Dashboard 'Q 0.00' issue verified end-to-end. /api/dashboard/stats now returns correct current-month totals (test_dashboard_stats_matches_current_month_expenses asserts equality with sum of expenses.amount where date >= YYYY-MM-01). Regression suite at /app/backend/tests/test_dashboard_stats_fix.py. Separate pre-existing issue: /api/dashboard/summary returns 500 due to response_model DashboardSummary mismatch and missing TypeBreakdown class - report to main agent, not part of current fix scope.",
+  "rca of the issue": "Root cause: expenses.date stored as 'YYYY-MM-DD' (e.g., '2026-08-01'), but the filter previously computed month_start via datetime.replace(day=1).isoformat() producing '2026-08-01T00:00:00+00:00'. In MongoDB, {$gte: '2026-08-01T00:00:00+00:00'} against '2026-08-01' returns false lexicographically (because 'T' > '-' but the string '2026-08-01' < '2026-08-01T...' -> everything is excluded). Fix applied: month_start = now.replace(day=1).strftime('%Y-%m-%d') producing '2026-08-01' which lexically matches the stored format. Verified: with 1 expense of Q100 dated in Aug 2026, stats now correctly returns total_gastos=100.0 (previously would be 0). Mitigation validated by test_dashboard_stats_matches_current_month_expenses which cross-checks the aggregated sum against a client-side filter over /api/expenses using the same date-string prefix rule."
+}

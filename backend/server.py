@@ -2041,13 +2041,13 @@ async def delete_user(user_id: str, current_user: dict = Depends(require_permiss
 async def get_dashboard_summary(current_user: dict = Depends(require_permission("view_dashboard"))):
     await check_overdue_expenses()
     
-    # Get current month
+    # Get current month - usar formato YYYY-MM-DD para coincidir con el campo date
     now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1).strftime("%Y-%m-%d")  # Formato: 2026-08-01
     
     # Get all expenses for the month
     expenses = await db.expenses.find({
-        "date": {"$gte": month_start.isoformat()}
+        "date": {"$gte": month_start}
     }, {"_id": 0}).to_list(10000)
     
     total_month = sum(e["amount"] for e in expenses)
@@ -2171,9 +2171,9 @@ async def get_upcoming_payments(current_user: dict = Depends(require_permission(
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: dict = Depends(require_permission("view_dashboard"))):
     """Estadísticas del dashboard - filtrado por mes actual"""
-    # Calcular inicio del mes actual
+    # Calcular inicio del mes actual - usar formato YYYY-MM-DD para coincidir con el campo date
     now = datetime.now(timezone.utc)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    month_start = now.replace(day=1).strftime("%Y-%m-%d")  # Formato: 2026-08-01
     
     # Use aggregation for efficient stats calculation - filtrado por mes actual
     pipeline = [
