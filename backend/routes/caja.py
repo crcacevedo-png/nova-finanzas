@@ -44,8 +44,9 @@ def init_caja_routes(log_action_func):
 
 async def calcular_totales_caja_dia(fecha_dia: str) -> dict:
     """Calcula totales del día para la caja clínica"""
-    inicio = f"{fecha_dia}T00:00:00"
-    fin = f"{fecha_dia}T23:59:59"
+    # Usar timezone UTC para coincidir con fechas guardadas con isoformat()
+    inicio = f"{fecha_dia}T00:00:00+00:00"
+    fin = f"{fecha_dia}T23:59:59+00:00"
     
     movimientos = await db.caja_movimientos.find({
         "origen": "clinica",
@@ -169,8 +170,8 @@ async def get_movimientos(
 ):
     """Listar movimientos del día"""
     fecha_hoy = fecha or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    inicio = f"{fecha_hoy}T00:00:00"
-    fin = f"{fecha_hoy}T23:59:59"
+    inicio = f"{fecha_hoy}T00:00:00+00:00"
+    fin = f"{fecha_hoy}T23:59:59+00:00"
     
     query = {
         "origen": "clinica",
@@ -312,9 +313,9 @@ async def cerrar_caja(
     
     await db.caja_cierres.update_one({"id": cierre["id"]}, {"$set": update_data})
     
-    # Bloquear todos los movimientos del día
+    # Bloquear todos los movimientos del día - usar timezone UTC
     await db.caja_movimientos.update_many(
-        {"origen": "clinica", "fecha": {"$gte": f"{fecha_hoy}T00:00:00", "$lte": f"{fecha_hoy}T23:59:59"}},
+        {"origen": "clinica", "fecha": {"$gte": f"{fecha_hoy}T00:00:00+00:00", "$lte": f"{fecha_hoy}T23:59:59+00:00"}},
         {"$set": {"bloqueado": True}}
     )
     
@@ -383,9 +384,9 @@ async def reabrir_caja(
         }}
     )
     
-    # Desbloquear movimientos del día
+    # Desbloquear movimientos del día - usar timezone UTC
     await db.caja_movimientos.update_many(
-        {"origen": "clinica", "fecha": {"$gte": f"{cierre['fecha']}T00:00:00", "$lte": f"{cierre['fecha']}T23:59:59"}},
+        {"origen": "clinica", "fecha": {"$gte": f"{cierre['fecha']}T00:00:00+00:00", "$lte": f"{cierre['fecha']}T23:59:59+00:00"}},
         {"$set": {"bloqueado": False}}
     )
     
@@ -735,10 +736,10 @@ async def calcular_cierre_financiero(tipo: str, periodo: dict) -> dict:
             inicio = f"{year}-07-01"
             fin = f"{year + 1}-01-01"
     
-    # Movimientos de caja del período
+    # Movimientos de caja del período - usar timezone UTC
     movimientos = await db.caja_movimientos.find({
         "origen": "clinica",
-        "fecha": {"$gte": f"{inicio}T00:00:00", "$lt": f"{fin}T00:00:00"}
+        "fecha": {"$gte": f"{inicio}T00:00:00+00:00", "$lt": f"{fin}T00:00:00+00:00"}
     }, {"_id": 0}).to_list(10000)
     
     ingresos = sum(m["monto"] for m in movimientos if m["tipo"] == "Ingreso")

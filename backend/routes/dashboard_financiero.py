@@ -70,10 +70,11 @@ async def get_dashboard_financiero(
     fecha_fin_str = fecha_fin_dt.isoformat()
     
     # ========== INGRESOS DE CAJA (solo clínica) ==========
+    # Usar formato con timezone para coincidir con las fechas guardadas (isoformat UTC)
     ingresos_query = {
         "origen": "clinica",
         "tipo": "Ingreso",
-        "fecha": {"$gte": fecha_inicio_str + "T00:00:00", "$lte": fecha_fin_str + "T23:59:59"}
+        "fecha": {"$gte": fecha_inicio_str + "T00:00:00+00:00", "$lte": fecha_fin_str + "T23:59:59+00:00"}
     }
     movimientos_ingreso = await db.caja_movimientos.find(ingresos_query, {"_id": 0}).to_list(10000)
     
@@ -175,12 +176,12 @@ async def get_dashboard_financiero(
         else:
             mes_fin = date(target_year, target_month, ultimo_dia)
         
-        # Ingresos del mes
+        # Ingresos del mes - usar timezone UTC para coincidir con fechas guardadas
         ingresos_mes = await db.caja_movimientos.aggregate([
             {"$match": {
                 "origen": "clinica",
                 "tipo": "Ingreso",
-                "fecha": {"$gte": mes_inicio.isoformat() + "T00:00:00", "$lte": mes_fin.isoformat() + "T23:59:59"}
+                "fecha": {"$gte": mes_inicio.isoformat() + "T00:00:00+00:00", "$lte": mes_fin.isoformat() + "T23:59:59+00:00"}
             }},
             {"$group": {"_id": None, "total": {"$sum": "$monto"}}}
         ]).to_list(1)

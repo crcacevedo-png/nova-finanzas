@@ -1,0 +1,23 @@
+{
+  "summary": "Backend-only validation of timezone consistency (+00:00 UTC) in caja and dashboard financial date filters. All 13 tests passed (100%). Verified: (1) GET /api/dashboard/financiero returns correct period data for mes_actual/semestre/anual/personalizado, evolucion_mensual has 12 chronological months ending with current month; (2) GET /api/caja/movimientos filters correctly by fecha with UTC ISO strings; (3) GET /api/dashboard/stats returns numeric stats and total_gastos matches dashboard/financiero.gastos.total for current month; (4) End-to-end: creating a movement (stored via datetime.now(timezone.utc).isoformat()) is correctly captured by the date filter using T00:00:00+00:00/T23:59:59+00:00 both in /caja/movimientos and in /dashboard/financiero (de_caja_directa + evolucion_mensual current-month bucket); (5) POST /api/caja/cierre correctly locks (bloqueado=true) all movements of the day, and PUT on a locked movement returns 400.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_caja_timezone.py",
+    "/app/test_reports/pytest/caja_timezone.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "dashboard_financiero.py line 98: querying cxc with projection {tipo_pagador:1, abonos:1} but the field stored in caja.py is 'tipo_pagador_id' / 'tipo_pagador_nombre', not 'tipo_pagador'. As a result ingresos_por_pagador aggregation for CxC abonos always groups under 'Otro'. Same issue in cxc_pendientes aggregation (line 148). Minor logical bug, not a timezone issue.",
+    "caja.py get_movimientos default limit=100 hard-caps at 500 but if a day has > limit movements the total is correct while data is truncated (expected; documented).",
+    "dashboard/stats (server.py L2183) filters expenses by date >= month_start but has no upper bound; if future-dated expenses exist they will be included in current-month totals. Consider adding {'$lt': next_month_start}."
+  ],
+  "updated_files": ["/app/backend/tests/test_caja_timezone.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "During test_crear_movimiento_y_filtrar and test_cierre_bloquea_movimientos: opens caja (if closed), creates TEST_ prefixed movements, then cleans up (delete movement / reopen caja). Net effect: caja may be left in the same state as before or reopened; no residual TEST_ movements remain.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_caja_timezone.py validates that ISO date filters with +00:00 correctly match datetime.now(timezone.utc).isoformat() stored values. The e2e test creates a real caja movement to prove the filter round-trip works. Requires REACT_APP_BACKEND_URL env var to be exported when running pytest from /app root (frontend/.env is not auto-loaded by pytest).",
+  "rca of the issue": "N/A - fix verified. The timezone standardization to T00:00:00+00:00 / T23:59:59+00:00 correctly matches the ISO strings written by datetime.now(timezone.utc).isoformat() (which produce '...+00:00'). String range comparison in MongoDB works because ISO 8601 with same timezone is lexicographically sortable."
+}
