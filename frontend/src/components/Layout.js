@@ -91,6 +91,8 @@ const Layout = ({ children }) => {
   const finanzasItems = user?.role !== 'optica' ? [
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
+    // Gastos Fijos - Admin y SuperAdmin
+    ...(isAdminOrSuperAdmin ? [{ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' }] : []),
     // Autorizaciones Pendientes - Admin y SuperAdmin (SuperAdmin puede ver y cancelar, Admin ejecuta pagos)
     ...(isAdminOrSuperAdmin ? [{ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' }] : []),
     // Caja - Solo Admin y SuperAdmin
@@ -107,16 +109,6 @@ const Layout = ({ children }) => {
       icon: Truck, 
       label: 'Proveedores', 
       testId: 'nav-proveedores' 
-    });
-  }
-  
-  // Gastos Fijos - solo Admin y SuperAdmin
-  if (isAdminOrSuperAdmin) {
-    configItems.push({ 
-      path: '/configuracion/gastos-fijos', 
-      icon: CalendarClock, 
-      label: 'Gastos Fijos', 
-      testId: 'nav-gastos-fijos' 
     });
   }
   
