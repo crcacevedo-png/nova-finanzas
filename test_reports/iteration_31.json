@@ -1,0 +1,33 @@
+{
+  "summary": "End-to-end frontend testing of expense flow (SuperAdmin + Admin). Verified: (1) Login as SuperAdmin (superadmin/nova2024) reaches Dashboard OK. (2) BUG FIX VERIFIED: /gastos 'Resumen de Montos Pendientes' cards now show correct amounts (Total Vencido (9) = Q 38,467.00) instead of Q0.00. (3) Created new gasto via Nuevo Gasto modal (Test Proveedor / Gasto de Prueba Flujo / Gasto Variable / Q500) -> GST-0046 appears in list with toast 'Gasto registrado correctamente'. (4) Authorize modal: selected Cuenta Principal (Banco Industrial) and clicked 'Autorizar Gasto' -> row displays green 'Autorizado' badge in Acciones column. (5) /autorizaciones-pendientes shows GST-0046 pending authorization (7 pendientes) for both roles. (6) Logged in as admin/Admin2024Nuevo! (NOTE: password 'nova2024' in review request is WRONG). Admin sees 'Pagar' button (SuperAdmin only sees 'Cancelar'). (7) Executed payment: Confirmar Pago (Transferencia Bancaria) -> toast 'Pago registrado correctamente', GST-0046 removed from pending list. (8) /historial-pagos shows GST-0046 dated 05/08/26 Q500.00 Transferencia bancaria (Auth: 53dfd88a). Total Pagos incremented to 8, Monto Total Q 7,900.00. (9) /configuracion/gastos-fijos lists 5 fixed expenses (Total Mensual Q 18,350.00) correctly.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "GET /api/cuentas-bancarias (as admin)", "issue": "Admin user gets 403 when Autorizaciones page loads. Console: 'Failed to load resource: 403' / 'Error fetching bank accounts: AxiosError'. Non-blocking (admin doesn't need to select account when paying) but pollutes logs; either grant read permission to admin or avoid the request from that role."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Autorizar Gasto modal (radix Select)", "issue": "After clicking the bank-account dropdown inside the authorize dialog, CRA dev overlay 'Uncaught runtime errors: ResizeObserver loop completed with undelivered notifications' pops up covering the whole screen. Benign browser warning but leaks into dev overlay because it is dispatched as an error. Suppress via window.addEventListener('error', handler) in bootstrap or wrap ResizeObserver, or configure webpack overlay to ignore this message.", "selector": "[data-testid=\"auth-bank-select\"]", "priority": "MEDIUM"},
+      {"component": "Layout.js sidebar", "issue": "SuperAdmin has NO menu entry to 'Autorizaciones de Pago' - link is rendered only when isAdmin===true (Layout.js L96). SuperAdmin can access the page only by typing the URL. Task step 6 ('Navigate to Autorizaciones de Pagos') is not achievable from the UI as SuperAdmin.", "selector": "nav 'Autorizaciones'", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Add 'Autorizaciones' entry to sidebar for SuperAdmin (Layout.js line 96) - currently gated behind isAdmin only.",
+    "Silence ResizeObserver loop warning to avoid dev-overlay covering UI when opening the bank-account Select in the Authorize modal.",
+    "Fix admin permission for GET /api/cuentas-bancarias OR avoid calling it from AutorizacionesPendientes when role !== superadmin (403 spam in console).",
+    "Update review request / docs: admin password is 'Admin2024Nuevo!' per /app/memory/test_credentials.md, not 'nova2024'."
+  ],
+  "critical_code_review_comments": [
+    "Layout.js L96: '...(isAdmin ? [{path:/autorizaciones-pendientes...}]: [])' - SuperAdmin loses navigation to autorizaciones. Should be visible for both isAdmin and isSuperAdmin.",
+    "AutorizacionesPendientes.js fetches bank accounts unconditionally; if role is admin the endpoint returns 403 producing console errors on every visit."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "90%"},
+  "test_credentials": "superadmin/nova2024 (SuperAdmin), admin/Admin2024Nuevo! (Admin - NOTE: request said nova2024, that is incorrect)",
+  "seed_data_creation": "Created gasto GST-0046 'Gasto de Prueba Flujo' Q500 for Test Proveedor (now paid). Left in DB as evidence of full flow.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Full expense flow (create -> authorize with bank -> pay -> historial) works end-to-end. SuperAdmin authorizes, Admin executes payment. Main open issues: (a) SuperAdmin has no sidebar link to Autorizaciones page, (b) ResizeObserver dev-overlay appears when opening the Radix Select inside the Autorizar modal, (c) Admin gets 403 on /api/cuentas-bancarias. Admin password in memory file is 'Admin2024Nuevo!'.",
+  "rca of the issue": "Original 'Q0.00 en Resumen de Montos Pendientes' bug is FIXED. The dashboard cards now correctly sum expenses via the fixed UpcomingPayments Pydantic model - Total Vencido shows Q 38,467.00 with 9 items (previously showed Q0.00). Verified visually and via API-driven UI state."
+}
