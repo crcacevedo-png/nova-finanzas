@@ -88,12 +88,11 @@ const Layout = ({ children }) => {
 
   // Finanzas sub-items (visible para todos los roles autenticados)
   // Finanzas sub-items (NO visible para optica)
-  const isAdmin = user?.role === 'admin';
   const finanzasItems = user?.role !== 'optica' ? [
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
-    // Autorizaciones Pendientes - Solo Admin (SuperAdmin autoriza desde Gastos)
-    ...(isAdmin ? [{ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' }] : []),
+    // Autorizaciones Pendientes - Admin y SuperAdmin (SuperAdmin puede ver y cancelar, Admin ejecuta pagos)
+    ...(isAdminOrSuperAdmin ? [{ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' }] : []),
     // Caja - Solo Admin y SuperAdmin
     ...(isAdminOrSuperAdmin ? [{ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' }] : []),
   ] : [];

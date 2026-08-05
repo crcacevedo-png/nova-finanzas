@@ -423,3 +423,19 @@ Ver `/app/memory/test_credentials.md`
 - Total Vencido (9): Q 38,467.00
 - Por vencer -30 días (0): Q 0.00
 - Por vencer 30-60 días (0): Q 0.00
+
+### 2026-08-05 - Bug Fix: SuperAdmin no tenía link a Autorizaciones
+**Problema**: El SuperAdmin no podía navegar al módulo de "Autorizaciones de Pago" desde el menú lateral. El link solo estaba visible para Admin.
+
+**Causa Raíz**: En `Layout.js` línea 96, la condición usaba `isAdmin` en lugar de `isAdminOrSuperAdmin`.
+
+**Solución**: Se cambió la condición para que el link de Autorizaciones sea visible para Admin y SuperAdmin.
+
+**Archivo modificado**: `/app/frontend/src/components/Layout.js`
+
+**Verificación via Testing Agent (iteration_31.json)**:
+- ✅ Flujo completo de gastos verificado: Crear → Autorizar → Ejecutar pago
+- ✅ Cards de Resumen muestran montos correctos (Q 38,467.00 vencidos)
+- ✅ Link de Autorizaciones ahora visible para SuperAdmin
+- ✅ Historial de pagos registra correctamente
+- ✅ Gastos fijos listados (5 items, Q 18,350.00 mensual)
