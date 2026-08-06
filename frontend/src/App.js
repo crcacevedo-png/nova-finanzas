@@ -24,6 +24,11 @@ import AuditLogs from './pages/AuditLogs';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
+// Módulo Inventario
+import PanelInventario from './pages/inventario/PanelInventario';
+import ProductosInventario from './pages/inventario/Productos';
+import LotesInventario from './pages/inventario/Lotes';
+import MovimientosInventario from './pages/inventario/Movimientos';
 import './App.css';
 
 // Protected Route Component
@@ -267,6 +272,40 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Agenda />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* ==================== MÓDULO DE INVENTARIO ==================== */}
+      <Route 
+        path="/inventario" 
+        element={
+          <ProtectedRoute>
+            <PanelInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/inventario/productos" 
+        element={
+          <ProtectedRoute>
+            <ProductosInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/inventario/lotes" 
+        element={
+          <ProtectedRoute>
+            <LotesInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/inventario/movimientos" 
+        element={
+          <ProtectedRoute>
+            <MovimientosInventario />
           </ProtectedRoute>
         } 
       />

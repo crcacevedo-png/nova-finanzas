@@ -1594,6 +1594,423 @@ async def seed_catalogos_oftalmologicos():
             print("Evaluación sellada de ejemplo creada")
 
 
+# ==================== SEED DATA INVENTARIO ====================
+
+async def seed_inventario_data():
+    """Seed de datos de ejemplo para el módulo de inventario"""
+    # Verificar si ya existen datos
+    productos_count = await db.productos_inventario.count_documents({"origen": "clinica"})
+    if productos_count > 0:
+        print(f"Datos de inventario ya existen ({productos_count} productos), saltando seed")
+        return
+    
+    now = datetime.now(timezone.utc).isoformat()
+    hoy = datetime.now(timezone.utc).date()
+    
+    # ========== BODEGAS ==========
+    bodegas = [
+        {"id": str(uuid.uuid4()), "nombre": "Bodega General", "codigo": "BOD-GRAL", "descripcion": "Bodega principal de almacenamiento", "es_punto_venta": False, "activo": True, "origen": "clinica", "created_at": now},
+        {"id": str(uuid.uuid4()), "nombre": "Dispensario", "codigo": "BOD-DISP", "descripcion": "Dispensario para ventas", "es_punto_venta": True, "activo": True, "origen": "clinica", "created_at": now},
+        {"id": str(uuid.uuid4()), "nombre": "Quirófano", "codigo": "BOD-QX", "descripcion": "Insumos de quirófano", "es_punto_venta": False, "activo": True, "origen": "clinica", "created_at": now},
+    ]
+    
+    for b in bodegas:
+        await db.bodegas_inventario.insert_one(b)
+    print(f"Creadas {len(bodegas)} bodegas")
+    
+    bodega_general_id = bodegas[0]["id"]
+    bodega_dispensario_id = bodegas[1]["id"]
+    bodega_quirofano_id = bodegas[2]["id"]
+    
+    # ========== CATEGORÍAS ==========
+    categorias = [
+        {"id": str(uuid.uuid4()), "nombre": "Medicamentos", "icono": "pill", "color": "#EF4444", "orden": 1, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Gotas y Soluciones", "icono": "droplet", "color": "#3B82F6", "orden": 2, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Lentes de Contacto", "icono": "eye", "color": "#10B981", "orden": 3, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Accesorios", "icono": "glasses", "color": "#8B5CF6", "orden": 4, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Insumos Quirúrgicos", "icono": "syringe", "color": "#F59E0B", "orden": 5, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Consultas", "icono": "stethoscope", "color": "#0EA5E9", "orden": 6, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Procedimientos", "icono": "scissors", "color": "#EC4899", "orden": 7, "activo": True, "origen": "clinica"},
+        {"id": str(uuid.uuid4()), "nombre": "Estudios", "icono": "scan", "color": "#6366F1", "orden": 8, "activo": True, "origen": "clinica"},
+    ]
+    
+    for c in categorias:
+        await db.categorias_inventario.insert_one(c)
+    print(f"Creadas {len(categorias)} categorías")
+    
+    cat_medicamentos = categorias[0]["id"]
+    cat_gotas = categorias[1]["id"]
+    cat_lentes = categorias[2]["id"]
+    cat_accesorios = categorias[3]["id"]
+    cat_quirurgicos = categorias[4]["id"]
+    cat_consultas = categorias[5]["id"]
+    cat_procedimientos = categorias[6]["id"]
+    cat_estudios = categorias[7]["id"]
+    
+    # ========== PROVEEDORES (usar los existentes o crear nuevos) ==========
+    proveedores = await db.suppliers.find({}).to_list(10)
+    if not proveedores:
+        # Crear proveedores de ejemplo
+        proveedores_data = [
+            {"id": str(uuid.uuid4()), "name": "Laboratorios Visión S.A.", "company_name": "LabVision", "nit": "12345678-9", "contact_name": "Carlos Pérez", "contact_phone": "2222-1111", "contact_email": "ventas@labvision.gt", "payment_terms": 30, "notes": "Proveedor principal de medicamentos", "is_active": True, "created_at": now},
+            {"id": str(uuid.uuid4()), "name": "Distribuidora Óptica Centro", "company_name": "DOC", "nit": "98765432-1", "contact_name": "María García", "contact_phone": "2222-2222", "contact_email": "compras@doc.gt", "payment_terms": 15, "notes": "Lentes de contacto y accesorios", "is_active": True, "created_at": now},
+            {"id": str(uuid.uuid4()), "name": "Insumos Médicos GT", "company_name": "IMGT", "nit": "55667788-0", "contact_name": "Roberto Méndez", "contact_phone": "2222-3333", "contact_email": "ventas@imgt.gt", "payment_terms": 45, "notes": "Insumos quirúrgicos", "is_active": True, "created_at": now},
+        ]
+        for p in proveedores_data:
+            await db.suppliers.insert_one(p)
+        proveedores = proveedores_data
+        print(f"Creados {len(proveedores)} proveedores")
+    
+    prov_labvision = proveedores[0]["id"]
+    prov_doc = proveedores[1]["id"] if len(proveedores) > 1 else prov_labvision
+    prov_imgt = proveedores[2]["id"] if len(proveedores) > 2 else prov_labvision
+    
+    # ========== PRODUCTOS ==========
+    productos = [
+        # Medicamentos (con control de lotes)
+        {"nombre": "Prednisolona 1% gotas", "codigo": "PROD-00001", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 5ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 85.00, "existencia_minima": 10, "existencia_maxima": 50, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Moxifloxacino 0.5% gotas", "codigo": "PROD-00002", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 5ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 120.00, "existencia_minima": 10, "existencia_maxima": 40, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Tobramicina/Dexametasona gotas", "codigo": "PROD-00003", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 5ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 95.00, "existencia_minima": 8, "existencia_maxima": 35, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Tropicamida 1% gotas", "codigo": "PROD-00004", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 15ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 45.00, "existencia_minima": 5, "existencia_maxima": 20, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Fenilefrina 2.5% gotas", "codigo": "PROD-00005", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 15ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 55.00, "existencia_minima": 5, "existencia_maxima": 20, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Dorzolamida/Timolol gotas", "codigo": "PROD-00006", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 5ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 180.00, "existencia_minima": 8, "existencia_maxima": 30, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Latanoprost 0.005% gotas", "codigo": "PROD-00007", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 2.5ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 220.00, "existencia_minima": 5, "existencia_maxima": 25, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Lubricante Ocular Hialuronato", "codigo": "PROD-00008", "categoria_id": cat_gotas, "tipo": "producto", "presentacion": "Frasco 10ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 75.00, "existencia_minima": 15, "existencia_maxima": 60, "proveedor_preferido_id": prov_labvision},
+        
+        # Medicamentos orales (con control de lotes)
+        {"nombre": "Acetazolamida 250mg tabletas", "codigo": "PROD-00009", "categoria_id": cat_medicamentos, "tipo": "producto", "presentacion": "Caja 20 tabletas", "unidad_medida": "caja", "unidad_compra": "caja", "factor_conversion": 1, "controla_inventario": True, "controla_lotes": True, "precio_venta": 150.00, "existencia_minima": 5, "existencia_maxima": 20, "proveedor_preferido_id": prov_labvision},
+        {"nombre": "Prednisona 50mg tabletas", "codigo": "PROD-00010", "categoria_id": cat_medicamentos, "tipo": "producto", "presentacion": "Caja 10 tabletas", "unidad_medida": "caja", "controla_inventario": True, "controla_lotes": True, "precio_venta": 45.00, "existencia_minima": 10, "existencia_maxima": 40, "proveedor_preferido_id": prov_labvision},
+        
+        # Lentes de contacto (sin control de lotes)
+        {"nombre": "Lente de Contacto Diario -1.00", "codigo": "PROD-00011", "categoria_id": cat_lentes, "tipo": "producto", "presentacion": "Caja 30 unidades", "unidad_medida": "caja", "controla_inventario": True, "controla_lotes": False, "precio_venta": 350.00, "existencia_minima": 3, "existencia_maxima": 15, "proveedor_preferido_id": prov_doc},
+        {"nombre": "Lente de Contacto Mensual -2.00", "codigo": "PROD-00012", "categoria_id": cat_lentes, "tipo": "producto", "presentacion": "Caja 6 unidades", "unidad_medida": "caja", "controla_inventario": True, "controla_lotes": False, "precio_venta": 280.00, "existencia_minima": 3, "existencia_maxima": 12, "proveedor_preferido_id": prov_doc},
+        {"nombre": "Solución Multipropósito 360ml", "codigo": "PROD-00013", "categoria_id": cat_lentes, "tipo": "producto", "presentacion": "Frasco 360ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 95.00, "existencia_minima": 10, "existencia_maxima": 40, "proveedor_preferido_id": prov_doc},
+        
+        # Accesorios (sin control de lotes)
+        {"nombre": "Estuche para Lentes de Contacto", "codigo": "PROD-00014", "categoria_id": cat_accesorios, "tipo": "producto", "presentacion": "Unidad", "unidad_medida": "unidad", "controla_inventario": True, "controla_lotes": False, "precio_venta": 25.00, "existencia_minima": 20, "existencia_maxima": 100, "proveedor_preferido_id": prov_doc},
+        {"nombre": "Paño Microfibra Limpiador", "codigo": "PROD-00015", "categoria_id": cat_accesorios, "tipo": "producto", "presentacion": "Unidad", "unidad_medida": "unidad", "controla_inventario": True, "controla_lotes": False, "precio_venta": 15.00, "existencia_minima": 30, "existencia_maxima": 150, "proveedor_preferido_id": prov_doc},
+        {"nombre": "Spray Limpiador de Lentes 60ml", "codigo": "PROD-00016", "categoria_id": cat_accesorios, "tipo": "producto", "presentacion": "Frasco 60ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": False, "precio_venta": 35.00, "existencia_minima": 15, "existencia_maxima": 60, "proveedor_preferido_id": prov_doc},
+        
+        # Insumos quirúrgicos (con control de lotes)
+        {"nombre": "Viscoelástico Cohesivo 0.85ml", "codigo": "PROD-00017", "categoria_id": cat_quirurgicos, "tipo": "insumo", "presentacion": "Jeringa 0.85ml", "unidad_medida": "jeringa", "controla_inventario": True, "controla_lotes": True, "precio_venta": 450.00, "existencia_minima": 5, "existencia_maxima": 20, "proveedor_preferido_id": prov_imgt},
+        {"nombre": "Lente Intraocular Monofocal", "codigo": "PROD-00018", "categoria_id": cat_quirurgicos, "tipo": "insumo", "presentacion": "Unidad", "unidad_medida": "unidad", "controla_inventario": True, "controla_lotes": True, "precio_venta": 1200.00, "existencia_minima": 3, "existencia_maxima": 15, "proveedor_preferido_id": prov_imgt},
+        {"nombre": "Cuchillete 2.75mm", "codigo": "PROD-00019", "categoria_id": cat_quirurgicos, "tipo": "insumo", "presentacion": "Unidad estéril", "unidad_medida": "unidad", "controla_inventario": True, "controla_lotes": True, "precio_venta": 180.00, "existencia_minima": 10, "existencia_maxima": 50, "proveedor_preferido_id": prov_imgt},
+        {"nombre": "BSS Plus 500ml", "codigo": "PROD-00020", "categoria_id": cat_quirurgicos, "tipo": "insumo", "presentacion": "Frasco 500ml", "unidad_medida": "frasco", "controla_inventario": True, "controla_lotes": True, "precio_venta": 280.00, "existencia_minima": 5, "existencia_maxima": 20, "proveedor_preferido_id": prov_imgt},
+        
+        # Servicios (sin control de inventario)
+        {"nombre": "Consulta Oftalmológica General", "codigo": "SERV-00001", "categoria_id": cat_consultas, "tipo": "servicio", "presentacion": "Consulta", "unidad_medida": "servicio", "controla_inventario": False, "controla_lotes": False, "precio_venta": 300.00, "existencia_minima": 0, "existencia_maxima": 0},
+        {"nombre": "Consulta Oftalmológica Especializada", "codigo": "SERV-00002", "categoria_id": cat_consultas, "tipo": "servicio", "presentacion": "Consulta", "unidad_medida": "servicio", "controla_inventario": False, "controla_lotes": False, "precio_venta": 450.00, "existencia_minima": 0, "existencia_maxima": 0},
+        {"nombre": "OCT de Mácula", "codigo": "SERV-00003", "categoria_id": cat_estudios, "tipo": "servicio", "presentacion": "Estudio", "unidad_medida": "servicio", "controla_inventario": False, "controla_lotes": False, "precio_venta": 400.00, "existencia_minima": 0, "existencia_maxima": 0},
+        {"nombre": "Campimetría Computarizada", "codigo": "SERV-00004", "categoria_id": cat_estudios, "tipo": "servicio", "presentacion": "Estudio", "unidad_medida": "servicio", "controla_inventario": False, "controla_lotes": False, "precio_venta": 350.00, "existencia_minima": 0, "existencia_maxima": 0},
+        {"nombre": "Topografía Corneal", "codigo": "SERV-00005", "categoria_id": cat_estudios, "tipo": "servicio", "presentacion": "Estudio", "unidad_medida": "servicio", "controla_inventario": False, "controla_lotes": False, "precio_venta": 300.00, "existencia_minima": 0, "existencia_maxima": 0},
+    ]
+    
+    productos_creados = []
+    for p in productos:
+        producto_doc = {
+            "id": str(uuid.uuid4()),
+            **p,
+            "costo_promedio": 0.0,
+            "ultimo_costo": 0.0,
+            "activo": True,
+            "afecto_iva": True,
+            "origen": "clinica",
+            "created_at": now,
+            "updated_at": now
+        }
+        await db.productos_inventario.insert_one(producto_doc)
+        productos_creados.append(producto_doc)
+    print(f"Creados {len(productos)} productos")
+    
+    # ========== LOTES Y EXISTENCIAS ==========
+    # Crear lotes con vencimientos escalonados para productos que controlan lotes
+    lotes_data = []
+    
+    # Fechas de vencimiento escalonadas
+    fecha_vencido = (hoy - timedelta(days=15)).strftime("%Y-%m-%d")  # Ya vencido
+    fecha_30d = (hoy + timedelta(days=25)).strftime("%Y-%m-%d")  # Vence en ~30 días
+    fecha_60d = (hoy + timedelta(days=55)).strftime("%Y-%m-%d")  # Vence en ~60 días
+    fecha_90d = (hoy + timedelta(days=85)).strftime("%Y-%m-%d")  # Vence en ~90 días
+    fecha_180d = (hoy + timedelta(days=180)).strftime("%Y-%m-%d")  # Vence en 180 días
+    
+    for prod in productos_creados:
+        if prod.get("controla_inventario", True) and prod.get("tipo") != "servicio":
+            if prod.get("controla_lotes", False):
+                # Crear múltiples lotes con diferentes vencimientos
+                costo_base = prod["precio_venta"] * 0.5  # Costo = 50% del precio
+                
+                # Lote 1: Vencido (para alertas)
+                if prod["codigo"] in ["PROD-00001", "PROD-00003"]:
+                    lote_vencido = {
+                        "id": str(uuid.uuid4()),
+                        "producto_id": prod["id"],
+                        "bodega_id": bodega_general_id,
+                        "numero_lote": f"LOT-{prod['codigo'][-5:]}-VEN",
+                        "fecha_vencimiento": fecha_vencido,
+                        "cantidad_inicial": 5,
+                        "cantidad_disponible": 3,
+                        "costo_unitario": costo_base,
+                        "proveedor_id": prod.get("proveedor_preferido_id"),
+                        "estado": "disponible",
+                        "origen": "clinica"
+                    }
+                    lotes_data.append(lote_vencido)
+                
+                # Lote 2: Por vencer en 30 días
+                lote_30 = {
+                    "id": str(uuid.uuid4()),
+                    "producto_id": prod["id"],
+                    "bodega_id": bodega_general_id,
+                    "numero_lote": f"LOT-{prod['codigo'][-5:]}-30D",
+                    "fecha_vencimiento": fecha_30d,
+                    "cantidad_inicial": 10,
+                    "cantidad_disponible": 8,
+                    "costo_unitario": costo_base,
+                    "proveedor_id": prod.get("proveedor_preferido_id"),
+                    "estado": "disponible",
+                    "origen": "clinica"
+                }
+                lotes_data.append(lote_30)
+                
+                # Lote 3: Por vencer en 90 días
+                lote_90 = {
+                    "id": str(uuid.uuid4()),
+                    "producto_id": prod["id"],
+                    "bodega_id": bodega_dispensario_id,
+                    "numero_lote": f"LOT-{prod['codigo'][-5:]}-90D",
+                    "fecha_vencimiento": fecha_90d,
+                    "cantidad_inicial": 15,
+                    "cantidad_disponible": 15,
+                    "costo_unitario": costo_base * 1.05,  # Un poco más caro
+                    "proveedor_id": prod.get("proveedor_preferido_id"),
+                    "estado": "disponible",
+                    "origen": "clinica"
+                }
+                lotes_data.append(lote_90)
+                
+                # Lote 4: Vence en 180 días (fresco)
+                lote_180 = {
+                    "id": str(uuid.uuid4()),
+                    "producto_id": prod["id"],
+                    "bodega_id": bodega_general_id,
+                    "numero_lote": f"LOT-{prod['codigo'][-5:]}-180",
+                    "fecha_vencimiento": fecha_180d,
+                    "cantidad_inicial": 20,
+                    "cantidad_disponible": 20,
+                    "costo_unitario": costo_base * 1.1,
+                    "proveedor_id": prod.get("proveedor_preferido_id"),
+                    "estado": "disponible",
+                    "origen": "clinica"
+                }
+                lotes_data.append(lote_180)
+                
+                # Actualizar costo promedio del producto
+                total_unidades = 8 + 15 + 20 + (3 if prod["codigo"] in ["PROD-00001", "PROD-00003"] else 0)
+                valor_total = (8 * costo_base) + (15 * costo_base * 1.05) + (20 * costo_base * 1.1)
+                if prod["codigo"] in ["PROD-00001", "PROD-00003"]:
+                    valor_total += 3 * costo_base
+                costo_prom = valor_total / total_unidades if total_unidades > 0 else costo_base
+                
+                await db.productos_inventario.update_one(
+                    {"id": prod["id"]},
+                    {"$set": {"costo_promedio": round(costo_prom, 4), "ultimo_costo": round(costo_base * 1.1, 4)}}
+                )
+            else:
+                # Productos sin control de lotes - solo existencias
+                costo_base = prod["precio_venta"] * 0.5
+                await db.productos_inventario.update_one(
+                    {"id": prod["id"]},
+                    {"$set": {"costo_promedio": round(costo_base, 4), "ultimo_costo": round(costo_base, 4)}}
+                )
+    
+    # Insertar lotes
+    for lote in lotes_data:
+        await db.lotes_inventario.insert_one(lote)
+    print(f"Creados {len(lotes_data)} lotes")
+    
+    # ========== EXISTENCIAS ==========
+    # Calcular existencias por producto y bodega
+    existencias_map = {}
+    for lote in lotes_data:
+        key = f"{lote['producto_id']}_{lote['bodega_id']}"
+        if key not in existencias_map:
+            existencias_map[key] = {"producto_id": lote["producto_id"], "bodega_id": lote["bodega_id"], "cantidad": 0}
+        existencias_map[key]["cantidad"] += lote["cantidad_disponible"]
+    
+    # Agregar existencias para productos sin lotes
+    for prod in productos_creados:
+        if prod.get("controla_inventario", True) and not prod.get("controla_lotes", False) and prod.get("tipo") != "servicio":
+            # Existencia en bodega general
+            key_gral = f"{prod['id']}_{bodega_general_id}"
+            if key_gral not in existencias_map:
+                existencias_map[key_gral] = {
+                    "producto_id": prod["id"],
+                    "bodega_id": bodega_general_id,
+                    "cantidad": prod.get("existencia_maxima", 20) // 2  # 50% del máximo
+                }
+            # Existencia en dispensario
+            key_disp = f"{prod['id']}_{bodega_dispensario_id}"
+            if key_disp not in existencias_map:
+                existencias_map[key_disp] = {
+                    "producto_id": prod["id"],
+                    "bodega_id": bodega_dispensario_id,
+                    "cantidad": prod.get("existencia_maxima", 20) // 4  # 25% del máximo
+                }
+    
+    for key, exist in existencias_map.items():
+        exist_doc = {
+            "id": str(uuid.uuid4()),
+            "producto_id": exist["producto_id"],
+            "bodega_id": exist["bodega_id"],
+            "cantidad": exist["cantidad"],
+            "cantidad_reservada": 0,
+            "ultima_actualizacion": now,
+            "origen": "clinica"
+        }
+        await db.existencias_inventario.insert_one(exist_doc)
+    print(f"Creadas {len(existencias_map)} existencias")
+    
+    # ========== ÓRDENES DE COMPRA Y RECEPCIONES ==========
+    # Orden 1: Completada
+    orden1_id = str(uuid.uuid4())
+    orden1 = {
+        "id": orden1_id,
+        "numero_orden": "OC-000001",
+        "proveedor_id": prov_labvision,
+        "fecha": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
+        "fecha_estimada_entrega": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat(),
+        "items": [
+            {"producto_id": productos_creados[0]["id"], "codigo": productos_creados[0]["codigo"], "nombre": productos_creados[0]["nombre"], "cantidad": 20, "cantidad_recibida": 20, "costo_unitario": 42.50, "subtotal": 850.00},
+            {"producto_id": productos_creados[1]["id"], "codigo": productos_creados[1]["codigo"], "nombre": productos_creados[1]["nombre"], "cantidad": 15, "cantidad_recibida": 15, "costo_unitario": 60.00, "subtotal": 900.00},
+        ],
+        "subtotal": 1750.00,
+        "total": 1750.00,
+        "estado": "recibida",
+        "observaciones": "Pedido mensual de gotas oftálmicas",
+        "creada_por": "system",
+        "autorizada_por": "system",
+        "fecha_autorizacion": (datetime.now(timezone.utc) - timedelta(days=28)).isoformat(),
+        "origen": "clinica",
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
+        "updated_at": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat()
+    }
+    await db.ordenes_compra.insert_one(orden1)
+    
+    # Orden 2: Parcial
+    orden2_id = str(uuid.uuid4())
+    orden2 = {
+        "id": orden2_id,
+        "numero_orden": "OC-000002",
+        "proveedor_id": prov_imgt,
+        "fecha": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
+        "fecha_estimada_entrega": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
+        "items": [
+            {"producto_id": productos_creados[16]["id"], "codigo": productos_creados[16]["codigo"], "nombre": productos_creados[16]["nombre"], "cantidad": 10, "cantidad_recibida": 5, "costo_unitario": 225.00, "subtotal": 2250.00},
+            {"producto_id": productos_creados[17]["id"], "codigo": productos_creados[17]["codigo"], "nombre": productos_creados[17]["nombre"], "cantidad": 5, "cantidad_recibida": 0, "costo_unitario": 600.00, "subtotal": 3000.00},
+        ],
+        "subtotal": 5250.00,
+        "total": 5250.00,
+        "estado": "parcial",
+        "observaciones": "Insumos para cirugías programadas",
+        "creada_por": "system",
+        "autorizada_por": "system",
+        "fecha_autorizacion": (datetime.now(timezone.utc) - timedelta(days=9)).isoformat(),
+        "origen": "clinica",
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
+        "updated_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    }
+    await db.ordenes_compra.insert_one(orden2)
+    print("Creadas 2 órdenes de compra")
+    
+    # Recepción de la orden 1
+    recepcion1 = {
+        "id": str(uuid.uuid4()),
+        "numero_recepcion": "REC-000001",
+        "orden_compra_id": orden1_id,
+        "proveedor_id": prov_labvision,
+        "bodega_id": bodega_general_id,
+        "fecha": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat(),
+        "numero_factura": "FAC-12345",
+        "items": [
+            {"producto_id": productos_creados[0]["id"], "cantidad": 20, "costo_unitario": 42.50, "numero_lote": "LOT-00001-180", "fecha_vencimiento": fecha_180d},
+            {"producto_id": productos_creados[1]["id"], "cantidad": 15, "costo_unitario": 60.00, "numero_lote": "LOT-00002-180", "fecha_vencimiento": fecha_180d},
+        ],
+        "total_costo": 1750.00,
+        "usuario_id": "system",
+        "observaciones": "Recepción completa de orden OC-000001",
+        "origen": "clinica",
+        "created_at": (datetime.now(timezone.utc) - timedelta(days=25)).isoformat()
+    }
+    await db.recepciones_inventario.insert_one(recepcion1)
+    print("Creada 1 recepción")
+    
+    # ========== MOVIMIENTOS DE KARDEX ==========
+    # Crear algunos movimientos de ejemplo de los últimos 90 días
+    for prod in productos_creados[:10]:  # Solo para los primeros 10 productos
+        if prod.get("controla_inventario", True) and prod.get("tipo") != "servicio":
+            # Entrada inicial
+            mov_entrada = {
+                "id": str(uuid.uuid4()),
+                "fecha": (datetime.now(timezone.utc) - timedelta(days=60)).isoformat(),
+                "producto_id": prod["id"],
+                "bodega_id": bodega_general_id,
+                "tipo": "entrada",
+                "cantidad": 20,
+                "existencia_anterior": 0,
+                "existencia_nueva": 20,
+                "costo_unitario": prod["precio_venta"] * 0.5,
+                "costo_total": prod["precio_venta"] * 0.5 * 20,
+                "referencia_tipo": "recepcion",
+                "referencia_id": "REC-000001",
+                "motivo": "Recepción inicial de inventario",
+                "usuario_id": "system",
+                "origen": "clinica"
+            }
+            await db.movimientos_inventario.insert_one(mov_entrada)
+            
+            # Algunas salidas/ventas
+            for i in range(3):
+                mov_venta = {
+                    "id": str(uuid.uuid4()),
+                    "fecha": (datetime.now(timezone.utc) - timedelta(days=45-i*10)).isoformat(),
+                    "producto_id": prod["id"],
+                    "bodega_id": bodega_dispensario_id,
+                    "tipo": "venta",
+                    "cantidad": 2,
+                    "existencia_anterior": 20 - (i*2),
+                    "existencia_nueva": 18 - (i*2),
+                    "costo_unitario": prod["precio_venta"] * 0.5,
+                    "costo_total": prod["precio_venta"] * 0.5 * 2,
+                    "referencia_tipo": "venta",
+                    "referencia_id": f"VENTA-{i+1:05d}",
+                    "usuario_id": "system",
+                    "origen": "clinica"
+                }
+                await db.movimientos_inventario.insert_one(mov_venta)
+    
+    print("Creados movimientos de kardex de ejemplo")
+    
+    # ========== CONFIGURACIÓN ==========
+    config = {
+        "metodo_valuacion": "promedio_ponderado",
+        "metodo_salida_lotes": "FEFO",
+        "permitir_existencia_negativa": False,
+        "dias_alerta_vencimiento": [90, 60, 30],
+        "bloquear_venta_producto_vencido": True,
+        "generar_gasto_al_recibir": True,
+        "bodega_predeterminada_pos": bodega_dispensario_id,
+        "origen": "clinica"
+    }
+    await db.config_inventario.update_one(
+        {"origen": "clinica"},
+        {"$set": config},
+        upsert=True
+    )
+    print("Configuración de inventario creada")
+    
+    print("✅ Seed de inventario completado exitosamente")
+
+
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/login", response_model=TokenResponse)
@@ -1916,6 +2333,14 @@ from routes.payment_authorizations import router as payment_auth_router
 
 # Incluir router de autorizaciones de pago
 api_router.include_router(payment_auth_router, tags=["Autorizaciones de Pago"])
+
+# ==================== MÓDULO DE INVENTARIO ====================
+from routes.inventario import router as inventario_router
+from routes.inventario_ops import router as inventario_ops_router
+
+# Incluir routers de inventario
+api_router.include_router(inventario_router, tags=["Inventario"])
+api_router.include_router(inventario_ops_router, tags=["Inventario - Operaciones"])
 
 # ==================== USER MANAGEMENT ROUTES ====================
 
@@ -3031,6 +3456,36 @@ async def startup_event():
     
     # Seed de catálogos oftalmológicos
     await seed_catalogos_oftalmologicos()
+    
+    # Índices de Inventario
+    await db.bodegas_inventario.create_index([("codigo", 1)], unique=True)
+    await db.bodegas_inventario.create_index([("origen", 1)])
+    await db.categorias_inventario.create_index([("nombre", 1)])
+    await db.categorias_inventario.create_index([("origen", 1)])
+    await db.productos_inventario.create_index([("codigo", 1)])
+    await db.productos_inventario.create_index([("codigo_barras", 1)])
+    await db.productos_inventario.create_index([("nombre", "text")])
+    await db.productos_inventario.create_index([("categoria_id", 1)])
+    await db.productos_inventario.create_index([("origen", 1)])
+    await db.existencias_inventario.create_index([("producto_id", 1), ("bodega_id", 1)], unique=True)
+    await db.existencias_inventario.create_index([("origen", 1)])
+    await db.lotes_inventario.create_index([("producto_id", 1), ("numero_lote", 1)], unique=True)
+    await db.lotes_inventario.create_index([("fecha_vencimiento", 1)])
+    await db.lotes_inventario.create_index([("origen", 1)])
+    await db.movimientos_inventario.create_index([("producto_id", 1)])
+    await db.movimientos_inventario.create_index([("fecha", -1)])
+    await db.movimientos_inventario.create_index([("origen", 1)])
+    await db.ordenes_compra.create_index([("numero_orden", 1)], unique=True)
+    await db.ordenes_compra.create_index([("origen", 1)])
+    await db.recepciones_inventario.create_index([("numero_recepcion", 1)], unique=True)
+    await db.recepciones_inventario.create_index([("origen", 1)])
+    await db.transferencias_inventario.create_index([("numero_transferencia", 1)], unique=True)
+    await db.transferencias_inventario.create_index([("origen", 1)])
+    await db.tomas_fisicas.create_index([("numero_toma", 1)], unique=True)
+    await db.tomas_fisicas.create_index([("origen", 1)])
+    
+    # Seed de inventario
+    await seed_inventario_data()
     
     try:
         await db.users.create_index([("username", 1)], unique=True)

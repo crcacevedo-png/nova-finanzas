@@ -6,6 +6,15 @@
 ## Descripción General
 Sistema web completo para gestión financiera de clínica oftalmológica. Base de datos: MongoDB. Moneda: Quetzales (GTQ).
 
+### Módulos Implementados
+1. **Autenticación y Seguridad** - JWT, roles, audit logs
+2. **Gastos y Finanzas** - Gastos, pagos, autorizaciones, caja
+3. **Pacientes y Evaluaciones** - Evaluación oftalmológica completa
+4. **Sala de Operaciones** - Gestión de cirugías
+5. **Óptica** - Inventario y ventas de óptica
+6. **Agenda** - Citas de pacientes
+7. **📦 Inventario (NUEVO)** - Control de productos, lotes, existencias, kardex
+
 ---
 
 ## 🔒 Configuración de Seguridad (Actualizado Junio 2026)
@@ -439,3 +448,72 @@ Ver `/app/memory/test_credentials.md`
 - ✅ Link de Autorizaciones ahora visible para SuperAdmin
 - ✅ Historial de pagos registra correctamente
 - ✅ Gastos fijos listados (5 items, Q 18,350.00 mensual)
+
+
+### 2026-08-06 - NUEVO: Módulo de Inventario Completo
+
+**Implementación del módulo de inventario de nivel farmacia/clínica** que incluye:
+
+#### Backend (`/app/backend/routes/inventario.py`, `inventario_ops.py`)
+- **Bodegas**: CRUD completo, soporte para puntos de venta
+- **Categorías de Productos**: Con iconos Lucide y colores
+- **Productos**: 
+  - Tipos: producto, servicio, insumo
+  - Control de inventario y control de lotes opcional
+  - Costo promedio ponderado y último costo
+  - Precios de venta con margen calculado
+- **Existencias**: Por producto y bodega, matriz de existencias
+- **Lotes**: Control de vencimientos, FEFO (First Expired, First Out)
+- **Movimientos (Kardex)**: Inmutable, tipos de entrada/salida/ajuste/transferencia
+- **Órdenes de Compra**: Estados borrador/enviada/parcial/recibida/cancelada
+- **Recepciones**: Parciales y completas, recálculo de costo promedio
+- **Transferencias**: Entre bodegas con kardex dual
+- **Tomas Físicas**: Flujo guiado con ajustes automáticos
+- **Alertas**: Bajo mínimo, próximo vencimiento, vencidos
+- **Configuración**: FEFO, existencia negativa, días alerta
+
+#### Frontend (`/app/frontend/src/pages/inventario/`)
+- **PanelInventario.js**: Dashboard con KPIs, alertas, gráfica por categoría, últimos movimientos
+- **Productos.js**: Catálogo con filtros, búsqueda, CRUD completo
+- **Lotes.js**: Vista de vencimientos con código de color, baja de lotes
+- **Movimientos.js**: Kardex con filtros avanzados
+
+#### Función para el módulo POS
+- `descontarInventario(items, bodega_id, referencia)`: Transaccional, FEFO, genera kardex
+
+#### Seed Data (25 productos)
+- 3 Bodegas: General, Dispensario, Quirófano
+- 8 Categorías con iconos
+- Productos oftalmológicos: gotas, medicamentos, lentes de contacto, accesorios, insumos quirúrgicos, servicios
+- 47 Lotes con vencimientos escalonados (vencidos, 30d, 60d, 90d, 180d)
+- 2 Órdenes de compra con recepciones
+- Movimientos de kardex de ejemplo
+
+#### Colecciones MongoDB
+- `bodegas_inventario`
+- `categorias_inventario`
+- `productos_inventario`
+- `existencias_inventario`
+- `lotes_inventario`
+- `movimientos_inventario`
+- `ordenes_compra`
+- `recepciones_inventario`
+- `transferencias_inventario`
+- `tomas_fisicas`
+- `config_inventario`
+
+**Todas las colecciones usan `origen: "clinica"` para aislamiento del módulo de óptica.**
+
+#### Menú del Sidebar
+Nuevo menú "Inventario" con submenús:
+- Panel (Dashboard)
+- Productos
+- Lotes y Vencimientos
+- Kardex (Movimientos)
+
+#### Estado
+- ✅ Backend completo y funcionando
+- ✅ Frontend implementado
+- ✅ Seed data generado
+- ✅ KPIs mostrando datos correctos (Q 80,760.63 valor inventario, 25 productos, 47 lotes)
+- ⏳ Pendiente: Órdenes de compra UI, Recepciones UI, Transferencias UI, Toma física UI, Reportes

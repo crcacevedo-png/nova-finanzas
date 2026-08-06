@@ -28,7 +28,12 @@ import {
   Scissors,
   Shield,
   CalendarDays,
-  TrendingUp
+  TrendingUp,
+  Boxes,
+  AlertTriangle,
+  ArrowLeftRight,
+  FileText,
+  ClipboardList
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -49,8 +54,9 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
   const [finanzasOpen, setFinanzasOpen] = useState(
-    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja'].some(p => location.pathname.startsWith(p))
+    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos'].some(p => location.pathname.startsWith(p))
   );
+  const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
 
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
@@ -97,6 +103,14 @@ const Layout = ({ children }) => {
     ...(isAdminOrSuperAdmin ? [{ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' }] : []),
     // Caja - Solo Admin y SuperAdmin
     ...(isAdminOrSuperAdmin ? [{ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' }] : []),
+  ] : [];
+  
+  // Inventario sub-items (visible para todos excepto optica)
+  const inventarioItems = user?.role !== 'optica' ? [
+    { path: '/inventario', icon: LayoutDashboard, label: 'Panel', testId: 'nav-inv-panel' },
+    { path: '/inventario/productos', icon: Package, label: 'Productos', testId: 'nav-inv-productos' },
+    { path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' },
+    { path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' },
   ] : [];
   
   // Config sub-items
@@ -265,6 +279,37 @@ const Layout = ({ children }) => {
               {finanzasOpen && (
                 <div className="ml-4 mt-1 space-y-1">
                   {finanzasItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4.5. Inventario Section - NO para optica */}
+          {inventarioItems.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setInventarioOpen(!inventarioOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  location.pathname.startsWith('/inventario') ? 'active' : ''
+                }`}
+                data-testid="nav-inventario"
+              >
+                <div className="flex items-center gap-3">
+                  <Boxes className={`w-5 h-5 icon ${location.pathname.startsWith('/inventario') ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">Inventario</span>
+                </div>
+                {inventarioOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+              
+              {inventarioOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {inventarioItems.map((item) => (
                     <NavLink key={item.path} item={item} />
                   ))}
                 </div>

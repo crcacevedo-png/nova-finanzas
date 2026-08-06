@@ -465,6 +465,75 @@ export const auditActionLabels = {
   PATIENT_DELETED: 'Paciente eliminado',
 };
 
+// ==================== API DE INVENTARIO ====================
+export const inventarioApi = {
+  // Panel / Dashboard
+  getPanel: () => axios.get(`${API_URL}/inventario/panel`),
+  getAlertas: () => axios.get(`${API_URL}/inventario/alertas`),
+  getConfig: () => axios.get(`${API_URL}/inventario/config`),
+  updateConfig: (data) => axios.put(`${API_URL}/inventario/config`, data),
+  
+  // Bodegas
+  getBodegas: (params) => axios.get(`${API_URL}/inventario/bodegas`, { params }),
+  createBodega: (data) => axios.post(`${API_URL}/inventario/bodegas`, data),
+  updateBodega: (id, data) => axios.put(`${API_URL}/inventario/bodegas/${id}`, data),
+  deleteBodega: (id) => axios.delete(`${API_URL}/inventario/bodegas/${id}`),
+  
+  // Categorías
+  getCategorias: (params) => axios.get(`${API_URL}/inventario/categorias`, { params }),
+  createCategoria: (data) => axios.post(`${API_URL}/inventario/categorias`, data),
+  updateCategoria: (id, data) => axios.put(`${API_URL}/inventario/categorias/${id}`, data),
+  
+  // Productos
+  getProductos: (params) => axios.get(`${API_URL}/inventario/productos`, { params }),
+  getProducto: (id) => axios.get(`${API_URL}/inventario/productos/${id}`),
+  createProducto: (data) => axios.post(`${API_URL}/inventario/productos`, data),
+  updateProducto: (id, data) => axios.put(`${API_URL}/inventario/productos/${id}`, data),
+  deleteProducto: (id) => axios.delete(`${API_URL}/inventario/productos/${id}`),
+  cambiarEstadoProducto: (id, activo) => axios.patch(`${API_URL}/inventario/productos/${id}/estado`, { activo }),
+  
+  // Existencias
+  getExistencias: (params) => axios.get(`${API_URL}/inventario/existencias`, { params }),
+  getExistenciasMatriz: (params) => axios.get(`${API_URL}/inventario/existencias/matriz`, { params }),
+  getExistenciasProducto: (productoId) => axios.get(`${API_URL}/inventario/existencias/${productoId}`),
+  
+  // Lotes
+  getLotes: (params) => axios.get(`${API_URL}/inventario/lotes`, { params }),
+  darBajaLote: (id, data) => axios.post(`${API_URL}/inventario/lotes/${id}/baja`, data),
+  
+  // Movimientos / Kardex
+  getMovimientos: (params) => axios.get(`${API_URL}/inventario/movimientos`, { params }),
+  getKardexProducto: (productoId, params) => axios.get(`${API_URL}/inventario/kardex/${productoId}`, { params }),
+  
+  // Entrada y Ajuste
+  registrarEntrada: (data) => axios.post(`${API_URL}/inventario/entrada`, data),
+  registrarAjuste: (data) => axios.post(`${API_URL}/inventario/ajuste`, data),
+  
+  // Órdenes de Compra
+  getOrdenes: (params) => axios.get(`${API_URL}/inventario/ordenes`, { params }),
+  getOrden: (id) => axios.get(`${API_URL}/inventario/ordenes/${id}`),
+  createOrden: (data) => axios.post(`${API_URL}/inventario/ordenes`, data),
+  updateOrden: (id, data) => axios.put(`${API_URL}/inventario/ordenes/${id}`, data),
+  autorizarOrden: (id) => axios.patch(`${API_URL}/inventario/ordenes/${id}/autorizar`),
+  cancelarOrden: (id) => axios.patch(`${API_URL}/inventario/ordenes/${id}/cancelar`),
+  sugerirBajoMinimo: () => axios.get(`${API_URL}/inventario/ordenes/sugerir-bajo-minimo`),
+  
+  // Recepciones
+  getRecepciones: (params) => axios.get(`${API_URL}/inventario/recepciones`, { params }),
+  createRecepcion: (data) => axios.post(`${API_URL}/inventario/recepciones`, data),
+  
+  // Transferencias
+  getTransferencias: (params) => axios.get(`${API_URL}/inventario/transferencias`, { params }),
+  createTransferencia: (data) => axios.post(`${API_URL}/inventario/transferencias`, data),
+  
+  // Tomas Físicas
+  getTomas: (params) => axios.get(`${API_URL}/inventario/tomas`, { params }),
+  createToma: (data) => axios.post(`${API_URL}/inventario/tomas`, data),
+  actualizarConteo: (id, items) => axios.put(`${API_URL}/inventario/tomas/${id}/conteo`, items),
+  cerrarToma: (id) => axios.post(`${API_URL}/inventario/tomas/${id}/cerrar`),
+  getHojaConteo: (id) => axios.get(`${API_URL}/inventario/tomas/${id}/hoja-conteo`),
+};
+
 // Instancia de axios configurada para usar en componentes
 const api = axios.create({
   baseURL: API_URL
