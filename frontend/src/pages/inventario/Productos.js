@@ -2,26 +2,31 @@
 // Catálogo de productos del módulo de Inventario
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
 import {
-  Search, Plus, Edit, Package, AlertTriangle, Filter, ChevronLeft, ChevronRight
+  Search, Plus, Edit, Package, AlertTriangle, Filter, ChevronLeft, ChevronRight,
+  ArrowDownToLine, Truck, Calendar
 } from 'lucide-react';
 import { inventarioApi, formatCurrency } from '../../services/api';
 import { toast } from 'sonner';
 
 const Productos = () => {
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [bodegas, setBodegas] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -32,9 +37,24 @@ const Productos = () => {
   const [tipoFilter, setTipoFilter] = useState('all');
   const [bajoMinimoFilter, setBajoMinimoFilter] = useState(false);
   
-  // Modal
+  // Modal de producto
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  
+  // Modal de Entrada Rápida
+  const [entradaModalOpen, setEntradaModalOpen] = useState(false);
+  const [productoParaEntrada, setProductoParaEntrada] = useState(null);
+  const [entradaSubmitting, setEntradaSubmitting] = useState(false);
+  const [entradaData, setEntradaData] = useState({
+    bodega_id: '',
+    cantidad: 1,
+    costo_unitario: 0,
+    proveedor_id: '',
+    numero_lote: '',
+    fecha_vencimiento: '',
+    observaciones: ''
+  });
+  
   const [formData, setFormData] = useState({
     codigo: '',
     codigo_barras: '',
@@ -68,6 +88,19 @@ const Productos = () => {
     }
   }, []);
 
+  const loadBodegasYProveedores = useCallback(async () => {
+    try {
+      const [bodegasRes, proveedoresRes] = await Promise.all([
+        inventarioApi.getBodegas(),
+        inventarioApi.getProveedores()
+      ]);
+      setBodegas(bodegasRes.data.data || []);
+      setProveedores(proveedoresRes.data.data || []);
+    } catch (error) {
+      console.error('Error cargando bodegas/proveedores:', error);
+    }
+  }, []);
+
   const loadProductos = useCallback(async () => {
     try {
       setLoading(true);
@@ -92,7 +125,16 @@ const Productos = () => {
 
   useEffect(() => {
     loadCategorias();
-  }, [loadCategorias]);
+    loadBodegasYProveedores();
+  }, [loadCategorias, loadBodegasYProveedores]);
+
+  // Abrir modal de entrada si viene desde el panel
+  useEffect(() => {
+    if (searchParams.get('action') === 'entrada') {
+      // El usuario llegó desde "Entrada Rápida" del panel
+      // Se abrirá el modal cuando seleccione un producto
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -182,6 +224,78 @@ const Productos = () => {
     } catch (error) {
       console.error('Error guardando producto:', error);
       toast.error(error.response?.data?.detail || 'Error al guardar producto');
+    }
+  };
+
+  // ==================== ENTRADA RÁPIDA ====================
+  
+  const abrirEntradaRapida = (producto) => {
+    setProductoParaEntrada(producto);
+    // Pre-seleccionar Dispensario si existe, si no la primera bodega activa
+    const dispensario = bodegas.find(b => b.nombre === 'Dispensario' && b.activo);
+    const bodegaDefault = dispensario || bodegas.find(b => b.activo);
+    
+    setEntradaData({
+      bodega_id: bodegaDefault?.id || '',
+      cantidad: 1,
+      costo_unitario: producto.costo_promedio || 0,
+      proveedor_id: producto.proveedor_preferido_id || '',
+      numero_lote: '',
+      fecha_vencimiento: '',
+      observaciones: ''
+    });
+    setEntradaModalOpen(true);
+  };
+
+  const handleEntradaRapida = async () => {
+    // Validaciones
+    if (!entradaData.bodega_id) {
+      toast.error('Seleccione una bodega');
+      return;
+    }
+    if (entradaData.cantidad <= 0) {
+      toast.error('La cantidad debe ser mayor a 0');
+      return;
+    }
+    if (entradaData.costo_unitario < 0) {
+      toast.error('El costo no puede ser negativo');
+      return;
+    }
+    if (productoParaEntrada.controla_lotes) {
+      if (!entradaData.numero_lote.trim()) {
+        toast.error('Este producto requiere número de lote');
+        return;
+      }
+      if (!entradaData.fecha_vencimiento) {
+        toast.error('Este producto requiere fecha de vencimiento');
+        return;
+      }
+    }
+
+    setEntradaSubmitting(true);
+    try {
+      // Usar el endpoint de entrada rápida
+      const data = {
+        producto_id: productoParaEntrada.id,
+        bodega_id: entradaData.bodega_id,
+        cantidad: parseInt(entradaData.cantidad),
+        costo_unitario: parseFloat(entradaData.costo_unitario) || 0,
+        numero_lote: productoParaEntrada.controla_lotes ? entradaData.numero_lote : null,
+        fecha_vencimiento: productoParaEntrada.controla_lotes ? entradaData.fecha_vencimiento : null,
+        motivo: entradaData.observaciones || `Entrada rápida: ${productoParaEntrada.nombre}`
+      };
+
+      await inventarioApi.registrarEntrada(data);
+      
+      toast.success(`✓ Entrada registrada: ${entradaData.cantidad} ${productoParaEntrada.nombre}`);
+      setEntradaModalOpen(false);
+      loadProductos(); // Recargar para ver el nuevo stock
+      
+    } catch (error) {
+      console.error('Error en entrada rápida:', error);
+      toast.error(error.response?.data?.detail || 'Error al registrar entrada');
+    } finally {
+      setEntradaSubmitting(false);
     }
   };
 
@@ -337,14 +451,28 @@ const Productos = () => {
                             ) : '-'}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenModal(producto)}
-                              data-testid={`btn-edit-${producto.id}`}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center justify-center gap-1">
+                              {producto.controla_inventario && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => abrirEntradaRapida(producto)}
+                                  className="text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                  title="Entrada rápida"
+                                  data-testid={`btn-entrada-${producto.id}`}
+                                >
+                                  <ArrowDownToLine className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenModal(producto)}
+                                data-testid={`btn-edit-${producto.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -590,6 +718,144 @@ const Productos = () => {
               </Button>
               <Button onClick={handleSubmit}>
                 {editingProduct ? 'Guardar Cambios' : 'Crear Producto'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Entrada Rápida */}
+        <Dialog open={entradaModalOpen} onOpenChange={setEntradaModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ArrowDownToLine className="w-5 h-5 text-teal-600" />
+                Entrada Rápida
+              </DialogTitle>
+              <DialogDescription>
+                Agregar unidades al inventario
+              </DialogDescription>
+            </DialogHeader>
+            
+            {productoParaEntrada && (
+              <div className="space-y-4">
+                {/* Info del producto */}
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="font-medium text-slate-800">{productoParaEntrada.nombre}</p>
+                  <p className="text-sm text-slate-500">{productoParaEntrada.codigo}</p>
+                  <div className="flex gap-4 mt-2 text-sm">
+                    <span>Stock actual: <strong>{productoParaEntrada.existencia_total || 0}</strong></span>
+                    <span>Costo prom: <strong>{formatCurrency(productoParaEntrada.costo_promedio)}</strong></span>
+                  </div>
+                </div>
+
+                {/* Bodega */}
+                <div>
+                  <Label>Bodega destino *</Label>
+                  <Select 
+                    value={entradaData.bodega_id} 
+                    onValueChange={(v) => setEntradaData({...entradaData, bodega_id: v})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar bodega..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bodegas.filter(b => b.activo).map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Cantidad y Costo */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Cantidad *</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={entradaData.cantidad}
+                      onChange={(e) => setEntradaData({...entradaData, cantidad: parseInt(e.target.value) || 0})}
+                      className="text-center font-bold text-lg"
+                      data-testid="entrada-cantidad"
+                    />
+                  </div>
+                  <div>
+                    <Label>Costo Unitario (Q)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={entradaData.costo_unitario}
+                      onChange={(e) => setEntradaData({...entradaData, costo_unitario: parseFloat(e.target.value) || 0})}
+                      data-testid="entrada-costo"
+                    />
+                  </div>
+                </div>
+
+                {/* Lote y Vencimiento (solo si controla lotes) */}
+                {productoParaEntrada.controla_lotes && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                    <p className="text-sm text-amber-800 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Este producto requiere información de lote
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Número de Lote *</Label>
+                        <Input
+                          value={entradaData.numero_lote}
+                          onChange={(e) => setEntradaData({...entradaData, numero_lote: e.target.value})}
+                          placeholder="Ej: LOT-2024-001"
+                          data-testid="entrada-lote"
+                        />
+                      </div>
+                      <div>
+                        <Label>Fecha Vencimiento *</Label>
+                        <Input
+                          type="date"
+                          value={entradaData.fecha_vencimiento}
+                          onChange={(e) => setEntradaData({...entradaData, fecha_vencimiento: e.target.value})}
+                          data-testid="entrada-vencimiento"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Observaciones */}
+                <div>
+                  <Label>Observaciones (opcional)</Label>
+                  <Textarea
+                    value={entradaData.observaciones}
+                    onChange={(e) => setEntradaData({...entradaData, observaciones: e.target.value})}
+                    placeholder="Notas adicionales..."
+                    rows={2}
+                  />
+                </div>
+
+                {/* Resumen */}
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg">
+                  <p className="text-sm text-teal-800">
+                    <strong>Resumen:</strong> Entrada de <strong>{entradaData.cantidad}</strong> unidades 
+                    {entradaData.costo_unitario > 0 && (
+                      <> a <strong>{formatCurrency(entradaData.costo_unitario)}</strong> c/u = <strong>{formatCurrency(entradaData.cantidad * entradaData.costo_unitario)}</strong></>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEntradaModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleEntradaRapida} 
+                disabled={entradaSubmitting}
+                className="bg-teal-600 hover:bg-teal-700"
+                data-testid="btn-confirmar-entrada"
+              >
+                {entradaSubmitting ? 'Registrando...' : 'Registrar Entrada'}
               </Button>
             </DialogFooter>
           </DialogContent>

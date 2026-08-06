@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import {
   Package, AlertTriangle, Clock, TrendingUp, ArrowRight,
-  DollarSign, Box, AlertCircle, Activity
+  DollarSign, Box, AlertCircle, Activity, Plus, Truck, ArrowLeftRight
 } from 'lucide-react';
 import { inventarioApi, formatCurrency } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -148,11 +148,78 @@ const PanelInventario = () => {
               <Package className="w-4 h-4 mr-2" />
               Productos
             </Button>
-            <Button onClick={() => navigate('/inventario/ordenes')}>
-              <Box className="w-4 h-4 mr-2" />
-              Nueva Orden
+            <Button variant="outline" onClick={() => navigate('/inventario/movimientos')}>
+              <Activity className="w-4 h-4 mr-2" />
+              Kardex
             </Button>
           </div>
+        </div>
+
+        {/* Acciones Rápidas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card 
+            className="cursor-pointer hover:shadow-md hover:border-teal-300 transition-all bg-gradient-to-br from-teal-50 to-white"
+            onClick={() => navigate('/inventario/productos?action=entrada')}
+            data-testid="btn-entrada-rapida"
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-teal-500">
+                <Plus className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-teal-700">Entrada Rápida</p>
+                <p className="text-xs text-gray-500">Agregar stock a productos</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md hover:border-blue-300 transition-all bg-gradient-to-br from-blue-50 to-white"
+            onClick={() => navigate('/inventario/ordenes?action=nueva')}
+            data-testid="btn-nueva-orden"
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-blue-500">
+                <Box className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-blue-700">Nueva Orden</p>
+                <p className="text-xs text-gray-500">Crear orden de compra</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md hover:border-purple-300 transition-all bg-gradient-to-br from-purple-50 to-white"
+            onClick={() => navigate('/inventario/recepciones?action=nueva')}
+            data-testid="btn-nueva-recepcion"
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-purple-500">
+                <Truck className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-purple-700">Nueva Recepción</p>
+                <p className="text-xs text-gray-500">Recibir mercadería</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="cursor-pointer hover:shadow-md hover:border-amber-300 transition-all bg-gradient-to-br from-amber-50 to-white"
+            onClick={() => navigate('/inventario/transferencias?action=nueva')}
+            data-testid="btn-nueva-transferencia"
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-amber-500">
+                <ArrowLeftRight className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-amber-700">Transferencia</p>
+                <p className="text-xs text-gray-500">Entre bodegas</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* KPI Cards */}

@@ -538,8 +538,12 @@ Ver `/app/memory/test_credentials.md`
 - **Configuración**: FEFO, existencia negativa, días alerta
 
 #### Frontend (`/app/frontend/src/pages/inventario/`)
-- **PanelInventario.js**: Dashboard con KPIs, alertas, gráfica por categoría, últimos movimientos
-- **Productos.js**: Catálogo con filtros, búsqueda, CRUD completo
+- **PanelInventario.js**: Dashboard con KPIs, alertas, gráfica por categoría, acciones rápidas
+  - Entrada Rápida: Agregar stock a productos existentes
+  - Nueva Orden: Crear orden de compra
+  - Nueva Recepción: Recibir mercadería de proveedores
+  - Transferencia: Mover entre bodegas
+- **Productos.js**: Catálogo con filtros, búsqueda, CRUD completo, botón de entrada rápida por producto
 - **Lotes.js**: Vista de vencimientos con código de color, baja de lotes
 - **Movimientos.js**: Kardex con filtros avanzados
 
