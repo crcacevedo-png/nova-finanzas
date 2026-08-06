@@ -175,7 +175,7 @@ const PanelInventario = () => {
           
           <Card 
             className="cursor-pointer hover:shadow-md hover:border-blue-300 transition-all bg-gradient-to-br from-blue-50 to-white"
-            onClick={() => navigate('/inventario/ordenes?action=nueva')}
+            onClick={() => navigate('/inventario/productos')}
             data-testid="btn-nueva-orden"
           >
             <CardContent className="p-4 flex items-center gap-3">
@@ -183,15 +183,15 @@ const PanelInventario = () => {
                 <Box className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-blue-700">Nueva Orden</p>
-                <p className="text-xs text-gray-500">Crear orden de compra</p>
+                <p className="font-semibold text-blue-700">Productos</p>
+                <p className="text-xs text-gray-500">Ver catálogo completo</p>
               </div>
             </CardContent>
           </Card>
           
           <Card 
             className="cursor-pointer hover:shadow-md hover:border-purple-300 transition-all bg-gradient-to-br from-purple-50 to-white"
-            onClick={() => navigate('/inventario/recepciones?action=nueva')}
+            onClick={() => navigate('/inventario/lotes')}
             data-testid="btn-nueva-recepcion"
           >
             <CardContent className="p-4 flex items-center gap-3">
@@ -199,15 +199,15 @@ const PanelInventario = () => {
                 <Truck className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-purple-700">Nueva Recepción</p>
-                <p className="text-xs text-gray-500">Recibir mercadería</p>
+                <p className="font-semibold text-purple-700">Lotes y Vencimientos</p>
+                <p className="text-xs text-gray-500">Control FEFO</p>
               </div>
             </CardContent>
           </Card>
           
           <Card 
             className="cursor-pointer hover:shadow-md hover:border-amber-300 transition-all bg-gradient-to-br from-amber-50 to-white"
-            onClick={() => navigate('/inventario/transferencias?action=nueva')}
+            onClick={() => navigate('/inventario/movimientos')}
             data-testid="btn-nueva-transferencia"
           >
             <CardContent className="p-4 flex items-center gap-3">
@@ -215,8 +215,8 @@ const PanelInventario = () => {
                 <ArrowLeftRight className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-amber-700">Transferencia</p>
-                <p className="text-xs text-gray-500">Entre bodegas</p>
+                <p className="font-semibold text-amber-700">Kardex</p>
+                <p className="text-xs text-gray-500">Historial de movimientos</p>
               </div>
             </CardContent>
           </Card>
