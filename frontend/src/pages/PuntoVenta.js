@@ -344,8 +344,9 @@ const PuntoVenta = () => {
     setPaciente(null);
     setObservaciones('');
     setFormasPago([]);
-    setMetodoPago('Efectivo');
-    setEfectivoRecibido('');
+    setMetodoPagoActual('Efectivo');
+    setMontoPagoActual('');
+    setReferenciaPagoActual('');
     setTipoPagadorId('');
   };
 
@@ -505,11 +506,15 @@ const PuntoVenta = () => {
       // Limpiar carrito
       limpiarCarrito();
       
-      // Actualizar productos para reflejar nuevo stock
-      fetchProductos();
-      fetchProductosRapidos();
-      
       toast.success('Venta registrada exitosamente');
+      
+      // Actualizar productos para reflejar nuevo stock (en background, sin bloquear)
+      try {
+        await Promise.all([fetchProductos(), fetchProductosRapidos()]);
+      } catch (fetchError) {
+        console.warn('Error actualizando lista de productos:', fetchError);
+        // No mostrar error al usuario, la venta ya se completó
+      }
       
     } catch (error) {
       console.error('Error al crear venta:', error);
