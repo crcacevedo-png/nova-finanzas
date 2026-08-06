@@ -6,7 +6,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 import logging
 
@@ -215,6 +215,96 @@ async def buscar_productos_pos(
     
     resultado = []
     for p in productos:
+        existencia = existencias_map.get(p["id"], 0) if bodega_id else 0
+        
+        resultado.append(ProductoPOSResponse(
+            id=p["id"],
+            codigo=p.get("codigo", ""),
+            nombre=p["nombre"],
+            categoria_nombre=categorias.get(p.get("categoria_id")),
+            precio_venta=p.get("precio_venta", 0),
+            afecto_iva=p.get("afecto_iva", True),
+            existencia=existencia,
+            controla_lotes=p.get("controla_lotes", False),
+            requiere_receta=p.get("requiere_receta", False),
+            imagen=p.get("imagen")
+        ))
+    
+    return resultado
+
+@router.get("/productos-rapidos", response_model=List[ProductoPOSResponse])
+async def obtener_productos_rapidos(
+    bodega_id: Optional[str] = None,
+    limit: int = Query(8, ge=1, le=20),
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """
+    Obtiene los productos más vendidos para acceso rápido en el POS.
+    Basado en el historial de ventas de los últimos 30 días.
+    """
+    db = get_db()
+    
+    # Calcular fecha hace 30 días
+    fecha_limite = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    
+    # Agregar ventas por producto
+    pipeline = [
+        {
+            "$match": {
+                "origen": "clinica",
+                "estado": "completada",
+                "fecha": {"$gte": fecha_limite}
+            }
+        },
+        {"$unwind": "$items"},
+        {
+            "$group": {
+                "_id": "$items.producto_id",
+                "cantidad_vendida": {"$sum": "$items.cantidad"},
+                "veces_vendido": {"$sum": 1},
+                "ultimo_venta": {"$max": "$fecha"}
+            }
+        },
+        {"$sort": {"cantidad_vendida": -1, "veces_vendido": -1}},
+        {"$limit": limit * 2}  # Obtener más por si algunos están inactivos
+    ]
+    
+    top_vendidos = await db.ventas.aggregate(pipeline).to_list(limit * 2)
+    
+    # Si no hay ventas, devolver productos populares por defecto
+    if not top_vendidos:
+        # Obtener productos más recientes activos
+        productos = await db.productos_inventario.find({
+            "origen": "clinica",
+            "activo": True
+        }).sort("created_at", -1).limit(limit).to_list(limit)
+    else:
+        # Obtener los productos
+        producto_ids = [v["_id"] for v in top_vendidos]
+        productos = await db.productos_inventario.find({
+            "id": {"$in": producto_ids},
+            "origen": "clinica",
+            "activo": True
+        }).to_list(limit * 2)
+        
+        # Ordenar por cantidad vendida
+        productos_map = {p["id"]: p for p in productos}
+        productos = [productos_map[v["_id"]] for v in top_vendidos if v["_id"] in productos_map]
+    
+    # Obtener categorías
+    categorias = {c["id"]: c["nombre"] for c in await db.categorias_inventario.find({"origen": "clinica"}).to_list(100)}
+    
+    # Obtener existencias si hay bodega
+    existencias_map = {}
+    if bodega_id:
+        existencias = await db.existencias_inventario.find({
+            "bodega_id": bodega_id,
+            "origen": "clinica"
+        }).to_list(1000)
+        existencias_map = {e["producto_id"]: e.get("cantidad", 0) for e in existencias}
+    
+    resultado = []
+    for p in productos[:limit]:
         existencia = existencias_map.get(p["id"], 0) if bodega_id else 0
         
         resultado.append(ProductoPOSResponse(

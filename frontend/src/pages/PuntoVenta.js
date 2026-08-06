@@ -30,7 +30,11 @@ import {
   Tag,
   FileText,
   Clock,
-  DollarSign
+  DollarSign,
+  Zap,
+  Star,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -120,6 +124,11 @@ const PuntoVenta = () => {
   const [ventaExitosa, setVentaExitosa] = useState(null);
   const [ventaExitosaDialogOpen, setVentaExitosaDialogOpen] = useState(false);
   
+  // Productos Rápidos (más vendidos)
+  const [productosRapidos, setProductosRapidos] = useState([]);
+  const [loadingRapidos, setLoadingRapidos] = useState(false);
+  const [mostrarRapidos, setMostrarRapidos] = useState(true);
+  
   // UI state
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('venta');
@@ -132,9 +141,11 @@ const PuntoVenta = () => {
     fetchPagadores();
   }, []);
   
+  // Cargar productos rápidos cuando se obtiene la bodega
   useEffect(() => {
     if (bodegaPOS) {
       fetchProductos();
+      fetchProductosRapidos();
     }
   }, [bodegaPOS, categoriaSeleccionada]);
   
@@ -236,6 +247,23 @@ const PuntoVenta = () => {
       setResumenDia(resumenRes.data);
     } catch (error) {
       console.error('Error fetching ventas del día:', error);
+    }
+  };
+
+  const fetchProductosRapidos = async () => {
+    if (!bodegaPOS) return;
+    
+    setLoadingRapidos(true);
+    try {
+      const response = await ventasApi.getProductosRapidos({
+        bodega_id: bodegaPOS.bodega_id,
+        limit: 8
+      });
+      setProductosRapidos(response.data || []);
+    } catch (error) {
+      console.error('Error fetching productos rápidos:', error);
+    } finally {
+      setLoadingRapidos(false);
     }
   };
 
@@ -849,6 +877,68 @@ const PuntoVenta = () => {
 
             {/* Lista de productos - Grid táctil */}
             <div className="flex-1 overflow-y-auto p-4">
+              {/* Sección de Productos Rápidos */}
+              {mostrarRapidos && productosRapidos.length > 0 && !searchQuery && !categoriaSeleccionada && (
+                <div className="mb-6">
+                  <div 
+                    className="flex items-center justify-between mb-3 cursor-pointer group"
+                    onClick={() => setMostrarRapidos(!mostrarRapidos)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-5 h-5 text-amber-500" />
+                      <h3 className="font-semibold text-slate-700">Productos Rápidos</h3>
+                      <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
+                        Más vendidos
+                      </Badge>
+                    </div>
+                    <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+                  </div>
+                  
+                  <div className="grid grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2">
+                    {productosRapidos.map(producto => (
+                      <button
+                        key={`rapido-${producto.id}`}
+                        onClick={() => agregarAlCarrito(producto)}
+                        className={`
+                          p-2 rounded-lg border-2 text-center transition-all
+                          hover:border-amber-400 hover:shadow-md hover:bg-amber-50 active:scale-95
+                          ${producto.existencia === 0 && producto.existencia !== -1 
+                            ? 'bg-slate-100 border-slate-200 opacity-60' 
+                            : 'bg-gradient-to-b from-amber-50 to-white border-amber-200'}
+                        `}
+                        disabled={producto.existencia === 0 && producto.existencia !== -1}
+                        data-testid={`producto-rapido-${producto.id}`}
+                      >
+                        <p className="font-medium text-xs text-slate-700 line-clamp-2 mb-1 min-h-[2rem]">
+                          {producto.nombre.length > 20 ? producto.nombre.substring(0, 18) + '...' : producto.nombre}
+                        </p>
+                        <p className="text-sm font-bold text-amber-600">
+                          {formatCurrency(producto.precio_venta)}
+                        </p>
+                        {producto.existencia >= 0 && producto.existencia <= 5 && (
+                          <Badge variant="destructive" className="text-[10px] mt-1 px-1">
+                            {producto.existencia}
+                          </Badge>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Mostrar botón para expandir productos rápidos si está colapsado */}
+              {!mostrarRapidos && productosRapidos.length > 0 && !searchQuery && !categoriaSeleccionada && (
+                <button
+                  onClick={() => setMostrarRapidos(true)}
+                  className="w-full mb-4 p-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span className="text-sm font-medium">Mostrar productos rápidos</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Grid de todos los productos */}
               {loadingProductos ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {[1,2,3,4,5,6,7,8].map(i => (
@@ -861,41 +951,48 @@ const PuntoVenta = () => {
                   <p>No se encontraron productos</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {productos.map(producto => (
-                    <button
-                      key={producto.id}
-                      onClick={() => agregarAlCarrito(producto)}
-                      className={`
-                        p-3 rounded-lg border-2 text-left transition-all
-                        hover:border-teal-500 hover:shadow-md active:scale-95
-                        ${producto.existencia === 0 && producto.existencia !== -1 
-                          ? 'bg-slate-100 border-slate-200 opacity-60' 
-                          : 'bg-white border-slate-200'}
-                      `}
-                      disabled={producto.existencia === 0 && producto.existencia !== -1}
-                      data-testid={`producto-${producto.id}`}
-                    >
-                      <div className="flex items-start justify-between mb-1">
-                        <span className="text-xs font-mono text-slate-400">{producto.codigo}</span>
-                        {producto.existencia >= 0 && (
-                          <Badge variant={producto.existencia > 5 ? "outline" : "destructive"} className="text-xs">
-                            {producto.existencia}
-                          </Badge>
+                <>
+                  {(searchQuery || categoriaSeleccionada) && (
+                    <p className="text-sm text-slate-500 mb-3">
+                      {productos.length} producto{productos.length !== 1 ? 's' : ''} encontrado{productos.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {productos.map(producto => (
+                      <button
+                        key={producto.id}
+                        onClick={() => agregarAlCarrito(producto)}
+                        className={`
+                          p-3 rounded-lg border-2 text-left transition-all
+                          hover:border-teal-500 hover:shadow-md active:scale-95
+                          ${producto.existencia === 0 && producto.existencia !== -1 
+                            ? 'bg-slate-100 border-slate-200 opacity-60' 
+                            : 'bg-white border-slate-200'}
+                        `}
+                        disabled={producto.existencia === 0 && producto.existencia !== -1}
+                        data-testid={`producto-${producto.id}`}
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <span className="text-xs font-mono text-slate-400">{producto.codigo}</span>
+                          {producto.existencia >= 0 && (
+                            <Badge variant={producto.existencia > 5 ? "outline" : "destructive"} className="text-xs">
+                              {producto.existencia}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="font-medium text-sm text-slate-800 line-clamp-2 mb-1">
+                          {producto.nombre}
+                        </p>
+                        {producto.categoria_nombre && (
+                          <p className="text-xs text-slate-400 mb-1">{producto.categoria_nombre}</p>
                         )}
-                      </div>
-                      <p className="font-medium text-sm text-slate-800 line-clamp-2 mb-1">
-                        {producto.nombre}
-                      </p>
-                      {producto.categoria_nombre && (
-                        <p className="text-xs text-slate-400 mb-1">{producto.categoria_nombre}</p>
-                      )}
-                      <p className="text-lg font-bold text-teal-600">
-                        {formatCurrency(producto.precio_venta)}
-                      </p>
-                    </button>
-                  ))}
-                </div>
+                        <p className="text-lg font-bold text-teal-600">
+                          {formatCurrency(producto.precio_venta)}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>

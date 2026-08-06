@@ -539,6 +539,9 @@ export const ventasApi = {
   // Búsqueda de productos para POS
   buscarProductos: (params) => axios.get(`${API_URL}/ventas/productos`, { params }),
   
+  // Productos más vendidos para acceso rápido
+  getProductosRapidos: (params) => axios.get(`${API_URL}/ventas/productos-rapidos`, { params }),
+  
   // Obtener bodega predeterminada para POS
   getBodegaPOS: () => axios.get(`${API_URL}/ventas/bodega-pos`),
   

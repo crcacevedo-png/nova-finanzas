@@ -141,6 +141,7 @@ Sistema de Punto de Venta táctil integrado con el módulo de Inventario, optimi
 - **Tickets**: Numeración correlativa (VTA-YYYYMMDD-####)
 - **IVA Guatemala**: 12% calculado automáticamente
 - **Impresión Térmica**: Tickets optimizados para impresoras de 58mm y 80mm
+- **Productos Rápidos**: Grid de acceso rápido con los productos más vendidos (últimos 30 días)
 
 ### Archivos Clave:
 - `/app/backend/routes/ventas.py` - Router backend (~886 líneas)
@@ -149,10 +150,12 @@ Sistema de Punto de Venta táctil integrado con el módulo de Inventario, optimi
 ### Endpoints:
 - `GET /api/ventas/bodega-pos` - Obtener bodega POS predeterminada
 - `GET /api/ventas/productos` - Buscar productos con stock
+- `GET /api/ventas/productos-rapidos` - Productos más vendidos (últimos 30 días)
 - `POST /api/ventas/verificar-stock` - Verificar disponibilidad
 - `POST /api/ventas` - Crear venta (descuenta inventario)
 - `GET /api/ventas/hoy` - Ventas del día
 - `GET /api/ventas/resumen-dia` - Resumen con totales
+- `GET /api/ventas/{id}/ticket` - Datos para impresión de ticket
 - `POST /api/ventas/{id}/anular` - Anular venta (solo SuperAdmin)
 
 ### Modelo de Datos (ventas):
