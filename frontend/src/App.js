@@ -29,6 +29,8 @@ import PanelInventario from './pages/inventario/PanelInventario';
 import ProductosInventario from './pages/inventario/Productos';
 import LotesInventario from './pages/inventario/Lotes';
 import MovimientosInventario from './pages/inventario/Movimientos';
+// Punto de Venta (POS)
+import PuntoVenta from './pages/PuntoVenta';
 import './App.css';
 
 // Protected Route Component
@@ -272,6 +274,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Agenda />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* ==================== PUNTO DE VENTA (POS) ==================== */}
+      <Route 
+        path="/punto-venta" 
+        element={
+          <ProtectedRoute>
+            <PuntoVenta />
           </ProtectedRoute>
         } 
       />

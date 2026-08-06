@@ -534,6 +534,31 @@ export const inventarioApi = {
   getHojaConteo: (id) => axios.get(`${API_URL}/inventario/tomas/${id}/hoja-conteo`),
 };
 
+// ==================== API DE PUNTO DE VENTA (POS) ====================
+export const ventasApi = {
+  // Búsqueda de productos para POS
+  buscarProductos: (params) => axios.get(`${API_URL}/ventas/productos`, { params }),
+  
+  // Obtener bodega predeterminada para POS
+  getBodegaPOS: () => axios.get(`${API_URL}/ventas/bodega-pos`),
+  
+  // Verificar stock antes de vender
+  verificarStock: (data) => axios.post(`${API_URL}/ventas/verificar-stock`, data),
+  
+  // CRUD de ventas
+  crear: (data) => axios.post(`${API_URL}/ventas`, data),
+  getAll: (params) => axios.get(`${API_URL}/ventas`, { params }),
+  getById: (id) => axios.get(`${API_URL}/ventas/${id}`),
+  getVentasHoy: () => axios.get(`${API_URL}/ventas/hoy`),
+  getResumenDia: (fecha) => axios.get(`${API_URL}/ventas/resumen-dia`, { params: { fecha } }),
+  
+  // Anular venta
+  anular: (id, data) => axios.post(`${API_URL}/ventas/${id}/anular`, data),
+  
+  // Ticket para impresión
+  getTicket: (id) => axios.get(`${API_URL}/ventas/${id}/ticket`),
+};
+
 // Instancia de axios configurada para usar en componentes
 const api = axios.create({
   baseURL: API_URL

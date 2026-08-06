@@ -33,7 +33,8 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   FileText,
-  ClipboardList
+  ClipboardList,
+  Store
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -54,7 +55,7 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
   const [finanzasOpen, setFinanzasOpen] = useState(
-    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos'].some(p => location.pathname.startsWith(p))
+    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta'].some(p => location.pathname.startsWith(p))
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
 
@@ -95,6 +96,8 @@ const Layout = ({ children }) => {
   // Finanzas sub-items (visible para todos los roles autenticados)
   // Finanzas sub-items (NO visible para optica)
   const finanzasItems = user?.role !== 'optica' ? [
+    // Punto de Venta - Destacado como primer item
+    { path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' },
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
     // Gastos Fijos - Admin y SuperAdmin
@@ -261,12 +264,12 @@ const Layout = ({ children }) => {
               <button
                 onClick={() => setFinanzasOpen(!finanzasOpen)}
                 className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
                 }`}
                 data-testid="nav-finanzas"
               >
                 <div className="flex items-center gap-3">
-                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
                   <span className="font-medium text-sm">Finanzas</span>
                 </div>
                 {finanzasOpen ? (

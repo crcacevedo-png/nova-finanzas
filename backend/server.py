@@ -2342,6 +2342,12 @@ from routes.inventario_ops import router as inventario_ops_router
 api_router.include_router(inventario_router, tags=["Inventario"])
 api_router.include_router(inventario_ops_router, tags=["Inventario - Operaciones"])
 
+# ==================== MÓDULO DE PUNTO DE VENTA (POS) ====================
+from routes.ventas import router as ventas_router
+
+# Incluir router de ventas/POS
+api_router.include_router(ventas_router, tags=["Punto de Venta"])
+
 # ==================== USER MANAGEMENT ROUTES ====================
 
 @api_router.get("/users", response_model=List[UserResponse])
