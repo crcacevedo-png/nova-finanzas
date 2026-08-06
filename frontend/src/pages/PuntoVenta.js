@@ -1016,6 +1016,9 @@ const PuntoVenta = () => {
       {/* Dialog: Venta Exitosa */}
       <Dialog open={ventaExitosaDialogOpen} onOpenChange={setVentaExitosaDialogOpen}>
         <DialogContent className="max-w-md">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Venta Exitosa</DialogTitle>
+          </DialogHeader>
           <div className="text-center py-4">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-10 h-10 text-green-600" />
@@ -1063,13 +1066,15 @@ const PuntoVenta = () => {
         <DialogContent className="max-w-3xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Ventas del Día</DialogTitle>
-            <DialogDescription>
-              {resumenDia && (
-                <div className="flex gap-6 mt-2">
-                  <span>Total: <strong>{resumenDia.total_ventas}</strong> ventas</span>
-                  <span>Monto: <strong className="text-teal-600">{formatCurrency(resumenDia.total_monto)}</strong></span>
-                </div>
-              )}
+            <DialogDescription asChild>
+              <div>
+                {resumenDia && (
+                  <span className="flex gap-6 mt-2">
+                    <span>Total: <strong>{resumenDia.total_ventas}</strong> ventas</span>
+                    <span>Monto: <strong className="text-teal-600">{formatCurrency(resumenDia.total_monto)}</strong></span>
+                  </span>
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
           

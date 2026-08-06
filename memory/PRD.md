@@ -13,7 +13,8 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 4. **Sala de Operaciones** - Gestión de cirugías
 5. **Óptica** - Inventario y ventas de óptica
 6. **Agenda** - Citas de pacientes
-7. **📦 Inventario (NUEVO)** - Control de productos, lotes, existencias, kardex
+7. **📦 Inventario** - Control de productos, lotes, existencias, kardex
+8. **🆕 Punto de Venta (POS)** - Sistema táctil integrado con inventario FEFO
 
 ---
 
@@ -109,6 +110,9 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 14. **evaluaciones.py** - ✅ Evaluaciones oftalmológicas + catálogos (448 líneas)
 15. **optica.py** - ✅ NEW: Médicos, Aros, Lentes, Ventas, Compras, Dashboard (1322 líneas)
 16. **payment_authorizations.py** - ✅ NEW: Autorizaciones de pago (401 líneas)
+17. **inventario.py** - ✅ Inventario completo: productos, bodegas, lotes FEFO, kardex (1775 líneas)
+18. **inventario_ops.py** - ✅ Operaciones de inventario: entradas, transferencias, ajustes
+19. **ventas.py** - ✅ NEW: Punto de Venta (POS) táctil integrado (886 líneas)
 
 ### 🟡 Módulos Pendientes de Extracción:
 - Cuentas bancarias (rutas) - ~100 líneas aún en server.py
@@ -119,8 +123,64 @@ Sistema web completo para gestión financiera de clínica oftalmológica. Base d
 - **Antes (Julio 2026)**: server.py ~8000 líneas
 - **Después (1 Agosto 2026)**: server.py **3029 líneas**
 - **Reducción total**: ~4971 líneas extraídas (**62%**)
-- **Módulos extraídos**: 16 archivos en `/routes/`
-- **Total código modularizado**: ~4440 líneas
+- **Módulos extraídos**: 17 archivos en `/routes/`
+- **Total código modularizado**: ~5326 líneas
+
+---
+
+## 🆕 Punto de Venta (POS) - Implementado 6 Agosto 2026
+
+### Descripción
+Sistema de Punto de Venta táctil integrado con el módulo de Inventario, optimizado para tablets.
+
+### Características:
+- **Ventas anónimas**: Permite vender a "Cliente General" sin requerir paciente registrado
+- **Formas de Pago**: Efectivo, Tarjeta, Transferencia, Cheque, Pago Mixto, Crédito (→ Cuentas por Cobrar)
+- **Integración FEFO**: Descuenta inventario usando First Expire First Out
+- **Control de Caja**: Requiere caja abierta para operar
+- **Tickets**: Numeración correlativa (VTA-YYYYMMDD-####)
+- **IVA Guatemala**: 12% calculado automáticamente
+
+### Archivos Clave:
+- `/app/backend/routes/ventas.py` - Router backend (~886 líneas)
+- `/app/frontend/src/pages/PuntoVenta.js` - UI táctil (~1210 líneas)
+
+### Endpoints:
+- `GET /api/ventas/bodega-pos` - Obtener bodega POS predeterminada
+- `GET /api/ventas/productos` - Buscar productos con stock
+- `POST /api/ventas/verificar-stock` - Verificar disponibilidad
+- `POST /api/ventas` - Crear venta (descuenta inventario)
+- `GET /api/ventas/hoy` - Ventas del día
+- `GET /api/ventas/resumen-dia` - Resumen con totales
+- `POST /api/ventas/{id}/anular` - Anular venta (solo SuperAdmin)
+
+### Modelo de Datos (ventas):
+```json
+{
+  "id": "uuid",
+  "numero_venta": "VTA-20260806-0001",
+  "origen": "clinica",
+  "bodega_id": "uuid",
+  "paciente_id": null | "uuid",
+  "paciente_nombre": "Cliente General",
+  "items": [{ "producto_id", "nombre", "cantidad", "precio_unitario", "descuento", "subtotal", "lotes_consumidos": [] }],
+  "subtotal": 150.00,
+  "descuento_global": 0,
+  "iva": 18.00,
+  "total": 168.00,
+  "formas_pago": [{ "metodo": "Efectivo", "monto": 168.00 }],
+  "efectivo_recibido": 200.00,
+  "cambio": 32.00,
+  "estado": "completada",
+  "fecha": "2026-08-06T...",
+  "creado_por": "uuid"
+}
+```
+
+### Testing:
+- Backend: 8/8 tests pasando (`/app/backend/tests/test_ventas_pos.py`)
+- Frontend: 100% funcional
+- Reporte: `/app/test_reports/iteration_32.json`
 
 ---
 
