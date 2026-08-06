@@ -104,8 +104,9 @@ const PuntoVenta = () => {
   
   // Pago
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
-  const [metodoPago, setMetodoPago] = useState('Efectivo');
-  const [efectivoRecibido, setEfectivoRecibido] = useState('');
+  const [metodoPagoActual, setMetodoPagoActual] = useState('Efectivo');
+  const [montoPagoActual, setMontoPagoActual] = useState('');
+  const [referenciaPagoActual, setReferenciaPagoActual] = useState('');
   const [formasPago, setFormasPago] = useState([]);
   const [observaciones, setObservaciones] = useState('');
   
@@ -362,7 +363,6 @@ const PuntoVenta = () => {
   };
 
   const { subtotal, descuento, iva, total, cantidadItems } = calcularTotales();
-  const cambio = metodoPago === 'Efectivo' ? Math.max(0, (parseFloat(efectivoRecibido) || 0) - total) : 0;
 
   // ==================== FUNCIONES DE PAGO ====================
 
@@ -372,18 +372,72 @@ const PuntoVenta = () => {
       return;
     }
     
-    setFormasPago([{ metodo: 'Efectivo', monto: total, referencia: '' }]);
-    setEfectivoRecibido(total.toFixed(2));
+    // Resetear estado de pago
+    setFormasPago([]);
+    setMetodoPagoActual('Efectivo');
+    setMontoPagoActual(total.toFixed(2));
+    setReferenciaPagoActual('');
+    setTipoPagadorId('');
     setPagoDialogOpen(true);
   };
 
+  // Calcula el total ya pagado con las formas de pago agregadas
+  const totalPagado = formasPago.reduce((acc, fp) => acc + fp.monto, 0);
+  const pendientePorPagar = Math.max(0, total - totalPagado);
+  
+  // Calcula el cambio (solo si hay efectivo y se pagó de más)
+  const cambioTotal = formasPago.reduce((acc, fp) => {
+    if (fp.metodo === 'Efectivo' && fp.efectivo_recibido) {
+      return acc + Math.max(0, fp.efectivo_recibido - fp.monto);
+    }
+    return acc;
+  }, 0);
+
+  const agregarFormaPago = () => {
+    const monto = parseFloat(montoPagoActual) || 0;
+    
+    if (monto <= 0) {
+      toast.error('Ingrese un monto válido');
+      return;
+    }
+    
+    if (metodoPagoActual === 'Cuenta por Cobrar' && !tipoPagadorId) {
+      toast.error('Seleccione el tipo de pagador para Crédito');
+      return;
+    }
+    
+    const nuevaFormaPago = {
+      id: Date.now(),
+      metodo: metodoPagoActual,
+      monto: monto,
+      referencia: referenciaPagoActual || null,
+      tipo_pagador_id: metodoPagoActual === 'Cuenta por Cobrar' ? tipoPagadorId : null,
+      tipo_pagador_nombre: metodoPagoActual === 'Cuenta por Cobrar' ? 
+        pagadores.find(p => p.id === tipoPagadorId)?.nombre : null,
+      // Para efectivo, guardamos cuánto recibió el cliente
+      efectivo_recibido: metodoPagoActual === 'Efectivo' ? monto : null
+    };
+    
+    setFormasPago([...formasPago, nuevaFormaPago]);
+    
+    // Resetear para siguiente forma de pago
+    const nuevoMontoPendiente = Math.max(0, pendientePorPagar - monto);
+    setMontoPagoActual(nuevoMontoPendiente > 0 ? nuevoMontoPendiente.toFixed(2) : '');
+    setReferenciaPagoActual('');
+    setTipoPagadorId('');
+    
+    toast.success(`${metodoPagoActual} agregado: ${formatCurrency(monto)}`);
+  };
+
+  const eliminarFormaPago = (id) => {
+    setFormasPago(formasPago.filter(fp => fp.id !== id));
+  };
+
   const seleccionarMetodoPago = (metodo) => {
-    setMetodoPago(metodo);
-    setFormasPago([{ metodo, monto: total, referencia: '', tipo_pagador_id: '', tipo_pagador_nombre: '' }]);
-    if (metodo === 'Efectivo') {
-      setEfectivoRecibido(total.toFixed(2));
-    } else {
-      setEfectivoRecibido('');
+    setMetodoPagoActual(metodo);
+    // Pre-llenar con el monto pendiente
+    if (pendientePorPagar > 0) {
+      setMontoPagoActual(pendientePorPagar.toFixed(2));
     }
   };
 
@@ -394,27 +448,31 @@ const PuntoVenta = () => {
       return;
     }
     
-    if (formasPago[0].metodo === 'Efectivo' && parseFloat(efectivoRecibido) < total) {
-      toast.error('El efectivo recibido es menor al total');
+    if (formasPago.length === 0) {
+      toast.error('Agregue al menos una forma de pago');
       return;
     }
     
-    if (formasPago[0].metodo === 'Cuenta por Cobrar' && !tipoPagadorId) {
-      toast.error('Seleccione el tipo de pagador para Cuenta por Cobrar');
+    const totalFormasPago = formasPago.reduce((acc, fp) => acc + fp.monto, 0);
+    if (totalFormasPago < total) {
+      toast.error(`Faltan ${formatCurrency(total - totalFormasPago)} por cubrir`);
       return;
     }
     
     setSubmitting(true);
     
     try {
-      // Preparar datos
+      // Preparar datos - calcular efectivo total recibido y cambio
+      const efectivoTotalRecibido = formasPago
+        .filter(fp => fp.metodo === 'Efectivo')
+        .reduce((acc, fp) => acc + (fp.efectivo_recibido || fp.monto), 0);
+      
       const formasPagoData = formasPago.map(fp => ({
         metodo: fp.metodo,
-        monto: fp.metodo === 'Efectivo' ? parseFloat(efectivoRecibido) : total,
+        monto: fp.monto,
         referencia: fp.referencia || null,
-        tipo_pagador_id: fp.metodo === 'Cuenta por Cobrar' ? tipoPagadorId : null,
-        tipo_pagador_nombre: fp.metodo === 'Cuenta por Cobrar' ? 
-          pagadores.find(p => p.id === tipoPagadorId)?.nombre : null
+        tipo_pagador_id: fp.tipo_pagador_id || null,
+        tipo_pagador_nombre: fp.tipo_pagador_nombre || null
       }));
       
       const ventaData = {
@@ -433,6 +491,7 @@ const PuntoVenta = () => {
           afecto_iva: item.afecto_iva
         })),
         formas_pago: formasPagoData,
+        efectivo_recibido: efectivoTotalRecibido > 0 ? efectivoTotalRecibido : null,
         observaciones: observaciones || null
       };
       
@@ -448,6 +507,7 @@ const PuntoVenta = () => {
       
       // Actualizar productos para reflejar nuevo stock
       fetchProductos();
+      fetchProductosRapidos();
       
       toast.success('Venta registrada exitosamente');
       
@@ -1198,100 +1258,194 @@ const PuntoVenta = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Pago */}
+      {/* Dialog: Pago Mixto */}
       <Dialog open={pagoDialogOpen} onOpenChange={setPagoDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">Cobrar Venta</DialogTitle>
-            <DialogDescription>
-              Total a cobrar: <span className="text-2xl font-bold text-teal-600">{formatCurrency(total)}</span>
+            <DialogDescription asChild>
+              <div className="flex items-center justify-between">
+                <span>Total a cobrar: <span className="text-2xl font-bold text-teal-600">{formatCurrency(total)}</span></span>
+                {pendientePorPagar > 0 && formasPago.length > 0 && (
+                  <span className="text-orange-600 font-medium">
+                    Pendiente: {formatCurrency(pendientePorPagar)}
+                  </span>
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* Métodos de pago */}
-            <div>
-              <Label className="mb-2 block">Método de Pago</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {METODOS_PAGO.map(mp => {
-                  const Icon = mp.icon;
-                  return (
-                    <button
-                      key={mp.value}
-                      onClick={() => seleccionarMetodoPago(mp.value)}
-                      className={`
-                        p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-all
-                        ${metodoPago === mp.value 
-                          ? 'border-teal-500 bg-teal-50' 
-                          : 'border-slate-200 hover:border-slate-300'}
-                      `}
-                    >
-                      <div className={`w-10 h-10 rounded-full ${mp.color} flex items-center justify-center`}>
-                        <Icon className="w-5 h-5 text-white" />
+            {/* Formas de pago agregadas */}
+            {formasPago.length > 0 && (
+              <div className="bg-slate-50 rounded-lg p-3">
+                <Label className="mb-2 block text-sm font-medium text-slate-700">
+                  Formas de Pago Agregadas ({formasPago.length})
+                </Label>
+                <div className="space-y-2">
+                  {formasPago.map((fp, index) => {
+                    const metodoInfo = METODOS_PAGO.find(m => m.value === fp.metodo);
+                    const Icon = metodoInfo?.icon || Banknote;
+                    return (
+                      <div 
+                        key={fp.id} 
+                        className="flex items-center justify-between bg-white p-3 rounded-lg border"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full ${metodoInfo?.color || 'bg-slate-500'} flex items-center justify-center`}>
+                            <Icon className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{fp.metodo}</p>
+                            {fp.referencia && (
+                              <p className="text-xs text-slate-500">Ref: {fp.referencia}</p>
+                            )}
+                            {fp.tipo_pagador_nombre && (
+                              <p className="text-xs text-slate-500">{fp.tipo_pagador_nombre}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-teal-600">{formatCurrency(fp.monto)}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => eliminarFormaPago(fp.id)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <span className="text-sm font-medium">{mp.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Efectivo recibido (solo para efectivo) */}
-            {metodoPago === 'Efectivo' && (
-              <div>
-                <Label>Efectivo Recibido</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={total}
-                  value={efectivoRecibido}
-                  onChange={(e) => setEfectivoRecibido(e.target.value)}
-                  className="text-xl h-14 font-bold text-center"
-                  data-testid="input-efectivo-recibido"
-                />
-                {cambio > 0 && (
-                  <div className="mt-2 p-3 bg-green-50 rounded-lg text-center">
-                    <span className="text-sm text-green-600">Cambio:</span>
-                    <span className="text-2xl font-bold text-green-600 ml-2">{formatCurrency(cambio)}</span>
+                    );
+                  })}
+                </div>
+                
+                {/* Resumen de pago */}
+                <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-sm">
+                  <span>Total pagado:</span>
+                  <span className={`font-bold ${totalPagado >= total ? 'text-green-600' : 'text-orange-600'}`}>
+                    {formatCurrency(totalPagado)}
+                  </span>
+                </div>
+                
+                {cambioTotal > 0 && (
+                  <div className="mt-1 p-2 bg-yellow-50 rounded text-center">
+                    <span className="text-yellow-700 text-sm">Cambio a devolver: </span>
+                    <span className="font-bold text-yellow-700">{formatCurrency(cambioTotal)}</span>
                   </div>
                 )}
+              </div>
+            )}
+            
+            {/* Agregar nueva forma de pago - solo mostrar si falta por pagar */}
+            {(pendientePorPagar > 0 || formasPago.length === 0) && (
+              <div className="border rounded-lg p-4 bg-white">
+                <Label className="mb-3 block font-medium">
+                  {formasPago.length === 0 ? 'Seleccionar Método de Pago' : 'Agregar Otro Método'}
+                </Label>
                 
-                {/* Botones rápidos de efectivo */}
-                <div className="grid grid-cols-4 gap-2 mt-2">
-                  {[50, 100, 200, 500].map(monto => (
+                {/* Métodos de pago */}
+                <div className="grid grid-cols-5 gap-2 mb-4">
+                  {METODOS_PAGO.map(mp => {
+                    const Icon = mp.icon;
+                    return (
+                      <button
+                        key={mp.value}
+                        onClick={() => seleccionarMetodoPago(mp.value)}
+                        className={`
+                          p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-all
+                          ${metodoPagoActual === mp.value 
+                            ? 'border-teal-500 bg-teal-50' 
+                            : 'border-slate-200 hover:border-slate-300'}
+                        `}
+                      >
+                        <div className={`w-8 h-8 rounded-full ${mp.color} flex items-center justify-center`}>
+                          <Icon className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-xs font-medium text-center">{mp.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Monto */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm">Monto</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={montoPagoActual}
+                      onChange={(e) => setMontoPagoActual(e.target.value)}
+                      className="h-12 text-lg font-bold text-center"
+                      placeholder="0.00"
+                      data-testid="input-monto-pago"
+                    />
+                  </div>
+                  
+                  {/* Referencia (para tarjeta, transferencia, cheque) */}
+                  {['Tarjeta', 'Transferencia', 'Cheque'].includes(metodoPagoActual) && (
+                    <div>
+                      <Label className="text-sm">Referencia (opcional)</Label>
+                      <Input
+                        value={referenciaPagoActual}
+                        onChange={(e) => setReferenciaPagoActual(e.target.value)}
+                        className="h-12"
+                        placeholder="No. autorización..."
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Pagador para CxC */}
+                  {metodoPagoActual === 'Cuenta por Cobrar' && (
+                    <div>
+                      <Label className="text-sm">Tipo de Pagador *</Label>
+                      <Select value={tipoPagadorId || "select"} onValueChange={(v) => setTipoPagadorId(v === "select" ? "" : v)}>
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder="Seleccione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pagadores.filter(p => p.activo).map(pag => (
+                            <SelectItem key={pag.id} value={pag.id}>{pag.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones rápidos de monto */}
+                <div className="grid grid-cols-5 gap-2 mt-3">
+                  {[50, 100, 200, 500, pendientePorPagar > 0 ? Math.ceil(pendientePorPagar) : total].map((monto, idx) => (
                     <Button
-                      key={monto}
+                      key={idx}
                       variant="outline"
                       size="sm"
-                      onClick={() => setEfectivoRecibido(monto.toString())}
+                      onClick={() => setMontoPagoActual(monto.toString())}
+                      className={idx === 4 ? 'bg-teal-50 border-teal-200 text-teal-700' : ''}
                     >
-                      Q{monto}
+                      {idx === 4 ? 'Todo' : `Q${monto}`}
                     </Button>
                   ))}
                 </div>
-              </div>
-            )}
 
-            {/* Para Cuenta por Cobrar */}
-            {metodoPago === 'Cuenta por Cobrar' && (
-              <div>
-                <Label>Tipo de Pagador *</Label>
-                <Select value={tipoPagadorId || "select"} onValueChange={(v) => setTipoPagadorId(v === "select" ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pagadores.filter(p => p.activo).map(pag => (
-                      <SelectItem key={pag.id} value={pag.id}>{pag.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Botón agregar */}
+                <Button
+                  className="w-full mt-4 bg-teal-600 hover:bg-teal-700"
+                  onClick={agregarFormaPago}
+                  disabled={!montoPagoActual || parseFloat(montoPagoActual) <= 0}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar {metodoPagoActual} - {formatCurrency(parseFloat(montoPagoActual) || 0)}
+                </Button>
               </div>
             )}
 
             {/* Observaciones */}
             <div>
-              <Label>Observaciones (opcional)</Label>
+              <Label className="text-sm">Observaciones (opcional)</Label>
               <Textarea
                 value={observaciones}
                 onChange={(e) => setObservaciones(e.target.value)}
@@ -1301,13 +1455,13 @@ const PuntoVenta = () => {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 mt-4">
             <Button variant="outline" onClick={() => setPagoDialogOpen(false)}>
               Cancelar
             </Button>
             <Button 
               onClick={confirmarVenta}
-              disabled={submitting || (metodoPago === 'Efectivo' && parseFloat(efectivoRecibido) < total)}
+              disabled={submitting || formasPago.length === 0 || totalPagado < total}
               className="bg-teal-600 hover:bg-teal-700"
               data-testid="btn-confirmar-venta"
             >

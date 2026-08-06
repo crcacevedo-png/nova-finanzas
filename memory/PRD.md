@@ -136,6 +136,7 @@ Sistema de Punto de Venta táctil integrado con el módulo de Inventario, optimi
 ### Características:
 - **Ventas anónimas**: Permite vender a "Cliente General" sin requerir paciente registrado
 - **Formas de Pago**: Efectivo, Tarjeta, Transferencia, Cheque, Pago Mixto, Crédito (→ Cuentas por Cobrar)
+- **Pago Mixto**: Permite combinar múltiples métodos de pago en una misma venta (ej: Q100 efectivo + Q200 tarjeta)
 - **Integración FEFO**: Descuenta inventario usando First Expire First Out
 - **Control de Caja**: Requiere caja abierta para operar
 - **Tickets**: Numeración correlativa (VTA-YYYYMMDD-####)
