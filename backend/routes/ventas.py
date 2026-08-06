@@ -830,7 +830,8 @@ async def obtener_ticket_venta(
     current_user: dict = Depends(get_current_user_dependency())
 ):
     """
-    Obtiene los datos formateados para impresión de ticket.
+    Obtiene los datos formateados para impresión de ticket térmico.
+    Optimizado para impresoras de 58mm y 80mm.
     """
     db = get_db()
     
@@ -838,43 +839,64 @@ async def obtener_ticket_venta(
     if not venta:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     
-    # Formatear fecha
+    # Formatear fecha para Guatemala (GMT-6)
     fecha_dt = datetime.fromisoformat(venta["fecha"].replace("Z", "+00:00"))
     fecha_formateada = fecha_dt.strftime("%d/%m/%Y %H:%M")
     
+    # Obtener nombre del vendedor si existe
+    vendedor_nombre = venta.get("vendedor_nombre", "")
+    if not vendedor_nombre and venta.get("creado_por"):
+        usuario = await db.users.find_one({"id": venta["creado_por"]})
+        if usuario:
+            vendedor_nombre = usuario.get("name", usuario.get("username", ""))
+    
+    # Obtener configuración de empresa (si existe)
+    config = await db.configuracion.find_one({"origen": "clinica"})
+    empresa_config = config.get("empresa", {}) if config else {}
+    
     ticket_data = {
         "empresa": {
-            "nombre": "NovaVision - Clínica Oftalmológica",
-            "direccion": "",
-            "nit": "",
-            "telefono": ""
+            "nombre": empresa_config.get("nombre", "NovaVision - Clínica Oftalmológica"),
+            "direccion": empresa_config.get("direccion", ""),
+            "nit": empresa_config.get("nit", ""),
+            "telefono": empresa_config.get("telefono", "")
         },
         "venta": {
+            "id": venta["id"],
             "numero": venta["numero_venta"],
             "fecha": fecha_formateada,
-            "vendedor": venta.get("vendedor_nombre", "")
+            "vendedor": vendedor_nombre
         },
         "cliente": {
             "nombre": venta.get("paciente_nombre") or "Consumidor Final",
-            "id": venta.get("paciente_id")
+            "id": venta.get("paciente_id"),
+            "nit": venta.get("paciente_nit", "C/F")
         },
         "items": [
             {
                 "cantidad": item["cantidad"],
                 "nombre": item["nombre"],
                 "precio_unitario": item["precio_unitario"],
+                "descuento": item.get("descuento", 0),
                 "subtotal": item["subtotal"]
             }
             for item in venta.get("items", [])
         ],
         "totales": {
             "subtotal": venta["subtotal"],
-            "descuento": venta["descuento_total"],
+            "descuento": venta.get("descuento_total", 0),
             "iva": venta["iva"],
             "total": venta["total"]
         },
         "pago": {
-            "formas": venta.get("formas_pago", []),
+            "formas": [
+                {
+                    "metodo": fp.get("metodo", "Efectivo"),
+                    "monto": fp.get("monto", 0),
+                    "referencia": fp.get("referencia", "")
+                }
+                for fp in venta.get("formas_pago", [])
+            ],
             "efectivo_recibido": venta.get("efectivo_recibido", 0),
             "cambio": venta.get("cambio", 0)
         },

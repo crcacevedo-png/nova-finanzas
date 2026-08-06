@@ -140,6 +140,7 @@ Sistema de Punto de Venta táctil integrado con el módulo de Inventario, optimi
 - **Control de Caja**: Requiere caja abierta para operar
 - **Tickets**: Numeración correlativa (VTA-YYYYMMDD-####)
 - **IVA Guatemala**: 12% calculado automáticamente
+- **Impresión Térmica**: Tickets optimizados para impresoras de 58mm y 80mm
 
 ### Archivos Clave:
 - `/app/backend/routes/ventas.py` - Router backend (~886 líneas)

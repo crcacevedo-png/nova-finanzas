@@ -431,56 +431,260 @@ const PuntoVenta = () => {
     }
   };
 
+  // ==================== IMPRESIÓN DE TICKETS TÉRMICOS ====================
+  
   const imprimirTicket = async (ventaId) => {
     try {
       const response = await ventasApi.getTicket(ventaId);
       const ticket = response.data;
       
-      const printWindow = window.open('', '_blank', 'width=400,height=600');
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Ticket ${ticket.venta.numero}</title>
-            <style>
-              body { font-family: 'Courier New', monospace; font-size: 12px; padding: 10px; max-width: 300px; margin: 0 auto; }
-              .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px; }
-              .header h1 { font-size: 16px; margin: 0 0 5px 0; }
-              .info { margin-bottom: 10px; }
-              .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; }
-              .item { margin-bottom: 5px; }
-              .item-name { font-weight: bold; }
-              .item-detail { display: flex; justify-content: space-between; }
-              .totales { padding-top: 10px; }
-              .total-line { display: flex; justify-content: space-between; margin: 3px 0; }
-              .total-final { font-size: 16px; font-weight: bold; border-top: 1px solid #000; padding-top: 5px; margin-top: 5px; }
-              .footer { text-align: center; margin-top: 15px; font-size: 10px; }
-              @media print { body { margin: 0; } }
-            </style>
-          </head>
-          <body>
+      // Generar contenido HTML optimizado para impresoras térmicas (58mm/80mm)
+      const ticketHTML = generarTicketHTML(ticket);
+      
+      const printWindow = window.open('', '_blank', 'width=350,height=600');
+      printWindow.document.write(ticketHTML);
+      printWindow.document.close();
+      
+      // Esperar a que cargue y luego imprimir
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    } catch (error) {
+      console.error('Error al generar ticket:', error);
+      toast.error('Error al generar ticket');
+    }
+  };
+
+  const generarTicketHTML = (ticket) => {
+    // Formatear formas de pago
+    const formasPagoHTML = ticket.pago.formas.map(fp => `
+      <div class="pago-line">
+        <span>${fp.metodo}:</span>
+        <span>Q${fp.monto.toFixed(2)}</span>
+      </div>
+    `).join('');
+
+    // Calcular líneas de productos con truncado para papel térmico
+    const itemsHTML = ticket.items.map(item => {
+      const nombreCorto = item.nombre.length > 28 ? item.nombre.substring(0, 25) + '...' : item.nombre;
+      return `
+        <div class="item">
+          <div class="item-name">${nombreCorto}</div>
+          <div class="item-detail">
+            <span>${item.cantidad} x Q${item.precio_unitario.toFixed(2)}</span>
+            <span>Q${item.subtotal.toFixed(2)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Ticket ${ticket.venta.numero}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            body { 
+              font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
+              font-size: 11px;
+              line-height: 1.3;
+              width: 280px;
+              padding: 8px;
+              background: #fff;
+              color: #000;
+            }
+            
+            .ticket {
+              width: 100%;
+            }
+            
+            .header {
+              text-align: center;
+              padding-bottom: 8px;
+              border-bottom: 1px dashed #000;
+              margin-bottom: 8px;
+            }
+            
+            .logo-text {
+              font-size: 16px;
+              font-weight: bold;
+              letter-spacing: 1px;
+            }
+            
+            .empresa-info {
+              font-size: 10px;
+              margin-top: 4px;
+            }
+            
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 6px 0;
+            }
+            
+            .info-section {
+              margin-bottom: 8px;
+            }
+            
+            .info-line {
+              display: flex;
+              justify-content: space-between;
+              margin: 2px 0;
+            }
+            
+            .ticket-numero {
+              text-align: center;
+              font-size: 14px;
+              font-weight: bold;
+              padding: 6px 0;
+              background: #f0f0f0;
+              margin: 6px 0;
+            }
+            
+            .items {
+              padding: 8px 0;
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+            }
+            
+            .item {
+              margin-bottom: 6px;
+            }
+            
+            .item-name {
+              font-weight: bold;
+              font-size: 10px;
+            }
+            
+            .item-detail {
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              padding-left: 8px;
+            }
+            
+            .totales {
+              padding: 8px 0;
+            }
+            
+            .total-line {
+              display: flex;
+              justify-content: space-between;
+              margin: 3px 0;
+            }
+            
+            .total-final {
+              font-size: 14px;
+              font-weight: bold;
+              border-top: 2px solid #000;
+              padding-top: 6px;
+              margin-top: 6px;
+            }
+            
+            .pagos {
+              padding: 6px 0;
+              border-top: 1px dashed #000;
+            }
+            
+            .pagos-title {
+              font-weight: bold;
+              margin-bottom: 4px;
+            }
+            
+            .pago-line {
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+            }
+            
+            .cambio-section {
+              background: #f5f5f5;
+              padding: 6px;
+              margin: 6px 0;
+              text-align: center;
+            }
+            
+            .cambio-label {
+              font-size: 10px;
+            }
+            
+            .cambio-monto {
+              font-size: 16px;
+              font-weight: bold;
+            }
+            
+            .footer {
+              text-align: center;
+              padding-top: 10px;
+              border-top: 1px dashed #000;
+              margin-top: 8px;
+            }
+            
+            .footer-message {
+              font-size: 11px;
+              font-weight: bold;
+              margin-bottom: 4px;
+            }
+            
+            .footer-legal {
+              font-size: 9px;
+              color: #666;
+            }
+            
+            .barcode {
+              text-align: center;
+              margin: 8px 0;
+              font-family: 'Libre Barcode 39', monospace;
+              font-size: 32px;
+              letter-spacing: -2px;
+            }
+            
+            @media print {
+              @page {
+                size: 80mm auto;
+                margin: 0;
+              }
+              body {
+                width: 72mm;
+                padding: 2mm;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
             <div class="header">
-              <h1>${ticket.empresa.nombre}</h1>
-              <p>${ticket.empresa.direccion || ''}</p>
-              <p>NIT: ${ticket.empresa.nit || 'C/F'}</p>
+              <div class="logo-text">NOVAVISION</div>
+              <div class="empresa-info">Clínica Oftalmológica</div>
+              ${ticket.empresa.direccion ? `<div class="empresa-info">${ticket.empresa.direccion}</div>` : ''}
+              ${ticket.empresa.nit ? `<div class="empresa-info">NIT: ${ticket.empresa.nit}</div>` : ''}
+              ${ticket.empresa.telefono ? `<div class="empresa-info">Tel: ${ticket.empresa.telefono}</div>` : ''}
             </div>
             
-            <div class="info">
-              <p><strong>Ticket:</strong> ${ticket.venta.numero}</p>
-              <p><strong>Fecha:</strong> ${ticket.venta.fecha}</p>
-              <p><strong>Cliente:</strong> ${ticket.cliente.nombre}</p>
-              <p><strong>Atendió:</strong> ${ticket.venta.vendedor}</p>
+            <div class="ticket-numero">${ticket.venta.numero}</div>
+            
+            <div class="info-section">
+              <div class="info-line">
+                <span>Fecha:</span>
+                <span>${ticket.venta.fecha}</span>
+              </div>
+              <div class="info-line">
+                <span>Cliente:</span>
+                <span>${ticket.cliente.nombre}</span>
+              </div>
+              ${ticket.venta.vendedor ? `
+                <div class="info-line">
+                  <span>Atendió:</span>
+                  <span>${ticket.venta.vendedor}</span>
+                </div>
+              ` : ''}
             </div>
             
             <div class="items">
-              ${ticket.items.map(item => `
-                <div class="item">
-                  <div class="item-name">${item.nombre}</div>
-                  <div class="item-detail">
-                    <span>${item.cantidad} x Q${item.precio_unitario.toFixed(2)}</span>
-                    <span>Q${item.subtotal.toFixed(2)}</span>
-                  </div>
-                </div>
-              `).join('')}
+              ${itemsHTML}
             </div>
             
             <div class="totales">
@@ -502,30 +706,43 @@ const PuntoVenta = () => {
                 <span>TOTAL:</span>
                 <span>Q${ticket.totales.total.toFixed(2)}</span>
               </div>
-              ${ticket.pago.cambio > 0 ? `
-                <div class="total-line" style="margin-top: 10px;">
-                  <span>Efectivo:</span>
-                  <span>Q${ticket.pago.efectivo_recibido.toFixed(2)}</span>
-                </div>
-                <div class="total-line">
-                  <span>Cambio:</span>
-                  <span>Q${ticket.pago.cambio.toFixed(2)}</span>
-                </div>
-              ` : ''}
             </div>
             
-            <div class="footer">
-              <p>¡Gracias por su compra!</p>
-              <p>Conserve este ticket</p>
+            <div class="pagos">
+              <div class="pagos-title">Forma de Pago:</div>
+              ${formasPagoHTML}
             </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    } catch (error) {
-      toast.error('Error al generar ticket');
-    }
+            
+            ${ticket.pago.cambio > 0 ? `
+              <div class="cambio-section">
+                <div class="cambio-label">Efectivo recibido: Q${ticket.pago.efectivo_recibido.toFixed(2)}</div>
+                <div class="cambio-monto">CAMBIO: Q${ticket.pago.cambio.toFixed(2)}</div>
+              </div>
+            ` : ''}
+            
+            ${ticket.observaciones ? `
+              <div class="divider"></div>
+              <div style="font-size: 9px; padding: 4px 0;">
+                <strong>Obs:</strong> ${ticket.observaciones}
+              </div>
+            ` : ''}
+            
+            <div class="footer">
+              <div class="footer-message">¡Gracias por su preferencia!</div>
+              <div class="footer-legal">Documento no fiscal</div>
+              <div class="footer-legal">Conserve este ticket para cualquier aclaración</div>
+            </div>
+          </div>
+          
+          <script>
+            // Auto-imprimir cuando está listo
+            window.onafterprint = function() {
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
   };
 
   // ==================== SELECCIÓN DE PACIENTE ====================
