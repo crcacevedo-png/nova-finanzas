@@ -970,16 +970,16 @@ const Caja = () => {
                 </CardContent>
               </Card>
               
-              <Card className="border-teal-200 bg-teal-50">
+              <Card className="border-blue-200 bg-blue-50">
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-slate-500">Saldo Efectivo</p>
-                      <p className="text-xl font-bold text-teal-700">
+                      <p className="text-xl font-bold text-blue-700">
                         {formatCurrency(cajaEstado?.saldo_efectivo_vivo || 0)}
                       </p>
                     </div>
-                    <Banknote className="w-8 h-8 text-teal-600" />
+                    <Banknote className="w-8 h-8 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -1021,7 +1021,7 @@ const Caja = () => {
                       setEditingMovimiento(null);
                       setMovimientoDialogOpen(true);
                     }}
-                    className="bg-teal-600 hover:bg-teal-700"
+                    className="bg-blue-600 hover:bg-blue-700"
                     data-testid="btn-nuevo-movimiento"
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -1224,7 +1224,7 @@ const Caja = () => {
                     setPacienteSearch('');
                     setCxcDialogOpen(true);
                   }}
-                  className="bg-teal-600 hover:bg-teal-700"
+                  className="bg-blue-600 hover:bg-blue-700"
                   data-testid="btn-nueva-cxc"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -1310,7 +1310,7 @@ const Caja = () => {
                   setCierreFinancieroForm(initialCierreFinancieroForm);
                   setCierreFinancieroDialogOpen(true);
                 }}
-                className="bg-teal-600 hover:bg-teal-700"
+                className="bg-blue-600 hover:bg-blue-700"
                 data-testid="btn-nuevo-cierre-financiero"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1714,7 +1714,7 @@ const Caja = () => {
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setMovimientoDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveMovimiento} disabled={submitting} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleSaveMovimiento} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
               {submitting ? 'Guardando...' : (movimientoForm.metodo_pago === 'Cuenta por Cobrar' ? 'Crear CxC' : 'Guardar')}
             </Button>
           </DialogFooter>
@@ -2054,7 +2054,7 @@ const Caja = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCxcDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveCxC} disabled={submitting} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleSaveCxC} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
               {submitting ? 'Guardando...' : 'Guardar'}
             </Button>
           </DialogFooter>
@@ -2300,7 +2300,7 @@ const Caja = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCierreFinancieroDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateCierreFinanciero} disabled={submitting} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleCreateCierreFinanciero} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
               {submitting ? 'Generando...' : 'Generar Cierre'}
             </Button>
           </DialogFooter>

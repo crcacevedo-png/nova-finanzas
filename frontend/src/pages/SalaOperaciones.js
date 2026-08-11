@@ -584,7 +584,7 @@ const SalaOperaciones = () => {
                 Limpiar filtros
               </Button>
               
-              <Button variant="ghost" onClick={handleSearch} className="text-teal-600">
+              <Button variant="ghost" onClick={handleSearch} className="text-blue-600">
                 <Search className="w-4 h-4 mr-1" />
                 Buscar
               </Button>
@@ -668,7 +668,7 @@ const SalaOperaciones = () => {
                           <TableCell className="text-right text-sm">
                             {formatCurrency(getSuppliesTotal(surgery.supplies))}
                           </TableCell>
-                          <TableCell className="text-right font-semibold text-teal-600">
+                          <TableCell className="text-right font-semibold text-blue-600">
                             {formatCurrency(getTotalGeneral(surgery))}
                           </TableCell>
                           <TableCell className="text-right">
@@ -733,7 +733,7 @@ const SalaOperaciones = () => {
                                         variant="link"
                                         size="sm"
                                         onClick={() => { setSelectedSurgery(surgery); setEquipmentDialogOpen(true); }}
-                                        className="text-teal-600 text-xs h-auto p-0"
+                                        className="text-blue-600 text-xs h-auto p-0"
                                       >
                                         + Agregar
                                       </Button>
@@ -744,7 +744,7 @@ const SalaOperaciones = () => {
                                       {surgery.equipment.map(eq => (
                                         <li key={eq.id} className="flex items-center justify-between text-sm">
                                           <span className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                                             {eq.name}
                                             <span className="text-slate-400">x{eq.quantity}</span>
                                           </span>
@@ -773,7 +773,7 @@ const SalaOperaciones = () => {
                                         variant="link"
                                         size="sm"
                                         onClick={() => { setSelectedSurgery(surgery); setSupplyDialogOpen(true); }}
-                                        className="text-teal-600 text-xs h-auto p-0"
+                                        className="text-blue-600 text-xs h-auto p-0"
                                       >
                                         + Agregar
                                       </Button>
@@ -814,7 +814,7 @@ const SalaOperaciones = () => {
                                           ))}
                                           <tr className="font-semibold">
                                             <td colSpan={4} className="text-right py-2">TOTAL INSUMOS:</td>
-                                            <td className="text-right text-teal-600">{formatCurrency(getSuppliesTotal(surgery.supplies))}</td>
+                                            <td className="text-right text-blue-600">{formatCurrency(getSuppliesTotal(surgery.supplies))}</td>
                                             <td></td>
                                           </tr>
                                         </tbody>
@@ -841,7 +841,7 @@ const SalaOperaciones = () => {
                                   </div>
                                   <div>
                                     <span className="text-slate-500">TOTAL GENERAL:</span>
-                                    <span className="ml-2 font-bold text-lg text-teal-600">{formatCurrency(getTotalGeneral(surgery))}</span>
+                                    <span className="ml-2 font-bold text-lg text-blue-600">{formatCurrency(getTotalGeneral(surgery))}</span>
                                   </div>
                                 </div>
                               </div>
@@ -1140,7 +1140,7 @@ const SalaOperaciones = () => {
                         <div><span className="text-slate-500">SPS:</span> <span className="font-medium">{selectedSurgery.igss_data.sps}</span></div>
                         <div><span className="text-slate-500">No. afiliación:</span> <span className="font-medium">{selectedSurgery.igss_data.affiliation_number}</span></div>
                         <div><span className="text-slate-500">Código:</span> <span className="font-medium">{selectedSurgery.igss_data.code}</span></div>
-                        <div><span className="text-slate-500">Costo:</span> <span className="font-semibold text-teal-600">{formatCurrency(selectedSurgery.igss_data.procedure_cost)}</span></div>
+                        <div><span className="text-slate-500">Costo:</span> <span className="font-semibold text-blue-600">{formatCurrency(selectedSurgery.igss_data.procedure_cost)}</span></div>
                       </div>
                     </div>
                   )}
@@ -1150,7 +1150,7 @@ const SalaOperaciones = () => {
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">Equipo utilizado</h4>
                       {canEdit && selectedSurgery.status !== 'cancelado' && (
-                        <Button variant="link" size="sm" onClick={() => setEquipmentDialogOpen(true)} className="text-teal-600">
+                        <Button variant="link" size="sm" onClick={() => setEquipmentDialogOpen(true)} className="text-blue-600">
                           + Agregar equipo
                         </Button>
                       )}
@@ -1178,7 +1178,7 @@ const SalaOperaciones = () => {
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">Insumos utilizados</h4>
                       {canEdit && selectedSurgery.status !== 'cancelado' && (
-                        <Button variant="link" size="sm" onClick={() => setSupplyDialogOpen(true)} className="text-teal-600">
+                        <Button variant="link" size="sm" onClick={() => setSupplyDialogOpen(true)} className="text-blue-600">
                           + Agregar insumo
                         </Button>
                       )}
@@ -1214,7 +1214,7 @@ const SalaOperaciones = () => {
                           ))}
                           <tr className="font-semibold">
                             <td colSpan={4} className="text-right py-2">TOTAL:</td>
-                            <td className="text-right text-teal-600">{formatCurrency(getSuppliesTotal(selectedSurgery.supplies))}</td>
+                            <td className="text-right text-blue-600">{formatCurrency(getSuppliesTotal(selectedSurgery.supplies))}</td>
                             <td></td>
                           </tr>
                         </tbody>
@@ -1237,7 +1237,7 @@ const SalaOperaciones = () => {
                     <div className="h-px bg-slate-300 my-2"></div>
                     <div className="flex items-center justify-between">
                       <span className="font-semibold">TOTAL GENERAL:</span>
-                      <span className="text-xl font-bold text-teal-600">{formatCurrency(getTotalGeneral(selectedSurgery))}</span>
+                      <span className="text-xl font-bold text-blue-600">{formatCurrency(getTotalGeneral(selectedSurgery))}</span>
                     </div>
                   </div>
                   
@@ -1376,7 +1376,7 @@ const SalaOperaciones = () => {
               </div>
               <div className="p-3 bg-slate-100 rounded-lg">
                 <span className="text-sm text-slate-500">Total calculado:</span>
-                <span className="ml-2 font-semibold text-lg text-teal-600">
+                <span className="ml-2 font-semibold text-lg text-blue-600">
                   {formatCurrency(supplyForm.quantity * supplyForm.unit_cost)}
                 </span>
               </div>

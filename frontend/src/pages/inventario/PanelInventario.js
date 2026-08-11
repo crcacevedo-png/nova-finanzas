@@ -128,7 +128,7 @@ const PanelInventario = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
         </div>
       </Layout>
     );
@@ -158,16 +158,16 @@ const PanelInventario = () => {
         {/* Acciones Rápidas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card 
-            className="cursor-pointer hover:shadow-md hover:border-teal-300 transition-all bg-gradient-to-br from-teal-50 to-white"
+            className="cursor-pointer hover:shadow-md hover:border-blue-300 transition-all bg-gradient-to-br from-blue-50 to-white"
             onClick={() => navigate('/inventario/productos?action=entrada')}
             data-testid="btn-entrada-rapida"
           >
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-teal-500">
+              <div className="p-3 rounded-lg bg-blue-500">
                 <Plus className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-teal-700">Entrada Rápida</p>
+                <p className="font-semibold text-blue-700">Entrada Rápida</p>
                 <p className="text-xs text-gray-500">Agregar stock a productos</p>
               </div>
             </CardContent>
@@ -227,7 +227,7 @@ const PanelInventario = () => {
           {kpis.map((kpi, index) => (
             <Card 
               key={index}
-              className={`cursor-pointer hover:shadow-md transition-shadow ${kpi.onClick ? 'hover:border-teal-300' : ''}`}
+              className={`cursor-pointer hover:shadow-md transition-shadow ${kpi.onClick ? 'hover:border-blue-300' : ''}`}
               onClick={kpi.onClick}
               data-testid={`kpi-${index}`}
             >
@@ -321,7 +321,7 @@ const PanelInventario = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-teal-500" />
+                <TrendingUp className="w-5 h-5 text-blue-500" />
                 Mayor Rotación del Mes
               </CardTitle>
             </CardHeader>

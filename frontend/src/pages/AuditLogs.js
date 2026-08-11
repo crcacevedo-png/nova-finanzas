@@ -217,7 +217,7 @@ const AuditLogs = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              <Shield className="w-7 h-7 text-teal-600" />
+              <Shield className="w-7 h-7 text-blue-600" />
               Registro de Auditoría
             </h1>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -243,8 +243,8 @@ const AuditLogs = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="card-metrics border-0 shadow-none">
               <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-teal-100">
-                  <FileText className="w-5 h-5 text-teal-600" />
+                <div className="p-3 rounded-xl bg-blue-100">
+                  <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Total Registros</p>

@@ -190,8 +190,8 @@ const Proveedores = () => {
         {/* Summary Card */}
         <Card className="card-metrics border-0 shadow-none">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-teal-100">
-              <Users className="w-5 h-5 text-teal-600" />
+            <div className="p-3 rounded-xl bg-blue-100">
+              <Users className="w-5 h-5 text-blue-600" />
             </div>
             <div>
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Proveedores</p>
@@ -268,8 +268,8 @@ const Proveedores = () => {
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-teal-50">
-                              <Users className="w-4 h-4 text-teal-600" />
+                            <div className="p-2 rounded-lg bg-blue-50">
+                              <Users className="w-4 h-4 text-blue-600" />
                             </div>
                             <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                               {supplier.name}

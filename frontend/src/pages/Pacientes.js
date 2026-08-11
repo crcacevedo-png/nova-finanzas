@@ -479,8 +479,8 @@ const Pacientes = () => {
         {/* Summary Card */}
         <Card className="card-metrics border-0 shadow-none">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-teal-100">
-              <Users className="w-5 h-5 text-teal-600" />
+            <div className="p-3 rounded-xl bg-blue-100">
+              <Users className="w-5 h-5 text-blue-600" />
             </div>
             <div>
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Pacientes</p>
@@ -1177,8 +1177,8 @@ const Pacientes = () => {
             {selectedPatient && (
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-teal-600">
+                  <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-blue-600">
                       {selectedPatient.first_name?.charAt(0)}{selectedPatient.last_name?.charAt(0)}
                     </span>
                   </div>

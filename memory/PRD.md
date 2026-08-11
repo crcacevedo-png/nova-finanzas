@@ -450,7 +450,52 @@ Ver `/app/memory/test_credentials.md`
 
 ---
 
-## Última Actualización: 1 Agosto 2026
+## 🎨 Tema Visual Global - Azul Celeste e Intenso (Agosto 2026)
+
+### Descripción
+La interfaz fue completamente rediseñada con un esquema de colores azul celeste (`sky blue`) y azul intenso (`deep blue`) con degradados modernos.
+
+### Paleta de Colores Implementada
+```css
+/* Colores Primarios Azul - Azure a Deep Blue */
+--blue-900: #1E3A5F;   /* Azul más oscuro */
+--blue-800: #1E4D7B;   /* Sidebar background */
+--blue-700: #2563EB;   /* Botones primarios */
+--blue-600: #3B82F6;   /* Acentos */
+--blue-500: #60A5FA;   /* Hover states */
+--blue-400: #93C5FD;   /* Bordes activos */
+--blue-300: #BFDBFE;   /* Bordes hover */
+--blue-200: #DBEAFE;   /* Fondos suaves */
+--blue-100: #EFF6FF;   /* Fondos cards */
+--blue-50: #F0F9FF;    /* Fondo página */
+
+/* Acentos */
+--sky-400: #38BDF8;    /* Celeste brillante */
+--sky-300: #7DD3FC;    /* Celeste suave */
+--indigo-600: #4F46E5; /* Acentos violeta */
+--cyan-400: #22D3EE;   /* Cyan highlights */
+```
+
+### Archivos Modificados
+- `/app/frontend/src/index.css` - Variables CSS, estilos globales, componentes
+- `/app/frontend/src/App.css` - Estilos específicos de la app
+- Todos los componentes frontend - Clases Tailwind migradas de `teal-*` a `blue-*`
+
+### Características del Nuevo Tema
+1. **Gradientes en Botones**: `linear-gradient(135deg, blue-600 → blue-700 → indigo-600)`
+2. **Efecto Glassmorphism**: Login con `backdrop-filter: blur(24px)`
+3. **Hover States Modernos**: Transiciones suaves con sombras azules
+4. **Sidebar Oscuro**: Gradiente `bg-sidebar: #0F172A → #1E3A5F`
+5. **Cards con Sombras Azules**: `box-shadow: rgba(37, 99, 235, 0.12)`
+
+---
+
+## Última Actualización: 7 Agosto 2026
+
+### Cambios Realizados:
+1. **Suite de Testing Completa** - Vitest, Playwright, Pytest configurados
+2. **Tema UI Azul** - Documentado en PRD
+3. **78 tests totales** implementados y pasando
 
 ### Refactorización Completada (1 Agosto 2026):
 - **P0 - Pacientes**: Extraído a `/app/backend/routes/patients.py` (823 líneas)
@@ -586,3 +631,93 @@ Nuevo menú "Inventario" con submenús:
 - ✅ Seed data generado
 - ✅ KPIs mostrando datos correctos (Q 80,760.63 valor inventario, 25 productos, 47 lotes)
 - ⏳ Pendiente: Órdenes de compra UI, Recepciones UI, Transferencias UI, Toma física UI, Reportes
+
+
+---
+
+## 🧪 Suite de Testing Completa - Implementada 7 Agosto 2026
+
+### Descripción
+Suite completa de testing para el sistema NovaVision ERP, que incluye tests unitarios, de integración y end-to-end (E2E).
+
+### Frontend Testing
+
+#### Vitest (Tests Unitarios)
+- **Configuración**: `/app/frontend/vitest.config.js`
+- **Setup**: `/app/frontend/src/test/setup.js`
+- **Utilidades**: `/app/frontend/src/test/utils.js`
+
+**Tests Implementados (58 tests):**
+- `Login.test.js`: Validación de credenciales, JWT, roles, rate limiting
+- `PuntoVenta.test.js`: Cálculos de venta, pago mixto, FEFO, tickets
+- `api.test.js`: Validaciones (DPI, teléfono, email), cálculos financieros
+
+**Comandos:**
+```bash
+yarn test:unit          # Ejecutar tests
+yarn test:unit:watch    # Modo watch
+yarn test:unit:coverage # Con cobertura
+```
+
+#### Playwright (Tests E2E)
+- **Configuración**: `/app/frontend/playwright.config.js`
+- **Directorio**: `/app/frontend/tests/e2e/`
+
+**Tests E2E Implementados:**
+- `auth.spec.js`: Login, logout, permisos por rol
+- `pos.spec.js`: Flujo completo de POS, pago mixto, tickets
+- `inventario.spec.js`: Panel, productos, lotes, kardex
+
+**Comandos:**
+```bash
+yarn test:e2e        # Ejecutar E2E
+yarn test:e2e:ui     # Interfaz visual
+yarn test:e2e:report # Ver reporte HTML
+```
+
+### Backend Testing (Pytest)
+
+- **Configuración**: `/app/backend/pytest.ini`
+- **Fixtures**: `/app/backend/tests/conftest.py`
+
+**Tests de Lógica de Negocio (20 tests):**
+- `test_inventario_completo.py`:
+  - TestLogicaFEFO: Ordenamiento, distribución, stock insuficiente
+  - TestCalculosInventario: Costo promedio, margen, punto de reorden
+  - TestAlertasVencimiento: Clasificación, días para vencer
+  - TestValidaciones: Códigos, cantidades, precios
+  - TestKardex: Entradas, salidas, ajustes, inmutabilidad
+
+**Comandos:**
+```bash
+python -m pytest tests/ -v        # Todos los tests
+python -m pytest -m "inventario"  # Por marker
+```
+
+### Reportes
+- **Vitest**: `/app/test_reports/vitest/results.json`
+- **Playwright**: `/app/test_reports/playwright/html/`
+- **Pytest**: `/app/test_reports/pytest/`
+
+### Documentación
+Ver `/app/memory/TESTING.md` para documentación completa de la suite de testing.
+
+---
+
+## Backlog Actualizado (7 Agosto 2026)
+
+### ✅ Completado
+- Suite de Testing (Vitest, Playwright, Pytest)
+- Tema UI global azul celeste e intenso
+- Módulo POS completo con FEFO
+- Pago mixto y tickets térmicos
+- Entrada rápida de inventario
+
+### 🟡 P1 (Próximo)
+- FEL Guatemala (Facturación Electrónica) - Estructura lista, deshabilitada
+
+### 🟢 P2 (Futuro)
+- Importación masiva de pacientes (Excel)
+- Exportar evaluación oftalmológica a PDF
+- Sincronización Google Calendar
+- UI para Órdenes de compra, Recepciones, Transferencias, Toma física

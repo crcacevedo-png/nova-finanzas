@@ -855,7 +855,7 @@ const PuntoVenta = () => {
       <Layout>
         <div className="flex items-center justify-center h-[80vh]">
           <div className="text-center">
-            <RefreshCw className="w-12 h-12 animate-spin text-teal-600 mx-auto mb-4" />
+            <RefreshCw className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-slate-500">Cargando punto de venta...</p>
           </div>
         </div>
@@ -1029,7 +1029,7 @@ const PuntoVenta = () => {
                         onClick={() => agregarAlCarrito(producto)}
                         className={`
                           p-3 rounded-lg border-2 text-left transition-all
-                          hover:border-teal-500 hover:shadow-md active:scale-95
+                          hover:border-blue-500 hover:shadow-md active:scale-95
                           ${producto.existencia === 0 && producto.existencia !== -1 
                             ? 'bg-slate-100 border-slate-200 opacity-60' 
                             : 'bg-white border-slate-200'}
@@ -1051,7 +1051,7 @@ const PuntoVenta = () => {
                         {producto.categoria_nombre && (
                           <p className="text-xs text-slate-400 mb-1">{producto.categoria_nombre}</p>
                         )}
-                        <p className="text-lg font-bold text-teal-600">
+                        <p className="text-lg font-bold text-blue-600">
                           {formatCurrency(producto.precio_venta)}
                         </p>
                       </button>
@@ -1065,13 +1065,13 @@ const PuntoVenta = () => {
           {/* Columna derecha: Carrito */}
           <div className="flex flex-col bg-white rounded-lg border overflow-hidden">
             {/* Header del carrito */}
-            <div className="p-4 border-b bg-teal-600 text-white">
+            <div className="p-4 border-b bg-blue-600 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="w-5 h-5" />
                   <span className="font-semibold">Carrito</span>
                   {cantidadItems > 0 && (
-                    <Badge className="bg-white text-teal-600">{cantidadItems}</Badge>
+                    <Badge className="bg-white text-blue-600">{cantidadItems}</Badge>
                   )}
                 </div>
                 {carrito.length > 0 && (
@@ -1079,7 +1079,7 @@ const PuntoVenta = () => {
                     variant="ghost" 
                     size="sm" 
                     onClick={limpiarCarrito}
-                    className="text-white hover:bg-teal-700"
+                    className="text-white hover:bg-blue-700"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -1161,7 +1161,7 @@ const PuntoVenta = () => {
                             <Plus className="w-4 h-4" />
                           </Button>
                         </div>
-                        <span className="font-bold text-teal-600">
+                        <span className="font-bold text-blue-600">
                           {formatCurrency(item.subtotal)}
                         </span>
                       </div>
@@ -1184,12 +1184,12 @@ const PuntoVenta = () => {
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>TOTAL</span>
-                  <span className="text-teal-600">{formatCurrency(total)}</span>
+                  <span className="text-blue-600">{formatCurrency(total)}</span>
                 </div>
               </div>
 
               <Button
-                className="w-full h-14 text-lg bg-teal-600 hover:bg-teal-700"
+                className="w-full h-14 text-lg bg-blue-600 hover:bg-blue-700"
                 onClick={abrirDialogoPago}
                 disabled={carrito.length === 0}
                 data-testid="btn-cobrar"
@@ -1270,7 +1270,7 @@ const PuntoVenta = () => {
             <DialogTitle className="text-xl">Cobrar Venta</DialogTitle>
             <DialogDescription asChild>
               <div className="flex items-center justify-between">
-                <span>Total a cobrar: <span className="text-2xl font-bold text-teal-600">{formatCurrency(total)}</span></span>
+                <span>Total a cobrar: <span className="text-2xl font-bold text-blue-600">{formatCurrency(total)}</span></span>
                 {pendientePorPagar > 0 && formasPago.length > 0 && (
                   <span className="text-orange-600 font-medium">
                     Pendiente: {formatCurrency(pendientePorPagar)}
@@ -1311,7 +1311,7 @@ const PuntoVenta = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-teal-600">{formatCurrency(fp.monto)}</span>
+                          <span className="font-bold text-blue-600">{formatCurrency(fp.monto)}</span>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1361,7 +1361,7 @@ const PuntoVenta = () => {
                         className={`
                           p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-all
                           ${metodoPagoActual === mp.value 
-                            ? 'border-teal-500 bg-teal-50' 
+                            ? 'border-blue-500 bg-blue-50' 
                             : 'border-slate-200 hover:border-slate-300'}
                         `}
                       >
@@ -1429,7 +1429,7 @@ const PuntoVenta = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => setMontoPagoActual(monto.toString())}
-                      className={idx === 4 ? 'bg-teal-50 border-teal-200 text-teal-700' : ''}
+                      className={idx === 4 ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
                     >
                       {idx === 4 ? 'Todo' : `Q${monto}`}
                     </Button>
@@ -1438,7 +1438,7 @@ const PuntoVenta = () => {
 
                 {/* Botón agregar */}
                 <Button
-                  className="w-full mt-4 bg-teal-600 hover:bg-teal-700"
+                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
                   onClick={agregarFormaPago}
                   disabled={!montoPagoActual || parseFloat(montoPagoActual) <= 0}
                 >
@@ -1467,7 +1467,7 @@ const PuntoVenta = () => {
             <Button 
               onClick={confirmarVenta}
               disabled={submitting || formasPago.length === 0 || totalPagado < total}
-              className="bg-teal-600 hover:bg-teal-700"
+              className="bg-blue-600 hover:bg-blue-700"
               data-testid="btn-confirmar-venta"
             >
               {submitting ? (
@@ -1500,7 +1500,7 @@ const PuntoVenta = () => {
             <p className="text-slate-500 mb-4">
               Ticket: <span className="font-mono font-bold">{ventaExitosa?.numero_venta}</span>
             </p>
-            <p className="text-3xl font-bold text-teal-600 mb-6">
+            <p className="text-3xl font-bold text-blue-600 mb-6">
               {formatCurrency(ventaExitosa?.total || 0)}
             </p>
             
@@ -1526,7 +1526,7 @@ const PuntoVenta = () => {
             </Button>
             <Button 
               onClick={() => setVentaExitosaDialogOpen(false)}
-              className="bg-teal-600 hover:bg-teal-700"
+              className="bg-blue-600 hover:bg-blue-700"
             >
               Nueva Venta
             </Button>
@@ -1544,7 +1544,7 @@ const PuntoVenta = () => {
                 {resumenDia && (
                   <span className="flex gap-6 mt-2">
                     <span>Total: <strong>{resumenDia.total_ventas}</strong> ventas</span>
-                    <span>Monto: <strong className="text-teal-600">{formatCurrency(resumenDia.total_monto)}</strong></span>
+                    <span>Monto: <strong className="text-blue-600">{formatCurrency(resumenDia.total_monto)}</strong></span>
                   </span>
                 )}
               </div>
@@ -1588,7 +1588,7 @@ const PuntoVenta = () => {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-teal-600">{formatCurrency(venta.total)}</p>
+                      <p className="text-lg font-bold text-blue-600">{formatCurrency(venta.total)}</p>
                       <ChevronRight className="w-4 h-4 text-slate-400 inline" />
                     </div>
                   </div>
@@ -1651,7 +1651,7 @@ const PuntoVenta = () => {
                 </div>
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total</span>
-                  <span className="text-teal-600">{formatCurrency(ventaDetalle.total)}</span>
+                  <span className="text-blue-600">{formatCurrency(ventaDetalle.total)}</span>
                 </div>
               </div>
               

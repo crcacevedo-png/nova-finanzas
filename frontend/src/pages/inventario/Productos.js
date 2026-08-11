@@ -396,7 +396,7 @@ const Productos = () => {
           <CardContent className="p-0">
             {loading ? (
               <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
               </div>
             ) : productos.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
@@ -457,7 +457,7 @@ const Productos = () => {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => abrirEntradaRapida(producto)}
-                                  className="text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                   title="Entrada rápida"
                                   data-testid={`btn-entrada-${producto.id}`}
                                 >
@@ -728,7 +728,7 @@ const Productos = () => {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <ArrowDownToLine className="w-5 h-5 text-teal-600" />
+                <ArrowDownToLine className="w-5 h-5 text-blue-600" />
                 Entrada Rápida
               </DialogTitle>
               <DialogDescription>
@@ -834,8 +834,8 @@ const Productos = () => {
                 </div>
 
                 {/* Resumen */}
-                <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg">
-                  <p className="text-sm text-teal-800">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
                     <strong>Resumen:</strong> Entrada de <strong>{entradaData.cantidad}</strong> unidades 
                     {entradaData.costo_unitario > 0 && (
                       <> a <strong>{formatCurrency(entradaData.costo_unitario)}</strong> c/u = <strong>{formatCurrency(entradaData.cantidad * entradaData.costo_unitario)}</strong></>
@@ -852,7 +852,7 @@ const Productos = () => {
               <Button 
                 onClick={handleEntradaRapida} 
                 disabled={entradaSubmitting}
-                className="bg-teal-600 hover:bg-teal-700"
+                className="bg-blue-600 hover:bg-blue-700"
                 data-testid="btn-confirmar-entrada"
               >
                 {entradaSubmitting ? 'Registrando...' : 'Registrar Entrada'}

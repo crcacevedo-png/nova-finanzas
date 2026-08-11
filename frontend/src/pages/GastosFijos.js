@@ -284,8 +284,8 @@ const GastosFijos = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="card-metrics border-0 shadow-none">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-teal-100">
-                <CalendarClock className="w-5 h-5 text-teal-600" />
+              <div className="p-3 rounded-xl bg-blue-100">
+                <CalendarClock className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Gastos Fijos</p>
@@ -377,8 +377,8 @@ const GastosFijos = () => {
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-teal-50">
-                              <Truck className="w-4 h-4 text-teal-600" />
+                            <div className="p-2 rounded-lg bg-blue-50">
+                              <Truck className="w-4 h-4 text-blue-600" />
                             </div>
                             <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                               {expense.supplier_name || 'Sin proveedor'}
@@ -463,7 +463,7 @@ const GastosFijos = () => {
         </Card>
 
         {/* Info Card */}
-        <Card className="card-teal border-l-4 border-l-teal-500">
+        <Card className="card-teal border-l-4 border-l-blue-500">
           <CardContent className="p-4">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               <strong>Nota:</strong> Los gastos fijos se generan automáticamente cada día a las 00:05 horas. 
@@ -580,7 +580,7 @@ const GastosFijos = () => {
                     onClick={() => setFormData(prev => ({ ...prev, duration_type: 'ilimitado', end_date: '' }))}
                     className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
                       formData.duration_type === 'ilimitado'
-                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
                         : 'border-slate-200 hover:border-slate-300 text-slate-600'
                     }`}
                     data-testid="duration-unlimited"
@@ -593,7 +593,7 @@ const GastosFijos = () => {
                     onClick={() => setFormData(prev => ({ ...prev, duration_type: 'hasta_fecha' }))}
                     className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
                       formData.duration_type === 'hasta_fecha'
-                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
                         : 'border-slate-200 hover:border-slate-300 text-slate-600'
                     }`}
                     data-testid="duration-until-date"

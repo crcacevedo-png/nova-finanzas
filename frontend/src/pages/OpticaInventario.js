@@ -199,8 +199,8 @@ const OpticaInventario = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="card-metrics border-0 shadow-none">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-teal-100">
-                <Package className="w-5 h-5 text-teal-600" />
+              <div className="p-3 rounded-xl bg-blue-100">
+                <Package className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total en Stock</p>

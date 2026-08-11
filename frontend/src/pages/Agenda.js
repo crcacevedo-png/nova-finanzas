@@ -606,7 +606,7 @@ const Agenda = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <CalendarDays className="w-7 h-7 text-teal-600" />
+              <CalendarDays className="w-7 h-7 text-blue-600" />
               Agenda de Pacientes
             </h1>
             <p className="text-slate-500 text-sm">Gestión de citas y flujo de pacientes</p>
@@ -617,7 +617,7 @@ const Agenda = () => {
               <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
-            <Button onClick={() => handleOpenCitaDialog()} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={() => handleOpenCitaDialog()} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-1" />
               Nueva Cita
             </Button>
@@ -894,25 +894,25 @@ const Agenda = () => {
             {miAgenda ? (
               <div className="space-y-4">
                 {/* Header de mi agenda */}
-                <Card className="bg-gradient-to-r from-teal-500 to-teal-600 text-white">
+                <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-xl font-bold">{miAgenda.medico_nombre}</h2>
-                        <p className="text-teal-100">Mi agenda del {formatDate(miAgenda.fecha)}</p>
+                        <p className="text-blue-100">Mi agenda del {formatDate(miAgenda.fecha)}</p>
                       </div>
                       <div className="flex gap-4">
                         <div className="text-center">
                           <div className="text-3xl font-bold">{miAgenda.contadores.total}</div>
-                          <div className="text-xs text-teal-100">Citas hoy</div>
+                          <div className="text-xs text-blue-100">Citas hoy</div>
                         </div>
                         <div className="text-center">
                           <div className="text-3xl font-bold">{miAgenda.contadores.presentes + miAgenda.contadores.en_consulta}</div>
-                          <div className="text-xs text-teal-100">Presentes</div>
+                          <div className="text-xs text-blue-100">Presentes</div>
                         </div>
                         <div className="text-center">
                           <div className="text-3xl font-bold">{miAgenda.contadores.atendidos}</div>
-                          <div className="text-xs text-teal-100">Atendidos</div>
+                          <div className="text-xs text-blue-100">Atendidos</div>
                         </div>
                       </div>
                     </div>
@@ -1005,8 +1005,8 @@ const Agenda = () => {
             <div className="space-y-2">
               <Label>Paciente *</Label>
               {citaForm.paciente_nombre && !citaForm.es_paciente_nuevo ? (
-                <div className="flex items-center gap-2 p-2 bg-teal-50 rounded border border-teal-200">
-                  <User className="w-4 h-4 text-teal-600" />
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200">
+                  <User className="w-4 h-4 text-blue-600" />
                   <span className="flex-1">{citaForm.paciente_nombre}</span>
                   <Button 
                     variant="ghost" 
@@ -1081,7 +1081,7 @@ const Agenda = () => {
                         {pacienteResults.map(p => (
                           <div
                             key={p.id}
-                            className="p-2 hover:bg-teal-50 cursor-pointer"
+                            className="p-2 hover:bg-blue-50 cursor-pointer"
                             onClick={() => {
                               setCitaForm(prev => ({
                                 ...prev,
@@ -1225,7 +1225,7 @@ const Agenda = () => {
             </Button>
             <Button 
               onClick={handleSaveCita} 
-              className="bg-teal-600 hover:bg-teal-700"
+              className="bg-blue-600 hover:bg-blue-700"
               disabled={creandoPaciente}
             >
               {creandoPaciente ? 'Creando paciente...' : editingCita ? 'Guardar cambios' : citaForm.es_paciente_nuevo ? 'Crear paciente y cita' : 'Crear cita'}
@@ -1249,8 +1249,8 @@ const Agenda = () => {
             <div className="space-y-2">
               <Label>Paciente *</Label>
               {citaForm.paciente_nombre ? (
-                <div className="flex items-center gap-2 p-2 bg-teal-50 rounded border border-teal-200">
-                  <User className="w-4 h-4 text-teal-600" />
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200">
+                  <User className="w-4 h-4 text-blue-600" />
                   <span className="flex-1">{citaForm.paciente_nombre}</span>
                   <Button 
                     variant="ghost" 
@@ -1273,7 +1273,7 @@ const Agenda = () => {
                       {pacienteResults.map(p => (
                         <div
                           key={p.id}
-                          className="p-2 hover:bg-teal-50 cursor-pointer"
+                          className="p-2 hover:bg-blue-50 cursor-pointer"
                           onClick={() => {
                             setCitaForm(prev => ({
                               ...prev,

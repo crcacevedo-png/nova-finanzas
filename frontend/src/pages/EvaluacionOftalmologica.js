@@ -97,7 +97,7 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
           {suggestions.map((item, index) => (
             <div
               key={item.id || index}
-              className="px-3 py-2 hover:bg-teal-50 cursor-pointer text-sm"
+              className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
               onClick={() => {
                 onChange(item.nombre || item.nombre_completo || item.name || '');
                 setShowSuggestions(false);
@@ -126,12 +126,12 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, b
     <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--border-card)' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-teal-50 to-white hover:from-teal-100 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 transition-colors"
       >
         <div className="flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-teal-600" />}
+          {Icon && <Icon className="w-4 h-4 text-blue-600" />}
           <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{title}</span>
-          {badge && <Badge className="ml-2 bg-teal-100 text-teal-700 text-xs">{badge}</Badge>}
+          {badge && <Badge className="ml-2 bg-blue-100 text-blue-700 text-xs">{badge}</Badge>}
         </div>
         <div className="flex items-center gap-2">
           {onPrint && (
@@ -140,7 +140,7 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, b
                 e.stopPropagation();
                 onPrint();
               }}
-              className="p-1.5 rounded-md hover:bg-teal-100 text-teal-600 cursor-pointer transition-colors"
+              className="p-1.5 rounded-md hover:bg-blue-100 text-blue-600 cursor-pointer transition-colors"
               title="Imprimir receta"
             >
               <Printer className="w-4 h-4" />
@@ -696,7 +696,7 @@ const EvaluacionOftalmologica = () => {
                     {pacientes.map((p) => (
                       <div
                         key={p.id}
-                        className="px-4 py-3 hover:bg-teal-50 cursor-pointer border-b last:border-b-0"
+                        className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
                         onClick={() => seleccionarPaciente(p)}
                       >
                         <div className="font-medium text-sm">{p.nombre_completo}</div>
@@ -711,8 +711,8 @@ const EvaluacionOftalmologica = () => {
               
               {/* Datos del paciente seleccionado */}
               {formData.paciente_id && (
-                <div className="flex items-center gap-3 px-4 py-2 bg-teal-50 rounded-lg">
-                  <User className="w-5 h-5 text-teal-600" />
+                <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 rounded-lg">
+                  <User className="w-5 h-5 text-blue-600" />
                   <div>
                     <div className="font-semibold text-sm">{formData.paciente_nombre}</div>
                     <div className="text-xs text-gray-600">
@@ -807,7 +807,7 @@ const EvaluacionOftalmologica = () => {
                         key={ev.id}
                         onClick={() => cargarEvaluacion(ev)}
                         className={`flex flex-col items-start py-2 cursor-pointer ${
-                          evaluacionActual?.id === ev.id ? 'bg-teal-50' : ''
+                          evaluacionActual?.id === ev.id ? 'bg-blue-50' : ''
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
@@ -885,7 +885,7 @@ const EvaluacionOftalmologica = () => {
             <Card className="card-teal">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Stethoscope className="w-4 h-4 text-teal-600" />
+                  <Stethoscope className="w-4 h-4 text-blue-600" />
                   Motivo de Consulta
                 </CardTitle>
               </CardHeader>
@@ -995,7 +995,7 @@ const EvaluacionOftalmologica = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => addArrayItem('medicamentos_actuales', { nombre: '', dosis: '', frecuencia: '', via: '', desde: '' })}
-                        className="h-6 text-xs text-teal-600 hover:text-teal-700"
+                        className="h-6 text-xs text-blue-600 hover:text-blue-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
                       </Button>
@@ -1057,7 +1057,7 @@ const EvaluacionOftalmologica = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => addArrayItem('medicamentos_previos', { nombre: '', dosis: '', motivo: '', periodo: '' })}
-                        className="h-6 text-xs text-teal-600 hover:text-teal-700"
+                        className="h-6 text-xs text-blue-600 hover:text-blue-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
                       </Button>
@@ -1106,13 +1106,13 @@ const EvaluacionOftalmologica = () => {
                 {/* Encabezado OD/OS */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div></div>
-                  <div className="bg-teal-100 rounded py-1 text-xs font-semibold text-teal-700">OD (Derecho)</div>
-                  <div className="bg-teal-100 rounded py-1 text-xs font-semibold text-teal-700">OS (Izquierdo)</div>
+                  <div className="bg-blue-100 rounded py-1 text-xs font-semibold text-blue-700">OD (Derecho)</div>
+                  <div className="bg-blue-100 rounded py-1 text-xs font-semibold text-blue-700">OS (Izquierdo)</div>
                 </div>
                 
                 {/* Agudeza Visual */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Agudeza Visual</Label>
+                  <Label className="text-xs font-semibold text-blue-700">Agudeza Visual</Label>
                   <CampoODOS
                     label="Sin Corrección"
                     valueOD={formData.examen.avsc_od}
@@ -1135,7 +1135,7 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* Lensometría */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Lensometría</Label>
+                  <Label className="text-xs font-semibold text-blue-700">Lensometría</Label>
                   <div className="grid grid-cols-4 gap-1 text-center text-xs">
                     <div></div>
                     <div className="text-gray-500">Esfera</div>
@@ -1170,7 +1170,7 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* Refracción */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Refracción</Label>
+                  <Label className="text-xs font-semibold text-blue-700">Refracción</Label>
                   <div className="grid grid-cols-5 gap-1 text-center text-xs">
                     <div></div>
                     <div className="text-gray-500">Esfera</div>
@@ -1206,7 +1206,7 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* PIO */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Presión Intraocular</Label>
+                  <Label className="text-xs font-semibold text-blue-700">Presión Intraocular</Label>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <Label className="text-xs">OD (mmHg)</Label>
@@ -1241,7 +1241,7 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* Segmento Anterior - Simplificado a un solo textarea */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Segmento Anterior</Label>
+                  <Label className="text-xs font-semibold text-blue-700">Segmento Anterior</Label>
                   <Textarea
                     value={formData.examen.segmento_anterior}
                     onChange={(e) => updateNestedField('examen.segmento_anterior', e.target.value)}
@@ -1253,7 +1253,7 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* Segmento Posterior - Simplificado a un solo textarea */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-teal-700">Segmento Posterior</Label>
+                  <Label className="text-xs font-semibold text-blue-700">Segmento Posterior</Label>
                   <Textarea
                     value={formData.examen.segmento_posterior}
                     onChange={(e) => updateNestedField('examen.segmento_posterior', e.target.value)}
@@ -1292,7 +1292,7 @@ const EvaluacionOftalmologica = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => addArrayItem('diagnosticos', { descripcion: '', codigo_cie10: '', ojo: 'OU' })}
-                        className="h-6 text-xs text-teal-600 hover:text-teal-700"
+                        className="h-6 text-xs text-blue-600 hover:text-blue-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
                       </Button>
@@ -1349,7 +1349,7 @@ const EvaluacionOftalmologica = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => addArrayItem('recomendaciones.estudios_a_realizar', { estudio: '', ojo: 'OU', indicaciones: '' })}
-                        className="h-6 text-xs text-teal-600 hover:text-teal-700"
+                        className="h-6 text-xs text-blue-600 hover:text-blue-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
                       </Button>
@@ -1459,7 +1459,7 @@ const EvaluacionOftalmologica = () => {
                 </div>
                 
                 {formData.proxima_cita?.agendar && (
-                  <div className="pl-6 space-y-3 border-l-2 border-teal-200">
+                  <div className="pl-6 space-y-3 border-l-2 border-blue-200">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-xs">Médico</Label>
@@ -1559,7 +1559,7 @@ const EvaluacionOftalmologica = () => {
                         }];
                         updateNestedField('recetas.medicamentos.items', items);
                       }}
-                      className="h-6 text-xs text-teal-600 hover:text-teal-700"
+                      className="h-6 text-xs text-blue-600 hover:text-blue-700"
                     >
                       <Plus className="w-3 h-3 mr-1" /> Agregar
                     </Button>
@@ -1855,7 +1855,7 @@ const EvaluacionOftalmologica = () => {
                 className="h-16"
               />
               <div className="text-right">
-                <h1 className="text-xl font-bold text-teal-700">NovaVision</h1>
+                <h1 className="text-xl font-bold text-blue-700">NovaVision</h1>
                 <p className="text-sm text-gray-600">Clínica Oftalmológica</p>
                 <p className="text-xs text-gray-500">Tel: (502) 2222-3333</p>
               </div>
@@ -1977,10 +1977,10 @@ const EvaluacionOftalmologica = () => {
             
             {/* Próxima Cita (si está agendada) */}
             {formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && (
-              <div className="mt-6 p-4 border-2 border-teal-200 rounded-lg bg-teal-50">
+              <div className="mt-6 p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-5 h-5 text-teal-600" />
-                  <span className="font-bold text-teal-700">PRÓXIMA CITA</span>
+                  <Calendar className="w-5 h-5 text-blue-600" />
+                  <span className="font-bold text-blue-700">PRÓXIMA CITA</span>
                 </div>
                 <div className="text-sm">
                   <p><strong>Fecha:</strong> {new Date(formData.proxima_cita.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>

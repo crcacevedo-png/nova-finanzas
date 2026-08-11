@@ -469,8 +469,8 @@ const OpticaVentas = () => {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="card-metrics border-0 shadow-none">
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-teal-100">
-                <TrendingUp className="w-5 h-5 text-teal-600" />
+              <div className="p-3 rounded-xl bg-blue-100">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Ventas del Mes</p>
@@ -917,7 +917,7 @@ const OpticaVentas = () => {
                             <p className="font-medium">{f.label}</p>
                             <p className="text-xs text-gray-500">Stock: {f.stock}</p>
                           </div>
-                          <span className="font-semibold text-teal-600">{formatCurrency(f.sale_price)}</span>
+                          <span className="font-semibold text-blue-600">{formatCurrency(f.sale_price)}</span>
                         </div>
                       ))}
                     </div>
