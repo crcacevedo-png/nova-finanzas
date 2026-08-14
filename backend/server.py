@@ -2719,15 +2719,23 @@ def require_superadmin():
         return current_user
     return checker
 
+def require_admin_or_superadmin():
+    """Require admin or superadmin role (for read operations)"""
+    async def checker(current_user: dict = Depends(get_current_user)):
+        if current_user["role"] not in ["admin", "superadmin"]:
+            raise HTTPException(status_code=403, detail="Se requiere rol Admin o SuperAdmin para esta función")
+        return current_user
+    return checker
+
 @api_router.get("/bank-accounts", response_model=BankAccountListResponse)
-async def get_bank_accounts(current_user: dict = Depends(require_superadmin())):
-    """Get all bank accounts (SuperAdmin only)"""
+async def get_bank_accounts(current_user: dict = Depends(require_admin_or_superadmin())):
+    """Get all bank accounts (Admin+ can read, SuperAdmin can manage)"""
     accounts = await db.bank_accounts.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
     return BankAccountListResponse(data=[BankAccountResponse(**a) for a in accounts], total=len(accounts))
 
 @api_router.get("/bank-accounts/{account_id}", response_model=BankAccountResponse)
-async def get_bank_account(account_id: str, current_user: dict = Depends(require_superadmin())):
-    """Get a specific bank account (SuperAdmin only)"""
+async def get_bank_account(account_id: str, current_user: dict = Depends(require_admin_or_superadmin())):
+    """Get a specific bank account (Admin+ can read)"""
     account = await db.bank_accounts.find_one({"id": account_id}, {"_id": 0})
     if not account:
         raise HTTPException(status_code=404, detail="Cuenta bancaria no encontrada")

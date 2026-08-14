@@ -395,7 +395,11 @@ const Gastos = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, isAuthorized = false) => {
+    // Si está autorizado pero no pagado, mostrar badge de autorizado
+    if (isAuthorized && status !== 'pagado') {
+      return <Badge className="bg-emerald-100 text-emerald-700 border-0">Autorizado</Badge>;
+    }
     const colors = {
       pendiente: 'badge-pending border-0',
       parcial: 'badge-partial border-0',
@@ -744,7 +748,7 @@ const Gastos = () => {
                           </div>
                         </TableCell>
                         <TableCell>{getTypeBadge(expense.type)}</TableCell>
-                        <TableCell>{getStatusBadge(expense.status)}</TableCell>
+                        <TableCell>{getStatusBadge(expense.status, expense.is_authorized)}</TableCell>
                         <TableCell style={{ color: 'var(--text-secondary)' }}>
                           {expense.due_date ? formatDate(expense.due_date) : '-'}
                         </TableCell>
@@ -1005,15 +1009,17 @@ const Gastos = () => {
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle className="font-['Outfit']">Registrar Pago</DialogTitle>
-              <DialogDescription>
-                {selectedExpense && (
-                  <div className="mt-2 p-3 bg-slate-50 rounded-lg">
-                    <p className="font-medium text-slate-900">{selectedExpense.name}</p>
-                    <p className="text-sm">Total: {formatCurrency(selectedExpense.amount)}</p>
-                    <p className="text-sm text-emerald-600">Pagado: {formatCurrency(selectedExpense.paid_amount)}</p>
-                    <p className="text-sm text-amber-600 font-medium">Pendiente: {formatCurrency(selectedExpense.remaining_amount)}</p>
-                  </div>
-                )}
+              <DialogDescription asChild>
+                <div>
+                  {selectedExpense && (
+                    <div className="mt-2 p-3 bg-slate-50 rounded-lg">
+                      <span className="font-medium text-slate-900 block">{selectedExpense.name}</span>
+                      <span className="text-sm block">Total: {formatCurrency(selectedExpense.amount)}</span>
+                      <span className="text-sm text-emerald-600 block">Pagado: {formatCurrency(selectedExpense.paid_amount)}</span>
+                      <span className="text-sm text-amber-600 font-medium block">Pendiente: {formatCurrency(selectedExpense.remaining_amount)}</span>
+                    </div>
+                  )}
+                </div>
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handlePaymentSubmit} className="space-y-4">
@@ -1117,7 +1123,7 @@ const Gastos = () => {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Estado</p>
-                    {getStatusBadge(selectedExpense.status)}
+                    {getStatusBadge(selectedExpense.status, selectedExpense.is_authorized)}
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">Pagado</p>
@@ -1182,7 +1188,7 @@ const Gastos = () => {
             <DialogHeader>
               <DialogTitle className="font-['Outfit']">Eliminar Gasto</DialogTitle>
               <DialogDescription>
-                ¿Estás seguro de que deseas eliminar el gasto "{expenseToDelete?.name}"? 
+                ¿Estás seguro de que deseas eliminar el gasto &quot;{expenseToDelete?.name}&quot;? 
                 Esta acción eliminará también todos los pagos asociados y no se puede deshacer.
               </DialogDescription>
             </DialogHeader>
