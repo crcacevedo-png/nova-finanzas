@@ -11,7 +11,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
 SUPERADMIN_CREDS = {"username": "superadmin", "password": "nova2024"}
-ADMIN_CREDS = {"username": "admin", "password": "admin2024"}
+ADMIN_CREDS = {"username": "admin", "password": "Admin2024Nuevo!"}
 USER_CREDS = {"username": "usuario", "password": "user2024"}
 
 

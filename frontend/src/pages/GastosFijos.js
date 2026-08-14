@@ -468,7 +468,7 @@ const GastosFijos = () => {
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               <strong>Nota:</strong> Los gastos fijos se generan automáticamente cada día a las 00:05 horas. 
               Cuando el día configurado coincide con el día actual del mes, se crea un nuevo gasto pendiente 
-              con vencimiento a +30 días.
+              con fecha de vencimiento igual al día de cobro configurado.
             </p>
           </CardContent>
         </Card>

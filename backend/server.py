@@ -3308,9 +3308,32 @@ async def generate_fixed_expenses_for_today() -> int:
         supplier = await db.suppliers.find_one({"id": fe["supplier_id"]}, {"_id": 0})
         supplier_name = supplier["name"] if supplier else "Proveedor"
         
-        # Calcular fecha de vencimiento (+30 días)
+        # Calcular fecha de vencimiento basada en day_of_month configurado
         expense_date = today.strftime("%Y-%m-%d")
-        due_date = (today + timedelta(days=30)).strftime("%Y-%m-%d")
+        
+        # Usar el día del mes configurado para calcular la fecha de vencimiento
+        configured_day = fe.get("day_of_month", today.day)
+        
+        # Calcular el próximo mes de vencimiento
+        # Si hoy es el día configurado, el vencimiento es este mes
+        # Si el día ya pasó, el vencimiento es el próximo mes
+        import calendar
+        
+        target_year = today.year
+        target_month = today.month
+        
+        # Si el día configurado ya pasó este mes, usar el próximo mes
+        if today.day > configured_day:
+            target_month += 1
+            if target_month > 12:
+                target_month = 1
+                target_year += 1
+        
+        # Ajustar el día si el mes no tiene tantos días (ej: día 31 en febrero)
+        last_day_of_month = calendar.monthrange(target_year, target_month)[1]
+        actual_day = min(configured_day, last_day_of_month)
+        
+        due_date = f"{target_year}-{target_month:02d}-{actual_day:02d}"
         
         now = datetime.now(timezone.utc).isoformat()
         

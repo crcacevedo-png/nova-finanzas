@@ -1,0 +1,61 @@
+{
+  "summary": "Tested Gastos Fijos flow end-to-end (backend + frontend). CRUD operations for fixed expenses work correctly (day_of_month + start_date persisted, listed, updated). start_date skip-generation for future dates works. However, the user-reported bug is CONFIRMED: the due_date of the auto-generated expense does NOT match the configured day_of_month. Backend generates the expense with due_date = today + 30 days (server.py line 3313), so if day_of_month = 12 and generation runs on Aug 12, the resulting expense has due_date 2026-09-11 (day 11) instead of day 12. UI verified: list shows all fields (Proveedor, Nombre, Monto, Día de cobro, Fecha Inicio, Duración, Última Generación); edit dialog loads day_of_month and start_date correctly. Dashboard 'Vencimientos a 30 días' confirms bug in production (Planilla Abril día 12 → vence 11/09/26).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/fixed-expenses/generate-now (server.py line 3311-3313)",
+        "issue": "BUG CONFIRMED: due_date is calculated as (today + 30 days) instead of using the configured day_of_month. Reproduction: create fixed expense with day_of_month = today.day and start_date <= today; run generate-now; the resulting expense has due_date.day = today.day - 1 or +/- (offset by 30 days), NOT day_of_month. Expected: due_date should be either the current day_of_month (if same month) or day_of_month of next month. Fix: replace `due_date = (today + timedelta(days=30)).strftime('%Y-%m-%d')` with logic that computes the next occurrence of `fe['day_of_month']` (handling month-end clamping for days 29-31).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/fixed-expenses",
+        "issue": "start_date is now required in FixedExpenseCreate (server.py line 504) but the test file test_fixed_expense_start_date.py has a case that expects it to be optional. Model docstring/older tests are stale."
+      },
+      {
+        "endpoint": "GET /api/fixed-expenses",
+        "issue": "Response does not include a `proximo_vencimiento` computed field. The requirement mentions 'cálculo automático del próximo vencimiento' but backend does not expose it (frontend does not display it either)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "GastosFijos - Nota informativa",
+        "issue": "The info card literally says 'se crea un nuevo gasto pendiente con vencimiento a +30 días' (GastosFijos.js line 471). This contradicts the field label 'Día de cobro mensual' which implies the day should be the due date. Either the label is misleading or the +30 days logic is wrong.",
+        "affected_selectors": ["p in Card 'card-teal border-l-4 border-l-blue-500'"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixed_expenses_bug_repro.py",
+    "/app/test_reports/pytest/fixed_expenses_bug_repro.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Fix generate_fixed_expenses_for_today in /app/backend/server.py (~line 3311-3313). Replace `due_date = today + 30 days` with computation of the actual configured day_of_month for the target month. Reference logic: `due_date_dt = today.replace(day=min(fe['day_of_month'], calendar.monthrange(today.year, today.month)[1]))`; if that date has already passed for the month, use next month.",
+    "Update UI note in /app/frontend/src/pages/GastosFijos.js line 469-471 to reflect the corrected behavior (remove '+30 días' text).",
+    "Update test_fixed_expense_start_date.py::test_create_without_start_date_allowed_optional since start_date is now required (or make it optional again in the model as originally intended).",
+    "Consider adding a computed `proximo_vencimiento` field in the FixedExpenseResponse so the frontend can show when the next expense will be generated/due."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 3515 lines long - fixed expenses logic should be moved to /app/backend/routes/fixed_expenses.py (which already exists as a stub).",
+    "generate_fixed_expenses_for_today conflates 'expense_date' (date the expense is recorded) with 'due_date' (when it must be paid). The +30 days offset applied to due_date has no relation to the configured day_of_month, which is the user's core complaint.",
+    "Duplicate FixedExpense Pydantic models exist in both server.py (line 499+) and routes/fixed_expenses.py - source of truth ambiguity.",
+    "duration_type / end_date fields exist in the DB schema but are not present in FixedExpenseCreate/FixedExpenseResponse Pydantic models (only in the DB and update path). Inconsistent contract.",
+    "generate-now endpoint applies duplicate-prevention via `last_generated` = 'YYYY-MM' string, which prevents generating twice in the same calendar month. Combined with the +30 day bug this creates confusing behavior when day_of_month is near month end."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixed_expenses.py (updated ADMIN password to Admin2024Nuevo!)",
+    "/app/backend/tests/test_fixed_expenses_bug_repro.py (new file, focused bug reproduction)"
+  ],
+  "success_rate": {"backend": "6/7 new pytest passed (bug repro test intentionally fails to prove bug)", "frontend": "CRUD list/edit UI works 100%"},
+  "test_credentials": "superadmin/nova2024 and admin/Admin2024Nuevo! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Tests create and clean up TEST_BUG_* fixed expenses and TEST_BugRepro_* supplier automatically.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug is in /app/backend/server.py function generate_fixed_expenses_for_today at line 3311-3313. Once main agent fixes it (compute due_date from day_of_month instead of today+30d), re-run: `REACT_APP_BACKEND_URL=https://novavision-finanzas.preview.emergentagent.com pytest /app/backend/tests/test_fixed_expenses_bug_repro.py -v`. All 7 tests should pass including test_generated_expense_due_date_matches_day_of_month.",
+  "rca of the issue": "Root cause: /app/backend/server.py, function generate_fixed_expenses_for_today, line 3313: `due_date = (today + timedelta(days=30)).strftime('%Y-%m-%d')`. This hard-codes a +30 day offset from the current date, completely ignoring the fe['day_of_month'] value that the user configured. Reproduction: 1) Login as superadmin. 2) Create fixed expense with day_of_month=today.day, start_date<=today. 3) POST /api/fixed-expenses/generate-now. 4) GET /api/expenses and observe due_date is today+30 (e.g. today=Aug 14 → due=Sep 13) instead of the configured day. Mitigation/Fix: `import calendar; target_month = today.month + 1 if today.day >= fe['day_of_month'] else today.month; ... clamp day to last day of month; due_date = date(target_year, target_month, min(fe['day_of_month'], calendar.monthrange(target_year, target_month)[1]))`. Also update the UI note in GastosFijos.js that promises '+30 días'."
+}
