@@ -715,6 +715,7 @@ Ver `/app/memory/TESTING.md` para documentación completa de la suite de testing
 - **CRM Cirugías** - Módulo completo con gestión de candidatos
 - **Persistencia de Antecedentes** - Antecedentes y medicamentos del paciente se mantienen entre evaluaciones
 - **Auto-alimentación de Medicamentos** - Los medicamentos de recetas se agregan al historial del paciente
+- **Soporte Offline** - Evaluación Oftalmológica funciona sin conexión con sincronización automática
 
 ### 🟡 P1 (Próximo)
 - FEL Guatemala (Facturación Electrónica) - Estructura lista, deshabilitada
@@ -770,4 +771,35 @@ Los antecedentes de importancia y medicamentos del paciente se mantienen constan
 
 ### Colección MongoDB
 - `pacientes_historial_medico`: Almacena antecedentes y medicamentos por paciente
+
+---
+
+## Soporte Offline - Evaluación Oftalmológica - Agosto 2026
+
+### Descripción
+El módulo de Evaluación Oftalmológica ahora funciona sin conexión a internet. Los médicos pueden continuar trabajando durante consultas largas incluso si la conexión es inestable.
+
+### Funcionalidades
+1. **Detección automática de conexión**: Muestra estado "En línea" (verde) o "Sin conexión" (rojo)
+2. **Autoguardado offline**: Si se pierde la conexión, los cambios se guardan en localStorage
+3. **Cola de sincronización**: Las evaluaciones pendientes se muestran con badge "X pendiente(s)"
+4. **Sincronización automática**: Al restaurar conexión, los datos se sincronizan automáticamente
+5. **Sincronización periódica**: Cada 30 segundos si hay datos pendientes y hay conexión
+6. **Protección al cerrar**: Advertencia si hay cambios sin guardar al cerrar la pestaña
+
+### Almacenamiento Local
+- Key: `novavision_evaluaciones_offline`
+- Formato: Array de objetos `{ id, action, data, timestamp, synced }`
+
+### Indicadores Visuales
+- 🟢 Badge verde con icono Wifi: "En línea"
+- 🔴 Badge rojo con icono WifiOff (pulsante): "Sin conexión"
+- 🟡 Badge ámbar con CloudOff: "X pendiente(s)"
+- 🔵 Badge azul con RefreshCw (girando): "Sincronizando..."
+- 🟢 Badge verde con Cloud: "Sincronizado" (desaparece después de 3 segundos)
+
+### Archivos
+- Frontend: `/app/frontend/src/pages/EvaluacionOftalmologica.js`
+  - Estados: `isOnline`, `pendingSync`, `syncStatus`
+  - Funciones: `saveOfflineData()`, `syncPendingData()`, `loadPendingOfflineData()`
 

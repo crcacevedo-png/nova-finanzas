@@ -5,7 +5,7 @@ import {
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
   ChevronDown, ChevronUp, Lock, Clock, Calendar,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
-  Glasses, Contact, CheckCircle
+  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -211,8 +211,16 @@ const EvaluacionOftalmologica = () => {
   const [tiposCirugia, setTiposCirugia] = useState([]);
   const [crmEnviado, setCrmEnviado] = useState(false); // Para mostrar si ya se envió al CRM
   
+  // Estados para soporte offline
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingSync, setPendingSync] = useState([]);
+  const [syncStatus, setSyncStatus] = useState(''); // '', 'syncing', 'synced', 'pending'
+  
   const autoguardadoRef = useRef(null);
   const lastSavedRef = useRef(null);
+  const syncIntervalRef = useRef(null);
+  
+  const OFFLINE_STORAGE_KEY = 'novavision_evaluaciones_offline';
   
   const canEdit = user?.role === 'superadmin' || user?.role === 'admin';
   const isReadOnly = !canEdit || evaluacionActual?.sellado;
@@ -354,10 +362,194 @@ const EvaluacionOftalmologica = () => {
       } catch (error) {
         console.error('Error fetching tipos cirugía:', error);
       }
+      // Cargar datos offline pendientes
+      loadPendingOfflineData();
       setLoading(false);
     };
     init();
   }, [fetchEvaluaciones, fetchMedicos]);
+
+  // ==================== SOPORTE OFFLINE ====================
+  
+  // Cargar datos pendientes de sincronización
+  const loadPendingOfflineData = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(OFFLINE_STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        setPendingSync(data);
+        if (data.length > 0) {
+          setSyncStatus('pending');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading offline data:', error);
+    }
+  }, []);
+
+  // Guardar datos offline
+  const saveOfflineData = useCallback((evaluacionData, action = 'save') => {
+    try {
+      const stored = localStorage.getItem(OFFLINE_STORAGE_KEY);
+      const pending = stored ? JSON.parse(stored) : [];
+      
+      // Buscar si ya existe una entrada para esta evaluación
+      const existingIndex = pending.findIndex(p => 
+        p.data.paciente_id === evaluacionData.paciente_id && 
+        (!p.data.id || p.data.id === evaluacionData.id)
+      );
+      
+      const offlineEntry = {
+        id: evaluacionData.id || `offline_${Date.now()}`,
+        action,
+        data: evaluacionData,
+        timestamp: new Date().toISOString(),
+        synced: false
+      };
+      
+      if (existingIndex >= 0) {
+        pending[existingIndex] = offlineEntry;
+      } else {
+        pending.push(offlineEntry);
+      }
+      
+      localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(pending));
+      setPendingSync(pending);
+      setSyncStatus('pending');
+      
+      return offlineEntry.id;
+    } catch (error) {
+      console.error('Error saving offline data:', error);
+      return null;
+    }
+  }, []);
+
+  // Sincronizar datos pendientes cuando hay conexión
+  const syncPendingData = useCallback(async () => {
+    if (!isOnline || pendingSync.length === 0) return;
+    
+    setSyncStatus('syncing');
+    const token = localStorage.getItem('token');
+    const newPending = [];
+    let syncedCount = 0;
+    
+    for (const item of pendingSync) {
+      if (item.synced) continue;
+      
+      try {
+        if (item.data.id && !item.data.id.startsWith('offline_')) {
+          // Actualizar evaluación existente
+          await axios.patch(
+            `${API_URL}/evaluaciones/${item.data.id}/autoguardar`,
+            item.data,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } else {
+          // Crear nueva evaluación
+          const response = await axios.post(
+            `${API_URL}/evaluaciones`,
+            item.data,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          // Actualizar el ID local si la evaluación actual es esta
+          if (evaluacionActual && evaluacionActual.id === item.id) {
+            setEvaluacionActual(response.data);
+          }
+        }
+        syncedCount++;
+        item.synced = true;
+      } catch (error) {
+        console.error('Error syncing item:', error);
+        newPending.push(item);
+      }
+    }
+    
+    // Actualizar almacenamiento
+    const unsyncedItems = pendingSync.filter(p => !p.synced);
+    if (unsyncedItems.length === 0) {
+      localStorage.removeItem(OFFLINE_STORAGE_KEY);
+      setPendingSync([]);
+      setSyncStatus('synced');
+      if (syncedCount > 0) {
+        toast.success(`${syncedCount} evaluación(es) sincronizada(s)`);
+        fetchEvaluaciones();
+      }
+    } else {
+      localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(unsyncedItems));
+      setPendingSync(unsyncedItems);
+      setSyncStatus('pending');
+    }
+  }, [isOnline, pendingSync, evaluacionActual, fetchEvaluaciones]);
+
+  // Detectar cambios en la conexión
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('Conexión restaurada');
+      // Sincronizar datos pendientes
+      setTimeout(() => syncPendingData(), 1000);
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning('Sin conexión - Los cambios se guardarán localmente');
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [syncPendingData]);
+
+  // Intentar sincronizar periódicamente
+  useEffect(() => {
+    if (isOnline && pendingSync.length > 0) {
+      syncIntervalRef.current = setInterval(() => {
+        syncPendingData();
+      }, 30000); // Cada 30 segundos
+    }
+    
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+      }
+    };
+  }, [isOnline, pendingSync.length, syncPendingData]);
+
+  // Limpiar estado 'synced' después de 3 segundos
+  useEffect(() => {
+    if (syncStatus === 'synced') {
+      const timer = setTimeout(() => {
+        setSyncStatus('');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [syncStatus]);
+
+  // Guardar antes de cerrar la ventana si hay cambios sin guardar
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (autoguardadoStatus === 'Cambios sin guardar' && formData.paciente_id) {
+        // Guardar offline antes de cerrar
+        const dataToSave = {
+          ...formData,
+          id: evaluacionActual?.id || null
+        };
+        saveOfflineData(dataToSave, evaluacionActual?.id ? 'update' : 'create');
+        
+        // Mostrar advertencia
+        e.preventDefault();
+        e.returnValue = 'Tienes cambios sin guardar. ¿Estás seguro de salir?';
+        return e.returnValue;
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [autoguardadoStatus, formData, evaluacionActual?.id, saveOfflineData]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -368,13 +560,19 @@ const EvaluacionOftalmologica = () => {
 
   // Calcular tiempo restante para sellado
   useEffect(() => {
-    if (!evaluacionActual || evaluacionActual.sellado) {
+    // No mostrar tiempo si no hay evaluación, está sellada, o es offline/nueva
+    if (!evaluacionActual || evaluacionActual.sellado || !evaluacionActual.fecha_creacion || String(evaluacionActual.id).startsWith('offline_')) {
       setTiempoRestante(null);
       return;
     }
     
     const calcularTiempo = () => {
       const creacion = new Date(evaluacionActual.fecha_creacion);
+      // Validar que la fecha sea válida
+      if (isNaN(creacion.getTime())) {
+        setTiempoRestante(null);
+        return;
+      }
       const limite = new Date(creacion.getTime() + 24 * 60 * 60 * 1000);
       const ahora = new Date();
       const diff = limite - ahora;
@@ -395,7 +593,7 @@ const EvaluacionOftalmologica = () => {
     return () => clearInterval(interval);
   }, [evaluacionActual]);
 
-  // Autoguardado - funciona tanto para nuevas evaluaciones como para existentes
+  // Autoguardado - funciona tanto online como offline
   useEffect(() => {
     // No autoguardar si es solo lectura o no hay paciente seleccionado
     if (isReadOnly || !formData.paciente_id) return;
@@ -407,11 +605,40 @@ const EvaluacionOftalmologica = () => {
     setAutoguardadoStatus('Cambios sin guardar');
     
     autoguardadoRef.current = setTimeout(async () => {
+      // === MODO OFFLINE ===
+      if (!isOnline) {
+        try {
+          setAutoguardadoStatus('Guardando localmente...');
+          const dataToSave = {
+            ...formData,
+            id: evaluacionActual?.id || null
+          };
+          const savedId = saveOfflineData(dataToSave, evaluacionActual?.id ? 'update' : 'create');
+          
+          if (savedId) {
+            const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+            setAutoguardadoStatus(`Guardado offline ${now}`);
+            lastSavedRef.current = new Date();
+            // Si es nueva evaluación, guardar ID temporal
+            if (!evaluacionActual?.id) {
+              setEvaluacionActual({ ...formData, id: savedId });
+            }
+          } else {
+            setAutoguardadoStatus('Error guardando offline');
+          }
+        } catch (error) {
+          setAutoguardadoStatus('Error guardando offline');
+          console.error('Error autoguardando offline:', error);
+        }
+        return;
+      }
+      
+      // === MODO ONLINE ===
       try {
         setAutoguardadoStatus('Guardando...');
         const token = localStorage.getItem('token');
         
-        if (evaluacionActual?.id) {
+        if (evaluacionActual?.id && !String(evaluacionActual.id).startsWith('offline_')) {
           // Actualizar evaluación existente
           await axios.patch(
             `${API_URL}/evaluaciones/${evaluacionActual.id}/autoguardar`,
@@ -437,8 +664,20 @@ const EvaluacionOftalmologica = () => {
           toast.error('Expediente sellado. No se puede editar.');
           setEvaluacionActual(prev => ({ ...prev, sellado: true }));
         } else {
-          setAutoguardadoStatus('Error al guardar');
-          console.error('Error autoguardando:', error);
+          // Si falla la conexión, guardar offline
+          console.warn('Error de red, guardando offline:', error);
+          setAutoguardadoStatus('Guardando localmente...');
+          const dataToSave = {
+            ...formData,
+            id: evaluacionActual?.id || null
+          };
+          const savedId = saveOfflineData(dataToSave, evaluacionActual?.id ? 'update' : 'create');
+          if (savedId) {
+            const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+            setAutoguardadoStatus(`Guardado offline ${now}`);
+          } else {
+            setAutoguardadoStatus('Error al guardar');
+          }
         }
       }
     }, 2000); // 2 segundos de debounce
@@ -448,7 +687,7 @@ const EvaluacionOftalmologica = () => {
         clearTimeout(autoguardadoRef.current);
       }
     };
-  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones]);
+  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones, isOnline, saveOfflineData]);
 
   // Cargar evaluación
   const cargarEvaluacion = async (evaluacion) => {
@@ -945,11 +1184,58 @@ const EvaluacionOftalmologica = () => {
             
             {/* Botones y Estado */}
             <div className="flex items-center gap-2">
+              {/* Indicador de conexión */}
+              <div className="flex items-center gap-1.5" data-testid="connection-status">
+                {isOnline ? (
+                  <Badge className="bg-emerald-100 text-emerald-700 text-xs flex items-center gap-1">
+                    <Wifi className="w-3 h-3" />
+                    <span className="hidden sm:inline">En línea</span>
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-700 text-xs flex items-center gap-1 animate-pulse">
+                    <WifiOff className="w-3 h-3" />
+                    <span className="hidden sm:inline">Sin conexión</span>
+                  </Badge>
+                )}
+                
+                {/* Indicador de sincronización pendiente */}
+                {pendingSync.length > 0 && (
+                  <Badge 
+                    className={`text-xs flex items-center gap-1 ${
+                      syncStatus === 'syncing' 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                    data-testid="sync-status"
+                  >
+                    {syncStatus === 'syncing' ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin" />
+                        <span className="hidden sm:inline">Sincronizando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CloudOff className="w-3 h-3" />
+                        <span className="hidden sm:inline">{pendingSync.length} pendiente(s)</span>
+                      </>
+                    )}
+                  </Badge>
+                )}
+                
+                {syncStatus === 'synced' && pendingSync.length === 0 && (
+                  <Badge className="bg-emerald-100 text-emerald-700 text-xs flex items-center gap-1" data-testid="sync-complete">
+                    <Cloud className="w-3 h-3" />
+                    <span className="hidden sm:inline">Sincronizado</span>
+                  </Badge>
+                )}
+              </div>
+              
               {/* Estado de guardado */}
               {autoguardadoStatus && (
                 <Badge className={`text-xs ${
                   autoguardadoStatus.includes('Guardado') ? 'bg-green-100 text-green-700' :
-                  autoguardadoStatus.includes('Guardando') ? 'bg-blue-100 text-blue-700' :
+                  autoguardadoStatus.includes('Guardando') || autoguardadoStatus.includes('localmente') ? 'bg-blue-100 text-blue-700' :
+                  autoguardadoStatus.includes('offline') ? 'bg-amber-100 text-amber-700' :
                   'bg-orange-100 text-orange-700'
                 }`}>
                   {autoguardadoStatus}
