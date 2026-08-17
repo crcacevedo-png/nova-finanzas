@@ -395,9 +395,10 @@ const EvaluacionOftalmologica = () => {
     return () => clearInterval(interval);
   }, [evaluacionActual]);
 
-  // Autoguardado
+  // Autoguardado - funciona tanto para nuevas evaluaciones como para existentes
   useEffect(() => {
-    if (!evaluacionActual?.id || isReadOnly) return;
+    // No autoguardar si es solo lectura o no hay paciente seleccionado
+    if (isReadOnly || !formData.paciente_id) return;
     
     if (autoguardadoRef.current) {
       clearTimeout(autoguardadoRef.current);
@@ -409,11 +410,25 @@ const EvaluacionOftalmologica = () => {
       try {
         setAutoguardadoStatus('Guardando...');
         const token = localStorage.getItem('token');
-        await axios.patch(
-          `${API_URL}/evaluaciones/${evaluacionActual.id}/autoguardar`,
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        
+        if (evaluacionActual?.id) {
+          // Actualizar evaluación existente
+          await axios.patch(
+            `${API_URL}/evaluaciones/${evaluacionActual.id}/autoguardar`,
+            formData,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } else {
+          // Crear nueva evaluación automáticamente
+          const response = await axios.post(
+            `${API_URL}/evaluaciones`,
+            formData,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setEvaluacionActual(response.data);
+          fetchEvaluaciones(); // Actualizar lista
+        }
+        
         const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
         setAutoguardadoStatus(`Guardado a las ${now}`);
         lastSavedRef.current = new Date();
@@ -426,14 +441,14 @@ const EvaluacionOftalmologica = () => {
           console.error('Error autoguardando:', error);
         }
       }
-    }, 2500);
+    }, 2000); // 2 segundos de debounce
     
     return () => {
       if (autoguardadoRef.current) {
         clearTimeout(autoguardadoRef.current);
       }
     };
-  }, [formData, evaluacionActual?.id, isReadOnly]);
+  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones]);
 
   // Cargar evaluación
   const cargarEvaluacion = async (evaluacion) => {
@@ -762,19 +777,36 @@ const EvaluacionOftalmologica = () => {
       return;
     }
     
-    if (!evaluacionActual?.id) {
-      toast.error('Debe guardar la evaluación primero');
+    if (!formData.paciente_id) {
+      toast.error('Debe seleccionar un paciente primero');
       return;
     }
     
     try {
       const token = localStorage.getItem('token');
+      let evaluacionId = evaluacionActual?.id;
+      
+      // Si no hay evaluación guardada, guardarla primero
+      if (!evaluacionId) {
+        setAutoguardadoStatus('Guardando evaluación...');
+        const response = await axios.post(
+          `${API_URL}/evaluaciones`,
+          formData,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setEvaluacionActual(response.data);
+        evaluacionId = response.data.id;
+        fetchEvaluaciones();
+        const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+        setAutoguardadoStatus(`Guardado a las ${now}`);
+      }
+      
       // Auto-completar diagnóstico si está vacío
       const diagnosticoAuto = crmForm.diagnostico || 
         formData.diagnosticos?.map(d => d.descripcion).join(', ') || '';
       
       await axios.post(
-        `${API_URL}/evaluaciones/${evaluacionActual.id}/agregar-crm-cirugia`,
+        `${API_URL}/evaluaciones/${evaluacionId}/agregar-crm-cirugia`,
         {
           tipo_cirugia: crmForm.tipo_cirugia,
           ojo: crmForm.ojo,
@@ -1714,16 +1746,16 @@ const EvaluacionOftalmologica = () => {
                     
                     <Button
                       onClick={handleEnviarCRM}
-                      disabled={!evaluacionActual?.id || !crmForm.tipo_cirugia || isReadOnly}
+                      disabled={!formData.paciente_id || !crmForm.tipo_cirugia || isReadOnly}
                       className="w-full btn-primary bg-purple-600 hover:bg-purple-700"
                     >
                       <Stethoscope className="w-4 h-4 mr-2" />
                       Agregar al CRM de Cirugías
                     </Button>
                     
-                    {!evaluacionActual?.id && (
+                    {!formData.paciente_id && (
                       <p className="text-xs text-amber-600 text-center">
-                        Debe guardar la evaluación primero para agregar al CRM
+                        Seleccione un paciente primero
                       </p>
                     )}
                   </>
