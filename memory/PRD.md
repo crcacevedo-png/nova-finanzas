@@ -704,7 +704,7 @@ Ver `/app/memory/TESTING.md` para documentación completa de la suite de testing
 
 ---
 
-## Backlog Actualizado (7 Agosto 2026)
+## Backlog Actualizado (17 Agosto 2026)
 
 ### ✅ Completado
 - Suite de Testing (Vitest, Playwright, Pytest)
@@ -712,6 +712,9 @@ Ver `/app/memory/TESTING.md` para documentación completa de la suite de testing
 - Módulo POS completo con FEFO
 - Pago mixto y tickets térmicos
 - Entrada rápida de inventario
+- **CRM Cirugías** - Módulo completo con gestión de candidatos
+- **Persistencia de Antecedentes** - Antecedentes y medicamentos del paciente se mantienen entre evaluaciones
+- **Auto-alimentación de Medicamentos** - Los medicamentos de recetas se agregan al historial del paciente
 
 ### 🟡 P1 (Próximo)
 - FEL Guatemala (Facturación Electrónica) - Estructura lista, deshabilitada
@@ -721,3 +724,50 @@ Ver `/app/memory/TESTING.md` para documentación completa de la suite de testing
 - Exportar evaluación oftalmológica a PDF
 - Sincronización Google Calendar
 - UI para Órdenes de compra, Recepciones, Transferencias, Toma física
+
+---
+
+## Módulo CRM Cirugías - Agosto 2026
+
+### Descripción
+Sistema de CRM para gestión de pacientes interesados en cirugía oftalmológica.
+
+### Flujo
+1. **Entrada Manual**: Desde `/crm-cirugias` con botón "Nuevo Candidato"
+2. **Entrada desde Evaluación**: Botón "Candidato Cirugía" en evaluación guardada
+3. **Gestión**: Seguimientos, programación, estados (pendiente → contactado → programado → operado)
+
+### Endpoints Backend
+- `GET /api/surgery-crm` - Listar candidatos con filtros
+- `POST /api/surgery-crm` - Crear candidato
+- `POST /api/surgery-crm/{id}/seguimiento` - Registrar seguimiento
+- `POST /api/surgery-crm/{id}/programar` - Programar cirugía
+- `POST /api/surgery-crm/{id}/marcar-operado` - Marcar como operado
+- `POST /api/surgery-crm/{id}/descartar` - Descartar candidato
+- `DELETE /api/surgery-crm/{id}` - Eliminar candidato descartado/operado
+
+### Archivos
+- Backend: `/app/backend/routes/surgery_crm.py`
+- Frontend: `/app/frontend/src/pages/CRMCirugias.js`
+
+---
+
+## Persistencia de Historial Médico - Agosto 2026
+
+### Descripción
+Los antecedentes de importancia y medicamentos del paciente se mantienen constantes entre todas las evaluaciones.
+
+### Flujo
+1. Al seleccionar paciente en evaluación, se carga automáticamente su historial médico
+2. Al guardar evaluación, se actualiza el historial médico del paciente
+3. Los medicamentos de recetas se agregan automáticamente a medicamentos actuales
+
+### Endpoints Backend
+- `GET /api/evaluaciones/paciente/{id}/historial-medico` - Obtener historial
+- `PUT /api/evaluaciones/paciente/{id}/historial-medico` - Actualizar historial
+- `POST /api/evaluaciones/paciente/{id}/agregar-medicamento-receta` - Agregar medicamento
+- `POST /api/evaluaciones/{id}/agregar-crm-cirugia` - Agregar a CRM desde evaluación
+
+### Colección MongoDB
+- `pacientes_historial_medico`: Almacena antecedentes y medicamentos por paciente
+

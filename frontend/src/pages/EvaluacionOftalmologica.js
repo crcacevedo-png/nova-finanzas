@@ -21,6 +21,14 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -191,6 +199,15 @@ const EvaluacionOftalmologica = () => {
   const [tiempoRestante, setTiempoRestante] = useState(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printType, setPrintType] = useState('');
+  const [crmDialogOpen, setCrmDialogOpen] = useState(false);
+  const [crmForm, setCrmForm] = useState({
+    tipo_cirugia: '',
+    ojo: 'OU',
+    diagnostico: '',
+    prioridad: 'normal',
+    notas: ''
+  });
+  const [tiposCirugia, setTiposCirugia] = useState([]);
   
   const autoguardadoRef = useRef(null);
   const lastSavedRef = useRef(null);
@@ -325,6 +342,16 @@ const EvaluacionOftalmologica = () => {
     const init = async () => {
       setLoading(true);
       await Promise.all([fetchEvaluaciones(), fetchMedicos()]);
+      // Cargar tipos de cirugía para CRM
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_URL}/surgery-crm/tipos-cirugia`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setTiposCirugia(response.data || []);
+      } catch (error) {
+        console.error('Error fetching tipos cirugía:', error);
+      }
       setLoading(false);
     };
     init();
@@ -506,6 +533,43 @@ const EvaluacionOftalmologica = () => {
         toast.success('Evaluación creada correctamente');
       }
       
+      // Guardar historial médico del paciente (antecedentes y medicamentos persisten)
+      try {
+        await axios.put(
+          `${API_URL}/evaluaciones/paciente/${formData.paciente_id}/historial-medico`,
+          {
+            antecedentes: formData.antecedentes,
+            medicamentos_actuales: formData.medicamentos_actuales,
+            medicamentos_previos: formData.medicamentos_previos
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (historialError) {
+        console.error('Error guardando historial médico:', historialError);
+      }
+      
+      // Agregar medicamentos de la receta al historial de medicamentos actuales
+      const medicamentosReceta = formData.recetas?.medicamentos?.items || [];
+      for (const med of medicamentosReceta) {
+        if (med.medicamento) {
+          try {
+            await axios.post(
+              `${API_URL}/evaluaciones/paciente/${formData.paciente_id}/agregar-medicamento-receta`,
+              {
+                medicamento: med.medicamento,
+                dosis: med.dosis || '',
+                frecuencia: med.frecuencia || '',
+                via: med.via || ''
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } catch (medError) {
+            // Ignorar errores de medicamentos individuales
+            console.error('Error agregando medicamento:', medError);
+          }
+        }
+      }
+      
       // Crear próxima cita si está habilitada
       if (formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && formData.proxima_cita?.hora && formData.proxima_cita?.medico_id) {
         try {
@@ -545,8 +609,8 @@ const EvaluacionOftalmologica = () => {
     }
   };
 
-  // Seleccionar paciente
-  const seleccionarPaciente = (paciente) => {
+  // Seleccionar paciente y cargar historial médico
+  const seleccionarPaciente = async (paciente) => {
     setFormData(prev => ({
       ...prev,
       paciente_id: paciente.id,
@@ -557,6 +621,32 @@ const EvaluacionOftalmologica = () => {
     }));
     setSearchPaciente(paciente.nombre_completo);
     setShowPacienteList(false);
+    
+    // Cargar historial médico del paciente (antecedentes y medicamentos)
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${API_URL}/evaluaciones/paciente/${paciente.id}/historial-medico`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (response.data) {
+        const historial = response.data;
+        setFormData(prev => ({
+          ...prev,
+          antecedentes: historial.antecedentes || prev.antecedentes,
+          medicamentos_actuales: historial.medicamentos_actuales || prev.medicamentos_actuales,
+          medicamentos_previos: historial.medicamentos_previos || prev.medicamentos_previos
+        }));
+        
+        if (historial.fuente === 'historial_guardado' || historial.fuente === 'ultima_evaluacion') {
+          toast.info('Se cargaron los antecedentes y medicamentos previos del paciente');
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando historial médico:', error);
+      // No mostrar error, simplemente continuar sin historial
+    }
   };
 
   // Actualizar campo anidado
@@ -640,6 +730,50 @@ const EvaluacionOftalmologica = () => {
     setTimeout(() => {
       window.print();
     }, 500);
+  };
+
+  // Enviar a CRM de Cirugías
+  const handleEnviarCRM = async () => {
+    if (!crmForm.tipo_cirugia) {
+      toast.error('Debe seleccionar un tipo de cirugía');
+      return;
+    }
+    
+    if (!evaluacionActual?.id) {
+      toast.error('Debe guardar la evaluación primero');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      // Auto-completar diagnóstico si está vacío
+      const diagnosticoAuto = crmForm.diagnostico || 
+        formData.diagnosticos?.map(d => d.descripcion).join(', ') || '';
+      
+      await axios.post(
+        `${API_URL}/evaluaciones/${evaluacionActual.id}/agregar-crm-cirugia`,
+        {
+          tipo_cirugia: crmForm.tipo_cirugia,
+          ojo: crmForm.ojo,
+          diagnostico: diagnosticoAuto,
+          prioridad: crmForm.prioridad,
+          notas: crmForm.notas
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      toast.success(`Paciente agregado al CRM de Cirugías para ${crmForm.tipo_cirugia}`);
+      setCrmDialogOpen(false);
+      setCrmForm({
+        tipo_cirugia: '',
+        ojo: 'OU',
+        diagnostico: '',
+        prioridad: 'normal',
+        notas: ''
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al agregar al CRM');
+    }
   };
 
   if (loading) {
@@ -872,6 +1006,19 @@ const EvaluacionOftalmologica = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              
+              {/* Botón CRM Cirugías */}
+              {canEdit && evaluacionActual?.id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCrmDialogOpen(true)}
+                  className="btn-outline border-purple-300 text-purple-700 hover:bg-purple-50"
+                >
+                  <Stethoscope className="w-4 h-4 mr-1" />
+                  Candidato Cirugía
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -2015,6 +2162,104 @@ const EvaluacionOftalmologica = () => {
           </div>
         </div>
       )}
+
+      {/* Dialog CRM Cirugías */}
+      <Dialog open={crmDialogOpen} onOpenChange={setCrmDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+              <Stethoscope className="w-5 h-5 text-purple-600" />
+              Agregar a CRM de Cirugías
+            </DialogTitle>
+            <DialogDescription>
+              Paciente: {formData.paciente_nombre}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>Tipo de Cirugía *</Label>
+              <Select
+                value={crmForm.tipo_cirugia}
+                onValueChange={(v) => setCrmForm(prev => ({ ...prev, tipo_cirugia: v }))}
+              >
+                <SelectTrigger className="input-teal">
+                  <SelectValue placeholder="Seleccionar tipo de cirugía..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiposCirugia.map(tipo => (
+                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Ojo</Label>
+                <Select
+                  value={crmForm.ojo}
+                  onValueChange={(v) => setCrmForm(prev => ({ ...prev, ojo: v }))}
+                >
+                  <SelectTrigger className="input-teal">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="OD">OD (Derecho)</SelectItem>
+                    <SelectItem value="OS">OS (Izquierdo)</SelectItem>
+                    <SelectItem value="OU">OU (Ambos)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Prioridad</Label>
+                <Select
+                  value={crmForm.prioridad}
+                  onValueChange={(v) => setCrmForm(prev => ({ ...prev, prioridad: v }))}
+                >
+                  <SelectTrigger className="input-teal">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alta">Alta</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="baja">Baja</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div>
+              <Label>Diagnóstico</Label>
+              <Input
+                value={crmForm.diagnostico}
+                onChange={(e) => setCrmForm(prev => ({ ...prev, diagnostico: e.target.value }))}
+                placeholder="Se auto-completa con diagnósticos de la evaluación si está vacío"
+                className="input-teal"
+              />
+            </div>
+            
+            <div>
+              <Label>Notas</Label>
+              <Textarea
+                value={crmForm.notas}
+                onChange={(e) => setCrmForm(prev => ({ ...prev, notas: e.target.value }))}
+                placeholder="Notas adicionales..."
+                className="input-teal min-h-[60px]"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCrmDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEnviarCRM} className="btn-primary bg-purple-600 hover:bg-purple-700">
+              Agregar al CRM
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

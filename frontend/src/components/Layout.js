@@ -90,6 +90,11 @@ const Layout = ({ children }) => {
   // Sala de Operaciones - Visible para todos
   navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
   
+  // CRM Cirugías - Gestión de candidatos a cirugía (Admin y SuperAdmin)
+  if (isAdminOrSuperAdmin) {
+    navItems.push({ path: '/crm-cirugias', icon: Stethoscope, label: 'CRM Cirugías', testId: 'nav-crm-cirugias' });
+  }
+  
   // Agenda de Pacientes - Visible para todos (NO es la de Sala de Operaciones)
   navItems.push({ path: '/agenda', icon: CalendarDays, label: 'Agenda', testId: 'nav-agenda' });
 

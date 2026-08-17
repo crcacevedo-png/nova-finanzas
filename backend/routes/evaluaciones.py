@@ -446,3 +446,242 @@ async def delete_evaluacion(
     )
     
     return {"message": "Evaluación eliminada"}
+
+
+# ==================== ANTECEDENTES Y MEDICAMENTOS DEL PACIENTE ====================
+
+@router.get("/paciente/{paciente_id}/historial-medico")
+async def get_historial_medico_paciente(
+    paciente_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Obtener antecedentes y medicamentos actuales del paciente.
+    Estos datos persisten entre evaluaciones.
+    """
+    # Buscar en la colección de historial médico del paciente
+    historial = await db.pacientes_historial_medico.find_one(
+        {"paciente_id": paciente_id}, 
+        {"_id": 0}
+    )
+    
+    if not historial:
+        # Intentar obtener de la última evaluación del paciente
+        ultima_evaluacion = await db.evaluaciones_oftalmologicas.find_one(
+            {"paciente_id": paciente_id},
+            {"_id": 0, "antecedentes": 1, "medicamentos_actuales": 1, "medicamentos_previos": 1}
+        )
+        
+        if ultima_evaluacion:
+            return {
+                "paciente_id": paciente_id,
+                "antecedentes": ultima_evaluacion.get("antecedentes", {}),
+                "medicamentos_actuales": ultima_evaluacion.get("medicamentos_actuales", []),
+                "medicamentos_previos": ultima_evaluacion.get("medicamentos_previos", []),
+                "fuente": "ultima_evaluacion"
+            }
+        
+        # Retornar vacío si no hay historial
+        return {
+            "paciente_id": paciente_id,
+            "antecedentes": {
+                "personales_patologicos": "",
+                "oftalmologicos": "",
+                "quirurgicos": "",
+                "alergias": "",
+                "familiares": "",
+                "habitos": ""
+            },
+            "medicamentos_actuales": [],
+            "medicamentos_previos": [],
+            "fuente": "nuevo"
+        }
+    
+    return {
+        **historial,
+        "fuente": "historial_guardado"
+    }
+
+
+@router.put("/paciente/{paciente_id}/historial-medico")
+async def update_historial_medico_paciente(
+    paciente_id: str,
+    antecedentes: dict = Body(None),
+    medicamentos_actuales: list = Body(None),
+    medicamentos_previos: list = Body(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Actualizar antecedentes y medicamentos del paciente.
+    Estos datos persisten entre evaluaciones.
+    """
+    if current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos para actualizar historial médico")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    update_data = {
+        "paciente_id": paciente_id,
+        "updated_at": now,
+        "updated_by": current_user["id"],
+        "updated_by_name": current_user.get("name", "")
+    }
+    
+    if antecedentes is not None:
+        update_data["antecedentes"] = antecedentes
+    
+    if medicamentos_actuales is not None:
+        update_data["medicamentos_actuales"] = medicamentos_actuales
+    
+    if medicamentos_previos is not None:
+        update_data["medicamentos_previos"] = medicamentos_previos
+    
+    # Upsert - crear si no existe, actualizar si existe
+    await db.pacientes_historial_medico.update_one(
+        {"paciente_id": paciente_id},
+        {"$set": update_data, "$setOnInsert": {"created_at": now}},
+        upsert=True
+    )
+    
+    historial = await db.pacientes_historial_medico.find_one(
+        {"paciente_id": paciente_id}, 
+        {"_id": 0}
+    )
+    
+    return historial
+
+
+@router.post("/paciente/{paciente_id}/agregar-medicamento-receta")
+async def agregar_medicamento_desde_receta(
+    paciente_id: str,
+    medicamento: str = Body(...),
+    dosis: str = Body(""),
+    frecuencia: str = Body(""),
+    via: str = Body(""),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Agregar un medicamento de receta a los medicamentos actuales del paciente.
+    Se llama automáticamente cuando se guarda una receta con medicamentos.
+    """
+    if current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Obtener historial actual
+    historial = await db.pacientes_historial_medico.find_one(
+        {"paciente_id": paciente_id}, 
+        {"_id": 0}
+    )
+    
+    medicamentos_actuales = historial.get("medicamentos_actuales", []) if historial else []
+    
+    # Verificar si el medicamento ya existe
+    existe = any(m.get("nombre", "").lower() == medicamento.lower() for m in medicamentos_actuales)
+    
+    if not existe:
+        nuevo_medicamento = {
+            "nombre": medicamento,
+            "dosis": dosis,
+            "frecuencia": frecuencia,
+            "via": via,
+            "desde": now[:10],  # Solo fecha
+            "origen": "receta"
+        }
+        medicamentos_actuales.append(nuevo_medicamento)
+        
+        await db.pacientes_historial_medico.update_one(
+            {"paciente_id": paciente_id},
+            {
+                "$set": {
+                    "medicamentos_actuales": medicamentos_actuales,
+                    "updated_at": now,
+                    "updated_by": current_user["id"]
+                },
+                "$setOnInsert": {"created_at": now, "antecedentes": {}}
+            },
+            upsert=True
+        )
+    
+    return {"message": "Medicamento agregado", "medicamento": medicamento}
+
+
+# ==================== CRM CIRUGÍAS DESDE EVALUACIÓN ====================
+
+@router.post("/{evaluacion_id}/agregar-crm-cirugia")
+async def agregar_a_crm_cirugia(
+    evaluacion_id: str,
+    tipo_cirugia: str = Body(...),
+    ojo: str = Body("OU"),
+    diagnostico: str = Body(""),
+    prioridad: str = Body("normal"),
+    notas: str = Body(""),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Agregar paciente al CRM de cirugías desde una evaluación oftalmológica.
+    """
+    if current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    # Obtener evaluación
+    evaluacion = await db.evaluaciones_oftalmologicas.find_one(
+        {"id": evaluacion_id}, 
+        {"_id": 0}
+    )
+    if not evaluacion:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    paciente_id = evaluacion.get("paciente_id")
+    
+    # Verificar si ya existe en CRM para este tipo de cirugía
+    existing = await db.surgery_crm.find_one({
+        "paciente_id": paciente_id,
+        "tipo_cirugia": tipo_cirugia,
+        "estado": {"$nin": ["operado", "descartado"]}
+    })
+    
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El paciente ya está registrado en CRM para {tipo_cirugia}"
+        )
+    
+    # Obtener datos del paciente
+    paciente = await db.patients.find_one({"id": paciente_id}, {"_id": 0})
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    crm_entry = {
+        "id": str(uuid.uuid4()),
+        "paciente_id": paciente_id,
+        "paciente_nombre": evaluacion.get("paciente_nombre", ""),
+        "paciente_telefono": paciente.get("phone", "") if paciente else "",
+        "paciente_email": paciente.get("email", "") if paciente else "",
+        "tipo_cirugia": tipo_cirugia,
+        "ojo": ojo,
+        "diagnostico": diagnostico or ", ".join([d.get("descripcion", "") for d in evaluacion.get("diagnosticos", [])]),
+        "prioridad": prioridad,
+        "notas": notas,
+        "origen": "evaluacion",
+        "evaluacion_id": evaluacion_id,
+        "estado": "pendiente",
+        "seguimientos": [],
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    await db.surgery_crm.insert_one(crm_entry)
+    
+    # Limpiar _id para la respuesta
+    if "_id" in crm_entry:
+        del crm_entry["_id"]
+    
+    return {
+        "message": "Paciente agregado al CRM de cirugías",
+        "crm_id": crm_entry["id"],
+        "tipo_cirugia": tipo_cirugia
+    }
+

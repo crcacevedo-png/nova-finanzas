@@ -24,6 +24,7 @@ import AuditLogs from './pages/AuditLogs';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
+import CRMCirugias from './pages/CRMCirugias';
 // Módulo Inventario
 import PanelInventario from './pages/inventario/PanelInventario';
 import ProductosInventario from './pages/inventario/Productos';
@@ -254,6 +255,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <EvaluacionOftalmologica />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* CRM Cirugías - Gestión de candidatos a cirugía */}
+      <Route 
+        path="/crm-cirugias" 
+        element={
+          <ProtectedRoute>
+            <CRMCirugias />
           </ProtectedRoute>
         } 
       />
