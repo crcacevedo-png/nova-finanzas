@@ -23,6 +23,28 @@ router = APIRouter(prefix="/agenda", tags=["Agenda"])
 medicos_agenda_router = APIRouter(prefix="/medicos-agenda", tags=["Médicos Agenda"])
 config_router = APIRouter(prefix="/agenda/configuracion", tags=["Configuración Agenda"])
 
+# Variable para WebSocket manager (se inyecta desde server.py)
+ws_manager = None
+
+def init_agenda_routes(websocket_manager=None):
+    """Inicializa el WebSocket manager para agenda"""
+    global ws_manager
+    ws_manager = websocket_manager
+
+
+async def notify_agenda_update(event_type: str, data: dict, exclude_ws=None):
+    """Notifica a todos los clientes conectados al canal de agenda"""
+    if ws_manager:
+        try:
+            await ws_manager.broadcast("agenda", {
+                "type": event_type,
+                "data": data,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }, exclude=exclude_ws)
+        except Exception as e:
+            print(f"Error notificando WebSocket agenda: {e}")
+
+
 # ==================== HELPERS ====================
 
 async def get_medico_vinculado(user_id: str):
@@ -182,6 +204,13 @@ async def crear_cita(
     if "_id" in cita_doc:
         del cita_doc["_id"]
     
+    # Notificar a clientes WebSocket
+    await notify_agenda_update("cita_creada", {
+        "cita": cita_doc,
+        "fecha": cita.fecha,
+        "medico_id": cita.medico_id
+    })
+    
     return CitaResponse(**cita_doc)
 
 
@@ -218,6 +247,14 @@ async def actualizar_cita(
     await db.citas.update_one({"id": cita_id}, {"$set": update_data})
     
     cita_actualizada = await db.citas.find_one({"id": cita_id}, {"_id": 0})
+    
+    # Notificar a clientes WebSocket
+    await notify_agenda_update("cita_actualizada", {
+        "cita": cita_actualizada,
+        "fecha": cita_actualizada.get("fecha"),
+        "medico_id": cita_actualizada.get("medico_id")
+    })
+    
     return CitaResponse(**cita_actualizada)
 
 
@@ -253,6 +290,15 @@ async def cambiar_estado_cita(
     await db.citas.update_one({"id": cita_id}, {"$set": update_data})
     
     cita_actualizada = await db.citas.find_one({"id": cita_id}, {"_id": 0})
+    
+    # Notificar a clientes WebSocket (cambio de estado es importante)
+    await notify_agenda_update("cita_estado_cambiado", {
+        "cita": cita_actualizada,
+        "nuevo_estado": estado_data.estado,
+        "fecha": cita_actualizada.get("fecha"),
+        "medico_id": cita_actualizada.get("medico_id")
+    })
+    
     return CitaResponse(**cita_actualizada)
 
 

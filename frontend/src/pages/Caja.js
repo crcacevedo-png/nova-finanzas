@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import { useCajaWebSocket } from '../hooks/useWebSocket';
 import axios from 'axios';
 import { formatCurrency, formatDate } from '../services/api';
 
@@ -136,6 +137,38 @@ const Caja = () => {
   // Estado de la caja
   const [cajaEstado, setCajaEstado] = useState(null);
   const [loadingEstado, setLoadingEstado] = useState(true);
+  
+  // WebSocket para actualizaciones en tiempo real
+  const { isConnected: wsConnected, lastMessage: wsMessage } = useCajaWebSocket({
+    onMessage: (message) => {
+      console.log('📩 WebSocket Caja:', message.type);
+      
+      switch (message.type) {
+        case 'caja_abierta':
+          toast.success(`Caja abierta por ${message.data.usuario}`);
+          fetchCajaEstado();
+          break;
+          
+        case 'caja_cerrada':
+          toast.info(`Caja cerrada por ${message.data.usuario}`);
+          fetchCajaEstado();
+          break;
+          
+        case 'nuevo_movimiento':
+          toast.info(`Nuevo ${message.data.tipo}: ${formatCurrency(message.data.monto)}`);
+          fetchMovimientos();
+          break;
+          
+        case 'caja_estado_inicial':
+          // Estado inicial recibido al conectar
+          break;
+          
+        default:
+          break;
+      }
+    },
+    enabled: true
+  });
   
   // Tab actual
   const [activeTab, setActiveTab] = useState('caja-diaria');

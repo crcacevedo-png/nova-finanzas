@@ -4,10 +4,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import { useAgendaWebSocket } from '../hooks/useWebSocket';
 import { 
   Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
-  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays
+  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays, Wifi, WifiOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -215,6 +216,46 @@ const Agenda = () => {
   const [activeTab, setActiveTab] = useState('calendario');
   const [loading, setLoading] = useState(true);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
+  
+  // WebSocket para actualizaciones en tiempo real
+  const { isConnected: wsConnected, lastMessage: wsMessage } = useAgendaWebSocket({
+    onMessage: (message) => {
+      console.log('📩 WebSocket Agenda:', message.type);
+      
+      // Solo actualizar si la cita es de la fecha seleccionada
+      const citaFecha = message.data?.fecha || message.data?.cita?.fecha;
+      
+      switch (message.type) {
+        case 'cita_creada':
+          if (citaFecha === fechaSeleccionada) {
+            toast.success('Nueva cita agregada');
+            fetchCitas();
+          }
+          break;
+          
+        case 'cita_actualizada':
+          if (citaFecha === fechaSeleccionada) {
+            fetchCitas();
+          }
+          break;
+          
+        case 'cita_estado_cambiado':
+          if (citaFecha === fechaSeleccionada) {
+            const estadoMsg = message.data?.nuevo_estado;
+            if (estadoMsg === 'Presente') {
+              toast.info('Paciente llegó a consulta');
+            }
+            fetchCitas();
+            fetchPresentes();
+          }
+          break;
+          
+        default:
+          break;
+      }
+    },
+    enabled: true
+  });
   
   // Datos
   const [citas, setCitas] = useState([]);

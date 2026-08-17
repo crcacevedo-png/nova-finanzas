@@ -34,10 +34,27 @@ cierres_financieros_router = APIRouter(prefix="/cierres-financieros", tags=["Cie
 # Variable para audit logger (se inyecta desde server.py)
 audit_logger = None
 
-def init_caja_routes(log_action_func):
-    """Inicializa el logger de auditoría"""
-    global audit_logger
+# Variable para WebSocket manager (se inyecta desde server.py)
+ws_manager = None
+
+def init_caja_routes(log_action_func, websocket_manager=None):
+    """Inicializa el logger de auditoría y el WebSocket manager"""
+    global audit_logger, ws_manager
     audit_logger = log_action_func
+    ws_manager = websocket_manager
+
+
+async def notify_caja_update(event_type: str, data: dict, exclude_ws=None):
+    """Notifica a todos los clientes conectados al canal de caja"""
+    if ws_manager:
+        try:
+            await ws_manager.broadcast("caja", {
+                "type": event_type,
+                "data": data,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }, exclude=exclude_ws)
+        except Exception as e:
+            print(f"Error notificando WebSocket caja: {e}")
 
 
 # ==================== HELPERS ====================
@@ -155,6 +172,13 @@ async def abrir_caja(
     
     if "_id" in cierre:
         del cierre["_id"]
+    
+    # Notificar a clientes WebSocket
+    await notify_caja_update("caja_abierta", {
+        "cierre": cierre,
+        "usuario": current_user["name"]
+    })
+    
     return cierre
 
 
@@ -230,6 +254,14 @@ async def crear_movimiento(
     
     if "_id" in mov_dict:
         del mov_dict["_id"]
+    
+    # Notificar a clientes WebSocket
+    await notify_caja_update("nuevo_movimiento", {
+        "movimiento": mov_dict,
+        "tipo": movimiento.tipo,
+        "monto": movimiento.monto
+    })
+    
     return mov_dict
 
 
@@ -329,6 +361,14 @@ async def cerrar_caja(
         )
     
     updated = await db.caja_cierres.find_one({"id": cierre["id"]}, {"_id": 0})
+    
+    # Notificar a clientes WebSocket
+    await notify_caja_update("caja_cerrada", {
+        "cierre": updated,
+        "usuario": current_user["name"],
+        "diferencia": diferencia
+    })
+    
     return updated
 
 

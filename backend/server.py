@@ -1,9 +1,10 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, Body
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, Body, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.websockets import WebSocketState
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -20,7 +21,7 @@ import re
 import hashlib
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Set
 import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
@@ -122,6 +123,78 @@ class SimpleCache:
 
 # Instancia global de caché (TTL: 30 segundos para datos dinámicos)
 query_cache = SimpleCache(default_ttl=30)
+
+
+# ==================== WEBSOCKET CONNECTION MANAGER ====================
+
+class ConnectionManager:
+    """Gestor de conexiones WebSocket para actualizaciones en tiempo real"""
+    
+    def __init__(self):
+        # Conexiones por canal (caja, agenda, etc.)
+        self.active_connections: Dict[str, Set[WebSocket]] = {
+            "caja": set(),
+            "agenda": set(),
+            "inventario": set(),
+            "pos": set()
+        }
+        # Mapeo de websocket a usuario para tracking
+        self.connection_users: Dict[WebSocket, dict] = {}
+    
+    async def connect(self, websocket: WebSocket, channel: str, user_info: dict = None):
+        """Conectar un cliente a un canal específico"""
+        await websocket.accept()
+        if channel not in self.active_connections:
+            self.active_connections[channel] = set()
+        self.active_connections[channel].add(websocket)
+        if user_info:
+            self.connection_users[websocket] = user_info
+        logging.info(f"WebSocket conectado al canal '{channel}'. Total: {len(self.active_connections[channel])}")
+    
+    def disconnect(self, websocket: WebSocket, channel: str):
+        """Desconectar un cliente de un canal"""
+        if channel in self.active_connections:
+            self.active_connections[channel].discard(websocket)
+        if websocket in self.connection_users:
+            del self.connection_users[websocket]
+        logging.info(f"WebSocket desconectado del canal '{channel}'. Total: {len(self.active_connections.get(channel, []))}")
+    
+    async def broadcast(self, channel: str, message: dict, exclude: WebSocket = None):
+        """Enviar mensaje a todos los clientes conectados a un canal"""
+        if channel not in self.active_connections:
+            return
+        
+        disconnected = set()
+        for connection in self.active_connections[channel]:
+            if connection == exclude:
+                continue
+            try:
+                if connection.client_state == WebSocketState.CONNECTED:
+                    await connection.send_json(message)
+            except Exception as e:
+                logging.warning(f"Error enviando mensaje WebSocket: {e}")
+                disconnected.add(connection)
+        
+        # Limpiar conexiones muertas
+        for conn in disconnected:
+            self.active_connections[channel].discard(conn)
+            if conn in self.connection_users:
+                del self.connection_users[conn]
+    
+    async def send_personal(self, websocket: WebSocket, message: dict):
+        """Enviar mensaje a un cliente específico"""
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_json(message)
+        except Exception as e:
+            logging.warning(f"Error enviando mensaje personal: {e}")
+    
+    def get_channel_count(self, channel: str) -> int:
+        """Obtener número de conexiones en un canal"""
+        return len(self.active_connections.get(channel, []))
+
+# Instancia global del gestor de conexiones
+ws_manager = ConnectionManager()
 
 
 # ==================== SECURITY MIDDLEWARE ====================
@@ -2329,8 +2402,8 @@ async def caja_log_action(user_id: str, action: str, collection: str, doc_id: st
     user_name = user.get("name", "Sistema") if user else "Sistema"
     await audit.log(action, user_id, user_name, details)
 
-# Inicializar módulo de caja con función de audit
-init_caja_routes(caja_log_action)
+# Inicializar módulo de caja con función de audit y WebSocket manager
+init_caja_routes(caja_log_action, ws_manager)
 
 # Incluir routers de caja en api_router
 api_router.include_router(caja_router, tags=["Caja"])
@@ -2343,8 +2416,12 @@ api_router.include_router(caja_cierres_financieros_router, tags=["Caja - Cierres
 from routes.agenda import (
     router as agenda_router,
     medicos_agenda_router,
-    config_router as agenda_config_router
+    config_router as agenda_config_router,
+    init_agenda_routes
 )
+
+# Inicializar módulo de agenda con WebSocket manager
+init_agenda_routes(ws_manager)
 
 # Incluir routers de agenda en api_router
 api_router.include_router(agenda_router, tags=["Agenda"])
@@ -3703,6 +3780,178 @@ async def startup_event():
     logger.info(f"   - JWT Expiration: {JWT_EXPIRATION_HOURS}h")
     logger.info(f"   - Security Headers: Enabled")
     logger.info(f"   - Audit Logging: Enabled")
+    logger.info(f"   - WebSocket Manager: Initialized")
+
+
+# ==================== WEBSOCKET ENDPOINTS ====================
+
+def verify_ws_token(token: str) -> Optional[dict]:
+    """Verificar token JWT para WebSocket"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+@app.websocket("/ws/caja")
+async def websocket_caja(websocket: WebSocket, token: str = Query(None)):
+    """WebSocket para actualizaciones en tiempo real de la Caja"""
+    # Verificar autenticación
+    user_info = None
+    if token:
+        user_info = verify_ws_token(token)
+    
+    if not user_info:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+    
+    await ws_manager.connect(websocket, "caja", user_info)
+    
+    try:
+        # Enviar estado inicial de la caja
+        caja_estado = await db.caja_sesiones.find_one(
+            {"estado": "abierta"},
+            {"_id": 0}
+        )
+        await ws_manager.send_personal(websocket, {
+            "type": "caja_estado_inicial",
+            "data": {
+                "abierta": caja_estado is not None,
+                "sesion": caja_estado
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Mantener conexión activa y escuchar mensajes
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=30)
+                
+                # Ping/Pong para mantener conexión
+                if data.get("type") == "ping":
+                    await ws_manager.send_personal(websocket, {"type": "pong"})
+                
+            except asyncio.TimeoutError:
+                # Enviar ping para verificar conexión
+                try:
+                    await ws_manager.send_personal(websocket, {"type": "ping"})
+                except Exception:
+                    break
+                    
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, "caja")
+    except Exception as e:
+        logging.error(f"Error en WebSocket caja: {e}")
+        ws_manager.disconnect(websocket, "caja")
+
+
+@app.websocket("/ws/agenda")
+async def websocket_agenda(websocket: WebSocket, token: str = Query(None)):
+    """WebSocket para actualizaciones en tiempo real de la Agenda"""
+    user_info = None
+    if token:
+        user_info = verify_ws_token(token)
+    
+    if not user_info:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+    
+    await ws_manager.connect(websocket, "agenda", user_info)
+    
+    try:
+        # Enviar confirmación de conexión
+        await ws_manager.send_personal(websocket, {
+            "type": "connected",
+            "channel": "agenda",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=30)
+                
+                if data.get("type") == "ping":
+                    await ws_manager.send_personal(websocket, {"type": "pong"})
+                
+                # Suscribirse a una fecha específica
+                elif data.get("type") == "subscribe_fecha":
+                    fecha = data.get("fecha")
+                    await ws_manager.send_personal(websocket, {
+                        "type": "subscribed",
+                        "fecha": fecha
+                    })
+                    
+            except asyncio.TimeoutError:
+                try:
+                    await ws_manager.send_personal(websocket, {"type": "ping"})
+                except Exception:
+                    break
+                    
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, "agenda")
+    except Exception as e:
+        logging.error(f"Error en WebSocket agenda: {e}")
+        ws_manager.disconnect(websocket, "agenda")
+
+
+@app.websocket("/ws/pos")
+async def websocket_pos(websocket: WebSocket, token: str = Query(None)):
+    """WebSocket para actualizaciones en tiempo real del POS"""
+    user_info = None
+    if token:
+        user_info = verify_ws_token(token)
+    
+    if not user_info:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+    
+    await ws_manager.connect(websocket, "pos", user_info)
+    
+    try:
+        await ws_manager.send_personal(websocket, {
+            "type": "connected",
+            "channel": "pos",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=30)
+                
+                if data.get("type") == "ping":
+                    await ws_manager.send_personal(websocket, {"type": "pong"})
+                    
+            except asyncio.TimeoutError:
+                try:
+                    await ws_manager.send_personal(websocket, {"type": "ping"})
+                except Exception:
+                    break
+                    
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, "pos")
+    except Exception as e:
+        logging.error(f"Error en WebSocket pos: {e}")
+        ws_manager.disconnect(websocket, "pos")
+
+
+# Endpoint para obtener estadísticas de WebSocket (solo admin)
+@api_router.get("/ws/stats")
+async def get_websocket_stats(current_user: dict = Depends(require_role(["admin", "superadmin"]))):
+    """Obtener estadísticas de conexiones WebSocket activas"""
+    return {
+        "channels": {
+            channel: ws_manager.get_channel_count(channel)
+            for channel in ws_manager.active_connections.keys()
+        },
+        "total_connections": sum(
+            ws_manager.get_channel_count(ch) 
+            for ch in ws_manager.active_connections.keys()
+        )
+    }
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
