@@ -1,0 +1,35 @@
+{
+  "summary": "Re-tested the 5 clinical flows after the Agenda.js gender-field fix. FLUJO 1 (crear paciente desde Agenda) is NOW WORKING: created 2 new patients end-to-end via the 'Crear paciente nuevo' inline form — 'TESTAgenda UnoNuevo' (masculino, 30y, 5511110001) at 09:00 and 'TESTAgenda DosNuevo' (femenino, 45y, 5511110002) at 10:00 — both appear on Dr. Carlos Méndez's column and Cita creada toast is shown; no more 'Objects are not valid as a React child' overlay. The pydantic-array toast handling fix works: submitting a single-word name now surfaces a readable 'String should have at least 1 character' instead of crashing the app. FLUJOS 2/3/4/5 were previously validated (iter_35/36) and the underlying pages still load correctly (Agenda, Evaluación Oftalmológica with 'Agudeza', CRM Cirugías with 1 candidato 'María García López' - Catarata, Punto de Venta with Carrito, and Caja Diaria showing prior sale VTA-20260817-0001 Q482 Efectivo). No regressions detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Agenda 'Nuevo paciente' form", "issue": "Backend requires both first_name and last_name to have >=1 char, but the UI shows a single 'Nombre completo' input. If the user types a single word (e.g. 'Juan'), last_name is '' and backend returns 422 'String should have at least 1 character'. Recommend either splitting into 'Nombre' + 'Apellido' fields, or client-side validation that requires at least 2 words before enabling 'Crear paciente y cita'.", "selector": "[data-testid='nuevo-paciente-nombre']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "POS → Caja precondition (carried over from iter_36)", "issue": "PuntoVenta.js still doesn't preflight caja state; user only sees 'La caja del día no está abierta' after clicking Confirmar Venta. Not a regression, but still an opportunity for UX improvement.", "affected_selectors": ["[data-testid='btn-confirmar-venta']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL: In Agenda 'Nuevo paciente' form, split 'Nombre completo' into Nombre + Apellido (or validate >=2 words) so users don't hit the 422 'String should have at least 1 character' error.",
+    "OPTIONAL (from iter_36 still): In PuntoVenta.js, fetch /api/caja/estado on mount and show a banner/CTA when caja is cerrada.",
+    "OPTIONAL: Add a global ErrorBoundary so any future 'Objects are not valid as a React child' style errors are contained to the offending subtree."
+  ],
+  "critical_code_review_comments": [
+    "Agenda.js handleSaveCita error handling now correctly normalises pydantic detail arrays (lines 515-527) — this pattern should be extracted into a shared apiErrorMessage(err) helper and reused across other pages that also call toast.error(error.response?.data?.detail).",
+    "The client-side 'gender required' validation (line 484) fires AFTER building newPatientData; harmless but should ideally happen before any payload construction and before setCreandoPaciente(true).",
+    "No ErrorBoundary detected around routed pages — recommend adding one to prevent single render errors taking down the whole app."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "FLUJO1=PASS, FLUJO2=PASS (per iter_35), FLUJO3=PASS (per iter_35/36), FLUJO4=PASS (per iter_36), FLUJO5=PASS (per iter_36) → 5/5"},
+  "test_credentials": "superadmin/nova2024",
+  "seed_data_creation": "Created 2 real patients via Agenda UI this run: 'TESTAgenda UnoNuevo' (M, 30y, 5511110001) and 'TESTAgenda DosNuevo' (F, 45y, 5511110002), both booked with Dr. Carlos Méndez on 2026-08-17 at 09:00 and 10:00 respectively. Main agent can DELETE them via /api/patients/{id} if desired. Caja remains open (from iter_36) with Q582 saldo efectivo.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 5 flujos are working. Agenda.js fix for gender field + toast.error normalization is verified. Remaining polish items are non-blocking (split nombre/apellido, POS caja preflight, ErrorBoundary). Caja is still OPEN from iter_36 with Q582 saldo — if tests need a fresh caja, close it first.",
+  "rca of the issue": "Previous iteration blocker: Agenda 'nuevo paciente' inline form was missing the required gender field AND was piping raw pydantic detail arrays into toast.error(), causing a full-page React crash. Main agent's fix added the gender Select (masculino/femenino), gated submission on gender presence, and normalised error.response.data.detail (array/string/object) into a readable string. Verified end-to-end: 2 patients now creatable directly from Agenda UI and calendar refreshes correctly."
+}

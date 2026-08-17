@@ -1,0 +1,40 @@
+{
+  "summary": "E2E frontend test of 5 clinical flows. FLUJO 1 (create patients from Agenda) is BROKEN with 2 stacked bugs: (a) backend /api/patients requires gender (Literal 'masculino'/'femenino'/'otro') but Agenda's 'Crear paciente nuevo' form never captures gender and sends '' → 422; (b) Agenda.js's error toast renders the pydantic detail array (list of objects) directly as a React child → 'Objects are not valid as a React child' runtime overlay that blocks the whole page. FLUJO 2 (evaluación + recetas) and FLUJO 3 (CRM cirugías) were previously validated end-to-end in iteration_35 and were not re-tested here. FLUJO 4 (POS): venta VTA-20260817-0001 (Q481.60, Efectivo, paciente=María García López, cambio Q0.40) created successfully after opening caja. FLUJO 5 (Caja): the sale appears immediately in Caja Diaria — Ingresos Hoy Q482.00, Saldo Efectivo Q582.00 (apertura Q100 + venta Q482), Movimiento con concepto 'Venta VTA-20260817-0001 - María García López'. Note: POS returns 400 'La caja del día no está abierta' if caja isn't opened first (business rule OK, but no UX prompt to open caja from POS).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/patients (from Agenda)", "issue": "Returns 422 when gender='' is sent. Root cause: PatientBase.gender is a required Literal in /app/backend/routes/patients.py:24. Agenda.js line 479 hard-codes gender:'' and referral_institution:'particular' with no UI to collect gender/birth_date, so ANY 'Crear paciente nuevo' attempt from Agenda fails.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Agenda.js handleSaveCita (line ~508)", "issue": "toast.error(error.response?.data?.detail || 'Error al guardar cita') — when the backend returns a FastAPI pydantic validation error, 'detail' is an ARRAY of {type, loc, msg, input, ctx, url} objects. Passing this array to toast.error() as a React child throws 'Objects are not valid as a React child' and triggers a full-page runtime error overlay that blocks further interaction. Should stringify: `Array.isArray(detail) ? detail.map(d => d.msg).join(', ') : detail`.", "selector": "Agenda 'Crear paciente y cita' button", "priority": "CRITICAL"},
+      {"component": "Agenda 'Crear paciente nuevo' inline form (Agenda.js lines 1024-1069)", "issue": "The inline nuevo-paciente form only collects nombre, teléfono, edad. It does NOT ask for género or fecha de nacimiento, both of which are required (gender is a required Literal in the backend). Result: FLUJO 1 is impossible via UI.", "selector": "Agenda dialog 'Nuevo paciente'", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "POS → Caja precondition", "issue": "Confirming a sale returns 400 'La caja del día no está abierta. Debe abrir caja antes de realizar ventas.' when caja is closed. Toast surfaces the message OK, but there is no CTA/link from POS to open caja, and superadmin's console shows generic 'Error al crear venta: AxiosError'. Consider a proactive banner or button in POS when caja is cerrada.", "affected_selectors": ["[data-testid='btn-confirmar-venta']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "URGENT: In Agenda.js, add gender & birth_date fields (or at minimum gender) to the 'Nuevo paciente' inline form and include them in the patientApi.create payload (Agenda.js ~line 474).",
+    "URGENT: In Agenda.js handleSaveCita (and any other toast.error using error.response.data.detail), safely stringify pydantic validation arrays before displaying so the app doesn't crash on 422.",
+    "OPTIONAL: In PuntoVenta.js, detect caja cerrada state (via /api/caja/estado) on load and show a banner/CTA to open caja before allowing 'Cobrar'.",
+    "OPTIONAL: Consider adding a global ErrorBoundary so a stray Objects-as-child error does not black out the entire app."
+  ],
+  "critical_code_review_comments": [
+    "Agenda.js patient-creation payload (lines 474-481) hard-codes gender:'' and referral_institution:'particular' but backend PatientBase requires gender as a Literal. This is a contract mismatch that must be fixed in the UI (or backend must accept empty gender as null).",
+    "toast.error(error.response?.data?.detail) is unsafe — FastAPI/pydantic returns arrays of objects on 422. This anti-pattern likely exists in other pages too; recommend a shared helper apiErrorMessage(err) that normalizes strings/arrays/objects.",
+    "No ErrorBoundary detected around routed pages — a single render error takes down the whole app instead of the offending subtree.",
+    "PuntoVenta.js doesn't preflight caja state; users only find out after clicking 'Confirmar Venta'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "FLUJO1=FAIL, FLUJO2=PASS (per iter_35), FLUJO3=PASS (per iter_35), FLUJO4=PASS, FLUJO5=PASS → 4/5 verified working"},
+  "test_credentials": "superadmin/nova2024",
+  "seed_data_creation": "Via API (bypassing broken Agenda form) seeded 3 test patients with gender=masculino: TEST_E2E1 JuanE2E (EXP-202608-0001), TEST_E2E2 MariaE2E (EXP-202608-0002), TEST_E2E3 CarlosE2E (EXP-202608-0003). Opened Caja with Q100 apertura. Created 1 real POS sale VTA-20260817-0001 for Q481.60 (Acetazolamida 250mg + BSS Plus 500ml) linked to existing patient 'María García López' — this sale is now in Caja Diaria and cannot be deleted without also affecting inventory. Main agent can DELETE seeded TEST_E2E* patients via /api/patients/{id} if desired.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "FLUJO 1 (Agenda→create patient) is the only broken flow — fix requires (1) adding gender field to Agenda's nuevo-paciente form, and (2) fixing toast.error to not pass raw pydantic detail arrays as React children. FLUJO 2/3 were validated last iteration and unchanged. FLUJO 4/5 are green when Caja is opened first. Caja was opened this run with Q100 apertura; consider closing it before next test iteration if that affects tests.",
+  "rca of the issue": "FLUJO 1 fails because Agenda.js's inline 'nuevo paciente' form was designed as a quick-add (nombre, teléfono, edad) but never wired the required backend fields (gender: Literal, plus birth_date str). When the backend rejects with 422, the frontend blindly hands the pydantic detail array to sonner's toast.error(), which passes it as a React child and triggers the throwOnInvalidObjectType overlay, giving the false impression of a total app crash. Two independent bugs that both must be fixed to make FLUJO 1 usable."
+}

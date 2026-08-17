@@ -476,9 +476,16 @@ const Agenda = () => {
           last_name: lastName,
           phone: citaForm.nuevo_paciente_telefono || '',
           birth_date: birthDate,
-          gender: '',
+          gender: citaForm.nuevo_paciente_genero || 'masculino',
           referral_institution: 'particular'
         };
+        
+        // Validar género antes de crear
+        if (!citaForm.nuevo_paciente_genero) {
+          toast.error('Por favor seleccione el género del paciente');
+          setCreandoPaciente(false);
+          return;
+        }
         
         const response = await patientApi.create(newPatientData);
         pacienteId = response.data.id;
@@ -505,7 +512,19 @@ const Agenda = () => {
       fetchContadores();
     } catch (error) {
       setCreandoPaciente(false);
-      toast.error(error.response?.data?.detail || 'Error al guardar cita');
+      // Manejar errores de validación de pydantic (arrays de objetos)
+      const detail = error.response?.data?.detail;
+      let errorMsg = 'Error al guardar cita';
+      if (detail) {
+        if (Array.isArray(detail)) {
+          errorMsg = detail.map(d => d.msg || d.message || JSON.stringify(d)).join(', ');
+        } else if (typeof detail === 'string') {
+          errorMsg = detail;
+        } else if (typeof detail === 'object') {
+          errorMsg = detail.msg || detail.message || JSON.stringify(detail);
+        }
+      }
+      toast.error(errorMsg);
     }
   };
   
@@ -1035,7 +1054,8 @@ const Agenda = () => {
                         es_paciente_nuevo: false,
                         paciente_nombre: '',
                         nuevo_paciente_telefono: '',
-                        nuevo_paciente_edad: ''
+                        nuevo_paciente_edad: '',
+                        nuevo_paciente_genero: ''
                       }))}
                     >
                       Cancelar
@@ -1047,13 +1067,15 @@ const Agenda = () => {
                       value={citaForm.paciente_nombre}
                       onChange={(e) => setCitaForm(prev => ({ ...prev, paciente_nombre: e.target.value }))}
                       className="input-teal"
+                      data-testid="nuevo-paciente-nombre"
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Input
                         placeholder="Teléfono"
                         value={citaForm.nuevo_paciente_telefono}
                         onChange={(e) => setCitaForm(prev => ({ ...prev, nuevo_paciente_telefono: e.target.value }))}
                         className="input-teal"
+                        data-testid="nuevo-paciente-telefono"
                       />
                       <Input
                         placeholder="Edad (años)"
@@ -1063,7 +1085,20 @@ const Agenda = () => {
                         value={citaForm.nuevo_paciente_edad}
                         onChange={(e) => setCitaForm(prev => ({ ...prev, nuevo_paciente_edad: e.target.value }))}
                         className="input-teal"
+                        data-testid="nuevo-paciente-edad"
                       />
+                      <Select
+                        value={citaForm.nuevo_paciente_genero || ''}
+                        onValueChange={(value) => setCitaForm(prev => ({ ...prev, nuevo_paciente_genero: value }))}
+                      >
+                        <SelectTrigger className="input-teal" data-testid="nuevo-paciente-genero">
+                          <SelectValue placeholder="Género *" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="masculino">Masculino</SelectItem>
+                          <SelectItem value="femenino">Femenino</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
