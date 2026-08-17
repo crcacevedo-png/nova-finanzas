@@ -1,8 +1,9 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from starlette.middleware.gzip import GZipMiddleware
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -16,6 +17,7 @@ import os
 import logging
 import secrets
 import re
+import hashlib
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Literal
@@ -26,6 +28,8 @@ import bcrypt
 import io
 import json
 import asyncio
+from functools import lru_cache
+import time
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -75,16 +79,55 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Middleware de compresión GZip para respuestas > 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
 security = HTTPBearer()
 
 
+# ==================== CACHE EN MEMORIA ====================
+
+# Cache simple en memoria para consultas frecuentes
+class SimpleCache:
+    def __init__(self, default_ttl: int = 60):
+        self._cache = {}
+        self._timestamps = {}
+        self.default_ttl = default_ttl
+    
+    def get(self, key: str):
+        if key in self._cache:
+            if time.time() - self._timestamps.get(key, 0) < self.default_ttl:
+                return self._cache[key]
+            else:
+                del self._cache[key]
+                del self._timestamps[key]
+        return None
+    
+    def set(self, key: str, value, ttl: int = None):
+        self._cache[key] = value
+        self._timestamps[key] = time.time()
+    
+    def invalidate(self, pattern: str = None):
+        if pattern:
+            keys_to_delete = [k for k in self._cache.keys() if pattern in k]
+            for key in keys_to_delete:
+                del self._cache[key]
+                del self._timestamps[key]
+        else:
+            self._cache.clear()
+            self._timestamps.clear()
+
+# Instancia global de caché (TTL: 30 segundos para datos dinámicos)
+query_cache = SimpleCache(default_ttl=30)
+
+
 # ==================== SECURITY MIDDLEWARE ====================
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Middleware para agregar headers de seguridad a todas las respuestas"""
+    """Middleware para agregar headers de seguridad y caché a todas las respuestas"""
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
         
@@ -109,6 +152,29 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Forzar HTTPS en producción
         if os.environ.get('ENVIRONMENT', 'development') == 'production':
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
+        # Headers de caché para CDN y navegadores
+        path = request.url.path
+        
+        # Assets estáticos: caché largo (1 año)
+        if any(ext in path for ext in ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf']):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            response.headers["Vary"] = "Accept-Encoding"
+        
+        # Archivos descargables: caché medio (1 hora)
+        elif any(ext in path for ext in ['.xlsx', '.pdf', '.csv']):
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        
+        # API endpoints: no cachear por defecto (datos dinámicos)
+        elif '/api/' in path:
+            # Endpoints que pueden cachearse brevemente
+            cacheable_endpoints = ['/api/catalogos/', '/api/igss-units', '/api/doctors']
+            if any(ep in path for ep in cacheable_endpoints):
+                response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutos
+            else:
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
         
         return response
 
@@ -1311,7 +1377,7 @@ async def seed_catalogos_oftalmologicos():
                 "usos": 5,
                 "fecha_creacion": now
             })
-        except:
+        except Exception:
             pass  # Duplicado
     
     # Catálogo de estudios oftalmológicos
@@ -1334,7 +1400,7 @@ async def seed_catalogos_oftalmologicos():
                 "usos": 3,
                 "fecha_creacion": now
             })
-        except:
+        except Exception:
             pass
     
     # Catálogo de diagnósticos oftalmológicos comunes
@@ -1361,7 +1427,7 @@ async def seed_catalogos_oftalmologicos():
                 "usos": 2,
                 "fecha_creacion": now
             })
-        except:
+        except Exception:
             pass
     
     print(f"Catálogos oftalmológicos creados: {len(medicamentos)} medicamentos, {len(estudios)} estudios, {len(diagnosticos)} diagnósticos")
@@ -1381,7 +1447,7 @@ async def seed_catalogos_oftalmologicos():
                     birth = datetime.strptime(paciente["birth_date"], "%Y-%m-%d")
                     today = datetime.now()
                     edad = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
-                except:
+                except (ValueError, KeyError):
                     pass
             
             # Evaluación de ejemplo completa
@@ -3444,15 +3510,49 @@ async def startup_event():
     await db.fixed_expenses.create_index([("supplier_id", 1)])
     await db.fixed_expenses.create_index([("day_of_month", 1)])
     await db.fixed_expenses.create_index([("is_active", 1)])
-    # Índices de pacientes
-    await db.patients.create_index([("record_number", 1)], unique=True)
-    await db.patients.create_index([("dpi", 1)])
-    await db.patients.create_index([("first_name", 1), ("last_name", 1)])
-    await db.patients.create_index([("phone", 1)])
-    await db.patients.create_index([("referral_institution", 1)])
-    await db.patients.create_index([("igss_unit_id", 1)])
-    await db.patients.create_index([("is_active", 1)])
-    await db.patients.create_index([("created_at", -1)])
+    
+    # Índices de pacientes - Básicos (con manejo de conflictos)
+    try:
+        await db.patients.create_index([("record_number", 1)], unique=True)
+    except Exception:
+        pass
+    try:
+        # Dropear índice viejo si existe y crear nuevo con sparse
+        await db.patients.drop_index("dpi_1")
+    except Exception:
+        pass
+    try:
+        await db.patients.create_index([("dpi", 1)], sparse=True, name="dpi_1_sparse")
+    except Exception:
+        pass
+    try:
+        await db.patients.create_index([("phone", 1)])
+        await db.patients.create_index([("is_active", 1)])
+        await db.patients.create_index([("created_at", -1)])
+    except Exception:
+        pass
+    
+    # Índices compuestos optimizados para pacientes (consultas frecuentes)
+    try:
+        await db.patients.create_index([("is_active", 1), ("created_at", -1)], name="patients_active_created")
+        await db.patients.create_index([("first_name", 1), ("last_name", 1), ("is_active", 1)], name="patients_name_active")
+        await db.patients.create_index([("referral_institution", 1), ("is_active", 1)], name="patients_institution_active")
+        await db.patients.create_index([("igss_unit_id", 1), ("is_active", 1)], name="patients_igss_active")
+    except Exception:
+        pass
+    
+    # Índice de texto para búsqueda full-text
+    try:
+        await db.patients.create_index([
+            ("first_name", "text"), 
+            ("last_name", "text"), 
+            ("dpi", "text"),
+            ("record_number", "text"),
+            ("phone", "text")
+        ], name="patients_text_search")
+    except Exception:
+        pass  # El índice ya existe
+    
     # Índices de unidades IGSS
     await db.igss_units.create_index([("name", 1)])
     await db.igss_units.create_index([("is_active", 1)])
@@ -3478,12 +3578,75 @@ async def startup_event():
     # Seed de cirugías
     await seed_surgeries_data()
     
-    # Índices de Evaluaciones Oftalmológicas
-    await db.evaluaciones_oftalmologicas.create_index([("paciente_id", 1)])
-    await db.evaluaciones_oftalmologicas.create_index([("fecha", -1)])
-    await db.evaluaciones_oftalmologicas.create_index([("fecha_creacion", -1)])
-    await db.evaluaciones_oftalmologicas.create_index([("sellado", 1)])
-    await db.evaluaciones_oftalmologicas.create_index([("medico_id", 1)])
+    # Índices de Evaluaciones Oftalmológicas (con manejo de conflictos)
+    try:
+        await db.evaluaciones_oftalmologicas.create_index([("paciente_id", 1)])
+        await db.evaluaciones_oftalmologicas.create_index([("fecha", -1)])
+        await db.evaluaciones_oftalmologicas.create_index([("fecha_creacion", -1)])
+        await db.evaluaciones_oftalmologicas.create_index([("sellado", 1)])
+        await db.evaluaciones_oftalmologicas.create_index([("medico_id", 1)])
+        # Índices compuestos optimizados
+        await db.evaluaciones_oftalmologicas.create_index([("paciente_id", 1), ("fecha_creacion", -1)], name="eval_paciente_fecha")
+        await db.evaluaciones_oftalmologicas.create_index([("medico_id", 1), ("fecha", -1)], name="eval_medico_fecha")
+        await db.evaluaciones_oftalmologicas.create_index([("sellado", 1), ("fecha_creacion", -1)], name="eval_sellado_fecha")
+    except Exception:
+        pass
+    
+    # Índices para Agenda/Citas
+    try:
+        await db.citas.create_index([("fecha", 1)])
+        await db.citas.create_index([("paciente_id", 1)])
+        await db.citas.create_index([("medico_id", 1)])
+        await db.citas.create_index([("estado", 1)])
+        await db.citas.create_index([("fecha", 1), ("medico_id", 1), ("estado", 1)], name="citas_agenda_diaria")
+        await db.citas.create_index([("paciente_id", 1), ("fecha", -1)], name="citas_paciente_fecha")
+    except Exception:
+        pass
+    
+    # Índices para Inventario
+    try:
+        await db.inventario_productos.create_index([("codigo", 1)], unique=True, sparse=True)
+        await db.inventario_productos.create_index([("nombre", 1)])
+        await db.inventario_productos.create_index([("categoria_id", 1)])
+        await db.inventario_productos.create_index([("activo", 1)])
+        await db.inventario_productos.create_index([("activo", 1), ("nombre", 1)], name="productos_activos_nombre")
+        await db.inventario_productos.create_index([
+            ("nombre", "text"),
+            ("codigo", "text"),
+            ("descripcion", "text")
+        ], name="productos_text_search")
+    except Exception:
+        pass
+    
+    # Índices para Ventas POS
+    try:
+        await db.ventas.create_index([("numero_venta", 1)], unique=True)
+        await db.ventas.create_index([("fecha", -1)])
+        await db.ventas.create_index([("paciente_id", 1)])
+        await db.ventas.create_index([("estado", 1)])
+        await db.ventas.create_index([("fecha", -1), ("estado", 1)], name="ventas_fecha_estado")
+    except Exception:
+        pass
+    
+    # Índices para Caja
+    try:
+        await db.caja_sesiones.create_index([("fecha_apertura", -1)])
+        await db.caja_sesiones.create_index([("estado", 1)])
+        await db.caja_movimientos.create_index([("sesion_id", 1)])
+        await db.caja_movimientos.create_index([("fecha", -1)])
+        await db.caja_movimientos.create_index([("tipo", 1)])
+    except Exception:
+        pass
+    
+    # Índices para CRM Cirugías
+    try:
+        await db.surgery_candidates.create_index([("estado", 1)])
+        await db.surgery_candidates.create_index([("prioridad", 1)])
+        await db.surgery_candidates.create_index([("paciente_id", 1)])
+        await db.surgery_candidates.create_index([("created_at", -1)])
+        await db.surgery_candidates.create_index([("estado", 1), ("prioridad", 1), ("created_at", -1)], name="crm_candidatos_listado")
+    except Exception:
+        pass
     
     # Índices de Catálogos
     await db.catalogo_medicamentos.create_index([("nombre", 1)], unique=True)

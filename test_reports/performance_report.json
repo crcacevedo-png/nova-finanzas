@@ -1,77 +1,77 @@
 {
-  "timestamp": "2026-08-17T22:26:13.857778",
+  "timestamp": "2026-08-17T22:37:31.411251",
   "base_url": "https://novavision-finanzas.preview.emergentagent.com/api",
   "tests": [],
   "baseline": [
     {
       "name": "Autenticaci\u00f3n",
       "endpoint": "/auth/me",
-      "avg_ms": 137.49,
-      "min_ms": 123.92,
-      "max_ms": 169.06
+      "avg_ms": 143.04,
+      "min_ms": 116.8,
+      "max_ms": 177.68
     },
     {
       "name": "Lista Pacientes",
       "endpoint": "/patients?limit=20",
-      "avg_ms": 137.33,
-      "min_ms": 130.07,
-      "max_ms": 144.58
+      "avg_ms": 145.27,
+      "min_ms": 125.53,
+      "max_ms": 165.68
     },
     {
       "name": "B\u00fasqueda Pacientes",
       "endpoint": "/patients/search?q=Juan",
-      "avg_ms": 141.86,
-      "min_ms": 116.64,
-      "max_ms": 166.38
+      "avg_ms": 127.73,
+      "min_ms": 104.25,
+      "max_ms": 172.74
     },
     {
       "name": "Lista Evaluaciones",
       "endpoint": "/evaluaciones?limit=10",
-      "avg_ms": 131.25,
-      "min_ms": 120.46,
-      "max_ms": 147.78
+      "avg_ms": 132.98,
+      "min_ms": 125.08,
+      "max_ms": 143.7
     },
     {
       "name": "Citas del D\u00eda",
       "endpoint": "/agenda/citas?fecha=2026-08-17",
-      "avg_ms": 142.08,
-      "min_ms": 133.95,
-      "max_ms": 158.94
+      "avg_ms": 146.97,
+      "min_ms": 115.79,
+      "max_ms": 207.51
     },
     {
       "name": "Productos Inventario",
       "endpoint": "/inventario/productos?limit=20",
-      "avg_ms": 163.2,
-      "min_ms": 140.31,
-      "max_ms": 212.54
+      "avg_ms": 129.3,
+      "min_ms": 116.58,
+      "max_ms": 146.03
     },
     {
       "name": "Bodega POS",
       "endpoint": "/ventas/bodega-pos",
-      "avg_ms": 168.66,
-      "min_ms": 115.07,
-      "max_ms": 221.13
+      "avg_ms": 146.91,
+      "min_ms": 105.22,
+      "max_ms": 216.19
     },
     {
       "name": "Estado Caja",
       "endpoint": "/caja/estado",
-      "avg_ms": 124.79,
-      "min_ms": 113.39,
-      "max_ms": 151.1
+      "avg_ms": 126.32,
+      "min_ms": 107.12,
+      "max_ms": 153.16
     },
     {
       "name": "Lista Gastos",
       "endpoint": "/expenses?limit=20",
-      "avg_ms": 132.62,
-      "min_ms": 112.83,
-      "max_ms": 152.16
+      "avg_ms": 136.15,
+      "min_ms": 120.0,
+      "max_ms": 153.62
     },
     {
       "name": "Dashboard Stats",
       "endpoint": "/dashboard/stats",
-      "avg_ms": 153.23,
-      "min_ms": 116.94,
-      "max_ms": 205.23
+      "avg_ms": 136.03,
+      "min_ms": 104.38,
+      "max_ms": 169.86
     }
   ],
   "load_tests": [
@@ -82,15 +82,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 1.72,
-      "requests_per_second": 58.09,
+      "total_time_seconds": 2.57,
+      "requests_per_second": 38.86,
       "response_times_ms": {
-        "min": 51.25,
-        "max": 502.02,
-        "avg": 84.76,
-        "median": 76.19,
-        "p95": 138.07,
-        "p99": 502.02
+        "min": 59.73,
+        "max": 2162.98,
+        "avg": 122.26,
+        "median": 96.29,
+        "p95": 350.55,
+        "p99": 2162.98
       }
     },
     {
@@ -100,15 +100,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 1.47,
-      "requests_per_second": 67.92,
+      "total_time_seconds": 2.24,
+      "requests_per_second": 44.67,
       "response_times_ms": {
-        "min": 53.47,
-        "max": 120.05,
-        "avg": 71.73,
-        "median": 69.72,
-        "p95": 92.63,
-        "p99": 120.05
+        "min": 54.0,
+        "max": 441.54,
+        "avg": 107.3,
+        "median": 96.67,
+        "p95": 260.45,
+        "p99": 441.54
       }
     },
     {
@@ -118,15 +118,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 2.06,
-      "requests_per_second": 48.52,
+      "total_time_seconds": 1.57,
+      "requests_per_second": 63.87,
       "response_times_ms": {
-        "min": 59.05,
-        "max": 832.17,
-        "avg": 101.83,
-        "median": 82.51,
-        "p95": 177.83,
-        "p99": 832.17
+        "min": 51.54,
+        "max": 243.88,
+        "avg": 76.92,
+        "median": 70.58,
+        "p95": 148.2,
+        "p99": 243.88
       }
     },
     {
@@ -136,15 +136,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 5.63,
-      "requests_per_second": 17.75,
+      "total_time_seconds": 1.16,
+      "requests_per_second": 86.3,
       "response_times_ms": {
-        "min": 58.93,
-        "max": 5001.97,
-        "avg": 149.42,
-        "median": 84.66,
-        "p95": 244.11,
-        "p99": 5001.97
+        "min": 49.52,
+        "max": 630.41,
+        "avg": 109.53,
+        "median": 107.02,
+        "p95": 176.05,
+        "p99": 630.41
       }
     },
     {
@@ -154,15 +154,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 1.68,
-      "requests_per_second": 59.67,
+      "total_time_seconds": 1.07,
+      "requests_per_second": 93.87,
       "response_times_ms": {
-        "min": 44.85,
-        "max": 1036.08,
-        "avg": 104.75,
-        "median": 68.58,
-        "p95": 202.08,
-        "p99": 1036.08
+        "min": 44.61,
+        "max": 547.11,
+        "avg": 98.5,
+        "median": 99.47,
+        "p95": 151.66,
+        "p99": 547.11
       }
     },
     {
@@ -172,15 +172,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 1.82,
-      "requests_per_second": 54.97,
+      "total_time_seconds": 1.04,
+      "requests_per_second": 96.44,
       "response_times_ms": {
-        "min": 51.62,
-        "max": 1487.25,
-        "avg": 99.88,
-        "median": 81.8,
-        "p95": 134.93,
-        "p99": 1487.25
+        "min": 51.6,
+        "max": 437.46,
+        "avg": 93.78,
+        "median": 74.73,
+        "p95": 169.74,
+        "p99": 437.46
       }
     },
     {
@@ -190,15 +190,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 0.6,
-      "requests_per_second": 166.76,
+      "total_time_seconds": 0.97,
+      "requests_per_second": 102.79,
       "response_times_ms": {
-        "min": 71.68,
-        "max": 365.73,
-        "avg": 130.42,
-        "median": 111.61,
-        "p95": 239.3,
-        "p99": 365.73
+        "min": 57.22,
+        "max": 512.21,
+        "avg": 136.5,
+        "median": 118.22,
+        "p95": 274.75,
+        "p99": 512.21
       }
     },
     {
@@ -208,15 +208,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 0.9,
-      "requests_per_second": 111.01,
+      "total_time_seconds": 0.54,
+      "requests_per_second": 185.93,
       "response_times_ms": {
-        "min": 45.25,
-        "max": 794.73,
-        "avg": 105.25,
-        "median": 74.14,
-        "p95": 176.82,
-        "p99": 794.73
+        "min": 43.9,
+        "max": 357.12,
+        "avg": 121.62,
+        "median": 104.42,
+        "p95": 237.96,
+        "p99": 357.12
       }
     },
     {
@@ -226,15 +226,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 1.5,
-      "requests_per_second": 66.52,
+      "total_time_seconds": 2.29,
+      "requests_per_second": 43.58,
       "response_times_ms": {
-        "min": 68.4,
-        "max": 1222.11,
-        "avg": 184.56,
-        "median": 151.78,
-        "p95": 283.86,
-        "p99": 1222.11
+        "min": 60.71,
+        "max": 2294.11,
+        "avg": 180.26,
+        "median": 131.54,
+        "p95": 227.54,
+        "p99": 2294.11
       }
     },
     {
@@ -244,15 +244,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 1.63,
-      "requests_per_second": 61.34,
+      "total_time_seconds": 0.86,
+      "requests_per_second": 115.79,
       "response_times_ms": {
-        "min": 82.5,
-        "max": 1188.59,
-        "avg": 283.22,
-        "median": 235.41,
-        "p95": 462.08,
-        "p99": 1188.59
+        "min": 105.37,
+        "max": 862.8,
+        "avg": 277.55,
+        "median": 227.8,
+        "p95": 593.04,
+        "p99": 862.8
       }
     },
     {
@@ -262,15 +262,15 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 2.91,
-      "requests_per_second": 34.32,
+      "total_time_seconds": 3.06,
+      "requests_per_second": 32.71,
       "response_times_ms": {
-        "min": 49.11,
-        "max": 2720.18,
-        "avg": 211.79,
-        "median": 145.46,
-        "p95": 853.06,
-        "p99": 2720.18
+        "min": 45.33,
+        "max": 3055.64,
+        "avg": 714.85,
+        "median": 125.01,
+        "p95": 2537.74,
+        "p99": 3055.64
       }
     },
     {
@@ -280,51 +280,51 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 2.39,
-      "requests_per_second": 41.76,
+      "total_time_seconds": 0.68,
+      "requests_per_second": 147.32,
       "response_times_ms": {
-        "min": 70.4,
-        "max": 2317.26,
-        "avg": 338.03,
-        "median": 277.81,
-        "p95": 824.35,
-        "p99": 2317.26
+        "min": 62.23,
+        "max": 461.03,
+        "avg": 283.42,
+        "median": 244.39,
+        "p95": 447.56,
+        "p99": 461.03
       }
     },
     {
       "endpoint": "/patients?limit=10",
       "concurrent_users": 100,
       "total_requests": 100,
-      "successful_requests": 100,
-      "failed_requests": 0,
-      "success_rate": 100.0,
-      "total_time_seconds": 1.31,
-      "requests_per_second": 76.06,
+      "successful_requests": 56,
+      "failed_requests": 44,
+      "success_rate": 56.0,
+      "total_time_seconds": 30.53,
+      "requests_per_second": 3.28,
       "response_times_ms": {
-        "min": 290.57,
-        "max": 1314.28,
-        "avg": 500.06,
-        "median": 547.99,
-        "p95": 610.0,
-        "p99": 1314.28
+        "min": 138.77,
+        "max": 3745.12,
+        "avg": 389.0,
+        "median": 328.18,
+        "p95": 395.9,
+        "p99": 3745.12
       }
     },
     {
       "endpoint": "/agenda/citas?fecha=2026-08-17",
       "concurrent_users": 100,
       "total_requests": 100,
-      "successful_requests": 100,
-      "failed_requests": 0,
-      "success_rate": 100.0,
-      "total_time_seconds": 1.32,
-      "requests_per_second": 75.7,
+      "successful_requests": 99,
+      "failed_requests": 1,
+      "success_rate": 99.0,
+      "total_time_seconds": 30.99,
+      "requests_per_second": 3.23,
       "response_times_ms": {
-        "min": 234.69,
-        "max": 1318.4,
-        "avg": 346.27,
-        "median": 346.89,
-        "p95": 437.77,
-        "p99": 1318.4
+        "min": 179.95,
+        "max": 20641.98,
+        "avg": 5901.91,
+        "median": 2522.71,
+        "p95": 19682.2,
+        "p99": 20641.98
       }
     },
     {
@@ -334,64 +334,85 @@
       "successful_requests": 100,
       "failed_requests": 0,
       "success_rate": 100.0,
-      "total_time_seconds": 0.76,
-      "requests_per_second": 131.53,
+      "total_time_seconds": 0.83,
+      "requests_per_second": 119.92,
       "response_times_ms": {
-        "min": 257.28,
-        "max": 758.91,
-        "avg": 615.32,
-        "median": 696.03,
-        "p95": 728.31,
-        "p99": 758.91
+        "min": 321.7,
+        "max": 831.8,
+        "avg": 690.41,
+        "median": 735.39,
+        "p95": 788.98,
+        "p99": 831.8
       }
     }
   ],
   "stress_tests": [
     {
       "concurrent_users": 50,
-      "success_rate": 100.0,
-      "requests_per_second": 36.23,
-      "avg_response_ms": 184.51,
+      "success_rate": 98.5,
+      "requests_per_second": 6.63,
+      "avg_response_ms": 1028.85,
       "status": "\u2705"
     },
     {
       "concurrent_users": 100,
       "success_rate": 100.0,
-      "requests_per_second": 39.82,
-      "avg_response_ms": 398.12,
+      "requests_per_second": 62.9,
+      "avg_response_ms": 504.83,
       "status": "\u2705"
     },
     {
       "concurrent_users": 150,
-      "success_rate": 30.5,
-      "requests_per_second": 6.41,
-      "avg_response_ms": 4507.89,
-      "status": "\u274c"
+      "success_rate": 100.0,
+      "requests_per_second": 205.45,
+      "avg_response_ms": 487.49,
+      "status": "\u2705"
+    },
+    {
+      "concurrent_users": 200,
+      "success_rate": 100.0,
+      "requests_per_second": 126.74,
+      "avg_response_ms": 607.71,
+      "status": "\u2705"
+    },
+    {
+      "concurrent_users": 250,
+      "success_rate": 100.0,
+      "requests_per_second": 126.31,
+      "avg_response_ms": 626.25,
+      "status": "\u2705"
+    },
+    {
+      "concurrent_users": 300,
+      "success_rate": 80.5,
+      "requests_per_second": 119.86,
+      "avg_response_ms": 580.55,
+      "status": "\u26a0\ufe0f"
     }
   ],
   "database_tests": [
     {
       "operation": "50 pacientes",
-      "avg_ms": 8361.08
+      "avg_ms": 130.01
     },
     {
       "operation": "100 pacientes",
-      "avg_ms": 146.08
+      "avg_ms": 136.09
     },
     {
       "operation": "50 evaluaciones",
-      "avg_ms": 143.35
+      "avg_ms": 419.22
     },
     {
       "operation": "100 gastos",
-      "avg_ms": 144.15
+      "avg_ms": 114.22
     }
   ],
   "capacity": {
-    "optimal_concurrent": 100,
-    "max_rps": 39.82,
-    "avg_response_ms": 398.12,
-    "estimated_active_users": "100-200",
-    "estimated_total_users": "500-1000"
+    "optimal_concurrent": 250,
+    "max_rps": 126.31,
+    "avg_response_ms": 626.25,
+    "estimated_active_users": "250-500",
+    "estimated_total_users": "1250-2500"
   }
 }
