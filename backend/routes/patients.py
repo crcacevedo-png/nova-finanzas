@@ -864,17 +864,31 @@ class ImportPatientItem(BaseModel):
     cui: Optional[str] = None  # Alternativo
     profession: Optional[str] = None
     profesion: Optional[str] = None  # Alternativo
+    direccion: Optional[str] = None  # Dirección
+    estado_civil: Optional[str] = None  # Estado civil
     referral_institution: Optional[str] = None
     institucion: Optional[str] = None  # Alternativo
     insurance_name: Optional[str] = None
     seguro: Optional[str] = None  # Alternativo
+    nombre_seguro: Optional[str] = None  # Alternativo
+    otra_institucion: Optional[str] = None  # Nombre de otra institución
     comments: Optional[str] = None
     observaciones: Optional[str] = None  # Alternativo
     record_number: Optional[str] = None  # Para mantener expediente existente
     expediente: Optional[str] = None  # Alternativo
     emergency_phone: Optional[str] = None
+    emergencia_telefono: Optional[str] = None  # Alternativo
     emergency_contact_name: Optional[str] = None
+    emergencia_nombre: Optional[str] = None  # Alternativo
     emergency_contact_relationship: Optional[str] = None
+    emergencia_parentesco: Optional[str] = None  # Alternativo
+    # Campos IGSS
+    igss_unidad: Optional[str] = None
+    igss_afiliacion: Optional[str] = None
+    igss_no_sps: Optional[str] = None
+    igss_codigo: Optional[str] = None
+    igss_nog: Optional[str] = None  # Número de Orden de Gestión
+    igss_tipo_compra: Optional[str] = None
 
 
 class ImportBatchRequest(BaseModel):
@@ -1046,13 +1060,30 @@ def extract_patient_data(item: ImportPatientItem) -> dict:
     referral_institution = normalize_institution(item.referral_institution or item.institucion or "")
     
     # Seguro
-    insurance_name = item.insurance_name or item.seguro or ""
+    insurance_name = item.insurance_name or item.seguro or item.nombre_seguro or ""
+    
+    # Otra institución
+    other_institution_name = item.otra_institucion or ""
     
     # Comentarios
     comments = item.comments or item.observaciones or ""
     
     # Número de expediente (si se quiere preservar)
     record_number = item.record_number or item.expediente or None
+    
+    # Contacto de emergencia
+    emergency_phone = item.emergency_phone or item.emergencia_telefono or ""
+    emergency_contact_name = item.emergency_contact_name or item.emergencia_nombre or ""
+    emergency_contact_relationship = item.emergency_contact_relationship or item.emergencia_parentesco or ""
+    
+    # Campos IGSS (solo si la institución es IGSS)
+    is_igss = referral_institution == "igss"
+    igss_afiliacion = (item.igss_afiliacion or "") if is_igss else ""
+    igss_no_sps = (item.igss_no_sps or "") if is_igss else ""
+    igss_codigo = (item.igss_codigo or "") if is_igss else ""
+    igss_nog = (item.igss_nog or "") if is_igss else ""
+    igss_tipo_compra = (item.igss_tipo_compra or "") if is_igss else ""
+    igss_unidad = (item.igss_unidad or "") if is_igss else ""
     
     return {
         "first_name": first_name.strip()[:100] if first_name else "",
@@ -1063,14 +1094,22 @@ def extract_patient_data(item: ImportPatientItem) -> dict:
         "email": email[:100] if email else "",
         "dpi": dpi,
         "profession": profession[:100] if profession else "",
+        "direccion": item.direccion or "",
+        "estado_civil": item.estado_civil or "",
         "referral_institution": referral_institution,
         "insurance_name": insurance_name[:100] if insurance_name else "",
-        "other_institution_name": "",
+        "other_institution_name": other_institution_name[:100] if other_institution_name else "",
         "comments": comments[:500] if comments else "",
-        "emergency_phone": item.emergency_phone or "",
-        "emergency_contact_name": item.emergency_contact_name or "",
-        "emergency_contact_relationship": item.emergency_contact_relationship or "",
+        "emergency_phone": emergency_phone,
+        "emergency_contact_name": emergency_contact_name,
+        "emergency_contact_relationship": emergency_contact_relationship,
         "igss_unit_id": None,
+        "igss_unit_name": igss_unidad,
+        "igss_afiliacion": igss_afiliacion,
+        "igss_no_sps": igss_no_sps,
+        "igss_codigo": igss_codigo,
+        "igss_nog": igss_nog,
+        "igss_tipo_compra": igss_tipo_compra,
         "_original_record_number": record_number
     }
 
@@ -1270,10 +1309,17 @@ async def import_patients_batch(
                 "insurance_name": data["insurance_name"],
                 "other_institution_name": data["other_institution_name"],
                 "igss_unit_id": data["igss_unit_id"],
+                "igss_afiliacion": data.get("igss_afiliacion", ""),
+                "igss_no_sps": data.get("igss_no_sps", ""),
+                "igss_codigo": data.get("igss_codigo", ""),
+                "igss_nog": data.get("igss_nog", ""),
+                "igss_tipo_compra": data.get("igss_tipo_compra", ""),
                 "comments": data["comments"],
                 "emergency_phone": data["emergency_phone"],
                 "emergency_contact_name": data["emergency_contact_name"],
                 "emergency_contact_relationship": data["emergency_contact_relationship"],
+                "direccion": data.get("direccion", ""),
+                "estado_civil": data.get("estado_civil", ""),
                 "is_active": True,
                 "created_by": current_user["id"],
                 "created_at": now.isoformat(),
