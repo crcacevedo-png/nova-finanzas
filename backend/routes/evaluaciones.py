@@ -616,6 +616,7 @@ async def agregar_a_crm_cirugia(
     ojo: str = Body("OU"),
     diagnostico: str = Body(""),
     prioridad: str = Body("normal"),
+    nivel_interes: str = Body("interesado"),
     notas: str = Body(""),
     current_user: dict = Depends(get_current_user)
 ):
@@ -663,6 +664,7 @@ async def agregar_a_crm_cirugia(
         "ojo": ojo,
         "diagnostico": diagnostico or ", ".join([d.get("descripcion", "") for d in evaluacion.get("diagnosticos", [])]),
         "prioridad": prioridad,
+        "nivel_interes": nivel_interes,
         "notas": notas,
         "origen": "evaluacion",
         "evaluacion_id": evaluacion_id,

@@ -25,6 +25,7 @@ class SurgeryCandidateBase(BaseModel):
     ojo: str = "OU"  # OD, OS, OU
     diagnostico: Optional[str] = None
     prioridad: str = "normal"  # alta, normal, baja
+    nivel_interes: str = "interesado"  # muy_interesado, interesado, indeciso, poco_interesado
     notas: Optional[str] = None
     origen: str = "manual"  # manual, evaluacion
     evaluacion_id: Optional[str] = None  # Si viene de evaluación oftalmológica
@@ -39,6 +40,7 @@ class SurgeryCandidateUpdate(BaseModel):
     ojo: Optional[str] = None
     diagnostico: Optional[str] = None
     prioridad: Optional[str] = None
+    nivel_interes: Optional[str] = None
     notas: Optional[str] = None
     estado: Optional[str] = None  # pendiente, contactado, programado, operado, descartado
     fecha_contacto: Optional[str] = None
@@ -66,6 +68,7 @@ class SurgeryCandidateResponse(BaseModel):
     ojo: str
     diagnostico: Optional[str] = None
     prioridad: str
+    nivel_interes: str = "interesado"
     notas: Optional[str] = None
     origen: str
     evaluacion_id: Optional[str] = None

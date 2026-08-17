@@ -5,7 +5,7 @@ import {
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
   ChevronDown, ChevronUp, Lock, Clock, Calendar,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
-  Glasses, Contact
+  Glasses, Contact, CheckCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -205,9 +205,11 @@ const EvaluacionOftalmologica = () => {
     ojo: 'OU',
     diagnostico: '',
     prioridad: 'normal',
+    nivel_interes: 'interesado',
     notas: ''
   });
   const [tiposCirugia, setTiposCirugia] = useState([]);
+  const [crmEnviado, setCrmEnviado] = useState(false); // Para mostrar si ya se envió al CRM
   
   const autoguardadoRef = useRef(null);
   const lastSavedRef = useRef(null);
@@ -437,6 +439,17 @@ const EvaluacionOftalmologica = () => {
   const cargarEvaluacion = async (evaluacion) => {
     setEvaluacionActual(evaluacion);
     
+    // Resetear estado CRM al cargar nueva evaluación
+    setCrmEnviado(false);
+    setCrmForm({
+      tipo_cirugia: '',
+      ojo: 'OU',
+      diagnostico: '',
+      prioridad: 'normal',
+      nivel_interes: 'interesado',
+      notas: ''
+    });
+    
     // Migrar datos antiguos (oi → os) si es necesario
     const examenData = evaluacion.examen || {};
     const migratedExamen = {
@@ -497,6 +510,16 @@ const EvaluacionOftalmologica = () => {
     setSearchPaciente('');
     setAutoguardadoStatus('');
     setTiempoRestante(null);
+    // Resetear estado CRM
+    setCrmEnviado(false);
+    setCrmForm({
+      tipo_cirugia: '',
+      ojo: 'OU',
+      diagnostico: '',
+      prioridad: 'normal',
+      nivel_interes: 'interesado',
+      notas: ''
+    });
   };
 
   // Guardar evaluación
@@ -757,20 +780,16 @@ const EvaluacionOftalmologica = () => {
           ojo: crmForm.ojo,
           diagnostico: diagnosticoAuto,
           prioridad: crmForm.prioridad,
+          nivel_interes: crmForm.nivel_interes,
           notas: crmForm.notas
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
       toast.success(`Paciente agregado al CRM de Cirugías para ${crmForm.tipo_cirugia}`);
+      setCrmEnviado(true);
       setCrmDialogOpen(false);
-      setCrmForm({
-        tipo_cirugia: '',
-        ojo: 'OU',
-        diagnostico: '',
-        prioridad: 'normal',
-        notas: ''
-      });
+      // No resetear el form para que se vea lo que se envió
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al agregar al CRM');
     }
@@ -1006,19 +1025,6 @@ const EvaluacionOftalmologica = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
-              {/* Botón CRM Cirugías */}
-              {canEdit && evaluacionActual?.id && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCrmDialogOpen(true)}
-                  className="btn-outline border-purple-300 text-purple-700 hover:bg-purple-50"
-                >
-                  <Stethoscope className="w-4 h-4 mr-1" />
-                  Candidato Cirugía
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -1573,6 +1579,155 @@ const EvaluacionOftalmologica = () => {
                     className="input-teal min-h-[80px] text-sm"
                   />
                 </div>
+              </div>
+            </CollapsibleSection>
+
+            {/* Candidato a Cirugía - Sección integrada */}
+            <CollapsibleSection 
+              title="Candidato a Cirugía" 
+              icon={Stethoscope}
+              defaultOpen={false}
+            >
+              <div className="space-y-4">
+                {crmEnviado ? (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-purple-700 mb-2">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-medium">Paciente agregado al CRM de Cirugías</span>
+                    </div>
+                    <div className="text-sm text-purple-600">
+                      <p>Tipo: <strong>{crmForm.tipo_cirugia}</strong></p>
+                      <p>Ojo: {crmForm.ojo} | Interés: {crmForm.nivel_interes}</p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2 text-xs"
+                      onClick={() => {
+                        setCrmEnviado(false);
+                        setCrmForm({
+                          tipo_cirugia: '',
+                          ojo: 'OU',
+                          diagnostico: '',
+                          prioridad: 'normal',
+                          nivel_interes: 'interesado',
+                          notas: ''
+                        });
+                      }}
+                    >
+                      Agregar otro tipo de cirugía
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-purple-50/50 border border-purple-100 rounded-lg p-3 text-xs text-purple-700">
+                      <p>Complete los datos para agregar este paciente al CRM de Cirugías. El diagnóstico se auto-completa con los diagnósticos de esta evaluación.</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tipo de Cirugía *</Label>
+                        <Select
+                          value={crmForm.tipo_cirugia || undefined}
+                          onValueChange={(v) => setCrmForm(prev => ({ ...prev, tipo_cirugia: v }))}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs">
+                            <SelectValue placeholder="Seleccionar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tiposCirugia.map(tipo => (
+                              <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs">Ojo</Label>
+                        <Select
+                          value={crmForm.ojo}
+                          onValueChange={(v) => setCrmForm(prev => ({ ...prev, ojo: v }))}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="OD">OD (Derecho)</SelectItem>
+                            <SelectItem value="OS">OS (Izquierdo)</SelectItem>
+                            <SelectItem value="OU">OU (Ambos)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nivel de Interés *</Label>
+                        <Select
+                          value={crmForm.nivel_interes}
+                          onValueChange={(v) => setCrmForm(prev => ({ ...prev, nivel_interes: v }))}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="muy_interesado">Muy Interesado</SelectItem>
+                            <SelectItem value="interesado">Interesado</SelectItem>
+                            <SelectItem value="indeciso">Indeciso</SelectItem>
+                            <SelectItem value="poco_interesado">Poco Interesado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs">Prioridad</Label>
+                        <Select
+                          value={crmForm.prioridad}
+                          onValueChange={(v) => setCrmForm(prev => ({ ...prev, prioridad: v }))}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="alta">Alta</SelectItem>
+                            <SelectItem value="normal">Normal</SelectItem>
+                            <SelectItem value="baja">Baja</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label className="text-xs">Notas adicionales</Label>
+                      <Textarea
+                        value={crmForm.notas}
+                        onChange={(e) => setCrmForm(prev => ({ ...prev, notas: e.target.value }))}
+                        disabled={isReadOnly}
+                        placeholder="Observaciones relevantes para el seguimiento..."
+                        className="input-teal min-h-[50px] text-xs"
+                      />
+                    </div>
+                    
+                    <Button
+                      onClick={handleEnviarCRM}
+                      disabled={!evaluacionActual?.id || !crmForm.tipo_cirugia || isReadOnly}
+                      className="w-full btn-primary bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Stethoscope className="w-4 h-4 mr-2" />
+                      Agregar al CRM de Cirugías
+                    </Button>
+                    
+                    {!evaluacionActual?.id && (
+                      <p className="text-xs text-amber-600 text-center">
+                        Debe guardar la evaluación primero para agregar al CRM
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             </CollapsibleSection>
 
@@ -2162,104 +2317,6 @@ const EvaluacionOftalmologica = () => {
           </div>
         </div>
       )}
-
-      {/* Dialog CRM Cirugías */}
-      <Dialog open={crmDialogOpen} onOpenChange={setCrmDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle className="font-['Outfit'] flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-purple-600" />
-              Agregar a CRM de Cirugías
-            </DialogTitle>
-            <DialogDescription>
-              Paciente: {formData.paciente_nombre}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label>Tipo de Cirugía *</Label>
-              <Select
-                value={crmForm.tipo_cirugia}
-                onValueChange={(v) => setCrmForm(prev => ({ ...prev, tipo_cirugia: v }))}
-              >
-                <SelectTrigger className="input-teal">
-                  <SelectValue placeholder="Seleccionar tipo de cirugía..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {tiposCirugia.map(tipo => (
-                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Ojo</Label>
-                <Select
-                  value={crmForm.ojo}
-                  onValueChange={(v) => setCrmForm(prev => ({ ...prev, ojo: v }))}
-                >
-                  <SelectTrigger className="input-teal">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="OD">OD (Derecho)</SelectItem>
-                    <SelectItem value="OS">OS (Izquierdo)</SelectItem>
-                    <SelectItem value="OU">OU (Ambos)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Prioridad</Label>
-                <Select
-                  value={crmForm.prioridad}
-                  onValueChange={(v) => setCrmForm(prev => ({ ...prev, prioridad: v }))}
-                >
-                  <SelectTrigger className="input-teal">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="alta">Alta</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="baja">Baja</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <Label>Diagnóstico</Label>
-              <Input
-                value={crmForm.diagnostico}
-                onChange={(e) => setCrmForm(prev => ({ ...prev, diagnostico: e.target.value }))}
-                placeholder="Se auto-completa con diagnósticos de la evaluación si está vacío"
-                className="input-teal"
-              />
-            </div>
-            
-            <div>
-              <Label>Notas</Label>
-              <Textarea
-                value={crmForm.notas}
-                onChange={(e) => setCrmForm(prev => ({ ...prev, notas: e.target.value }))}
-                placeholder="Notas adicionales..."
-                className="input-teal min-h-[60px]"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCrmDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleEnviarCRM} className="btn-primary bg-purple-600 hover:bg-purple-700">
-              Agregar al CRM
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Layout>
   );
 };

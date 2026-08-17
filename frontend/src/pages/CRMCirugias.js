@@ -307,6 +307,23 @@ const CRMCirugias = () => {
     return <Badge className={styles[prioridad] || styles.normal}>{prioridad}</Badge>;
   };
 
+  // Obtener badge de nivel de interés
+  const getInteresBadge = (nivel) => {
+    const styles = {
+      muy_interesado: 'bg-emerald-100 text-emerald-700',
+      interesado: 'bg-blue-100 text-blue-700',
+      indeciso: 'bg-amber-100 text-amber-700',
+      poco_interesado: 'bg-red-100 text-red-700'
+    };
+    const labels = {
+      muy_interesado: 'Muy Interesado',
+      interesado: 'Interesado',
+      indeciso: 'Indeciso',
+      poco_interesado: 'Poco Interesado'
+    };
+    return <Badge className={styles[nivel] || styles.interesado}>{labels[nivel] || nivel}</Badge>;
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -493,6 +510,7 @@ const CRMCirugias = () => {
                   <TableHead>Ojo</TableHead>
                   <TableHead>Diagnóstico</TableHead>
                   <TableHead>Prioridad</TableHead>
+                  <TableHead>Interés</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Seguimientos</TableHead>
                   <TableHead>Fecha Prog.</TableHead>
@@ -502,7 +520,7 @@ const CRMCirugias = () => {
               <TableBody>
                 {candidates.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                       No hay candidatos registrados
                     </TableCell>
                   </TableRow>
@@ -537,6 +555,7 @@ const CRMCirugias = () => {
                         {candidate.diagnostico || '-'}
                       </TableCell>
                       <TableCell>{getPrioridadBadge(candidate.prioridad)}</TableCell>
+                      <TableCell>{getInteresBadge(candidate.nivel_interes)}</TableCell>
                       <TableCell>{getEstadoBadge(candidate.estado)}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
