@@ -34,6 +34,11 @@ class PatientBase(BaseModel):
     insurance_name: Optional[str] = ""
     other_institution_name: Optional[str] = ""
     igss_unit_id: Optional[str] = None
+    igss_afiliacion: Optional[str] = ""
+    igss_no_sps: Optional[str] = ""
+    igss_codigo: Optional[str] = ""
+    igss_tipo_compra: Optional[str] = ""
+    igss_nog: Optional[str] = ""
     comments: Optional[str] = ""
 
 
@@ -57,6 +62,11 @@ class PatientUpdate(BaseModel):
     insurance_name: Optional[str] = None
     other_institution_name: Optional[str] = None
     igss_unit_id: Optional[str] = None
+    igss_afiliacion: Optional[str] = None
+    igss_no_sps: Optional[str] = None
+    igss_codigo: Optional[str] = None
+    igss_tipo_compra: Optional[str] = None
+    igss_nog: Optional[str] = None
     comments: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -84,6 +94,11 @@ class PatientResponse(BaseModel):
     other_institution_name: Optional[str] = ""
     igss_unit_id: Optional[str] = ""
     igss_unit_name: Optional[str] = ""
+    igss_afiliacion: Optional[str] = ""
+    igss_no_sps: Optional[str] = ""
+    igss_codigo: Optional[str] = ""
+    igss_tipo_compra: Optional[str] = ""
+    igss_nog: Optional[str] = ""
     comments: Optional[str] = ""
     is_active: bool = True
     created_by: str
@@ -479,6 +494,11 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
         "insurance_name": patient_data.insurance_name or "",
         "other_institution_name": patient_data.other_institution_name or "",
         "igss_unit_id": patient_data.igss_unit_id if patient_data.referral_institution == "igss" else "",
+        "igss_afiliacion": patient_data.igss_afiliacion if patient_data.referral_institution == "igss" else "",
+        "igss_no_sps": patient_data.igss_no_sps if patient_data.referral_institution == "igss" else "",
+        "igss_codigo": patient_data.igss_codigo if patient_data.referral_institution == "igss" else "",
+        "igss_tipo_compra": patient_data.igss_tipo_compra if patient_data.referral_institution == "igss" else "",
+        "igss_nog": patient_data.igss_nog if patient_data.referral_institution == "igss" else "",
         "comments": patient_data.comments or "",
         "is_active": True,
         "created_by": current_user["id"],

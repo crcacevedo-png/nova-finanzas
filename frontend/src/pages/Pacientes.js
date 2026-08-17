@@ -180,6 +180,7 @@ const Pacientes = () => {
       igss_no_sps: '',
       igss_codigo: '',
       igss_tipo_compra: '',
+      igss_nog: '',
       comments: ''
     });
     setEditingPatient(null);
@@ -210,6 +211,7 @@ const Pacientes = () => {
         igss_no_sps: patient.igss_no_sps || '',
         igss_codigo: patient.igss_codigo || '',
         igss_tipo_compra: patient.igss_tipo_compra || '',
+        igss_nog: patient.igss_nog || '',
         comments: patient.comments || ''
       });
     } else {
@@ -1000,6 +1002,7 @@ const Pacientes = () => {
                         igss_no_sps: value !== 'igss' ? '' : prev.igss_no_sps,
                         igss_codigo: value !== 'igss' ? '' : prev.igss_codigo,
                         igss_tipo_compra: value !== 'igss' ? '' : prev.igss_tipo_compra,
+                        igss_nog: value !== 'igss' ? '' : prev.igss_nog,
                         insurance_name: value !== 'seguro_privado' ? '' : prev.insurance_name,
                         other_institution_name: value !== 'otra' ? '' : prev.other_institution_name
                       }))}
@@ -1047,7 +1050,7 @@ const Pacientes = () => {
                   {/* Campos adicionales IGSS */}
                   {formData.referral_institution === 'igss' && (
                     <>
-                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
                         <div className="space-y-2">
                           <Label className="text-xs">Afiliación</Label>
                           <Input
@@ -1076,6 +1079,16 @@ const Pacientes = () => {
                             className="input-teal"
                             placeholder="Código"
                             data-testid="patient-igss-codigo"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">NOG</Label>
+                          <Input
+                            value={formData.igss_nog}
+                            onChange={(e) => setFormData(prev => ({ ...prev, igss_nog: e.target.value }))}
+                            className="input-teal"
+                            placeholder="No. Orden Gestión"
+                            data-testid="patient-igss-nog"
                           />
                         </div>
                         <div className="space-y-2">
@@ -1296,7 +1309,7 @@ const Pacientes = () => {
                 Desactivar Paciente
               </DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de desactivar al paciente "{selectedPatient?.full_name}"? 
+                ¿Estás seguro de desactivar al paciente &quot;{selectedPatient?.full_name}&quot;? 
                 El registro no será eliminado y podrá ser reactivado posteriormente.
               </DialogDescription>
             </DialogHeader>
