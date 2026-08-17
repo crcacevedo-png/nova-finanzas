@@ -26,6 +26,7 @@ import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
 import ImportarPacientes from './pages/ImportarPacientes';
+import ErrorBoundary from './components/ErrorBoundary';
 // Módulo Inventario
 import PanelInventario from './pages/inventario/PanelInventario';
 import ProductosInventario from './pages/inventario/Productos';
@@ -353,11 +354,13 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

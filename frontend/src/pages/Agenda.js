@@ -455,10 +455,28 @@ const Agenda = () => {
       if (citaForm.es_paciente_nuevo && !citaForm.paciente_id) {
         setCreandoPaciente(true);
         
-        // Separar nombre y apellido
-        const nombreParts = citaForm.paciente_nombre.trim().split(' ');
-        const firstName = nombreParts[0] || '';
-        const lastName = nombreParts.slice(1).join(' ') || '';
+        // Usar campos separados de nombre y apellido
+        const firstName = (citaForm.nuevo_paciente_nombre || '').trim();
+        const lastName = (citaForm.nuevo_paciente_apellido || '').trim();
+        
+        // Validar que ambos campos tengan valor
+        if (!firstName) {
+          toast.error('Por favor ingrese el nombre del paciente');
+          setCreandoPaciente(false);
+          return;
+        }
+        if (!lastName) {
+          toast.error('Por favor ingrese el apellido del paciente');
+          setCreandoPaciente(false);
+          return;
+        }
+        
+        // Validar género antes de crear
+        if (!citaForm.nuevo_paciente_genero) {
+          toast.error('Por favor seleccione el género del paciente');
+          setCreandoPaciente(false);
+          return;
+        }
         
         // Calcular fecha de nacimiento aproximada si se proporcionó edad
         let birthDate = '';
@@ -476,16 +494,9 @@ const Agenda = () => {
           last_name: lastName,
           phone: citaForm.nuevo_paciente_telefono || '',
           birth_date: birthDate,
-          gender: citaForm.nuevo_paciente_genero || 'masculino',
+          gender: citaForm.nuevo_paciente_genero,
           referral_institution: 'particular'
         };
-        
-        // Validar género antes de crear
-        if (!citaForm.nuevo_paciente_genero) {
-          toast.error('Por favor seleccione el género del paciente');
-          setCreandoPaciente(false);
-          return;
-        }
         
         const response = await patientApi.create(newPatientData);
         pacienteId = response.data.id;
@@ -1052,6 +1063,8 @@ const Agenda = () => {
                       onClick={() => setCitaForm(prev => ({ 
                         ...prev, 
                         es_paciente_nuevo: false,
+                        nuevo_paciente_nombre: '',
+                        nuevo_paciente_apellido: '',
                         paciente_nombre: '',
                         nuevo_paciente_telefono: '',
                         nuevo_paciente_edad: '',
@@ -1062,13 +1075,30 @@ const Agenda = () => {
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    <Input
-                      placeholder="Nombre completo del paciente *"
-                      value={citaForm.paciente_nombre}
-                      onChange={(e) => setCitaForm(prev => ({ ...prev, paciente_nombre: e.target.value }))}
-                      className="input-teal"
-                      data-testid="nuevo-paciente-nombre"
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Nombre(s) *"
+                        value={citaForm.nuevo_paciente_nombre || ''}
+                        onChange={(e) => setCitaForm(prev => ({ 
+                          ...prev, 
+                          nuevo_paciente_nombre: e.target.value,
+                          paciente_nombre: `${e.target.value} ${prev.nuevo_paciente_apellido || ''}`.trim()
+                        }))}
+                        className="input-teal"
+                        data-testid="nuevo-paciente-nombre"
+                      />
+                      <Input
+                        placeholder="Apellido(s) *"
+                        value={citaForm.nuevo_paciente_apellido || ''}
+                        onChange={(e) => setCitaForm(prev => ({ 
+                          ...prev, 
+                          nuevo_paciente_apellido: e.target.value,
+                          paciente_nombre: `${prev.nuevo_paciente_nombre || ''} ${e.target.value}`.trim()
+                        }))}
+                        className="input-teal"
+                        data-testid="nuevo-paciente-apellido"
+                      />
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
                       <Input
                         placeholder="Teléfono"

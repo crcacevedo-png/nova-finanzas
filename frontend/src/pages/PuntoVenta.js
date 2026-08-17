@@ -130,6 +130,10 @@ const PuntoVenta = () => {
   const [loadingRapidos, setLoadingRapidos] = useState(false);
   const [mostrarRapidos, setMostrarRapidos] = useState(true);
   
+  // Estado de la caja
+  const [estadoCaja, setEstadoCaja] = useState(null);
+  const [loadingCaja, setLoadingCaja] = useState(true);
+  
   // UI state
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('venta');
@@ -140,6 +144,7 @@ const PuntoVenta = () => {
     fetchBodegaPOS();
     fetchCategorias();
     fetchPagadores();
+    fetchEstadoCaja();
   }, []);
   
   // Cargar productos rápidos cuando se obtiene la bodega
@@ -202,6 +207,22 @@ const PuntoVenta = () => {
       setPagadores(response.data || []);
     } catch (error) {
       console.error('Error fetching pagadores:', error);
+    }
+  };
+
+  const fetchEstadoCaja = async () => {
+    setLoadingCaja(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/caja/estado`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEstadoCaja(response.data);
+    } catch (error) {
+      console.error('Error fetching estado caja:', error);
+      setEstadoCaja({ abierta: false });
+    } finally {
+      setLoadingCaja(false);
     }
   };
 
@@ -905,6 +926,27 @@ const PuntoVenta = () => {
             </Button>
           </div>
         </div>
+
+        {/* Banner de caja cerrada */}
+        {!loadingCaja && estadoCaja && !estadoCaja.abierta && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between" data-testid="banner-caja-cerrada">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-amber-600" />
+              <div>
+                <p className="font-medium text-amber-800">La caja está cerrada</p>
+                <p className="text-sm text-amber-600">Debe abrir la caja antes de realizar ventas. Las ventas no se registrarán en el corte del día.</p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              className="border-amber-400 text-amber-700 hover:bg-amber-100"
+              onClick={() => window.location.href = '/caja'}
+              data-testid="btn-ir-a-caja"
+            >
+              Ir a Caja
+            </Button>
+          </div>
+        )}
 
         {/* Contenido principal - 2 columnas */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 overflow-hidden">
