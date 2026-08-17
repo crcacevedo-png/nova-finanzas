@@ -25,6 +25,7 @@ import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
+import ImportarPacientes from './pages/ImportarPacientes';
 // Módulo Inventario
 import PanelInventario from './pages/inventario/PanelInventario';
 import ProductosInventario from './pages/inventario/Productos';
@@ -329,6 +330,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MovimientosInventario />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Importación Masiva de Pacientes */}
+      <Route 
+        path="/importar-pacientes" 
+        element={
+          <ProtectedRoute>
+            <ImportarPacientes />
           </ProtectedRoute>
         } 
       />

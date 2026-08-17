@@ -34,7 +34,8 @@ import {
   ArrowLeftRight,
   FileText,
   ClipboardList,
-  Store
+  Store,
+  Upload
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -83,6 +84,11 @@ const Layout = ({ children }) => {
   
   // Pacientes - Visible para todos
   navItems.push({ path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' });
+  
+  // Importación Masiva - Solo Admin y SuperAdmin
+  if (isAdminOrSuperAdmin) {
+    navItems.push({ path: '/importar-pacientes', icon: Upload, label: 'Importar Pacientes', testId: 'nav-importar-pacientes' });
+  }
   
   // Evaluación Oftalmológica - Visible para todos (Admin/SuperAdmin editan, Usuario solo lectura)
   navItems.push({ path: '/evaluacion-oftalmologica', icon: Eye, label: 'Evaluación Oftalmológica', testId: 'nav-evaluacion' });

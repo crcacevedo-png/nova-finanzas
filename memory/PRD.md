@@ -720,8 +720,10 @@ Ver `/app/memory/TESTING.md` para documentación completa de la suite de testing
 ### 🟡 P1 (Próximo)
 - FEL Guatemala (Facturación Electrónica) - Estructura lista, deshabilitada
 
-### 🟢 P2 (Futuro)
-- Importación masiva de pacientes (Excel)
+### ✅ P2 (Completado - Agosto 2026)
+- **Importación masiva de pacientes (JSON)** - Sistema de importación por lotes para 16,000+ registros
+
+### 🟢 P3 (Futuro)
 - Exportar evaluación oftalmológica a PDF
 - Sincronización Google Calendar
 - UI para Órdenes de compra, Recepciones, Transferencias, Toma física
@@ -803,3 +805,53 @@ El módulo de Evaluación Oftalmológica ahora funciona sin conexión a internet
   - Estados: `isOnline`, `pendingSync`, `syncStatus`
   - Funciones: `saveOfflineData()`, `syncPendingData()`, `loadPendingOfflineData()`
 
+---
+
+## Importación Masiva de Pacientes - Agosto 2026
+
+### Descripción
+Sistema de importación masiva para cargar hasta 16,000+ pacientes desde archivo JSON. Diseñado para migrar datos de sistemas anteriores o cargar bases de datos de pacientes existentes.
+
+### Características
+1. **Procesamiento por lotes**: 500 registros por lote para evitar timeouts
+2. **Validación previa**: Detecta errores y duplicados antes de importar
+3. **Normalización automática**: Convierte fechas, teléfonos, géneros a formatos estándar
+4. **Tolerancia a formatos**: Acepta campos en español e inglés
+5. **Control de duplicados**: Por DPI o por nombre exacto
+6. **Pausar/Reanudar**: Control de la importación en tiempo real
+7. **Progreso visual**: Barra de progreso y estadísticas en vivo
+
+### Formatos de Fecha Aceptados
+- `YYYY-MM-DD` (ISO)
+- `DD/MM/YYYY` (Guatemalteco)
+- `DD-MM-YYYY`
+- `MM/DD/YYYY` (Americano)
+
+### Campos Aceptados (español/inglés)
+- `nombres` / `first_name`
+- `apellidos` / `last_name`
+- `nombre` (se divide automáticamente)
+- `sexo` / `gender` (M, F, masculino, femenino)
+- `fecha_nacimiento` / `birth_date`
+- `telefono` / `phone`
+- `correo` / `email`
+- `dpi` / `cui`
+- `profesion` / `profession`
+- `institucion` / `referral_institution`
+- `expediente` / `record_number`
+
+### Endpoints Backend
+- `POST /api/patients/import/validate` - Validar datos antes de importar
+- `POST /api/patients/import/batch` - Importar un lote de pacientes
+- `GET /api/patients/import/template` - Descargar plantilla JSON
+- `GET /api/patients/import/stats` - Estadísticas de importaciones
+
+### Archivos
+- Backend: `/app/backend/routes/patients.py` (sección "IMPORTACIÓN MASIVA")
+- Frontend: `/app/frontend/src/pages/ImportarPacientes.js`
+
+### Recomendaciones para Grandes Volúmenes
+- Dividir archivos mayores a 8,000 registros
+- Ejecutar importaciones fuera del horario pico
+- Usar "Omitir duplicados" para evitar conflictos
+- Validar antes de importar para detectar problemas

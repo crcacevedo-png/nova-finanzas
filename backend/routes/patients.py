@@ -155,7 +155,7 @@ def calcular_edad(birth_date: str) -> int:
         today = datetime.now(timezone.utc).replace(tzinfo=None)
         age = today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
         return max(0, age)
-    except:
+    except (ValueError, TypeError):
         return 0
 
 
@@ -173,7 +173,7 @@ async def get_next_record_number() -> str:
         try:
             last_num = int(last["record_number"].split("-")[-1])
             next_num = last_num + 1
-        except:
+        except (ValueError, IndexError):
             next_num = 1
     else:
         next_num = 1
@@ -821,3 +821,578 @@ async def export_patients_pdf(
         )
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Librería PDF no disponible: {str(e)}")
+
+
+# ==================== IMPORTACIÓN MASIVA ====================
+
+class ImportPatientItem(BaseModel):
+    """Esquema flexible para importación - campos opcionales para mayor tolerancia"""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    nombre: Optional[str] = None  # Alternativo: nombre completo
+    nombres: Optional[str] = None  # Alternativo
+    apellidos: Optional[str] = None  # Alternativo
+    gender: Optional[str] = None
+    sexo: Optional[str] = None  # Alternativo
+    birth_date: Optional[str] = None
+    fecha_nacimiento: Optional[str] = None  # Alternativo
+    phone: Optional[str] = None
+    telefono: Optional[str] = None  # Alternativo
+    email: Optional[str] = None
+    correo: Optional[str] = None  # Alternativo
+    dpi: Optional[str] = None
+    cui: Optional[str] = None  # Alternativo
+    profession: Optional[str] = None
+    profesion: Optional[str] = None  # Alternativo
+    referral_institution: Optional[str] = None
+    institucion: Optional[str] = None  # Alternativo
+    insurance_name: Optional[str] = None
+    seguro: Optional[str] = None  # Alternativo
+    comments: Optional[str] = None
+    observaciones: Optional[str] = None  # Alternativo
+    record_number: Optional[str] = None  # Para mantener expediente existente
+    expediente: Optional[str] = None  # Alternativo
+    emergency_phone: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_relationship: Optional[str] = None
+
+
+class ImportBatchRequest(BaseModel):
+    """Request para importación por lotes"""
+    patients: List[ImportPatientItem]
+    batch_number: int = 1
+    total_batches: int = 1
+    skip_duplicates: bool = True
+    preserve_record_numbers: bool = False  # Mantener números de expediente existentes
+
+
+class ImportResult(BaseModel):
+    """Resultado de importación"""
+    success: bool
+    batch_number: int
+    total_processed: int
+    inserted: int
+    duplicates: int
+    errors: int
+    error_details: List[dict] = []
+    duplicate_details: List[dict] = []
+
+
+class ImportValidationResult(BaseModel):
+    """Resultado de validación previa"""
+    valid: bool
+    total_records: int
+    valid_records: int
+    invalid_records: int
+    duplicate_records: int
+    errors: List[dict] = []
+    duplicates: List[dict] = []
+    field_mapping: dict = {}
+    sample_data: List[dict] = []
+
+
+def normalize_gender(value: str) -> str:
+    """Normalizar valor de género"""
+    if not value:
+        return "otro"
+    value_lower = value.lower().strip()
+    if value_lower in ['m', 'masculino', 'male', 'hombre', 'h']:
+        return "masculino"
+    elif value_lower in ['f', 'femenino', 'female', 'mujer']:
+        return "femenino"
+    return "otro"
+
+
+def normalize_institution(value: str) -> str:
+    """Normalizar institución de referencia"""
+    if not value:
+        return "particular"
+    value_lower = value.lower().strip()
+    if 'igss' in value_lower:
+        return "igss"
+    elif 'seguro' in value_lower or 'privado' in value_lower:
+        return "seguro_privado"
+    elif 'particular' in value_lower or 'privado' in value_lower:
+        return "particular"
+    elif value_lower and value_lower != 'particular':
+        return "otra"
+    return "particular"
+
+
+def normalize_date(value: str) -> Optional[str]:
+    """Normalizar fecha a formato YYYY-MM-DD"""
+    if not value:
+        return None
+    
+    import re
+    value = str(value).strip()
+    
+    # Formato ISO: 2024-01-15
+    if re.match(r'^\d{4}-\d{2}-\d{2}', value):
+        return value[:10]
+    
+    # Formato DD/MM/YYYY o DD-MM-YYYY
+    match = re.match(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$', value)
+    if match:
+        day, month, year = match.groups()
+        return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+    
+    # Formato MM/DD/YYYY
+    match = re.match(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$', value)
+    if match:
+        part1, part2, year = match.groups()
+        # Si part1 > 12, asumimos DD/MM/YYYY
+        if int(part1) > 12:
+            return f"{year}-{part2.zfill(2)}-{part1.zfill(2)}"
+        # Si part2 > 12, asumimos MM/DD/YYYY
+        elif int(part2) > 12:
+            return f"{year}-{part1.zfill(2)}-{part2.zfill(2)}"
+        # Ambiguo, asumimos DD/MM/YYYY (formato guatemalteco)
+        return f"{year}-{part2.zfill(2)}-{part1.zfill(2)}"
+    
+    # Formato YYYY/MM/DD
+    match = re.match(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$', value)
+    if match:
+        year, month, day = match.groups()
+        return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+    
+    return None
+
+
+def normalize_phone(value: str) -> str:
+    """Normalizar teléfono"""
+    if not value:
+        return "00000000"
+    import re
+    # Remover todo excepto dígitos
+    phone = re.sub(r'[^\d]', '', str(value))
+    # Si tiene código de país, removerlo
+    if phone.startswith('502') and len(phone) > 8:
+        phone = phone[3:]
+    # Asegurar al menos 8 dígitos
+    if len(phone) < 8:
+        phone = phone.zfill(8)
+    return phone[:20]
+
+
+def normalize_dpi(value: str) -> Optional[str]:
+    """Normalizar DPI/CUI"""
+    if not value:
+        return None
+    import re
+    dpi = re.sub(r'[^\d]', '', str(value))
+    if len(dpi) == 13:
+        return dpi
+    return None
+
+
+def extract_patient_data(item: ImportPatientItem) -> dict:
+    """Extraer y normalizar datos del paciente desde el item de importación"""
+    # Nombre
+    first_name = item.first_name or item.nombres or ""
+    last_name = item.last_name or item.apellidos or ""
+    
+    # Si viene nombre completo, intentar separar
+    if not first_name and not last_name and item.nombre:
+        parts = item.nombre.strip().split()
+        if len(parts) >= 2:
+            # Asumimos primer nombre(s) y último apellido(s)
+            mid = len(parts) // 2
+            first_name = " ".join(parts[:mid])
+            last_name = " ".join(parts[mid:])
+        else:
+            first_name = item.nombre
+            last_name = ""
+    
+    # Género
+    gender = normalize_gender(item.gender or item.sexo or "")
+    
+    # Fecha de nacimiento
+    birth_date = normalize_date(item.birth_date or item.fecha_nacimiento or "")
+    
+    # Teléfono
+    phone = normalize_phone(item.phone or item.telefono or "")
+    
+    # Email
+    email = item.email or item.correo or ""
+    
+    # DPI
+    dpi = normalize_dpi(item.dpi or item.cui or "")
+    
+    # Profesión
+    profession = item.profession or item.profesion or ""
+    
+    # Institución
+    referral_institution = normalize_institution(item.referral_institution or item.institucion or "")
+    
+    # Seguro
+    insurance_name = item.insurance_name or item.seguro or ""
+    
+    # Comentarios
+    comments = item.comments or item.observaciones or ""
+    
+    # Número de expediente (si se quiere preservar)
+    record_number = item.record_number or item.expediente or None
+    
+    return {
+        "first_name": first_name.strip()[:100] if first_name else "",
+        "last_name": last_name.strip()[:100] if last_name else "",
+        "gender": gender,
+        "birth_date": birth_date or "1900-01-01",
+        "phone": phone,
+        "email": email[:100] if email else "",
+        "dpi": dpi,
+        "profession": profession[:100] if profession else "",
+        "referral_institution": referral_institution,
+        "insurance_name": insurance_name[:100] if insurance_name else "",
+        "other_institution_name": "",
+        "comments": comments[:500] if comments else "",
+        "emergency_phone": item.emergency_phone or "",
+        "emergency_contact_name": item.emergency_contact_name or "",
+        "emergency_contact_relationship": item.emergency_contact_relationship or "",
+        "igss_unit_id": None,
+        "_original_record_number": record_number
+    }
+
+
+@router.post("/import/validate", response_model=ImportValidationResult)
+async def validate_import_data(
+    patients: List[ImportPatientItem] = Body(...),
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """
+    Validar datos de importación antes de procesar.
+    Detecta duplicados, errores y muestra mapeo de campos.
+    """
+    errors = []
+    duplicates = []
+    valid_count = 0
+    
+    # Detectar campos presentes en los datos
+    field_mapping = {}
+    if patients:
+        sample = patients[0].model_dump()
+        for key, value in sample.items():
+            if value is not None and value != "":
+                field_mapping[key] = "detectado"
+    
+    # Obtener DPIs y nombres existentes para verificar duplicados
+    existing_dpis = set()
+    existing_names = set()
+    
+    cursor = db.patients.find(
+        {"is_active": True}, 
+        {"_id": 0, "dpi": 1, "first_name": 1, "last_name": 1}
+    )
+    async for p in cursor:
+        if p.get("dpi"):
+            existing_dpis.add(p["dpi"])
+        name_key = f"{p.get('first_name', '').lower()}|{p.get('last_name', '').lower()}"
+        existing_names.add(name_key)
+    
+    # Validar cada registro
+    for idx, item in enumerate(patients[:1000]):  # Limitar validación a primeros 1000
+        try:
+            data = extract_patient_data(item)
+            
+            # Validar campos requeridos
+            if not data["first_name"]:
+                errors.append({
+                    "row": idx + 1,
+                    "error": "Nombre vacío o no detectado",
+                    "data": item.model_dump()
+                })
+                continue
+            
+            # Verificar duplicado por DPI
+            if data["dpi"] and data["dpi"] in existing_dpis:
+                duplicates.append({
+                    "row": idx + 1,
+                    "type": "DPI",
+                    "value": data["dpi"],
+                    "name": f"{data['first_name']} {data['last_name']}"
+                })
+                continue
+            
+            # Verificar duplicado por nombre
+            name_key = f"{data['first_name'].lower()}|{data['last_name'].lower()}"
+            if name_key in existing_names:
+                duplicates.append({
+                    "row": idx + 1,
+                    "type": "Nombre",
+                    "value": f"{data['first_name']} {data['last_name']}",
+                    "name": f"{data['first_name']} {data['last_name']}"
+                })
+                continue
+            
+            valid_count += 1
+            existing_names.add(name_key)
+            if data["dpi"]:
+                existing_dpis.add(data["dpi"])
+                
+        except Exception as e:
+            errors.append({
+                "row": idx + 1,
+                "error": str(e),
+                "data": item.model_dump() if hasattr(item, 'model_dump') else str(item)
+            })
+    
+    # Muestra de datos normalizados
+    sample_data = []
+    for item in patients[:5]:
+        try:
+            sample_data.append(extract_patient_data(item))
+        except Exception:
+            pass
+    
+    return ImportValidationResult(
+        valid=len(errors) == 0 and valid_count > 0,
+        total_records=len(patients),
+        valid_records=valid_count,
+        invalid_records=len(errors),
+        duplicate_records=len(duplicates),
+        errors=errors[:50],  # Limitar errores mostrados
+        duplicates=duplicates[:50],  # Limitar duplicados mostrados
+        field_mapping=field_mapping,
+        sample_data=sample_data
+    )
+
+
+@router.post("/import/batch", response_model=ImportResult)
+async def import_patients_batch(
+    request: ImportBatchRequest,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """
+    Importar un lote de pacientes.
+    Diseñado para procesar ~500 registros por lote.
+    """
+    inserted = 0
+    duplicates = 0
+    errors_count = 0
+    error_details = []
+    duplicate_details = []
+    
+    now = datetime.now(timezone.utc)
+    
+    # Obtener DPIs existentes
+    existing_dpis = set()
+    if request.skip_duplicates:
+        cursor = db.patients.find({"is_active": True, "dpi": {"$ne": None}}, {"_id": 0, "dpi": 1})
+        async for p in cursor:
+            if p.get("dpi"):
+                existing_dpis.add(p["dpi"])
+    
+    # Obtener último número de expediente
+    last_record = await db.patients.find_one(
+        {"record_number": {"$regex": r"^EXP-\d{6}-"}},
+        sort=[("record_number", -1)]
+    )
+    
+    if last_record:
+        try:
+            last_num = int(last_record["record_number"].split("-")[-1])
+        except (ValueError, IndexError):
+            last_num = 0
+    else:
+        last_num = 0
+    
+    current_prefix = f"EXP-{now.strftime('%Y%m')}-"
+    next_num = last_num + 1
+    
+    # Procesar pacientes en el lote
+    patients_to_insert = []
+    
+    for idx, item in enumerate(request.patients):
+        try:
+            data = extract_patient_data(item)
+            
+            # Validar campos mínimos
+            if not data["first_name"]:
+                errors_count += 1
+                error_details.append({
+                    "row": idx + 1,
+                    "error": "Nombre vacío"
+                })
+                continue
+            
+            # Verificar duplicado por DPI
+            if data["dpi"] and data["dpi"] in existing_dpis:
+                if request.skip_duplicates:
+                    duplicates += 1
+                    duplicate_details.append({
+                        "row": idx + 1,
+                        "dpi": data["dpi"],
+                        "name": f"{data['first_name']} {data['last_name']}"
+                    })
+                    continue
+            
+            # Generar número de expediente
+            if request.preserve_record_numbers and data.get("_original_record_number"):
+                record_number = data["_original_record_number"]
+            else:
+                record_number = f"{current_prefix}{next_num:04d}"
+                next_num += 1
+            
+            # Preparar documento
+            patient_doc = {
+                "id": str(uuid.uuid4()),
+                "record_number": record_number,
+                "first_name": data["first_name"],
+                "last_name": data["last_name"],
+                "gender": data["gender"],
+                "birth_date": data["birth_date"],
+                "phone": data["phone"],
+                "email": data["email"],
+                "dpi": data["dpi"],
+                "profession": data["profession"],
+                "referral_institution": data["referral_institution"],
+                "insurance_name": data["insurance_name"],
+                "other_institution_name": data["other_institution_name"],
+                "igss_unit_id": data["igss_unit_id"],
+                "comments": data["comments"],
+                "emergency_phone": data["emergency_phone"],
+                "emergency_contact_name": data["emergency_contact_name"],
+                "emergency_contact_relationship": data["emergency_contact_relationship"],
+                "is_active": True,
+                "created_by": current_user["id"],
+                "created_at": now.isoformat(),
+                "updated_by": None,
+                "updated_at": None,
+                "imported": True,
+                "import_date": now.isoformat(),
+                "import_batch": request.batch_number
+            }
+            
+            patients_to_insert.append(patient_doc)
+            
+            # Agregar DPI al set para evitar duplicados dentro del mismo lote
+            if data["dpi"]:
+                existing_dpis.add(data["dpi"])
+                
+        except Exception as e:
+            errors_count += 1
+            error_details.append({
+                "row": idx + 1,
+                "error": str(e)
+            })
+    
+    # Insertar en lote
+    if patients_to_insert:
+        try:
+            result = await db.patients.insert_many(patients_to_insert, ordered=False)
+            inserted = len(result.inserted_ids)
+        except Exception as e:
+            # Algunos pueden haber fallado por duplicados de índice único
+            error_str = str(e)
+            if "duplicate key" in error_str.lower():
+                # Contar cuántos se insertaron realmente
+                inserted = patients_to_insert.__len__() - errors_count
+            else:
+                raise HTTPException(status_code=500, detail=f"Error de base de datos: {str(e)}")
+    
+    return ImportResult(
+        success=True,
+        batch_number=request.batch_number,
+        total_processed=len(request.patients),
+        inserted=inserted,
+        duplicates=duplicates,
+        errors=errors_count,
+        error_details=error_details[:20],
+        duplicate_details=duplicate_details[:20]
+    )
+
+
+@router.get("/import/template")
+async def get_import_template(
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """
+    Obtener plantilla JSON para importación.
+    """
+    template = {
+        "descripcion": "Plantilla para importación masiva de pacientes NovaVision",
+        "instrucciones": [
+            "El archivo debe ser un array JSON de objetos",
+            "Puede usar nombres de campos en español o inglés",
+            "Los campos obligatorios son: nombre (first_name o nombres) y apellido (last_name o apellidos)",
+            "El formato de fecha puede ser: YYYY-MM-DD, DD/MM/YYYY, o DD-MM-YYYY",
+            "El género puede ser: M, F, masculino, femenino, hombre, mujer",
+            "El DPI debe tener exactamente 13 dígitos",
+            "Se recomienda importar en lotes de 500 registros máximo"
+        ],
+        "campos_aceptados": {
+            "nombre_completo": ["nombre", "name", "full_name"],
+            "nombres": ["first_name", "nombres", "primer_nombre"],
+            "apellidos": ["last_name", "apellidos", "apellido"],
+            "genero": ["gender", "sexo", "genero"],
+            "fecha_nacimiento": ["birth_date", "fecha_nacimiento", "nacimiento"],
+            "telefono": ["phone", "telefono", "tel"],
+            "email": ["email", "correo", "correo_electronico"],
+            "dpi": ["dpi", "cui", "documento"],
+            "profesion": ["profession", "profesion", "ocupacion"],
+            "institucion": ["referral_institution", "institucion", "referido_por"],
+            "seguro": ["insurance_name", "seguro", "aseguradora"],
+            "observaciones": ["comments", "observaciones", "notas"],
+            "expediente": ["record_number", "expediente", "numero_expediente"]
+        },
+        "ejemplo": [
+            {
+                "nombres": "María José",
+                "apellidos": "García López",
+                "sexo": "F",
+                "fecha_nacimiento": "15/03/1985",
+                "telefono": "5555-1234",
+                "dpi": "1234567890123",
+                "profesion": "Maestra",
+                "institucion": "IGSS"
+            },
+            {
+                "first_name": "Juan Carlos",
+                "last_name": "Pérez Morales",
+                "gender": "M",
+                "birth_date": "1990-07-22",
+                "phone": "4444-5678",
+                "email": "juan@email.com",
+                "profession": "Ingeniero",
+                "referral_institution": "particular"
+            }
+        ]
+    }
+    
+    return template
+
+
+@router.get("/import/stats")
+async def get_import_stats(
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """
+    Obtener estadísticas de importaciones realizadas.
+    """
+    total_patients = await db.patients.count_documents({})
+    imported_patients = await db.patients.count_documents({"imported": True})
+    manual_patients = total_patients - imported_patients
+    
+    # Estadísticas por lote de importación
+    pipeline = [
+        {"$match": {"imported": True}},
+        {"$group": {
+            "_id": "$import_batch",
+            "count": {"$sum": 1},
+            "date": {"$first": "$import_date"}
+        }},
+        {"$sort": {"_id": -1}},
+        {"$limit": 10}
+    ]
+    
+    batches = await db.patients.aggregate(pipeline).to_list(10)
+    
+    return {
+        "total_patients": total_patients,
+        "imported_patients": imported_patients,
+        "manual_patients": manual_patients,
+        "import_percentage": round(imported_patients / total_patients * 100, 2) if total_patients > 0 else 0,
+        "recent_batches": batches
+    }
+
