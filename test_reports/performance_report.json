@@ -1,0 +1,397 @@
+{
+  "timestamp": "2026-08-17T22:26:13.857778",
+  "base_url": "https://novavision-finanzas.preview.emergentagent.com/api",
+  "tests": [],
+  "baseline": [
+    {
+      "name": "Autenticaci\u00f3n",
+      "endpoint": "/auth/me",
+      "avg_ms": 137.49,
+      "min_ms": 123.92,
+      "max_ms": 169.06
+    },
+    {
+      "name": "Lista Pacientes",
+      "endpoint": "/patients?limit=20",
+      "avg_ms": 137.33,
+      "min_ms": 130.07,
+      "max_ms": 144.58
+    },
+    {
+      "name": "B\u00fasqueda Pacientes",
+      "endpoint": "/patients/search?q=Juan",
+      "avg_ms": 141.86,
+      "min_ms": 116.64,
+      "max_ms": 166.38
+    },
+    {
+      "name": "Lista Evaluaciones",
+      "endpoint": "/evaluaciones?limit=10",
+      "avg_ms": 131.25,
+      "min_ms": 120.46,
+      "max_ms": 147.78
+    },
+    {
+      "name": "Citas del D\u00eda",
+      "endpoint": "/agenda/citas?fecha=2026-08-17",
+      "avg_ms": 142.08,
+      "min_ms": 133.95,
+      "max_ms": 158.94
+    },
+    {
+      "name": "Productos Inventario",
+      "endpoint": "/inventario/productos?limit=20",
+      "avg_ms": 163.2,
+      "min_ms": 140.31,
+      "max_ms": 212.54
+    },
+    {
+      "name": "Bodega POS",
+      "endpoint": "/ventas/bodega-pos",
+      "avg_ms": 168.66,
+      "min_ms": 115.07,
+      "max_ms": 221.13
+    },
+    {
+      "name": "Estado Caja",
+      "endpoint": "/caja/estado",
+      "avg_ms": 124.79,
+      "min_ms": 113.39,
+      "max_ms": 151.1
+    },
+    {
+      "name": "Lista Gastos",
+      "endpoint": "/expenses?limit=20",
+      "avg_ms": 132.62,
+      "min_ms": 112.83,
+      "max_ms": 152.16
+    },
+    {
+      "name": "Dashboard Stats",
+      "endpoint": "/dashboard/stats",
+      "avg_ms": 153.23,
+      "min_ms": 116.94,
+      "max_ms": 205.23
+    }
+  ],
+  "load_tests": [
+    {
+      "endpoint": "/patients?limit=10",
+      "concurrent_users": 5,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.72,
+      "requests_per_second": 58.09,
+      "response_times_ms": {
+        "min": 51.25,
+        "max": 502.02,
+        "avg": 84.76,
+        "median": 76.19,
+        "p95": 138.07,
+        "p99": 502.02
+      }
+    },
+    {
+      "endpoint": "/agenda/citas?fecha=2026-08-17",
+      "concurrent_users": 5,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.47,
+      "requests_per_second": 67.92,
+      "response_times_ms": {
+        "min": 53.47,
+        "max": 120.05,
+        "avg": 71.73,
+        "median": 69.72,
+        "p95": 92.63,
+        "p99": 120.05
+      }
+    },
+    {
+      "endpoint": "/inventario/productos?limit=10",
+      "concurrent_users": 5,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 2.06,
+      "requests_per_second": 48.52,
+      "response_times_ms": {
+        "min": 59.05,
+        "max": 832.17,
+        "avg": 101.83,
+        "median": 82.51,
+        "p95": 177.83,
+        "p99": 832.17
+      }
+    },
+    {
+      "endpoint": "/patients?limit=10",
+      "concurrent_users": 10,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 5.63,
+      "requests_per_second": 17.75,
+      "response_times_ms": {
+        "min": 58.93,
+        "max": 5001.97,
+        "avg": 149.42,
+        "median": 84.66,
+        "p95": 244.11,
+        "p99": 5001.97
+      }
+    },
+    {
+      "endpoint": "/agenda/citas?fecha=2026-08-17",
+      "concurrent_users": 10,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.68,
+      "requests_per_second": 59.67,
+      "response_times_ms": {
+        "min": 44.85,
+        "max": 1036.08,
+        "avg": 104.75,
+        "median": 68.58,
+        "p95": 202.08,
+        "p99": 1036.08
+      }
+    },
+    {
+      "endpoint": "/inventario/productos?limit=10",
+      "concurrent_users": 10,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.82,
+      "requests_per_second": 54.97,
+      "response_times_ms": {
+        "min": 51.62,
+        "max": 1487.25,
+        "avg": 99.88,
+        "median": 81.8,
+        "p95": 134.93,
+        "p99": 1487.25
+      }
+    },
+    {
+      "endpoint": "/patients?limit=10",
+      "concurrent_users": 25,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 0.6,
+      "requests_per_second": 166.76,
+      "response_times_ms": {
+        "min": 71.68,
+        "max": 365.73,
+        "avg": 130.42,
+        "median": 111.61,
+        "p95": 239.3,
+        "p99": 365.73
+      }
+    },
+    {
+      "endpoint": "/agenda/citas?fecha=2026-08-17",
+      "concurrent_users": 25,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 0.9,
+      "requests_per_second": 111.01,
+      "response_times_ms": {
+        "min": 45.25,
+        "max": 794.73,
+        "avg": 105.25,
+        "median": 74.14,
+        "p95": 176.82,
+        "p99": 794.73
+      }
+    },
+    {
+      "endpoint": "/inventario/productos?limit=10",
+      "concurrent_users": 25,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.5,
+      "requests_per_second": 66.52,
+      "response_times_ms": {
+        "min": 68.4,
+        "max": 1222.11,
+        "avg": 184.56,
+        "median": 151.78,
+        "p95": 283.86,
+        "p99": 1222.11
+      }
+    },
+    {
+      "endpoint": "/patients?limit=10",
+      "concurrent_users": 50,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.63,
+      "requests_per_second": 61.34,
+      "response_times_ms": {
+        "min": 82.5,
+        "max": 1188.59,
+        "avg": 283.22,
+        "median": 235.41,
+        "p95": 462.08,
+        "p99": 1188.59
+      }
+    },
+    {
+      "endpoint": "/agenda/citas?fecha=2026-08-17",
+      "concurrent_users": 50,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 2.91,
+      "requests_per_second": 34.32,
+      "response_times_ms": {
+        "min": 49.11,
+        "max": 2720.18,
+        "avg": 211.79,
+        "median": 145.46,
+        "p95": 853.06,
+        "p99": 2720.18
+      }
+    },
+    {
+      "endpoint": "/inventario/productos?limit=10",
+      "concurrent_users": 50,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 2.39,
+      "requests_per_second": 41.76,
+      "response_times_ms": {
+        "min": 70.4,
+        "max": 2317.26,
+        "avg": 338.03,
+        "median": 277.81,
+        "p95": 824.35,
+        "p99": 2317.26
+      }
+    },
+    {
+      "endpoint": "/patients?limit=10",
+      "concurrent_users": 100,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.31,
+      "requests_per_second": 76.06,
+      "response_times_ms": {
+        "min": 290.57,
+        "max": 1314.28,
+        "avg": 500.06,
+        "median": 547.99,
+        "p95": 610.0,
+        "p99": 1314.28
+      }
+    },
+    {
+      "endpoint": "/agenda/citas?fecha=2026-08-17",
+      "concurrent_users": 100,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 1.32,
+      "requests_per_second": 75.7,
+      "response_times_ms": {
+        "min": 234.69,
+        "max": 1318.4,
+        "avg": 346.27,
+        "median": 346.89,
+        "p95": 437.77,
+        "p99": 1318.4
+      }
+    },
+    {
+      "endpoint": "/inventario/productos?limit=10",
+      "concurrent_users": 100,
+      "total_requests": 100,
+      "successful_requests": 100,
+      "failed_requests": 0,
+      "success_rate": 100.0,
+      "total_time_seconds": 0.76,
+      "requests_per_second": 131.53,
+      "response_times_ms": {
+        "min": 257.28,
+        "max": 758.91,
+        "avg": 615.32,
+        "median": 696.03,
+        "p95": 728.31,
+        "p99": 758.91
+      }
+    }
+  ],
+  "stress_tests": [
+    {
+      "concurrent_users": 50,
+      "success_rate": 100.0,
+      "requests_per_second": 36.23,
+      "avg_response_ms": 184.51,
+      "status": "\u2705"
+    },
+    {
+      "concurrent_users": 100,
+      "success_rate": 100.0,
+      "requests_per_second": 39.82,
+      "avg_response_ms": 398.12,
+      "status": "\u2705"
+    },
+    {
+      "concurrent_users": 150,
+      "success_rate": 30.5,
+      "requests_per_second": 6.41,
+      "avg_response_ms": 4507.89,
+      "status": "\u274c"
+    }
+  ],
+  "database_tests": [
+    {
+      "operation": "50 pacientes",
+      "avg_ms": 8361.08
+    },
+    {
+      "operation": "100 pacientes",
+      "avg_ms": 146.08
+    },
+    {
+      "operation": "50 evaluaciones",
+      "avg_ms": 143.35
+    },
+    {
+      "operation": "100 gastos",
+      "avg_ms": 144.15
+    }
+  ],
+  "capacity": {
+    "optimal_concurrent": 100,
+    "max_rps": 39.82,
+    "avg_response_ms": 398.12,
+    "estimated_active_users": "100-200",
+    "estimated_total_users": "500-1000"
+  }
+}
