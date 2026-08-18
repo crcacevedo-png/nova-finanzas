@@ -413,3 +413,254 @@ async def obtener_credenciales_prueba(
         ],
         "advertencia": "Estas credenciales son SOLO para ambiente de desarrollo"
     }
+
+
+# ==================== FASE 3-6: VERIFICACIONES E2E ====================
+
+@router.post("/verificaciones/ejecutar-todas")
+async def ejecutar_todas_verificaciones(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    FASE 3-4: Ejecuta la batería completa de verificaciones E2E.
+    Incluye los 9 recorridos y 70+ pruebas de verificación.
+    """
+    from server import db
+    from seed.verificaciones_e2e import VerificadorE2E
+    
+    verificador = VerificadorE2E(db)
+    resultado = await verificador.ejecutar_bateria_completa()
+    
+    return resultado
+
+
+@router.post("/verificaciones/ejecutar-categoria/{categoria}")
+async def ejecutar_categoria_verificaciones(
+    categoria: str,
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    Ejecuta solo una categoría de verificaciones.
+    Categorías: recorridos, datos_maestros, inventario, caja, agenda, aislamiento, seguridad, integridad
+    """
+    from server import db
+    from seed.verificaciones_e2e import VerificadorE2E
+    
+    categorias_validas = [
+        "recorridos", "datos_maestros", "inventario", "caja", 
+        "agenda", "aislamiento", "seguridad", "integridad"
+    ]
+    
+    if categoria not in categorias_validas:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Categoría inválida. Válidas: {categorias_validas}"
+        )
+    
+    verificador = VerificadorE2E(db)
+    resultado = await verificador.ejecutar_categoria(categoria)
+    
+    return resultado
+
+
+@router.get("/verificaciones/categorias")
+async def listar_categorias_verificaciones(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    Lista las categorías de verificaciones disponibles.
+    """
+    return {
+        "categorias": [
+            {
+                "id": "recorridos",
+                "nombre": "Recorridos E2E",
+                "descripcion": "9 flujos completos de negocio",
+                "pruebas_aproximadas": 9
+            },
+            {
+                "id": "datos_maestros",
+                "nombre": "Datos Maestros",
+                "descripcion": "Verificaciones de bodegas, proveedores, productos, médicos",
+                "pruebas_aproximadas": 7
+            },
+            {
+                "id": "inventario",
+                "nombre": "Inventario",
+                "descripcion": "FEFO, lotes, vencimientos, stock mínimo",
+                "pruebas_aproximadas": 10
+            },
+            {
+                "id": "caja",
+                "nombre": "Caja",
+                "descripcion": "Movimientos y cierres de caja",
+                "pruebas_aproximadas": 3
+            },
+            {
+                "id": "agenda",
+                "nombre": "Agenda",
+                "descripcion": "Médicos, especialidades, colores",
+                "pruebas_aproximadas": 3
+            },
+            {
+                "id": "aislamiento",
+                "nombre": "Aislamiento Clínica/Óptica",
+                "descripcion": "Verificación de separación de datos",
+                "pruebas_aproximadas": 5
+            },
+            {
+                "id": "seguridad",
+                "nombre": "Seguridad",
+                "descripcion": "Contraseñas, roles, índices",
+                "pruebas_aproximadas": 3
+            },
+            {
+                "id": "integridad",
+                "nombre": "Integridad de Datos",
+                "descripcion": "Flags esDatoPrueba, prefijos PRB-",
+                "pruebas_aproximadas": 12
+            }
+        ],
+        "total_aproximado": 52
+    }
+
+
+# ==================== FASE 5: PRUEBAS DE VOLUMEN ====================
+
+@router.post("/volumen/generar")
+async def generar_datos_volumen(
+    cantidad: int = 100,
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    FASE 5: Genera datos de volumen para pruebas de estrés.
+    Por defecto genera 100 pacientes adicionales.
+    Máximo permitido: 1000
+    """
+    from server import db
+    from seed.verificaciones_e2e import PruebasVolumen
+    
+    if cantidad > 1000:
+        raise HTTPException(
+            status_code=400,
+            detail="Máximo permitido: 1000 pacientes por ejecución"
+        )
+    
+    pruebas = PruebasVolumen(db)
+    resultado = await pruebas.generar_volumen(cantidad)
+    
+    return resultado
+
+
+@router.get("/volumen/medir-rendimiento")
+async def medir_rendimiento(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    FASE 5: Mide el rendimiento de consultas comunes.
+    """
+    from server import db
+    from seed.verificaciones_e2e import PruebasVolumen
+    
+    pruebas = PruebasVolumen(db)
+    resultado = await pruebas.medir_rendimiento_consultas()
+    
+    return resultado
+
+
+# ==================== FASE 6: GENERACIÓN DE INFORME ====================
+
+@router.get("/informe/generar")
+async def generar_informe_e2e(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    FASE 6: Genera el informe completo de pruebas E2E en formato estructurado.
+    """
+    from server import db
+    from seed.verificaciones_e2e import VerificadorE2E
+    
+    verificador = VerificadorE2E(db)
+    resultado = await verificador.ejecutar_bateria_completa()
+    
+    # Generar resumen para el informe
+    informe = {
+        "titulo": "INFORME DE PRUEBAS E2E - NOVAVISION ERP",
+        "fecha_generacion": resultado["timestamp"],
+        "duracion_total_ms": resultado["duracion_total_ms"],
+        "resumen_ejecutivo": {
+            "total_pruebas": resultado["total_pruebas"],
+            "aprobadas": resultado["resumen"]["PASA"],
+            "falladas": resultado["resumen"]["FALLA"],
+            "omitidas": resultado["resumen"]["OMITIDA"],
+            "errores": resultado["resumen"]["ERROR"],
+            "tasa_exito": resultado["tasa_exito"],
+            "veredicto": "APROBADO" if resultado["success"] else "REQUIERE ATENCIÓN"
+        },
+        "por_categoria": resultado["por_categoria"],
+        "fallos_criticos": resultado["fallos_por_severidad"].get("CRITICA", []),
+        "fallos_altos": resultado["fallos_por_severidad"].get("ALTA", []),
+        "detalle_pruebas": resultado["resultados"]
+    }
+    
+    return informe
+
+
+@router.get("/informe/markdown")
+async def generar_informe_markdown(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    FASE 6: Genera el informe en formato Markdown para anexar a INFORME_PRUEBAS_E2E.md
+    """
+    from server import db
+    from seed.verificaciones_e2e import VerificadorE2E
+    
+    verificador = VerificadorE2E(db)
+    resultado = await verificador.ejecutar_bateria_completa()
+    
+    # Generar Markdown
+    md = []
+    md.append(f"\n# RESULTADOS DE EJECUCIÓN - {resultado['timestamp'][:10]}\n")
+    md.append(f"**Duración total:** {resultado['duracion_total_ms']}ms\n")
+    md.append(f"**Tasa de éxito:** {resultado['tasa_exito']}%\n")
+    md.append(f"**Veredicto:** {'✅ APROBADO' if resultado['success'] else '❌ REQUIERE ATENCIÓN'}\n")
+    
+    md.append("\n## Resumen por Estado\n")
+    md.append("| Estado | Cantidad |")
+    md.append("|--------|----------|")
+    for estado, cantidad in resultado["resumen"].items():
+        emoji = {"PASA": "✅", "FALLA": "❌", "OMITIDA": "⏭️", "ERROR": "💥"}.get(estado, "")
+        md.append(f"| {emoji} {estado} | {cantidad} |")
+    
+    md.append("\n## Resumen por Categoría\n")
+    md.append("| Categoría | PASA | FALLA | OMITIDA |")
+    md.append("|-----------|------|-------|---------|")
+    for cat, conteos in resultado["por_categoria"].items():
+        md.append(f"| {cat} | {conteos.get('PASA', 0)} | {conteos.get('FALLA', 0)} | {conteos.get('OMITIDA', 0)} |")
+    
+    if resultado["fallos_por_severidad"]:
+        md.append("\n## Fallos por Severidad\n")
+        for severidad, tests in resultado["fallos_por_severidad"].items():
+            if tests:
+                md.append(f"\n### {severidad}")
+                for t in tests:
+                    md.append(f"- {t}")
+    
+    md.append("\n## Detalle de Pruebas\n")
+    for r in resultado["resultados"]:
+        emoji = {"PASA": "✅", "FALLA": "❌", "OMITIDA": "⏭️", "ERROR": "💥"}.get(r["estado"], "")
+        md.append(f"\n### {r['test_id']}: {r['nombre']}")
+        md.append(f"- **Estado:** {emoji} {r['estado']}")
+        md.append(f"- **Categoría:** {r['categoria']}")
+        md.append(f"- **Severidad:** {r['severidad']}")
+        md.append(f"- **Mensaje:** {r['mensaje']}")
+        if r.get("evidencia"):
+            md.append(f"- **Evidencia:** `{r['evidencia']}`")
+        md.append(f"- **Duración:** {r['duracion_ms']}ms")
+    
+    return {
+        "markdown": "\n".join(md),
+        "success": resultado["success"]
+    }
+

@@ -331,3 +331,410 @@ Basado en el análisis de precondiciones:
 # FASE 1-7: EN PROGRESO
 
 *Las siguientes fases se documentarán a medida que se implementen...*
+
+# FASE 3-6: RESULTADOS DE VERIFICACIONES AUTOMATIZADAS
+
+Las siguientes pruebas fueron ejecutadas automáticamente por el motor de verificaciones E2E del Laboratorio de Pruebas.
+
+
+# RESULTADOS DE EJECUCIÓN - 2026-08-18
+
+**Duración total:** 36ms
+
+**Tasa de éxito:** 100.0%
+
+**Veredicto:** ✅ APROBADO
+
+
+## Resumen por Estado
+
+| Estado | Cantidad |
+|--------|----------|
+| ✅ PASA | 50 |
+| ❌ FALLA | 0 |
+| ⏭️ OMITIDA | 0 |
+| 💥 ERROR | 0 |
+|  PENDIENTE | 0 |
+
+## Resumen por Categoría
+
+| Categoría | PASA | FALLA | OMITIDA |
+|-----------|------|-------|---------|
+| recorridos | 9 | 0 | 0 |
+| datos_maestros | 7 | 0 | 0 |
+| inventario | 8 | 0 | 0 |
+| caja | 3 | 0 | 0 |
+| agenda | 3 | 0 | 0 |
+| aislamiento | 5 | 0 | 0 |
+| seguridad | 3 | 0 | 0 |
+| integridad | 12 | 0 | 0 |
+
+## Detalle de Pruebas
+
+
+### REC-A: Recorrido Clínica Completa
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** CRITICA
+- **Mensaje:** Todos los componentes del recorrido clínico están disponibles
+- **Evidencia:** `{'paciente_id': '57188f0d-019b-4777-9043-b8a614630230', 'productos_disponibles': 15, 'lotes_con_stock': 19, 'bodega_pv': 'PRB-BOD-DIS', 'medicos': 4}`
+- **Duración:** 3ms
+
+### REC-B: Recorrido Óptica Pura
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** ALTA
+- **Mensaje:** Componentes de óptica disponibles (SIN conexión a recetas - PRE-02)
+- **Evidencia:** `{'paciente_id': 'ef9f02eb-b909-45b3-ace9-a7ec8a24bbe6', 'frames_disponibles': 5, 'lens_types': 4, 'nota': 'Conexión recetas→óptica no implementada (hallazgo PRE-02)'}`
+- **Duración:** 1ms
+
+### REC-C: Recorrido IGSS
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** ALTA
+- **Mensaje:** Paciente IGSS tiene todos los campos requeridos
+- **Evidencia:** `{'paciente_id': '4dfab40c-93fc-4545-8d30-385ec232ecf6', 'campos_igss': {'igss_unidad': 'Unidad de Oftalmología Central', 'igss_afiliacion': '123456789-0', 'igss_no_sps': 'PRB-SPS-001', 'igss_codigo': 'OFT-CAT-001', 'igss_nog': 'PRB-NOG-001'}}`
+- **Duración:** 0ms
+
+### REC-D: Recorrido Inventario FEFO
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** CRITICA
+- **Mensaje:** Producto con lotes escalonados listo para FEFO
+- **Evidencia:** `{'producto_id': '35a2487f-68b9-4c41-8d44-51d43ed247dd', 'total_lotes': 3, 'lote_fefo': 'PRB-L001-A', 'fecha_vencimiento_proximo': '2026-09-07T00:45:36.556894+00:00', 'orden_fechas': ['2026-09-07T00:45:36.556894+00:00', '2026-12-16T00:45:36.556903+00:00', '2027-09-22T00:45:36.556908+00:00']}`
+- **Duración:** 0ms
+
+### REC-E: Recorrido Agenda Completa
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** ALTA
+- **Mensaje:** Componentes de agenda disponibles
+- **Evidencia:** `{'medicos': 4, 'colores': ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0'], 'paciente_test': 'PRB-PAC-0012'}`
+- **Duración:** 0ms
+
+### REC-F: Recorrido Gastos y Autorizaciones
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** MEDIA
+- **Mensaje:** Proveedores con plazos variados disponibles
+- **Evidencia:** `{'proveedores': 4, 'plazos_credito': [0, 15, 30, 60]}`
+- **Duración:** 0ms
+
+### REC-G: Recorrido Multi-Usuario
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** MEDIA
+- **Mensaje:** Usuarios de prueba por rol disponibles
+- **Evidencia:** `{'total_usuarios': 5, 'por_rol': {'superadmin': 1, 'admin': 1, 'usuario': 3}, 'usernames': {'superadmin': ['prb.superadmin'], 'admin': ['prb.admin'], 'usuario': ['prb.usuario', 'prb.medico1', 'prb.medico2']}}`
+- **Duración:** 0ms
+
+### REC-H: Recorrido Cierre de Caja
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** ALTA
+- **Mensaje:** Estructura de caja disponible para pruebas
+- **Evidencia:** `{'colecciones_verificadas': ['caja_movimientos', 'caja_cierres'], 'nota': 'Movimientos de caja requieren flujo UI completo'}`
+- **Duración:** 0ms
+
+### REC-I: Recorrido Paciente Cruzado (Aislamiento)
+- **Estado:** ✅ PASA
+- **Categoría:** recorridos
+- **Severidad:** CRITICA
+- **Mensaje:** Paciente cruzado listo para pruebas de aislamiento
+- **Evidencia:** `{'paciente_id': '13b2322f-b009-4950-818f-ef4fa06ee14d', 'paciente_codigo': 'PRB-PAC-0008', 'productos_clinica': 18, 'productos_optica': 5}`
+- **Duración:** 1ms
+
+### DM-01: Códigos de bodega únicos
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** ALTA
+- **Mensaje:** Todos los 4 registros tienen codigo único
+- **Duración:** 1ms
+
+### DM-02: Códigos de producto únicos
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** ALTA
+- **Mensaje:** Todos los 18 registros tienen codigo único
+- **Duración:** 0ms
+
+### DM-03: Proveedores con NIT
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** MEDIA
+- **Mensaje:** Todos los 4 registros tienen nit
+- **Duración:** 0ms
+
+### DM-04: Médicos con colegiado
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** MEDIA
+- **Mensaje:** Todos los 4 registros tienen colegiado
+- **Duración:** 1ms
+
+### DM-05: Productos clínicos con bodega asignada
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** ALTA
+- **Mensaje:** Todos los productos físicos tienen bodega
+- **Duración:** 0ms
+
+### DM-06: Servicios sin bodega (correcto)
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** MEDIA
+- **Mensaje:** Los servicios no tienen bodega asignada
+- **Duración:** 0ms
+
+### DM-07: Tipo pagador convenio configurado
+- **Estado:** ✅ PASA
+- **Categoría:** datos_maestros
+- **Severidad:** MEDIA
+- **Mensaje:** Convenio empresarial configurado
+- **Evidencia:** `{'cobertura': 80, 'plazo': 45}`
+- **Duración:** 0ms
+
+### INV-01: Lote vencido detectado
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** CRITICA
+- **Mensaje:** Lote vencido encontrado para pruebas
+- **Evidencia:** `{'numero_lote': 'PRB-L002-VENCIDO', 'fecha_vencimiento': '2026-08-08T00:45:36.556915+00:00'}`
+- **Duración:** 0ms
+
+### INV-02: Producto con stock mínimo (1 unidad)
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** ALTA
+- **Mensaje:** Lote con 1 unidad encontrado
+- **Evidencia:** `{'numero_lote': 'PRB-L003-UNICO'}`
+- **Duración:** 0ms
+
+### INV-03: Productos bajo mínimo detectados
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** ALTA
+- **Mensaje:** 2 productos bajo mínimo detectados
+- **Duración:** 2ms
+
+### INV-04: Costos distintos por lote
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** MEDIA
+- **Mensaje:** Producto con múltiples costos por lote
+- **Evidencia:** `{'costos': [48.0, 52.0, 45.0]}`
+- **Duración:** 1ms
+
+### INV-05: Bodega quirófano existe
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** ALTA
+- **Mensaje:** Bodega quirófano configurada
+- **Evidencia:** `{'codigo': 'PRB-BOD-QUI'}`
+- **Duración:** 0ms
+
+### INV-06: Insumos quirúrgicos en bodega quirófano
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** ALTA
+- **Mensaje:** 4 insumos quirúrgicos en bodega correcta
+- **Duración:** 1ms
+
+### INV-07: Control de lote en insumos
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** MEDIA
+- **Mensaje:** Todos los 15 productos físicos controlan lote
+- **Duración:** 1ms
+
+### INV-08: Precios con IVA configurado
+- **Estado:** ✅ PASA
+- **Categoría:** inventario
+- **Severidad:** MEDIA
+- **Mensaje:** Todos los productos tienen precio_con_iva: true
+- **Duración:** 0ms
+
+### CAJA-01: Colección caja_movimientos existe
+- **Estado:** ✅ PASA
+- **Categoría:** caja
+- **Severidad:** ALTA
+- **Mensaje:** Colección caja_movimientos disponible
+- **Duración:** 0ms
+
+### CAJA-02: Colección caja_cierres existe
+- **Estado:** ✅ PASA
+- **Categoría:** caja
+- **Severidad:** ALTA
+- **Mensaje:** Colección caja_cierres disponible
+- **Duración:** 0ms
+
+### CAJA-03: Óptica usa optica_sale_payments (no caja)
+- **Estado:** ✅ PASA
+- **Categoría:** caja
+- **Severidad:** CRITICA
+- **Mensaje:** Óptica tiene su propia colección de pagos
+- **Duración:** 0ms
+
+### AGE-01: Médicos con especialidad definida
+- **Estado:** ✅ PASA
+- **Categoría:** agenda
+- **Severidad:** MEDIA
+- **Mensaje:** Todos los 4 médicos tienen especialidad
+- **Duración:** 0ms
+
+### AGE-02: Colores únicos de médicos
+- **Estado:** ✅ PASA
+- **Categoría:** agenda
+- **Severidad:** MEDIA
+- **Mensaje:** Todos los colores son únicos
+- **Duración:** 0ms
+
+### AGE-03: Usuarios médicos enlazados
+- **Estado:** ✅ PASA
+- **Categoría:** agenda
+- **Severidad:** ALTA
+- **Mensaje:** 2 usuarios médicos enlazados
+- **Duración:** 0ms
+
+### AIS-01: Ventas clínica en colección separada
+- **Estado:** ✅ PASA
+- **Categoría:** aislamiento
+- **Severidad:** CRITICA
+- **Mensaje:** Colecciones de ventas separadas: ventas, optica_sales
+- **Duración:** 0ms
+
+### AIS-02: Óptica sin kardex (hallazgo PRE-01)
+- **Estado:** ✅ PASA
+- **Categoría:** aislamiento
+- **Severidad:** INFO
+- **Mensaje:** Óptica usa stock directo, NO kardex (hallazgo PRE-01 documentado)
+- **Evidencia:** `{'nota': 'Esto es un hallazgo de arquitectura, no un error de prueba'}`
+- **Duración:** 0ms
+
+### AIS-03: Pacientes compartidos entre clínica y óptica
+- **Estado:** ✅ PASA
+- **Categoría:** aislamiento
+- **Severidad:** CRITICA
+- **Mensaje:** Solo existe una colección de pacientes (compartida)
+- **Duración:** 0ms
+
+### AIS-04: Correlativos de ventas independientes
+- **Estado:** ✅ PASA
+- **Categoría:** aislamiento
+- **Severidad:** ALTA
+- **Mensaje:** Formatos de correlativo documentados como separados
+- **Evidencia:** `{'clinica': 'VTA-YYYYMMDD-XXXX', 'optica': 'ORD-YYYYMM-XXXX'}`
+- **Duración:** 0ms
+
+### AIS-05: Óptica aislada de recetas (hallazgo PRE-02)
+- **Estado:** ✅ PASA
+- **Categoría:** aislamiento
+- **Severidad:** INFO
+- **Mensaje:** Óptica NO tiene integración con recetas de evaluaciones (hallazgo PRE-02)
+- **Evidencia:** `{'nota': 'Pendiente de implementación futura'}`
+- **Duración:** 0ms
+
+### SEC-01: Contraseñas hasheadas con bcrypt
+- **Estado:** ✅ PASA
+- **Categoría:** seguridad
+- **Severidad:** CRITICA
+- **Mensaje:** Todos los 5 usuarios tienen hash bcrypt
+- **Duración:** 0ms
+
+### SEC-02: Roles de usuario válidos
+- **Estado:** ✅ PASA
+- **Categoría:** seguridad
+- **Severidad:** ALTA
+- **Mensaje:** Todos los usuarios tienen roles válidos
+- **Duración:** 0ms
+
+### SEC-03: Índice esDatoPrueba para purga rápida
+- **Estado:** ✅ PASA
+- **Categoría:** seguridad
+- **Severidad:** MEDIA
+- **Mensaje:** Índice esDatoPrueba existe en patients
+- **Duración:** 0ms
+
+### INT-01: Flag esDatoPrueba en pacientes
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en patients
+- **Duración:** 0ms
+
+### INT-02: Flag esDatoPrueba en usuarios
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en users
+- **Duración:** 0ms
+
+### INT-03: Flag esDatoPrueba en productos
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en productos_inventario
+- **Duración:** 0ms
+
+### INT-04: Flag esDatoPrueba en lotes
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en lotes_inventario
+- **Duración:** 0ms
+
+### INT-05: Flag esDatoPrueba en bodegas
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en bodegas_inventario
+- **Duración:** 0ms
+
+### INT-06: Flag esDatoPrueba en proveedores
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en proveedores
+- **Duración:** 0ms
+
+### INT-07: Flag esDatoPrueba en médicos
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en medicos_agenda
+- **Duración:** 0ms
+
+### INT-08: Flag esDatoPrueba en frames
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en optica_frames
+- **Duración:** 0ms
+
+### INT-09: Flag esDatoPrueba en tipos lente
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en optica_lens_types
+- **Duración:** 0ms
+
+### INT-10: Flag esDatoPrueba en LC
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Integridad de flag verificada en optica_contact_lenses
+- **Duración:** 0ms
+
+### INT-11: Prefijo PRB- en códigos de prueba
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** CRITICA
+- **Mensaje:** Todos los códigos de prueba tienen prefijo PRB-
+- **Duración:** 0ms
+
+### INT-12: Perfiles de paciente asignados
+- **Estado:** ✅ PASA
+- **Categoría:** integridad
+- **Severidad:** ALTA
+- **Mensaje:** Todos los 13 pacientes tienen perfil asignado
+- **Duración:** 1ms

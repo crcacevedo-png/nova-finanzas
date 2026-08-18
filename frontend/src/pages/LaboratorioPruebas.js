@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { toast } from 'sonner';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -28,6 +29,8 @@ export default function LaboratorioPruebas() {
   const [error, setError] = useState(null);
   const [credenciales, setCredenciales] = useState(null);
   const [confirmacionPurga, setConfirmacionPurga] = useState('');
+  const [resultadoVerificaciones, setResultadoVerificaciones] = useState(null);
+  const [resultadoRendimiento, setResultadoRendimiento] = useState(null);
 
   // Verificar acceso
   useEffect(() => {
@@ -133,6 +136,89 @@ export default function LaboratorioPruebas() {
       setCredenciales(response.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al obtener credenciales');
+    }
+  };
+
+  // Ejecutar todas las verificaciones E2E
+  const ejecutarVerificacionesCompletas = async () => {
+    try {
+      setOperacionEnCurso('verificaciones');
+      setResultadoVerificaciones(null);
+      const response = await axios.post(`${API_URL}/api/laboratorio-pruebas/verificaciones/ejecutar-todas`);
+      setResultadoVerificaciones(response.data);
+      toast.success(`Verificaciones completadas: ${response.data.tasa_exito}% éxito`);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al ejecutar verificaciones');
+      toast.error('Error al ejecutar verificaciones');
+    } finally {
+      setOperacionEnCurso(null);
+    }
+  };
+
+  // Ejecutar categoría específica
+  const ejecutarCategoria = async (categoria) => {
+    try {
+      setOperacionEnCurso('verificaciones');
+      setResultadoVerificaciones(null);
+      const response = await axios.post(`${API_URL}/api/laboratorio-pruebas/verificaciones/ejecutar-categoria/${categoria}`);
+      setResultadoVerificaciones(response.data);
+      toast.success(`Verificaciones de ${categoria} completadas`);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al ejecutar verificaciones');
+    } finally {
+      setOperacionEnCurso(null);
+    }
+  };
+
+  // Generar informe Markdown
+  const generarInformeMarkdown = async () => {
+    try {
+      setOperacionEnCurso('informe');
+      const response = await axios.get(`${API_URL}/api/laboratorio-pruebas/informe/markdown`);
+      
+      // Crear blob y descargar
+      const blob = new Blob([response.data.markdown], { type: 'text/markdown' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `informe_e2e_${new Date().toISOString().slice(0,10)}.md`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Informe descargado');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al generar informe');
+    } finally {
+      setOperacionEnCurso(null);
+    }
+  };
+
+  // Generar datos de volumen
+  const generarVolumen = async (cantidad) => {
+    try {
+      setOperacionEnCurso('volumen');
+      const response = await axios.post(`${API_URL}/api/laboratorio-pruebas/volumen/generar?cantidad=${cantidad}`);
+      toast.success(`Generados ${response.data.pacientes_creados} pacientes`);
+      cargarEstado();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al generar volumen');
+    } finally {
+      setOperacionEnCurso(null);
+    }
+  };
+
+  // Medir rendimiento
+  const medirRendimiento = async () => {
+    try {
+      setOperacionEnCurso('rendimiento');
+      setResultadoRendimiento(null);
+      const response = await axios.get(`${API_URL}/api/laboratorio-pruebas/volumen/medir-rendimiento`);
+      setResultadoRendimiento(response.data);
+      toast.success('Rendimiento medido');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al medir rendimiento');
+    } finally {
+      setOperacionEnCurso(null);
     }
   };
 
@@ -437,29 +523,179 @@ export default function LaboratorioPruebas() {
         </Card>
       </div>
 
-      {/* Próximamente */}
+      {/* Verificaciones E2E */}
       <Card className="mt-6 bg-slate-800/50 border-slate-700 backdrop-blur">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <FileText className="h-5 w-5 text-slate-400" />
-            Próximamente
+            <Play className="h-5 w-5 text-green-400" />
+            Verificaciones E2E (Fases 3-6)
           </CardTitle>
+          <CardDescription className="text-slate-400">
+            Ejecutar batería de pruebas automatizadas
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-slate-500">
-            <div className="p-4 bg-slate-700/30 rounded-lg">
-              <h4 className="font-medium text-slate-300 mb-2">Fase 3: Recorridos E2E</h4>
-              <p className="text-sm">Ejecución de los 9 recorridos de prueba automatizados</p>
-            </div>
-            <div className="p-4 bg-slate-700/30 rounded-lg">
-              <h4 className="font-medium text-slate-300 mb-2">Fase 4: Batería de Pruebas</h4>
-              <p className="text-sm">70+ pruebas de verificación con reportes detallados</p>
-            </div>
-            <div className="p-4 bg-slate-700/30 rounded-lg">
-              <h4 className="font-medium text-slate-300 mb-2">Fase 5: Pruebas de Volumen</h4>
-              <p className="text-sm">Generación de datos masivos y medición de rendimiento</p>
-            </div>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={ejecutarVerificacionesCompletas}
+              disabled={operacionEnCurso !== null}
+            >
+              {operacionEnCurso === 'verificaciones' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Ejecutar Todas las Verificaciones
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={generarInformeMarkdown}
+              disabled={operacionEnCurso !== null}
+            >
+              {operacionEnCurso === 'informe' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Generar Informe Markdown
+            </Button>
           </div>
+          
+          {/* Categorías de pruebas */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-4 border-t border-slate-700">
+            {['recorridos', 'datos_maestros', 'inventario', 'aislamiento'].map(cat => (
+              <Button
+                key={cat}
+                variant="ghost"
+                size="sm"
+                className="text-slate-400 hover:text-white"
+                onClick={() => ejecutarCategoria(cat)}
+                disabled={operacionEnCurso !== null}
+              >
+                {cat.replace('_', ' ')}
+              </Button>
+            ))}
+          </div>
+          
+          {/* Resultados de verificaciones */}
+          {resultadoVerificaciones && (
+            <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-white">
+                  {resultadoVerificaciones.success ? (
+                    <span className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      Verificaciones Aprobadas
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-500" />
+                      Requiere Atención
+                    </span>
+                  )}
+                </h4>
+                <span className="text-sm text-slate-400">
+                  Tasa: {resultadoVerificaciones.tasa_exito}%
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="p-2 bg-green-500/20 rounded">
+                  <div className="text-xl font-bold text-green-400">{resultadoVerificaciones.resumen?.PASA || 0}</div>
+                  <div className="text-xs text-slate-400">Pasan</div>
+                </div>
+                <div className="p-2 bg-red-500/20 rounded">
+                  <div className="text-xl font-bold text-red-400">{resultadoVerificaciones.resumen?.FALLA || 0}</div>
+                  <div className="text-xs text-slate-400">Fallan</div>
+                </div>
+                <div className="p-2 bg-yellow-500/20 rounded">
+                  <div className="text-xl font-bold text-yellow-400">{resultadoVerificaciones.resumen?.OMITIDA || 0}</div>
+                  <div className="text-xs text-slate-400">Omitidas</div>
+                </div>
+                <div className="p-2 bg-slate-500/20 rounded">
+                  <div className="text-xl font-bold text-slate-400">{resultadoVerificaciones.resumen?.ERROR || 0}</div>
+                  <div className="text-xs text-slate-400">Errores</div>
+                </div>
+              </div>
+              
+              {/* Lista de fallos */}
+              {resultadoVerificaciones.resumen?.FALLA > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-600">
+                  <h5 className="text-sm font-medium text-red-400 mb-2">Pruebas Fallidas:</h5>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {resultadoVerificaciones.resultados
+                      ?.filter(r => r.estado === 'FALLA')
+                      .map((r, i) => (
+                        <div key={i} className="text-xs p-2 bg-red-500/10 rounded">
+                          <span className="font-mono text-red-300">{r.test_id}</span>
+                          <span className="text-slate-400 ml-2">{r.nombre}</span>
+                          <p className="text-red-400 mt-1">{r.mensaje}</p>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pruebas de Volumen */}
+      <Card className="mt-6 bg-slate-800/50 border-slate-700 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Database className="h-5 w-5 text-orange-400" />
+            Pruebas de Volumen (Fase 5)
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Generar datos masivos y medir rendimiento
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              className="w-full bg-orange-600 hover:bg-orange-700"
+              onClick={() => generarVolumen(100)}
+              disabled={operacionEnCurso !== null}
+            >
+              {operacionEnCurso === 'volumen' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4 mr-2" />
+              )}
+              Generar 100 Pacientes Extra
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={medirRendimiento}
+              disabled={operacionEnCurso !== null}
+            >
+              {operacionEnCurso === 'rendimiento' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Clock className="h-4 w-4 mr-2" />
+              )}
+              Medir Rendimiento
+            </Button>
+          </div>
+          
+          {resultadoRendimiento && (
+            <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
+              <h5 className="text-sm font-medium text-white mb-2">Métricas de Rendimiento:</h5>
+              <div className="space-y-1">
+                {Object.entries(resultadoRendimiento.mediciones_ms || {}).map(([key, value]) => (
+                  <div key={key} className="flex justify-between text-sm">
+                    <span className="text-slate-400">{key.replace(/_/g, ' ')}</span>
+                    <span className="font-mono text-teal-400">{value}ms</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
