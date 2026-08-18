@@ -72,6 +72,13 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - [x] Función de Purga: Elimina todos los datos con `esDatoPrueba: true`
 - [x] Ruta en frontend: `/laboratorio-pruebas`
 - [x] Bloqueo en producción vía `NODE_ENV`/`ENVIRONMENT`
+- [x] **Pruebas de Transacción (NUEVO)**:
+  - Apertura/cierre de caja de prueba
+  - 4 tipos de ventas POS (simple, múltiple, con descuento, pago mixto)
+  - Movimientos de caja (ingresos/egresos)
+  - Verificación de kardex e integridad
+  - Verificación de totales de caja
+  - 11 pruebas que validan el flujo financiero completo
 
 #### Optimizaciones
 - [x] GZIP Middleware

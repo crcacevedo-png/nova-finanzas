@@ -31,6 +31,8 @@ export default function LaboratorioPruebas() {
   const [confirmacionPurga, setConfirmacionPurga] = useState('');
   const [resultadoVerificaciones, setResultadoVerificaciones] = useState(null);
   const [resultadoRendimiento, setResultadoRendimiento] = useState(null);
+  const [resultadoTransacciones, setResultadoTransacciones] = useState(null);
+  const [estadoTransacciones, setEstadoTransacciones] = useState(null);
 
   // Verificar acceso
   useEffect(() => {
@@ -221,6 +223,53 @@ export default function LaboratorioPruebas() {
       setOperacionEnCurso(null);
     }
   };
+
+  // Ejecutar pruebas de transacción
+  const ejecutarTransacciones = async () => {
+    try {
+      setOperacionEnCurso('transacciones');
+      setResultadoTransacciones(null);
+      const response = await axios.post(`${API_URL}/api/laboratorio-pruebas/transacciones/ejecutar-todas`);
+      setResultadoTransacciones(response.data);
+      toast.success(`Transacciones: ${response.data.tasa_exito}% éxito`);
+      cargarEstadoTransacciones();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al ejecutar transacciones');
+      toast.error('Error en pruebas de transacción');
+    } finally {
+      setOperacionEnCurso(null);
+    }
+  };
+
+  // Limpiar transacciones de prueba
+  const limpiarTransacciones = async () => {
+    try {
+      setOperacionEnCurso('limpiar_trx');
+      const response = await axios.delete(`${API_URL}/api/laboratorio-pruebas/transacciones/limpiar`);
+      toast.success('Transacciones de prueba eliminadas');
+      setResultadoTransacciones(null);
+      cargarEstadoTransacciones();
+      cargarEstado();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error al limpiar transacciones');
+    } finally {
+      setOperacionEnCurso(null);
+    }
+  };
+
+  // Cargar estado de transacciones
+  const cargarEstadoTransacciones = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/laboratorio-pruebas/transacciones/estado`);
+      setEstadoTransacciones(response.data);
+    } catch (err) {
+      // Silenciar error si no hay transacciones
+    }
+  };
+
+  useEffect(() => {
+    cargarEstadoTransacciones();
+  }, []);
 
   if (!hasRole('superadmin')) {
     return null;
@@ -691,6 +740,150 @@ export default function LaboratorioPruebas() {
                   <div key={key} className="flex justify-between text-sm">
                     <span className="text-slate-400">{key.replace(/_/g, ' ')}</span>
                     <span className="font-mono text-teal-400">{value}ms</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pruebas de Transacción */}
+      <Card className="mt-6 bg-slate-800/50 border-slate-700 backdrop-blur">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <FileText className="h-5 w-5 text-purple-400" />
+            Pruebas de Transacción
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Ventas POS, movimientos de caja, verificación de totales y kardex
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Estado de transacciones */}
+          {estadoTransacciones && estadoTransacciones.total > 0 && (
+            <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-purple-300 text-sm">
+                  {estadoTransacciones.total} transacciones de prueba activas
+                </span>
+                {estadoTransacciones.caja_prueba_abierta && (
+                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                    Caja abierta
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+                <div className="text-center">
+                  <div className="text-purple-400 font-bold">{estadoTransacciones.conteo?.ventas || 0}</div>
+                  <div className="text-slate-500">Ventas</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-purple-400 font-bold">{estadoTransacciones.conteo?.caja_movimientos || 0}</div>
+                  <div className="text-slate-500">Movimientos</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-purple-400 font-bold">{estadoTransacciones.conteo?.kardex || 0}</div>
+                  <div className="text-slate-500">Kardex</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-purple-400 font-bold">{estadoTransacciones.conteo?.caja_cierres || 0}</div>
+                  <div className="text-slate-500">Cierres</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              className="w-full bg-purple-600 hover:bg-purple-700"
+              onClick={ejecutarTransacciones}
+              disabled={operacionEnCurso !== null}
+            >
+              {operacionEnCurso === 'transacciones' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Ejecutar Flujo Completo
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-red-500/50 text-red-400 hover:bg-red-500/10"
+              onClick={limpiarTransacciones}
+              disabled={operacionEnCurso !== null || !estadoTransacciones?.total}
+            >
+              {operacionEnCurso === 'limpiar_trx' ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Limpiar Transacciones
+            </Button>
+          </div>
+
+          {/* Resultados de transacciones */}
+          {resultadoTransacciones && (
+            <div className="mt-4 p-4 bg-slate-700/50 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-white">
+                  {resultadoTransacciones.success ? (
+                    <span className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      Transacciones Exitosas
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-500" />
+                      Hay Errores
+                    </span>
+                  )}
+                </h4>
+                <span className="text-sm text-slate-400">
+                  {resultadoTransacciones.tasa_exito}% éxito | {resultadoTransacciones.duracion_total_ms}ms
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center mb-4">
+                <div className="p-2 bg-green-500/20 rounded">
+                  <div className="text-xl font-bold text-green-400">{resultadoTransacciones.resumen?.PASA || 0}</div>
+                  <div className="text-xs text-slate-400">Pasan</div>
+                </div>
+                <div className="p-2 bg-red-500/20 rounded">
+                  <div className="text-xl font-bold text-red-400">{resultadoTransacciones.resumen?.FALLA || 0}</div>
+                  <div className="text-xs text-slate-400">Fallan</div>
+                </div>
+                <div className="p-2 bg-slate-500/20 rounded">
+                  <div className="text-xl font-bold text-slate-400">{resultadoTransacciones.resumen?.ERROR || 0}</div>
+                  <div className="text-xs text-slate-400">Errores</div>
+                </div>
+              </div>
+
+              {/* Detalle de pruebas */}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {resultadoTransacciones.resultados?.map((r, i) => (
+                  <div 
+                    key={i} 
+                    className={`text-xs p-2 rounded ${
+                      r.estado === 'PASA' ? 'bg-green-500/10' : 
+                      r.estado === 'FALLA' ? 'bg-red-500/10' : 'bg-slate-500/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-slate-300">{r.test_id}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        r.estado === 'PASA' ? 'bg-green-500/20 text-green-400' :
+                        r.estado === 'FALLA' ? 'bg-red-500/20 text-red-400' : 'bg-slate-500/20 text-slate-400'
+                      }`}>
+                        {r.estado}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 mt-1">{r.nombre}</p>
+                    {r.evidencia && Object.keys(r.evidencia).length > 0 && (
+                      <p className="text-slate-500 text-xs mt-1 truncate">
+                        {JSON.stringify(r.evidencia).slice(0, 100)}...
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

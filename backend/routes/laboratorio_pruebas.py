@@ -664,3 +664,78 @@ async def generar_informe_markdown(
         "success": resultado["success"]
     }
 
+
+# ==================== PRUEBAS DE TRANSACCIÓN ====================
+
+@router.post("/transacciones/ejecutar-todas")
+async def ejecutar_pruebas_transaccion(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    Ejecuta pruebas de transacción completas:
+    - Apertura de caja
+    - Ventas POS con descuento de inventario
+    - Movimientos de caja (ingresos/egresos)
+    - Verificación de totales y kardex
+    - Cierre de caja con arqueo
+    """
+    from server import db
+    from seed.pruebas_transaccion import PruebasTransaccion
+    
+    pruebas = PruebasTransaccion(db)
+    resultado = await pruebas.ejecutar_todas()
+    
+    return resultado
+
+
+@router.delete("/transacciones/limpiar")
+async def limpiar_transacciones_prueba(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    Limpia todas las transacciones de prueba (ventas, movimientos, kardex).
+    """
+    from server import db
+    from seed.pruebas_transaccion import PruebasTransaccion
+    
+    pruebas = PruebasTransaccion(db)
+    eliminados = await pruebas.limpiar_transacciones()
+    
+    return {
+        "success": True,
+        "message": "Transacciones de prueba eliminadas",
+        "eliminados": eliminados
+    }
+
+
+@router.get("/transacciones/estado")
+async def estado_transacciones_prueba(
+    _: bool = Depends(verificar_no_produccion)
+):
+    """
+    Obtiene el estado actual de transacciones de prueba.
+    """
+    from server import db
+    
+    conteo = {
+        "ventas": await db.ventas.count_documents({"esDatoPrueba": True}),
+        "caja_movimientos": await db.caja_movimientos.count_documents({"esDatoPrueba": True}),
+        "caja_cierres": await db.caja_cierres.count_documents({"esDatoPrueba": True}),
+        "kardex": await db.kardex_inventario.count_documents({"esDatoPrueba": True})
+    }
+    
+    # Verificar si hay caja de prueba abierta
+    fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    caja_abierta = await db.caja_cierres.find_one({
+        "fecha": fecha_hoy,
+        "esDatoPrueba": True,
+        "estado": "Abierto"
+    }, {"_id": 0})
+    
+    return {
+        "conteo": conteo,
+        "total": sum(conteo.values()),
+        "caja_prueba_abierta": caja_abierta is not None,
+        "caja_prueba": caja_abierta
+    }
+
