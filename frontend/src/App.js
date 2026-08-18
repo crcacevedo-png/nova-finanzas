@@ -28,6 +28,8 @@ import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
 import ImportarPacientes from './pages/ImportarPacientes';
 import LaboratorioPruebas from './pages/LaboratorioPruebas';
+import CuentasCobrarOptica from './pages/CuentasCobrarOptica';
+import CuentasCobrarFinanzas from './pages/CuentasCobrarFinanzas';
 import ErrorBoundary from './components/ErrorBoundary';
 // Módulo Inventario
 import PanelInventario from './pages/inventario/PanelInventario';
@@ -227,6 +229,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_optica">
             <TiposLente />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/cuentas-cobrar" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <CuentasCobrarOptica />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Cuentas por Cobrar - Finanzas/Clínica */}
+      <Route 
+        path="/cuentas-cobrar-finanzas" 
+        element={
+          <ProtectedRoute>
+            <CuentasCobrarFinanzas />
           </ProtectedRoute>
         } 
       />

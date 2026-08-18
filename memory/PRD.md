@@ -41,6 +41,11 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - [x] Movimientos de ingresos/egresos
 - [x] Historial de cierres con arqueo
 - [x] WebSocket para actualizaciones en tiempo real (opcional)
+- [x] **Cuentas por Cobrar Clínica** (`/cuentas-cobrar-finanzas`) - CxC con responsables configurables:
+  - Médico, Institución, Seguro, Convenio, IGSS, Otro
+  - Catálogo de responsables CRUD
+  - Filtros por tipo de responsable y estado
+  - Registro de abonos parciales/totales
 
 #### POS (Punto de Venta)
 - [x] Integración con inventario FEFO
@@ -59,6 +64,8 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - [x] Lentes de contacto (`optica_contact_lenses`)
 - [x] Tipos de lente (`optica_lens_types`)
 - [x] Ventas de óptica (`optica_sales`) - Colecciones SEPARADAS de clínica
+- [x] **Punto de Venta Óptica** (`/optica/punto-venta`) - Interfaz POS dedicada
+- [x] **Cuentas por Cobrar Óptica** (`/optica/cuentas-cobrar`) - CxC vinculadas al paciente/cliente
 - [x] **NOTA CRÍTICA**: Óptica NO usa Kardex inmutable ni sistema de bodegas
 
 #### CRM Cirugías
@@ -103,19 +110,33 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - ✅ Fase 5: Pruebas de volumen y rendimiento
   - ✅ Fase 6: Generación de informe automático
   - ✅ Fase 7: Función de purga funcionando
+- [x] Cuentas por Cobrar Independientes - **COMPLETADO** (2026-08-18)
+  - ✅ Backend: `/api/cuentas-cobrar/optica` y `/api/cuentas-cobrar/clinica`
+  - ✅ Backend: CRUD de responsables (`/api/cuentas-cobrar/responsables`)
+  - ✅ Backend: Registro de abonos (`/api/cuentas-cobrar/{id}/abono`)
+  - ✅ Frontend: CuentasCobrarOptica.js con resumen y tabla
+  - ✅ Frontend: CuentasCobrarFinanzas.js con tabs (Cuentas/Responsables)
+  - ✅ Submenús agregados en Layout.js para Óptica y Finanzas
+  - ✅ Fase 3: 9 Recorridos E2E automatizados
+  - ✅ Fase 4: 50 pruebas de verificación (100% PASA)
+  - ✅ Fase 5: Pruebas de volumen y rendimiento
+  - ✅ Fase 6: Generación de informe automático
+  - ✅ Fase 7: Función de purga funcionando
 
 ### 📋 Backlog (Próximas Tareas)
 
 #### P1 - Alta Prioridad
+- [ ] **Google Calendar Sync**: Sincronización bidireccional con calendarios de médicos (requiere credenciales OAuth de Google Cloud)
 - [ ] **FEL Guatemala**: Estructura de Facturación Electrónica (deshabilitada con `FEL_ENABLED=false`)
 
 #### P2 - Media Prioridad
-- [ ] **PDF Evaluaciones**: Exportar evaluación oftalmológica completa a PDF
-- [ ] **Google Calendar**: Sincronización activa en módulo Agenda
+- [ ] **PDF Evaluaciones**: Exportar evaluación oftalmológica completa a PDF para anexar al expediente
+- [ ] **Integración CxC-POS**: Permitir crear ventas a crédito directamente desde Punto de Venta
 
 #### P3 - Baja Prioridad
 - [ ] Indicador visual de estado de WebSocket en UI
-- [ ] Refactorización de `server.py` (extraer inicialización de índices MongoDB)
+- [ ] Refactorización de `CuentasCobrarFinanzas.js` (separar en subcomponentes)
+- [ ] Anulación/reversión de abonos en CxC
 
 ## Arquitectura Técnica
 
@@ -140,33 +161,40 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 │   │   ├── caja.py
 │   │   ├── agenda.py
 │   │   ├── patients.py
-│   │   ├── laboratorio_pruebas.py  # NUEVO: Endpoints QA E2E
-│   ├── seed/                    # NUEVO: Generadores de datos de prueba
+│   │   ├── cuentas_cobrar.py    # NUEVO: CxC Óptica y Clínica
+│   │   ├── laboratorio_pruebas.py  # Endpoints QA E2E
+│   ├── seed/                    # Generadores de datos de prueba
 │   │   ├── __init__.py
 │   │   ├── datos_maestros.py
 │   │   ├── pacientes.py
+│   │   ├── pruebas_transaccion.py
+│   │   ├── verificaciones_e2e.py
 │   └── scripts/
 │       ├── performance_test.py
 │       ├── generar_plantilla_*.py
 ├── frontend/
 │   ├── src/
 │   │   ├── hooks/useWebSocket.js
-│   │   ├── hooks/useInactivityTimeout.js  # NUEVO: Timeout 30 min
+│   │   ├── hooks/useInactivityTimeout.js
 │   │   ├── components/
 │   │   │   ├── ErrorBoundary.js
-│   │   │   ├── InactivityWarning.js  # NUEVO: Modal advertencia
-│   │   │   ├── Layout.js
+│   │   │   ├── InactivityWarning.js
+│   │   │   ├── Layout.js           # Submenús CxC Óptica y Finanzas
 │   │   ├── pages/
 │   │       ├── Caja.js
 │   │       ├── Agenda.js
-│   │       ├── LaboratorioPruebas.js  # NUEVO: Panel QA E2E
+│   │       ├── PuntoVenta.js       # POS Clínica
+│   │       ├── OpticaPOS.js        # NUEVO: POS Óptica
+│   │       ├── CuentasCobrarOptica.js    # NUEVO: CxC Óptica
+│   │       ├── CuentasCobrarFinanzas.js  # NUEVO: CxC Clínica
+│   │       ├── LaboratorioPruebas.js     # Panel QA E2E
 │   └── public/
 │       ├── plantilla_*.xlsx
-├── docs/                        # NUEVO: Documentación de seguridad
+├── docs/                        # Documentación de seguridad
 │   ├── SECURITY_AUDIT.md
 │   ├── SECURITY_REMEDIATION_PLAN.md
 │   ├── SECURITY_BASELINE.md
-├── INFORME_PRUEBAS_E2E.md       # NUEVO: Reporte de auditoría QA
+├── INFORME_PRUEBAS_E2E.md       # Reporte de auditoría QA
 ```
 
 ## Credenciales de Prueba

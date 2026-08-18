@@ -2789,6 +2789,10 @@ api_router.include_router(ventas_router, tags=["Punto de Venta"])
 from routes.laboratorio_pruebas import router as laboratorio_pruebas_router
 api_router.include_router(laboratorio_pruebas_router, tags=["Laboratorio de Pruebas"])
 
+# Incluir router de Cuentas por Cobrar (CxC independiente para Óptica y Clínica)
+from routes.cuentas_cobrar import router as cuentas_cobrar_router
+api_router.include_router(cuentas_cobrar_router, prefix="/cuentas-cobrar", tags=["Cuentas por Cobrar"])
+
 # ==================== USER MANAGEMENT ROUTES ====================
 
 @api_router.get("/users", response_model=List[UserResponse])

@@ -36,7 +36,8 @@ import {
   ClipboardList,
   Store,
   Upload,
-  FlaskConical
+  FlaskConical,
+  CreditCard
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -110,6 +111,7 @@ const Layout = ({ children }) => {
   const finanzasItems = user?.role !== 'optica' ? [
     // Punto de Venta - Destacado como primer item
     { path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' },
+    { path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' },
     { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
     { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
     // Gastos Fijos - Admin y SuperAdmin
@@ -171,6 +173,7 @@ const Layout = ({ children }) => {
   const opticaItems = canViewOptica ? [
     { path: '/optica/inventario', icon: Package, label: 'Inventario', testId: 'nav-optica-inventario' },
     { path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' },
+    { path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' },
     { path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' },
     { path: '/optica/tipos-lente', icon: Eye, label: 'Tipos de Lente', testId: 'nav-optica-tipos-lente' },
   ] : [];
