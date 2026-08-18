@@ -74,6 +74,7 @@ const METODOS_PAGO = [
   { value: 'Tarjeta', label: 'Tarjeta', icon: CreditCard, color: 'bg-blue-500' },
   { value: 'Transferencia', label: 'Transferencia', icon: Building2, color: 'bg-purple-500' },
   { value: 'Cheque', label: 'Cheque', icon: FileText, color: 'bg-orange-500' },
+  { value: 'Cuenta por Cobrar', label: 'Crédito (CxC)', icon: Clock, color: 'bg-yellow-500' },
 ];
 
 // Categorías de productos óptica
@@ -376,11 +377,35 @@ const OpticaPOS = () => {
     setFormasPago(prev => [...prev, {
       metodo: metodoPagoActual,
       monto: montoFinal,
-      referencia: referenciaPagoActual || null
+      referencia: referenciaPagoActual || null,
+      es_cxc: metodoPagoActual === 'Cuenta por Cobrar'
     }]);
     
     setMontoPagoActual('');
     setReferenciaPagoActual('');
+  };
+
+  // Agregar saldo pendiente a CxC (para Óptica, vinculado al paciente)
+  const agregarCxCPendiente = () => {
+    const pendiente = calcularPendiente();
+    if (pendiente <= 0) {
+      toast.error('No hay saldo pendiente');
+      return;
+    }
+    
+    if (!paciente) {
+      toast.error('Debe seleccionar un paciente para crear Cuenta por Cobrar');
+      return;
+    }
+    
+    setFormasPago(prev => [...prev, {
+      metodo: 'Cuenta por Cobrar',
+      monto: pendiente,
+      referencia: null,
+      es_cxc: true
+    }]);
+    
+    toast.success(`Saldo de ${formatCurrency(pendiente)} agregado a Cuenta por Cobrar`);
   };
 
   const eliminarFormaPago = (index) => {
@@ -396,8 +421,19 @@ const OpticaPOS = () => {
     }
     
     const pendiente = calcularPendiente();
-    if (pendiente > 0.01) {
-      toast.error(`Falta cubrir ${formatCurrency(pendiente)}`);
+    
+    // Verificar si hay CxC en las formas de pago
+    const tieneCxC = formasPago.some(fp => fp.es_cxc);
+    
+    // Si hay pendiente y no hay CxC, no permitir
+    if (pendiente > 0.01 && !tieneCxC) {
+      toast.error(`Falta cubrir ${formatCurrency(pendiente)}. Agregue un pago o envíe a Cuenta por Cobrar.`);
+      return;
+    }
+    
+    // Si hay CxC pero no hay paciente seleccionado
+    if (tieneCxC && !paciente) {
+      toast.error('Debe seleccionar un paciente para ventas con Cuenta por Cobrar');
       return;
     }
     
@@ -420,6 +456,11 @@ const OpticaPOS = () => {
       // Verificar si hay lentes que requieren receta
       const tieneLentes = carrito.some(item => item.tipo === 'tipos_lente');
       
+      // Separar pagos de CxC de pagos normales
+      const pagosCxC = formasPago.filter(fp => fp.es_cxc);
+      const pagosNormales = formasPago.filter(fp => !fp.es_cxc);
+      const montoCxC = pagosCxC.reduce((sum, fp) => sum + fp.monto, 0);
+      
       const ventaData = {
         patient_id: paciente?.id || null,
         patient_name: paciente 
@@ -429,7 +470,7 @@ const OpticaPOS = () => {
         subtotal: calcularSubtotal(),
         discount: 0,
         total: calcularTotal(),
-        payments: formasPago.map(fp => ({
+        payments: pagosNormales.map(fp => ({
           method: fp.metodo,
           amount: fp.monto,
           reference: fp.referencia
@@ -437,7 +478,10 @@ const OpticaPOS = () => {
         notes: observaciones || null,
         prescription: tieneLentes && Object.values(receta).some(v => v) ? receta : null,
         created_by: user?.id,
-        created_by_name: user?.name || user?.username
+        created_by_name: user?.name || user?.username,
+        // Indicar si tiene CxC
+        tiene_cxc: montoCxC > 0,
+        monto_cxc: montoCxC
       };
       
       const response = await axios.post(`${API_URL}/optica/sales`, ventaData, {
@@ -446,6 +490,33 @@ const OpticaPOS = () => {
           'Content-Type': 'application/json'
         }
       });
+      
+      // Si tiene CxC, crear la cuenta por cobrar
+      if (montoCxC > 0 && paciente) {
+        try {
+          const cxcData = {
+            origen: 'optica',
+            paciente_id: paciente.id,
+            paciente_nombre: `${paciente.primer_nombre} ${paciente.primer_apellido}`,
+            monto_total: montoCxC,
+            concepto: `Venta Óptica #${response.data?.sale_number || 'N/A'} - ${items.map(i => i.type).join(', ')}`,
+            venta_id: response.data?.id || null,
+            notas: observaciones || null
+          };
+          
+          await axios.post(`${API_URL}/cuentas-cobrar/optica`, cxcData, {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          toast.success(`Cuenta por Cobrar de ${formatCurrency(montoCxC)} creada para ${paciente.primer_nombre}`);
+        } catch (cxcError) {
+          console.error('Error creando CxC:', cxcError);
+          toast.warning('Venta registrada, pero hubo un error creando la Cuenta por Cobrar');
+        }
+      }
       
       setVentaExitosa(response.data);
       setVentaExitosaDialogOpen(true);
@@ -1001,6 +1072,26 @@ const OpticaPOS = () => {
               </div>
             </div>
             
+            {/* Botón para agregar saldo pendiente a CxC */}
+            {calcularPendiente() > 0.01 && (
+              <Button
+                variant="outline"
+                className="w-full border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                onClick={agregarCxCPendiente}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                Agregar saldo pendiente a Cuenta por Cobrar - {formatCurrency(calcularPendiente())}
+              </Button>
+            )}
+            
+            {/* Aviso si hay CxC pero no paciente */}
+            {formasPago.some(fp => fp.es_cxc) && !paciente && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2 text-yellow-800">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <span className="text-sm">Debe seleccionar un paciente para ventas con Cuenta por Cobrar</span>
+              </div>
+            )}
+            
             {/* Observaciones */}
             <div>
               <Label>Observaciones</Label>
@@ -1020,7 +1111,7 @@ const OpticaPOS = () => {
             <Button 
               className="bg-teal-600 hover:bg-teal-700"
               onClick={procesarVenta}
-              disabled={submitting || calcularPendiente() > 0.01}
+              disabled={submitting || (calcularPendiente() > 0.01 && !formasPago.some(fp => fp.es_cxc))}
             >
               {submitting ? (
                 <>

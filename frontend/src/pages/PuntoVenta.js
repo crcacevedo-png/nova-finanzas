@@ -203,10 +203,15 @@ const PuntoVenta = () => {
 
   const fetchPagadores = async () => {
     try {
-      const response = await axios.get(`${API_URL}/catalogos/pagadores`);
-      setPagadores(response.data || []);
+      const token = localStorage.getItem('token');
+      // Usar los responsables del sistema de CxC
+      const response = await axios.get(`${API_URL}/cuentas-cobrar/responsables`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPagadores(response.data?.data || []);
     } catch (error) {
-      console.error('Error fetching pagadores:', error);
+      console.error('Error fetching pagadores/responsables:', error);
+      setPagadores([]);
     }
   };
 
@@ -1448,15 +1453,23 @@ const PuntoVenta = () => {
                   {/* Pagador para CxC */}
                   {metodoPagoActual === 'Cuenta por Cobrar' && (
                     <div>
-                      <Label className="text-sm">Tipo de Pagador *</Label>
+                      <Label className="text-sm">Responsable de Pago *</Label>
                       <Select value={tipoPagadorId || "select"} onValueChange={(v) => setTipoPagadorId(v === "select" ? "" : v)}>
                         <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Seleccione..." />
+                          <SelectValue placeholder="Seleccione responsable..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {pagadores.filter(p => p.activo).map(pag => (
-                            <SelectItem key={pag.id} value={pag.id}>{pag.nombre}</SelectItem>
-                          ))}
+                          {pagadores.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No hay responsables. Créelos en CxC &gt; Responsables
+                            </SelectItem>
+                          ) : (
+                            pagadores.map(pag => (
+                              <SelectItem key={pag.id} value={pag.id}>
+                                {pag.nombre} ({pag.tipo})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
