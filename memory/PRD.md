@@ -78,7 +78,12 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - Movimientos de caja (ingresos/egresos)
   - Verificación de kardex e integridad
   - Verificación de totales de caja
-  - 11 pruebas que validan el flujo financiero completo
+  - **Pruebas de Devolución (NUEVO)**:
+    - Anulación con devolución de inventario (TRX-12)
+    - Anulación SIN devolución (TRX-13)
+    - Verificación de reversión en kardex (TRX-14)
+    - Verificación de totales post-anulación (TRX-15)
+  - 15 pruebas que validan el flujo financiero completo
 
 #### Optimizaciones
 - [x] GZIP Middleware

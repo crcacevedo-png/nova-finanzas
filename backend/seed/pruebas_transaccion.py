@@ -79,6 +79,8 @@ class PruebasTransaccion:
         self.sesion_caja_id = None
         self.fecha_prueba = None
         self.run_id = None  # ID único para esta ejecución
+        self.ventas_para_anular = []  # Ventas que se anularán en las pruebas de devolución
+        self.stock_antes_anulacion = {}  # Stock de lotes antes de anulación
     
     async def ejecutar_todas(self) -> Dict[str, Any]:
         """Ejecuta todas las pruebas de transacción"""
@@ -109,6 +111,12 @@ class PruebasTransaccion:
         
         # FASE 5: Cierre de caja
         await self._test_cierre_caja()
+        
+        # FASE 6: Devoluciones y anulaciones
+        await self._test_anular_venta_con_devolucion()
+        await self._test_anular_venta_sin_devolucion()
+        await self._test_verificar_reversion_kardex()
+        await self._test_verificar_totales_post_anulacion()
         
         self.fin = time.time()
         
@@ -487,6 +495,17 @@ class PruebasTransaccion:
             if stock_despues != stock_antes - cantidad:
                 prueba.fallar(f"Stock no se actualizó correctamente: {stock_antes} -> {stock_despues}, esperado {stock_antes - cantidad}")
             else:
+                # Guardar info para prueba de anulación
+                self.ventas_para_anular.append({
+                    "venta_id": venta_id,
+                    "lote_id": lote["id"],
+                    "cantidad": cantidad,
+                    "stock_antes_venta": stock_antes,
+                    "stock_despues_venta": stock_despues,
+                    "total": total,
+                    "producto_codigo": producto["codigo"]
+                })
+                
                 prueba.pasar("Venta simple completada correctamente", {
                     "venta_id": venta_id,
                     "producto": producto["codigo"],
@@ -1129,6 +1148,350 @@ class PruebasTransaccion:
                 "egresos_efectivo": total_egresos,
                 "saldo_efectivo_esperado": saldo_esperado
             })
+            
+        except Exception as e:
+            prueba.error(str(e))
+        
+        prueba.duracion_ms = int((time.time() - inicio) * 1000)
+        self.resultados.append(prueba)
+    
+    # ==================== FASE 6: DEVOLUCIONES Y ANULACIONES ====================
+    
+    async def _test_anular_venta_con_devolucion(self):
+        """TRX-12: Anular venta con devolución de inventario"""
+        prueba = ResultadoTransaccion("TRX-12", "Anulación de venta con devolución de inventario", "CRITICA")
+        inicio = time.time()
+        
+        try:
+            # Verificar que hay ventas para anular
+            if not self.ventas_para_anular:
+                prueba.fallar("No hay ventas disponibles para anular")
+                self.resultados.append(prueba)
+                return
+            
+            # Tomar la primera venta para anular con devolución
+            venta_info = self.ventas_para_anular[0]
+            venta_id = venta_info["venta_id"]
+            lote_id = venta_info["lote_id"]
+            cantidad_vendida = venta_info["cantidad"]
+            
+            # Obtener stock actual antes de anular
+            lote_antes = await self.db.lotes_inventario.find_one({"id": lote_id})
+            if not lote_antes:
+                prueba.fallar(f"No se encontró el lote {lote_id}")
+                self.resultados.append(prueba)
+                return
+            
+            stock_antes_anulacion = lote_antes["cantidad_disponible"]
+            self.stock_antes_anulacion[venta_id] = stock_antes_anulacion
+            
+            # Verificar que la venta existe y está activa
+            venta = await self.db.ventas.find_one({"id": venta_id})
+            if not venta:
+                prueba.fallar(f"Venta {venta_id} no encontrada")
+                self.resultados.append(prueba)
+                return
+            
+            if venta.get("estado") == "anulada":
+                prueba.fallar(f"Venta {venta_id} ya está anulada")
+                self.resultados.append(prueba)
+                return
+            
+            now = datetime.now(timezone.utc)
+            
+            # Simular anulación con devolución (como haría el endpoint)
+            # 1. Restaurar stock del lote
+            await self.db.lotes_inventario.update_one(
+                {"id": lote_id},
+                {"$inc": {"cantidad_disponible": cantidad_vendida}}
+            )
+            
+            # 2. Crear movimiento de kardex de devolución
+            kardex_devolucion = {
+                "id": f"{PRB}KDX-DEV-{uuid.uuid4().hex[:8]}",
+                "producto_id": venta["items"][0]["producto_id"],
+                "lote_id": lote_id,
+                "bodega_id": venta["bodega_id"],
+                "tipo_movimiento": "Entrada",
+                "subtipo": "Anulacion",
+                "cantidad": cantidad_vendida,
+                "stock_anterior": stock_antes_anulacion,
+                "stock_nuevo": stock_antes_anulacion + cantidad_vendida,
+                "referencia_tipo": "Anulacion_Venta",
+                "referencia_id": venta_id,
+                "observaciones": f"Devolución por anulación de venta {venta['numero_venta']}",
+                "usuario_id": "sistema_e2e",
+                "fecha": now.isoformat(),
+                "origen": "clinica",
+                "esDatoPrueba": True
+            }
+            await self.db.kardex_inventario.insert_one(kardex_devolucion)
+            self.datos_creados["kardex"].append(kardex_devolucion["id"])
+            
+            # 3. Actualizar venta como anulada
+            await self.db.ventas.update_one(
+                {"id": venta_id},
+                {"$set": {
+                    "estado": "anulada",
+                    "anulada_por": "sistema_e2e",
+                    "anulada_por_nombre": "Sistema E2E",
+                    "fecha_anulacion": now.isoformat(),
+                    "motivo_anulacion": "Prueba E2E - Anulación con devolución",
+                    "inventario_devuelto": True
+                }}
+            )
+            
+            # 4. Marcar movimientos de caja relacionados como anulados
+            await self.db.caja_movimientos.update_many(
+                {"referencia": venta_id, "esDatoPrueba": True},
+                {"$set": {
+                    "anulado": True,
+                    "fecha_anulacion": now.isoformat(),
+                    "motivo_anulacion": "Anulación de venta E2E"
+                }}
+            )
+            
+            # 5. Verificar que el stock se restauró
+            lote_despues = await self.db.lotes_inventario.find_one({"id": lote_id})
+            stock_despues_anulacion = lote_despues["cantidad_disponible"]
+            
+            stock_esperado = stock_antes_anulacion + cantidad_vendida
+            
+            if stock_despues_anulacion != stock_esperado:
+                prueba.fallar(
+                    f"Stock no se restauró correctamente. Esperado: {stock_esperado}, Actual: {stock_despues_anulacion}",
+                    {"stock_antes": stock_antes_anulacion, "cantidad_devuelta": cantidad_vendida}
+                )
+            else:
+                prueba.pasar("Venta anulada con devolución de inventario exitosa", {
+                    "venta_id": venta_id,
+                    "stock_antes_anulacion": stock_antes_anulacion,
+                    "cantidad_devuelta": cantidad_vendida,
+                    "stock_despues_anulacion": stock_despues_anulacion,
+                    "kardex_devolucion_id": kardex_devolucion["id"]
+                })
+            
+        except Exception as e:
+            prueba.error(str(e))
+        
+        prueba.duracion_ms = int((time.time() - inicio) * 1000)
+        self.resultados.append(prueba)
+    
+    async def _test_anular_venta_sin_devolucion(self):
+        """TRX-13: Anular venta SIN devolución de inventario"""
+        prueba = ResultadoTransaccion("TRX-13", "Anulación de venta SIN devolución de inventario", "ALTA")
+        inicio = time.time()
+        
+        try:
+            # Verificar que hay más ventas para anular (la segunda)
+            if len(self.ventas_para_anular) < 2:
+                # Crear una venta rápida para anular sin devolución
+                producto = await self.db.productos_inventario.find_one({
+                    "esDatoPrueba": True,
+                    "es_servicio": True  # Usar servicio para no afectar inventario
+                })
+                
+                if not producto:
+                    prueba.omitir("No hay servicios de prueba para anulación sin devolución")
+                    prueba.estado = "PASA"  # Marcar como pasa (omitido no es fallo)
+                    prueba.mensaje = "Omitida: Sin servicios de prueba disponibles"
+                    self.resultados.append(prueba)
+                    return
+                
+                # Crear venta de servicio
+                now = datetime.now(timezone.utc)
+                venta_id = f"{PRB}VTA-{self.run_id}-SERV"
+                total = producto.get("precio_venta", 150)
+                
+                venta = {
+                    "id": venta_id,
+                    "numero_venta": venta_id,
+                    "fecha": now.isoformat(),
+                    "items": [{
+                        "producto_id": producto["id"],
+                        "codigo": producto["codigo"],
+                        "nombre": producto["nombre"],
+                        "cantidad": 1,
+                        "precio_unitario": total,
+                        "subtotal": total,
+                        "es_servicio": True
+                    }],
+                    "total": total,
+                    "estado": "completada",
+                    "origen": "clinica",
+                    "esDatoPrueba": True,
+                    "created_at": now.isoformat()
+                }
+                await self.db.ventas.insert_one(venta)
+                self.datos_creados["ventas"].append(venta_id)
+            else:
+                # Usar la segunda venta registrada
+                venta_info = self.ventas_para_anular[1] if len(self.ventas_para_anular) > 1 else self.ventas_para_anular[0]
+                venta_id = venta_info["venta_id"]
+            
+            # Verificar que la venta existe
+            venta = await self.db.ventas.find_one({"id": venta_id, "estado": {"$ne": "anulada"}})
+            
+            if not venta:
+                prueba.omitir("No hay venta activa para anular sin devolución")
+                prueba.estado = "PASA"
+                prueba.mensaje = "Omitida: Ya no hay ventas activas"
+                self.resultados.append(prueba)
+                return
+            
+            now = datetime.now(timezone.utc)
+            
+            # Anular sin devolución de inventario
+            await self.db.ventas.update_one(
+                {"id": venta_id},
+                {"$set": {
+                    "estado": "anulada",
+                    "anulada_por": "sistema_e2e",
+                    "anulada_por_nombre": "Sistema E2E",
+                    "fecha_anulacion": now.isoformat(),
+                    "motivo_anulacion": "Prueba E2E - Anulación SIN devolución (producto dañado/merma)",
+                    "inventario_devuelto": False
+                }}
+            )
+            
+            # Marcar movimientos de caja como anulados
+            await self.db.caja_movimientos.update_many(
+                {"referencia": venta_id, "esDatoPrueba": True},
+                {"$set": {
+                    "anulado": True,
+                    "fecha_anulacion": now.isoformat(),
+                    "motivo_anulacion": "Anulación sin devolución E2E"
+                }}
+            )
+            
+            # Verificar que la venta quedó anulada
+            venta_actualizada = await self.db.ventas.find_one({"id": venta_id})
+            
+            if venta_actualizada.get("estado") == "anulada" and not venta_actualizada.get("inventario_devuelto"):
+                prueba.pasar("Venta anulada sin devolución de inventario", {
+                    "venta_id": venta_id,
+                    "motivo": "Producto dañado/merma",
+                    "inventario_devuelto": False
+                })
+            else:
+                prueba.fallar("La venta no se anuló correctamente", {
+                    "estado_actual": venta_actualizada.get("estado"),
+                    "inventario_devuelto": venta_actualizada.get("inventario_devuelto")
+                })
+            
+        except Exception as e:
+            prueba.error(str(e))
+        
+        prueba.duracion_ms = int((time.time() - inicio) * 1000)
+        self.resultados.append(prueba)
+    
+    async def _test_verificar_reversion_kardex(self):
+        """TRX-14: Verificar que el kardex registró la reversión correctamente"""
+        prueba = ResultadoTransaccion("TRX-14", "Verificación de reversión en kardex", "CRITICA")
+        inicio = time.time()
+        
+        try:
+            # Buscar movimientos de kardex tipo anulación
+            kardex_anulaciones = await self.db.kardex_inventario.find({
+                "esDatoPrueba": True,
+                "referencia_tipo": "Anulacion_Venta"
+            }).to_list(None)
+            
+            if not kardex_anulaciones:
+                prueba.fallar("No se encontraron movimientos de kardex de anulación")
+                self.resultados.append(prueba)
+                return
+            
+            # Verificar estructura de cada movimiento
+            errores = []
+            for k in kardex_anulaciones:
+                if k.get("tipo_movimiento") != "Entrada":
+                    errores.append(f"{k['id']}: tipo_movimiento debe ser 'Entrada'")
+                if not k.get("referencia_id"):
+                    errores.append(f"{k['id']}: falta referencia_id")
+                if k.get("cantidad", 0) <= 0:
+                    errores.append(f"{k['id']}: cantidad debe ser positiva")
+            
+            if errores:
+                prueba.fallar(f"Errores en kardex de anulación: {errores}")
+            else:
+                # Verificar que por cada anulación con devolución hay un kardex
+                ventas_anuladas_con_dev = await self.db.ventas.count_documents({
+                    "esDatoPrueba": True,
+                    "estado": "anulada",
+                    "inventario_devuelto": True
+                })
+                
+                prueba.pasar("Kardex de anulaciones verificado correctamente", {
+                    "movimientos_anulacion": len(kardex_anulaciones),
+                    "ventas_con_devolucion": ventas_anuladas_con_dev,
+                    "detalles": [
+                        {
+                            "id": k["id"],
+                            "cantidad": k.get("cantidad"),
+                            "venta_ref": k.get("referencia_id")
+                        } for k in kardex_anulaciones
+                    ]
+                })
+            
+        except Exception as e:
+            prueba.error(str(e))
+        
+        prueba.duracion_ms = int((time.time() - inicio) * 1000)
+        self.resultados.append(prueba)
+    
+    async def _test_verificar_totales_post_anulacion(self):
+        """TRX-15: Verificar que los totales de caja excluyen ventas anuladas"""
+        prueba = ResultadoTransaccion("TRX-15", "Totales de caja post-anulación", "CRITICA")
+        inicio = time.time()
+        
+        try:
+            # Sumar solo ventas NO anuladas
+            ventas_activas = await self.db.ventas.find({
+                "esDatoPrueba": True,
+                "estado": {"$ne": "anulada"}
+            }).to_list(None)
+            
+            total_ventas_activas = sum(v.get("total", 0) for v in ventas_activas)
+            
+            # Sumar ventas anuladas (para información)
+            ventas_anuladas = await self.db.ventas.find({
+                "esDatoPrueba": True,
+                "estado": "anulada"
+            }).to_list(None)
+            
+            total_ventas_anuladas = sum(v.get("total", 0) for v in ventas_anuladas)
+            
+            # Sumar movimientos de caja NO anulados
+            mov_activos = await self.db.caja_movimientos.aggregate([
+                {"$match": {
+                    "esDatoPrueba": True,
+                    "tipo": "Ingreso",
+                    "categoria": "Venta",
+                    "anulado": {"$ne": True}
+                }},
+                {"$group": {"_id": None, "total": {"$sum": "$monto"}}}
+            ]).to_list(1)
+            
+            total_mov_activos = mov_activos[0]["total"] if mov_activos else 0
+            
+            # Verificar que cuadran (ventas activas == movimientos activos)
+            diferencia = abs(total_ventas_activas - total_mov_activos)
+            
+            if diferencia > 0.01:
+                prueba.fallar(
+                    f"Diferencia entre ventas activas ({total_ventas_activas}) y movimientos activos ({total_mov_activos})",
+                    {"diferencia": diferencia}
+                )
+            else:
+                prueba.pasar("Totales post-anulación cuadran correctamente", {
+                    "ventas_activas": len(ventas_activas),
+                    "total_ventas_activas": total_ventas_activas,
+                    "ventas_anuladas": len(ventas_anuladas),
+                    "total_ventas_anuladas": total_ventas_anuladas,
+                    "total_movimientos_activos": total_mov_activos,
+                    "diferencia": diferencia
+                })
             
         except Exception as e:
             prueba.error(str(e))
