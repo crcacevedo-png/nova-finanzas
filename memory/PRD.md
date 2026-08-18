@@ -1,19 +1,28 @@
 # PRD - NovaVision ERP Oftalmológico
 
 ## Descripción General
-Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, y más.
+Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-08-17
+**Última actualización**: 2026-08-18
 
 ### ✅ Funcionalidades Completadas
 
 #### Core
-- [x] Autenticación JWT con roles (superadmin, admin, usuario)
+- [x] Autenticación JWT con roles (superadmin, admin, usuario, optica)
 - [x] Dashboard con estadísticas y alertas
 - [x] Gestión de Pacientes con campos IGSS (NOG, afiliación, unidad, etc.)
 - [x] Importación masiva de pacientes (JSON/Excel)
 - [x] Plantillas Excel descargables
+
+#### Seguridad (Fase 1 - AppSec)
+- [x] Headers de seguridad (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, CSP)
+- [x] Rate limiting en login (5 intentos/minuto con bloqueo de 15 min)
+- [x] Bcrypt con costo 12 para hashing
+- [x] Flag `must_change_password` para usuarios sembrados
+- [x] Timeout de inactividad de 30 minutos con advertencia modal
+- [x] Token blacklist persistente en MongoDB
+- [x] Panel de alertas de seguridad para SuperAdmin
 
 #### Agenda
 - [x] Calendario con múltiples médicos
@@ -45,9 +54,24 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - [x] Kardex inmutable
 - [x] Alertas de stock bajo y vencimiento
 
+#### Óptica (Módulo Separado)
+- [x] Inventario de aros (`optica_frames`)
+- [x] Lentes de contacto (`optica_contact_lenses`)
+- [x] Tipos de lente (`optica_lens_types`)
+- [x] Ventas de óptica (`optica_sales`) - Colecciones SEPARADAS de clínica
+- [x] **NOTA CRÍTICA**: Óptica NO usa Kardex inmutable ni sistema de bodegas
+
 #### CRM Cirugías
 - [x] Pipeline de seguimiento de pacientes quirúrgicos
 - [x] Estados configurables
+
+#### Laboratorio de Pruebas E2E (NUEVO)
+- [x] Panel accesible solo para SuperAdmin en ambiente de desarrollo
+- [x] Seed de Datos Maestros (Fase 1): Bodegas, Proveedores, Productos, Usuarios, Médicos
+- [x] Seed de Pacientes (Fase 2): 14 pacientes con perfiles específicos
+- [x] Función de Purga: Elimina todos los datos con `esDatoPrueba: true`
+- [x] Ruta en frontend: `/laboratorio-pruebas`
+- [x] Bloqueo en producción vía `NODE_ENV`/`ENVIRONMENT`
 
 #### Optimizaciones
 - [x] GZIP Middleware
@@ -58,10 +82,20 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 
 ### 🔄 En Progreso
 - [x] WebSockets para Caja y Agenda - **COMPLETADO** (2026-08-17)
-  - Corregido error `SECRET_KEY` → `JWT_SECRET` en backend
-  - Refactorizado hook `useWebSocket.js` para evitar loops infinitos
+- [x] Laboratorio de Pruebas E2E - **COMPLETADO** (2026-08-18)
+  - Fase 0: Documentación de precondiciones en `INFORME_PRUEBAS_E2E.md`
+  - Fase 1: Seed de datos maestros funcionando
+  - Fase 2: Seed de pacientes funcionando
+  - Función de purga funcionando
 
 ### 📋 Backlog (Próximas Tareas)
+
+#### P0 - Inmediato
+- [ ] **Verificaciones E2E (Fases 3-7)**: Implementar las 70+ pruebas de verificación
+  - Recorridos de flujo completo
+  - Batería de pruebas automatizadas
+  - Pruebas de volumen
+  - Generación de informe final
 
 #### P1 - Alta Prioridad
 - [ ] **FEL Guatemala**: Estructura de Facturación Electrónica (deshabilitada con `FEL_ENABLED=false`)
@@ -97,18 +131,33 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 │   │   ├── caja.py
 │   │   ├── agenda.py
 │   │   ├── patients.py
+│   │   ├── laboratorio_pruebas.py  # NUEVO: Endpoints QA E2E
+│   ├── seed/                    # NUEVO: Generadores de datos de prueba
+│   │   ├── __init__.py
+│   │   ├── datos_maestros.py
+│   │   ├── pacientes.py
 │   └── scripts/
 │       ├── performance_test.py
 │       ├── generar_plantilla_*.py
 ├── frontend/
 │   ├── src/
 │   │   ├── hooks/useWebSocket.js
-│   │   ├── components/ErrorBoundary.js
+│   │   ├── hooks/useInactivityTimeout.js  # NUEVO: Timeout 30 min
+│   │   ├── components/
+│   │   │   ├── ErrorBoundary.js
+│   │   │   ├── InactivityWarning.js  # NUEVO: Modal advertencia
+│   │   │   ├── Layout.js
 │   │   ├── pages/
 │   │       ├── Caja.js
 │   │       ├── Agenda.js
+│   │       ├── LaboratorioPruebas.js  # NUEVO: Panel QA E2E
 │   └── public/
 │       ├── plantilla_*.xlsx
+├── docs/                        # NUEVO: Documentación de seguridad
+│   ├── SECURITY_AUDIT.md
+│   ├── SECURITY_REMEDIATION_PLAN.md
+│   ├── SECURITY_BASELINE.md
+├── INFORME_PRUEBAS_E2E.md       # NUEVO: Reporte de auditoría QA
 ```
 
 ## Credenciales de Prueba

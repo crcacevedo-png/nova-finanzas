@@ -2785,6 +2785,10 @@ from routes.ventas import router as ventas_router
 # Incluir router de ventas/POS
 api_router.include_router(ventas_router, tags=["Punto de Venta"])
 
+# Incluir router de Laboratorio de Pruebas (solo desarrollo)
+from routes.laboratorio_pruebas import router as laboratorio_pruebas_router
+api_router.include_router(laboratorio_pruebas_router, tags=["Laboratorio de Pruebas"])
+
 # ==================== USER MANAGEMENT ROUTES ====================
 
 @api_router.get("/users", response_model=List[UserResponse])

@@ -35,7 +35,8 @@ import {
   FileText,
   ClipboardList,
   Store,
-  Upload
+  Upload,
+  FlaskConical
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -344,6 +345,11 @@ const Layout = ({ children }) => {
           {/* 7. Registro de Auditoría - Solo SuperAdmin */}
           {hasPermission('view_audit_logs') && (
             <NavLink item={{ path: '/auditoria', icon: Shield, label: 'Auditoría', testId: 'nav-auditoria' }} />
+          )}
+
+          {/* 7.5. Laboratorio de Pruebas - Solo SuperAdmin (desarrollo) */}
+          {isSuperAdmin && (
+            <NavLink item={{ path: '/laboratorio-pruebas', icon: FlaskConical, label: 'Lab. Pruebas', testId: 'nav-laboratorio-pruebas' }} />
           )}
           
           {/* 8. Configuration Section - Admin, SuperAdmin y Optica (si tiene items) */}

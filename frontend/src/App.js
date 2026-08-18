@@ -26,6 +26,7 @@ import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
 import ImportarPacientes from './pages/ImportarPacientes';
+import LaboratorioPruebas from './pages/LaboratorioPruebas';
 import ErrorBoundary from './components/ErrorBoundary';
 // Módulo Inventario
 import PanelInventario from './pages/inventario/PanelInventario';
@@ -341,6 +342,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ImportarPacientes />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Laboratorio de Pruebas - Solo SuperAdmin, solo desarrollo */}
+      <Route 
+        path="/laboratorio-pruebas" 
+        element={
+          <ProtectedRoute requiredPermission="view_audit_logs">
+            <LaboratorioPruebas />
           </ProtectedRoute>
         } 
       />
