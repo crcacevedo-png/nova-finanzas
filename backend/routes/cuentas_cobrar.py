@@ -47,7 +47,7 @@ class ResponsableCxCResponse(ResponsableCxCBase):
 
 class CxCOpticaCreate(BaseModel):
     """Crear CxC para Óptica - asociada a una orden/venta"""
-    venta_id: str
+    venta_id: Optional[str] = None  # Opcional para soportar CxC sin venta previa
     paciente_id: str
     paciente_nombre: str
     monto_total: float = Field(..., ge=0)

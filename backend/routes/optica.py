@@ -182,6 +182,42 @@ class SaleLineItem(BaseModel):
     unit_price: float = Field(ge=0)
     subtotal: float = Field(ge=0)
 
+
+# Modelo V2 para ventas desde el POS (formato genérico con items[])
+class SaleItemV2(BaseModel):
+    """Item genérico para venta desde POS"""
+    type: Literal["frame", "contact_lens", "lens_type"]
+    product_id: str
+    quantity: int = Field(ge=1, default=1)
+    unit_price: float = Field(ge=0)
+    subtotal: float = Field(ge=0)
+
+
+class SalePaymentV2(BaseModel):
+    """Pago para venta desde POS"""
+    method: str  # Efectivo, Tarjeta, Transferencia, Cheque
+    amount: float = Field(ge=0)
+    reference: Optional[str] = None
+
+
+class OpticaSaleCreateV2(BaseModel):
+    """Modelo V2 para crear venta desde el POS de Óptica"""
+    patient_id: Optional[str] = None
+    patient_name: str = "Consumidor Final"
+    items: List[SaleItemV2] = []
+    subtotal: float = Field(ge=0)
+    discount: float = Field(ge=0, default=0)
+    total: float = Field(ge=0)
+    payments: List[SalePaymentV2] = []
+    notes: Optional[str] = None
+    prescription: Optional[dict] = None  # Receta óptica
+    created_by: Optional[str] = None
+    created_by_name: Optional[str] = None
+    # Campos para CxC
+    tiene_cxc: bool = False
+    monto_cxc: float = Field(ge=0, default=0)
+
+
 class OpticaSaleBase(BaseModel):
     patient_id: str
     doctor_id: Optional[str] = None
@@ -990,6 +1026,189 @@ async def create_optica_sale(sale_data: OpticaSaleCreate, current_user: dict = D
     
     enriched = await enrich_sale(sale_doc)
     return OpticaSaleResponse(**enriched)
+
+
+@router.post("/sales/v2")
+async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dict = Depends(require_permission("manage_optica_sales"))):
+    """
+    Crear nueva venta de óptica (formato V2 desde POS)
+    Acepta items[] genéricos en lugar del formato legacy con frame_id/contact_lens_id
+    """
+    if not sale_data.items:
+        raise HTTPException(status_code=400, detail="Debe agregar al menos un producto")
+    
+    # Verificar paciente si se proporciona
+    patient_name = sale_data.patient_name or "Consumidor Final"
+    if sale_data.patient_id:
+        patient = await db.patients.find_one({"id": sale_data.patient_id, "is_active": True})
+        if patient:
+            patient_name = f"{patient.get('primer_nombre', '')} {patient.get('primer_apellido', '')}".strip()
+    
+    # Procesar items y calcular totales
+    processed_items = []
+    frame_id = None
+    frame_price = 0
+    contact_lens_id = None
+    contact_lens_price = 0
+    lens_items = []
+    subtotal = 0
+    
+    for item in sale_data.items:
+        if item.type == "frame":
+            frame = await db.optica_frames.find_one({"id": item.product_id, "is_active": True})
+            if not frame:
+                raise HTTPException(status_code=400, detail=f"Armazón no encontrado: {item.product_id}")
+            if frame["stock"] < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente para: {frame.get('brand', '')} {frame.get('model', '')}")
+            
+            frame_id = item.product_id
+            frame_price = item.unit_price * item.quantity
+            subtotal += frame_price
+            
+            # Descontar stock
+            await db.optica_frames.update_one({"id": item.product_id}, {"$inc": {"stock": -item.quantity}})
+            
+            processed_items.append({
+                "type": "frame",
+                "product_id": item.product_id,
+                "name": f"{frame.get('brand', '')} {frame.get('model', '')}",
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "subtotal": item.subtotal
+            })
+            
+        elif item.type == "contact_lens":
+            contact_lens = await db.optica_contact_lenses.find_one({"id": item.product_id, "is_active": True})
+            if not contact_lens:
+                raise HTTPException(status_code=400, detail=f"Lente de contacto no encontrado: {item.product_id}")
+            if contact_lens["stock"] < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente para lente de contacto")
+            
+            contact_lens_id = item.product_id
+            contact_lens_price = item.unit_price * item.quantity
+            subtotal += contact_lens_price
+            
+            # Descontar stock
+            await db.optica_contact_lenses.update_one({"id": item.product_id}, {"$inc": {"stock": -item.quantity}})
+            
+            processed_items.append({
+                "type": "contact_lens",
+                "product_id": item.product_id,
+                "name": f"{contact_lens.get('lens_type', '')} - {contact_lens.get('brand', '')}",
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "subtotal": item.subtotal
+            })
+            
+        elif item.type == "lens_type":
+            lens_type = await db.optica_lens_types.find_one({"id": item.product_id, "is_active": True})
+            if not lens_type:
+                raise HTTPException(status_code=400, detail=f"Tipo de lente no encontrado: {item.product_id}")
+            
+            lens_item = {
+                "lens_type_id": item.product_id,
+                "lens_type_name": lens_type["name"],
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "subtotal": item.subtotal
+            }
+            lens_items.append(lens_item)
+            subtotal += item.subtotal
+            
+            processed_items.append({
+                "type": "lens_type",
+                "product_id": item.product_id,
+                "name": lens_type["name"],
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "subtotal": item.subtotal
+            })
+    
+    # Calcular totales
+    discount_amount = sale_data.discount
+    total = subtotal - discount_amount
+    
+    # Calcular total pagado (excluyendo montos de CxC)
+    total_paid = sum(p.amount for p in sale_data.payments if p.method != 'Cuenta por Cobrar')
+    balance_due = total - total_paid
+    
+    # Determinar método de pago principal
+    if sale_data.payments:
+        payment_method = sale_data.payments[0].method.lower()
+        if len(sale_data.payments) > 1:
+            payment_method = "mixto"
+    else:
+        payment_method = "efectivo"
+    
+    status = "pagado" if balance_due <= 0.01 else "pendiente"
+    
+    now = datetime.now(timezone.utc).isoformat()
+    order_number = await get_next_order_number()
+    
+    sale_doc = {
+        "id": str(uuid.uuid4()),
+        "order_number": order_number,
+        "patient_id": sale_data.patient_id or "",
+        "patient_name": patient_name,
+        "doctor_id": "",
+        "frame_id": frame_id or "",
+        "frame_price": frame_price,
+        "contact_lens_id": contact_lens_id or "",
+        "contact_lens_price": contact_lens_price,
+        "lens_items": lens_items,
+        "lens_total": sum(li["subtotal"] for li in lens_items),
+        "items_v2": processed_items,  # Guardar items en formato V2 también
+        "subtotal": subtotal,
+        "discount_percent": (discount_amount / subtotal * 100) if subtotal > 0 else 0,
+        "discount_amount": discount_amount,
+        "total": total,
+        "total_paid": total_paid,
+        "balance_due": balance_due,
+        "payment_method": payment_method,
+        "status": status,
+        "notes": sale_data.notes or "",
+        "prescription": sale_data.prescription,
+        "created_by": current_user["id"],
+        "created_by_name": current_user.get("name", current_user.get("username", "")),
+        "created_at": now,
+        "updated_at": now,
+        "tiene_cxc": sale_data.tiene_cxc,
+        "monto_cxc": sale_data.monto_cxc
+    }
+    
+    await db.optica_sales.insert_one(sale_doc)
+    if "_id" in sale_doc:
+        del sale_doc["_id"]
+    
+    # Registrar pagos
+    for payment in sale_data.payments:
+        if payment.method != 'Cuenta por Cobrar' and payment.amount > 0:
+            payment_doc = {
+                "id": str(uuid.uuid4()),
+                "sale_id": sale_doc["id"],
+                "amount": payment.amount,
+                "payment_method": payment.method,
+                "reference": payment.reference or "",
+                "notes": "",
+                "created_by": current_user["id"],
+                "created_at": now
+            }
+            await db.optica_sale_payments.insert_one(payment_doc)
+    
+    # Retornar la venta creada
+    return {
+        "id": sale_doc["id"],
+        "sale_number": order_number,
+        "order_number": order_number,
+        "patient_name": patient_name,
+        "total": total,
+        "total_paid": total_paid,
+        "balance_due": balance_due,
+        "status": status,
+        "tiene_cxc": sale_data.tiene_cxc,
+        "monto_cxc": sale_data.monto_cxc,
+        "message": "Venta registrada exitosamente"
+    }
 
 
 @router.post("/sales/{sale_id}/payments", response_model=SalePaymentResponse)

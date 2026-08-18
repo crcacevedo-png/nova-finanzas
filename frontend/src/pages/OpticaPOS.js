@@ -484,7 +484,7 @@ const OpticaPOS = () => {
         monto_cxc: montoCxC
       };
       
-      const response = await axios.post(`${API_URL}/optica/sales`, ventaData, {
+      const response = await axios.post(`${API_URL}/optica/sales/v2`, ventaData, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'

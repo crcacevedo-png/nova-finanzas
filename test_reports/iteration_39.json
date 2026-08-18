@@ -1,0 +1,45 @@
+{
+  "summary": "Tested POS→CxC flow. Finanzas POS flow works end-to-end: caja/estado returns caja_abierta=true, venta with forma_pago 'Cuenta por Cobrar' creates CxC in /cuentas-cobrar/clinica correctly. Bug fix del banner de caja cerrada verificado (caja_abierta=true → banner no debe mostrarse). CRITICAL: Óptica POS venta is BROKEN — frontend OpticaPOS.js sends a payload shape that does NOT match backend /api/optica/sales schema (missing required payment_method, using items[] with mixed types instead of frame_id/contact_lens_id/lens_items). Also POST /api/cuentas-cobrar/optica rejects venta_id=null (model declares venta_id: str required). Result: usuarios no pueden completar ventas de Óptica ni con efectivo ni con CxC.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/optica/sales", "issue": "Payload esperado por backend (patient_id, frame_id/contact_lens_id/lens_items, payment_method Literal, initial_payment, discount_percent) NO coincide con lo que envía OpticaPOS.js (items[] con type frame/contact_lens/lens_type, payments[], total, discount, patient_name, tiene_cxc, monto_cxc). 422 'payment_method Field required'. Toda venta de Óptica falla.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/cuentas-cobrar/optica", "issue": "Modelo CxCOpticaCreate.venta_id es str (requerido). OpticaPOS.js envía venta_id=null cuando /optica/sales devuelve sin id o falla. Devuelve 422 'venta_id Input should be a valid string'. La CxC de Óptica nunca se crea.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/ventas (Cuenta por Cobrar)", "issue": "El CxC creado desde ventas tiene 'tipo_pagador_id/nombre' pero NO llena 'responsable_id/responsable_nombre/tipo_responsable'. El listado /cuentas-cobrar/clinica funciona (retorna origin=clinica), pero filtros por responsable no encontrarán estas cuentas creadas desde POS Finanzas."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "POS Óptica → Venta", "issue": "Payload que envía OpticaPOS.js (líneas 464-486) no es aceptado por POST /api/optica/sales. Requiere alinear el modelo backend o mapear el payload frontend.", "affected_selectors": ["pos-pagar-btn", "optica-pos-page"]},
+      {"flow": "POS Óptica → CxC", "issue": "Aún si /optica/sales aceptara el payload, la subsecuente creación de CxC vía POST /api/cuentas-cobrar/optica falla por venta_id=null (línea 503 OpticaPOS.js: 'venta_id: response.data?.id || null').", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pos_cxc_flow.py",
+    "/app/test_reports/pytest/pos_cxc_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Alinear OpticaPOS.js con backend /api/optica/sales. Opciones: (a) Refactorizar backend para aceptar payload genérico items[] con type; (b) Ajustar OpticaPOS.js para enviar frame_id, contact_lens_id, lens_items[], payment_method, initial_payment según OpticaSaleCreate.",
+    "CRITICAL: Hacer venta_id Optional[str] en CxCOpticaCreate (backend/routes/cuentas_cobrar.py:50). También aceptar paciente sin venta_id cuando la CxC se crea manualmente/pendiente.",
+    "MINOR: Al crear CxC desde POST /api/ventas con forma_pago 'Cuenta por Cobrar', copiar tipo_pagador_id/nombre a responsable_id/responsable_nombre/tipo_responsable para consistencia con listado por responsable en CuentasCobrarFinanzas."
+  ],
+  "critical_code_review_comments": [
+    "OpticaPOS.js:487 realiza POST a /api/optica/sales con payload que no coincide con OpticaSaleCreate (falta payment_method y estructura de items).",
+    "OpticaPOS.js:507 hace segundo POST a /api/cuentas-cobrar/optica; si falla la primera, aún intenta la segunda con venta_id=null y también falla.",
+    "cuentas_cobrar.py:50 CxCOpticaCreate.venta_id debería ser Optional[str] para soportar CxC sin venta_id (ej. abono directo o venta pendiente).",
+    "ventas.py:582-611 al crear CxC desde POS Finanzas usa 'tipo_pagador_id/nombre' en lugar de 'responsable_id/responsable_nombre/tipo_responsable'; inconsistente con CxCClinicaCreate y afecta filtros del listado por responsable."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pos_cxc_flow.py"
+  ],
+  "success_rate": {"backend": "60% (3/5 tests passed)", "frontend": "N/A - blocked by backend issues in Óptica"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Creó venta TEST_POS_CXC + CxC clinica ligada. Cuentas quedan en DB con concepto 'Venta VTA-...'",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "POS Finanzas → CxC clínica: FUNCIONA. Caja banner fix: FUNCIONA. POS Óptica: BROKEN por schema mismatch en /api/optica/sales y venta_id required en /cuentas-cobrar/optica. Test file: /app/backend/tests/test_pos_cxc_flow.py cubre ambos flujos.",
+  "rca of the issue": "El módulo POS Óptica fue diseñado con un payload genérico items[type/product_id] pero el endpoint /api/optica/sales espera un esquema específico y legacy (frame_id, contact_lens_id, lens_items) heredado de una implementación anterior. La CxC Óptica exige venta_id como string requerido, mientras la lógica del frontend depende de que la venta se haya creado exitosamente antes; al fallar la venta, el fallback envía null → 422."
+}

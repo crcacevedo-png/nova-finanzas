@@ -222,7 +222,11 @@ const PuntoVenta = () => {
       const response = await axios.get(`${API_URL}/caja/estado`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setEstadoCaja(response.data);
+      // El backend devuelve 'caja_abierta', mapeamos a 'abierta' para consistencia
+      setEstadoCaja({
+        ...response.data,
+        abierta: response.data.caja_abierta
+      });
     } catch (error) {
       console.error('Error fetching estado caja:', error);
       setEstadoCaja({ abierta: false });
