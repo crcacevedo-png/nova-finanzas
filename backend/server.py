@@ -51,13 +51,19 @@ db = client[os.environ['DB_NAME']]
 
 # JWT Settings - CRÍTICO: No usar fallback en producción
 JWT_SECRET = os.environ.get('JWT_SECRET')
-if not JWT_SECRET or JWT_SECRET == 'novavision_secret_key_2024':
-    # Generar un secret seguro si no está configurado correctamente
+if not JWT_SECRET:
+    if os.environ.get('ENVIRONMENT') == 'production':
+        raise RuntimeError("❌ CRÍTICO: JWT_SECRET no configurado en producción. Configure en .env")
+    # En desarrollo, generar un secret seguro temporal
     JWT_SECRET = secrets.token_urlsafe(64)
     logging.warning("⚠️ SEGURIDAD: JWT_SECRET no configurado. Usando valor temporal. Configure en .env para producción.")
+elif len(JWT_SECRET) < 32:
+    logging.warning("⚠️ SEGURIDAD: JWT_SECRET demasiado corto. Recomendado: 64+ caracteres")
+elif JWT_SECRET in ['novavision_secret_key_2024', 'novavision_secure_secret_key_2024_gtq_production_v2']:
+    logging.warning("⚠️ SEGURIDAD: JWT_SECRET es un valor conocido. Genere uno nuevo con: python -c \"import secrets; print(secrets.token_urlsafe(64))\"")
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 8  # Reducido de 24 a 8 horas por seguridad
+JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '8'))  # Por defecto 8 horas
 
 # CORS - Orígenes permitidos (restringir en producción)
 ALLOWED_ORIGINS = os.environ.get('CORS_ORIGINS', '').split(',')
@@ -82,6 +88,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Middleware de compresión GZip para respuestas > 500 bytes
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# CORS Middleware - Configuración de seguridad para orígenes permitidos
+# SEC-002: CORS debe estar correctamente configurado
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    expose_headers=["Content-Disposition"],
+    max_age=600,  # Cache preflight por 10 minutos
+)
+
+# Nota: SecurityHeadersMiddleware se agrega después de su definición (línea ~280)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -251,6 +271,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         
         return response
 
+# Agregar middleware de headers de seguridad a la aplicación
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ==================== AUDIT LOGGING ====================
 
@@ -829,6 +851,7 @@ def require_role(role: str):
 async def seed_default_users():
     """Create default users if they don't exist - CONTRASEÑAS MÁS SEGURAS"""
     # IMPORTANTE: Cambiar estas contraseñas en producción
+    # SEC-001: Usuarios sembrados deben forzar cambio de contraseña
     default_users = [
         {"username": "superadmin", "name": "Administrador General", "password": "Nova$2024Secure!", "role": "superadmin"},
         {"username": "admin", "name": "Administrador", "password": "Admin$2024Secure!", "role": "admin"},
@@ -848,8 +871,15 @@ async def seed_default_users():
                 "last_login": None,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
-                "password_changed_at": None,  # Para forzar cambio de contraseña
-                "failed_login_attempts": 0
+                # SEC-001: Forzar cambio de contraseña en primer login
+                "must_change_password": True,
+                "password_changed_at": None,
+                # SEC-005: Control de intentos fallidos
+                "failed_login_attempts": 0,
+                "locked_until": None,
+                # SEC-006: Registro de dispositivos conocidos
+                "known_devices": [],
+                "token_version": 1  # SEC-013: Para revocación masiva de sesiones
             }
             await db.users.insert_one(user_doc)
             print(f"Created default user: {user_data['username']}")
@@ -2152,24 +2182,139 @@ async def seed_inventario_data():
 
 # ==================== AUTH ROUTES ====================
 
-@api_router.post("/auth/login", response_model=TokenResponse)
+# SEC-006: Función para alertar a SuperAdmin
+async def alert_superadmin(message: str, severity: str = "warning", details: dict = None):
+    """Enviar alerta de seguridad al SuperAdmin"""
+    alert_doc = {
+        "id": str(uuid.uuid4()),
+        "message": message,
+        "severity": severity,
+        "details": details or {},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "acknowledged": False
+    }
+    await db.security_alerts.insert_one(alert_doc)
+    await audit.log(
+        action="SECURITY_ALERT",
+        user_id="system",
+        user_name="system",
+        details={"message": message, "severity": severity, **(details or {})}
+    )
+    logging.warning(f"🚨 ALERTA DE SEGURIDAD [{severity}]: {message}")
+
+# SEC-006: Función para verificar y registrar dispositivo
+async def check_and_register_device(user_id: str, ip_address: str, user_agent: str) -> bool:
+    """Verificar si es un dispositivo nuevo y registrarlo. Retorna True si es nuevo."""
+    device_fingerprint = hashlib.sha256(f"{ip_address}:{user_agent}".encode()).hexdigest()[:16]
+    
+    user = await db.users.find_one({"id": user_id})
+    known_devices = user.get("known_devices", [])
+    
+    # Buscar si el dispositivo ya existe
+    is_new = not any(d.get("fingerprint") == device_fingerprint for d in known_devices)
+    
+    if is_new:
+        # Registrar nuevo dispositivo
+        new_device = {
+            "fingerprint": device_fingerprint,
+            "ip_address": ip_address,
+            "user_agent": user_agent[:200],  # Limitar longitud
+            "first_seen": datetime.now(timezone.utc).isoformat(),
+            "last_seen": datetime.now(timezone.utc).isoformat()
+        }
+        await db.users.update_one(
+            {"id": user_id},
+            {"$push": {"known_devices": new_device}}
+        )
+    else:
+        # Actualizar última vez visto
+        await db.users.update_one(
+            {"id": user_id, "known_devices.fingerprint": device_fingerprint},
+            {"$set": {"known_devices.$.last_seen": datetime.now(timezone.utc).isoformat()}}
+        )
+    
+    return is_new
+
+
+class LoginResponse(BaseModel):
+    """Respuesta extendida de login que incluye información de seguridad"""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+    must_change_password: bool = False
+    is_new_device: bool = False
+
+
+@api_router.post("/auth/login")
 @limiter.limit("5/minute")
 async def login(request: Request, credentials: UserLogin):
-    """Login endpoint with rate limiting (5 attempts per minute) y audit logging"""
+    """
+    Login endpoint con seguridad mejorada:
+    - Rate limiting (5 intentos por minuto)
+    - Bloqueo tras 5 intentos fallidos (15 minutos)
+    - Detección de nuevos dispositivos
+    - Forzado de cambio de contraseña inicial
+    """
     client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")[:200]
     
+    # Buscar usuario
     user = await db.users.find_one({"username": credentials.username.lower().strip()})
+    
+    # SEC-005: Verificar si la cuenta está bloqueada
+    if user and user.get("locked_until"):
+        locked_until = datetime.fromisoformat(user["locked_until"].replace('Z', '+00:00'))
+        if locked_until > datetime.now(timezone.utc):
+            remaining_minutes = int((locked_until - datetime.now(timezone.utc)).total_seconds() / 60)
+            await audit.log(
+                action="LOGIN_BLOCKED",
+                user_id=user["id"],
+                user_name=user["username"],
+                details={"reason": "Cuenta bloqueada", "remaining_minutes": remaining_minutes},
+                ip_address=client_ip
+            )
+            raise HTTPException(
+                status_code=429, 
+                detail=f"Cuenta bloqueada temporalmente. Intente en {remaining_minutes} minutos."
+            )
+        else:
+            # Desbloquear si el tiempo expiró
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"locked_until": None, "failed_login_attempts": 0}}
+            )
+    
+    # Verificar credenciales
     if not user or not verify_password(credentials.password, user["password"]):
-        # Log intento fallido
+        # SEC-005: Incrementar intentos fallidos
+        if user:
+            attempts = user.get("failed_login_attempts", 0) + 1
+            update_data = {"failed_login_attempts": attempts}
+            
+            if attempts >= 5:
+                # Bloquear por 15 minutos
+                lock_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                update_data["locked_until"] = lock_until.isoformat()
+                
+                # Alertar a SuperAdmin
+                await alert_superadmin(
+                    f"Cuenta '{user['username']}' bloqueada tras {attempts} intentos fallidos",
+                    severity="warning",
+                    details={"user_id": user["id"], "ip_address": client_ip, "attempts": attempts}
+                )
+            
+            await db.users.update_one({"id": user["id"]}, {"$set": update_data})
+        
         await audit.log(
             action="LOGIN_FAILED",
-            user_id="unknown",
+            user_id=user["id"] if user else "unknown",
             user_name=credentials.username,
-            details={"reason": "Credenciales inválidas"},
+            details={"reason": "Credenciales inválidas", "ip": client_ip},
             ip_address=client_ip
         )
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
+    # Verificar si está activo
     if not user.get("is_active", True):
         await audit.log(
             action="LOGIN_FAILED",
@@ -2180,12 +2325,30 @@ async def login(request: Request, credentials: UserLogin):
         )
         raise HTTPException(status_code=401, detail="Usuario desactivado")
     
-    # Update last login
+    # Login exitoso - resetear contador de intentos
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "failed_login_attempts": 0, 
+            "locked_until": None,
+            "last_login": datetime.now(timezone.utc).isoformat()
+        }}
     )
     
+    # SEC-006: Verificar si es un dispositivo nuevo
+    is_new_device = await check_and_register_device(user["id"], client_ip, user_agent)
+    
+    if is_new_device:
+        await alert_superadmin(
+            f"Nuevo dispositivo detectado para '{user['username']}' desde IP {client_ip}",
+            severity="info",
+            details={"user_id": user["id"], "ip_address": client_ip, "user_agent": user_agent}
+        )
+    
+    # SEC-001: Verificar si debe cambiar contraseña
+    must_change = user.get("must_change_password", False)
+    
+    # Crear token
     token = create_token(user["id"], user["username"], user["role"])
     
     # Log login exitoso
@@ -2193,13 +2356,21 @@ async def login(request: Request, credentials: UserLogin):
         action="LOGIN_SUCCESS",
         user_id=user["id"],
         user_name=user["username"],
-        details={"role": user["role"]},
+        details={
+            "role": user["role"], 
+            "ip": client_ip, 
+            "new_device": is_new_device,
+            "must_change_password": must_change
+        },
         ip_address=client_ip
     )
     
-    return TokenResponse(
-        access_token=token,
-        user=UserResponse(
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "must_change_password": must_change,
+        "is_new_device": is_new_device,
+        "user": UserResponse(
             id=user["id"],
             username=user["username"],
             name=user["name"],
@@ -2210,7 +2381,7 @@ async def login(request: Request, credentials: UserLogin):
             updated_at=user.get("updated_at"),
             permissions=get_permissions(user["role"])
         )
-    )
+    }
 
 @api_router.post("/auth/logout")
 async def logout(request: Request, current_user: dict = Depends(get_current_user)):
@@ -2342,7 +2513,10 @@ async def change_password(
     new_password: str = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Cambiar contraseña del usuario actual"""
+    """
+    Cambiar contraseña del usuario actual.
+    SEC-001: Resetea el flag must_change_password después del cambio.
+    """
     client_ip = request.client.host if request.client else "unknown"
     
     # Verificar contraseña actual
@@ -2362,25 +2536,143 @@ async def change_password(
     if not is_valid:
         raise HTTPException(status_code=400, detail=message)
     
-    # Actualizar contraseña
+    # Verificar que no sea igual a la actual
+    if verify_password(new_password, user["password"]):
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe ser diferente a la actual")
+    
+    # Actualizar contraseña y resetear flag de cambio obligatorio
     await db.users.update_one(
         {"id": current_user["id"]},
         {"$set": {
             "password": hash_password(new_password),
             "password_changed_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "must_change_password": False  # SEC-001: Resetear flag
         }}
     )
     
     # Log cambio de contraseña
+    was_forced = user.get("must_change_password", False)
     await audit.log(
         action="PASSWORD_CHANGED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={"forced_change": was_forced},
+        ip_address=client_ip
+    )
+    
+    return {"message": "Contraseña actualizada correctamente", "forced_change_completed": was_forced}
+
+
+# SEC-006: Endpoint para obtener alertas de seguridad (solo SuperAdmin)
+@api_router.get("/security/alerts")
+async def get_security_alerts(
+    current_user: dict = Depends(require_role("superadmin")),
+    acknowledged: Optional[bool] = Query(None),
+    limit: int = Query(50, ge=1, le=200)
+):
+    """Obtener alertas de seguridad (solo SuperAdmin)"""
+    query = {}
+    if acknowledged is not None:
+        query["acknowledged"] = acknowledged
+    
+    cursor = db.security_alerts.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
+    alerts = await cursor.to_list(length=limit)
+    
+    return {
+        "alerts": alerts,
+        "total": await db.security_alerts.count_documents(query)
+    }
+
+
+@api_router.post("/security/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(
+    alert_id: str,
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Marcar alerta de seguridad como reconocida"""
+    result = await db.security_alerts.update_one(
+        {"id": alert_id},
+        {"$set": {
+            "acknowledged": True,
+            "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+            "acknowledged_by": current_user["id"]
+        }}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Alerta no encontrada")
+    
+    return {"message": "Alerta reconocida"}
+
+
+# SEC-006: Endpoint para ver dispositivos conocidos del usuario
+@api_router.get("/security/my-devices")
+async def get_my_devices(current_user: dict = Depends(get_current_user)):
+    """Obtener lista de dispositivos conocidos del usuario actual"""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "known_devices": 1})
+    return {"devices": user.get("known_devices", [])}
+
+
+# SEC-013: Endpoint para revocar todas las sesiones de un usuario (SuperAdmin)
+@api_router.post("/users/{user_id}/revoke-sessions")
+async def revoke_user_sessions(
+    user_id: str,
+    request: Request,
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Revocar todas las sesiones activas de un usuario (incrementa token_version)"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Verificar que el usuario existe
+    target_user = await db.users.find_one({"id": user_id})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Incrementar versión de token (invalida todos los tokens existentes)
+    await db.users.update_one(
+        {"id": user_id},
+        {"$inc": {"token_version": 1}}
+    )
+    
+    # Registrar en audit log
+    await audit.log(
+        action="SESSIONS_REVOKED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={
+            "target_user_id": user_id,
+            "target_username": target_user.get("username")
+        },
+        ip_address=client_ip
+    )
+    
+    return {"message": f"Todas las sesiones de '{target_user.get('username')}' han sido revocadas"}
+
+
+# SEC-013: Endpoint para revocar mis propias sesiones (cerrar en todos los dispositivos)
+@api_router.post("/security/revoke-my-sessions")
+async def revoke_my_sessions(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """Revocar todas mis sesiones excepto la actual"""
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Incrementar versión de token
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$inc": {"token_version": 1}}
+    )
+    
+    await audit.log(
+        action="SELF_SESSIONS_REVOKED",
         user_id=current_user["id"],
         user_name=current_user.get("username", "unknown"),
         ip_address=client_ip
     )
     
-    return {"message": "Contraseña actualizada correctamente"}
+    return {"message": "Todas tus otras sesiones han sido cerradas. Deberás iniciar sesión nuevamente."}
 
 
 # ==================== EVALUACIONES MOVIDAS A routes/evaluaciones.py ====================
