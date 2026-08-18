@@ -323,44 +323,24 @@ def validate_password_strength(password: str, user_id: str = None) -> tuple[bool
 
 **Esfuerzo:** 3 horas  
 **Riesgo de Regresión:** Medio  
+**Estado:** ✅ IMPLEMENTADO
 
-**Cambios Frontend:**
-```javascript
-// En App.js o Layout.js
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutos
-const WARNING_BEFORE = 5 * 60 * 1000; // Avisar 5 minutos antes
+**Cambios Implementados:**
 
-useEffect(() => {
-    let inactivityTimer;
-    let warningTimer;
-    
-    const resetTimers = () => {
-        clearTimeout(inactivityTimer);
-        clearTimeout(warningTimer);
-        
-        warningTimer = setTimeout(() => {
-            // Mostrar modal de advertencia
-            setShowInactivityWarning(true);
-        }, INACTIVITY_TIMEOUT - WARNING_BEFORE);
-        
-        inactivityTimer = setTimeout(() => {
-            // Cerrar sesión
-            logout();
-            navigate('/login', { state: { reason: 'inactivity' } });
-        }, INACTIVITY_TIMEOUT);
-    };
-    
-    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach(event => window.addEventListener(event, resetTimers));
-    resetTimers();
-    
-    return () => {
-        events.forEach(event => window.removeEventListener(event, resetTimers));
-        clearTimeout(inactivityTimer);
-        clearTimeout(warningTimer);
-    };
-}, []);
-```
+1. **Hook `useInactivityTimeout.js`**: Detecta inactividad del usuario mediante eventos de mouse, teclado y scroll.
+
+2. **Componente `InactivityWarning.js`**: Modal que advierte al usuario 5 minutos antes del cierre.
+
+3. **Integración en `AuthContext.js`**: El timeout se activa automáticamente cuando hay un usuario logueado.
+
+**Comportamiento:**
+- Después de 25 minutos de inactividad: aparece modal de advertencia con countdown
+- El usuario puede hacer clic en "Continuar trabajando" para extender la sesión
+- Después de 30 minutos totales: cierre automático de sesión
+- En la página de login se muestra mensaje explicativo si la sesión expiró por inactividad
+
+**Configuración:**
+- Timeout configurable via `REACT_APP_INACTIVITY_TIMEOUT` (en minutos, default: 30)
 
 ---
 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Clock, AlertTriangle } from 'lucide-react';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/qvzbrum6_logo%20nova%20transparente.png";
 
@@ -11,17 +11,37 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [inactivityMessage, setInactivityMessage] = useState('');
+  const { login, logoutReason, inactivityTimeout } = useAuth();
   const navigate = useNavigate();
+
+  // Mostrar mensaje si la sesión expiró por inactividad
+  useEffect(() => {
+    if (logoutReason === 'inactivity') {
+      setInactivityMessage(
+        `Su sesión fue cerrada automáticamente después de ${inactivityTimeout} minutos de inactividad.`
+      );
+      // Limpiar mensaje después de 10 segundos
+      const timer = setTimeout(() => setInactivityMessage(''), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [logoutReason, inactivityTimeout]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setInactivityMessage('');
     setLoading(true);
 
     try {
-      await login(username, password);
-      navigate('/dashboard');
+      const result = await login(username, password);
+      
+      // Si el usuario debe cambiar su contraseña, redirigir a cambio de contraseña
+      if (result.must_change_password) {
+        navigate('/change-password', { state: { forced: true } });
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al iniciar sesión');
     } finally {
@@ -88,6 +108,19 @@ const Login = () => {
         <p className="text-center text-sm text-[#5A7A72] mb-8 tracking-wide">
           Gestión Hospitalaria
         </p>
+
+        {/* Inactivity Message */}
+        {inactivityMessage && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in" data-testid="inactivity-message">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Sesión expirada por inactividad</p>
+                <p className="text-sm text-amber-700 mt-1">{inactivityMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (

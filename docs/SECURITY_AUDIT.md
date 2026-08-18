@@ -53,7 +53,7 @@ El sistema NovaVision ha sido sometido a una auditoría de seguridad exhaustiva.
 | SEC-004 | Política de contraseñas insuficiente | Autenticación | server.py:726-736 | **MEDIA** | A07:2021 | Contraseñas fáciles de adivinar | Mínimo 12 caracteres, lista de contraseñas comunes |
 | SEC-005 | Sin bloqueo por intentos fallidos | Autenticación | server.py:2155-2213 | **MEDIA** | A07:2021 | Ataques de fuerza bruta sostenidos | Implementar bloqueo temporal tras N intentos |
 | SEC-006 | Sin registro de dispositivo/IP en sesión | Autenticación | server.py | **MEDIA** | A07:2021 | No hay detección de acceso sospechoso | Registrar y alertar acceso desde nuevos dispositivos |
-| SEC-007 | Sin timeout de inactividad en backend | Sesión | Frontend/Backend | **MEDIA** | A07:2021 | Sesiones abandonadas vulnerables | Implementar timeout 30 minutos |
+| SEC-007 | Sin timeout de inactividad en backend | Sesión | Frontend | **IMPLEMENTADO** | A07:2021 | Sesiones abandonadas vulnerables | ✅ Timeout 30 minutos implementado |
 | SEC-008 | Falta validación NoSQL en búsquedas | Validación | routes/*.py | **MEDIA** | A03:2021 | Inyección NoSQL potencial | Sanitizar operadores $ en inputs |
 | SEC-009 | Console.log con datos sensibles | Logging | Frontend (98 instancias) | **BAJA** | A09:2021 | Exposición de datos en consola del navegador | Remover en producción |
 | SEC-010 | Sin bitácora de acceso a expedientes | Auditoría | Backend | **MEDIA** | A09:2021 | No hay trazabilidad de consultas a datos clínicos | Implementar log de acceso a expedientes |
