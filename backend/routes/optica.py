@@ -88,13 +88,13 @@ class FrameInventoryResponse(BaseModel):
     code: str
     model: Optional[str] = ""
     color: Optional[str] = ""
-    cost_price: float
-    sale_price: float
-    stock: int
-    entry_date: str
+    cost_price: Optional[float] = 0
+    sale_price: Optional[float] = 0
+    stock: int = 0
+    entry_date: Optional[str] = None
     is_active: bool = True
-    created_by: str
-    created_at: str
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
 class FrameInventoryListResponse(BaseModel):
@@ -127,14 +127,16 @@ class ContactLensInventoryResponse(BaseModel):
     id: str
     lens_type: str
     brand: Optional[str] = ""
+    name: Optional[str] = ""
     description: Optional[str] = ""
-    cost_price: float
-    sale_price: float
-    stock: int
-    entry_date: str
+    cost_price: Optional[float] = 0
+    sale_price: Optional[float] = 0
+    price: Optional[float] = 0
+    stock: int = 0
+    entry_date: Optional[str] = None
     is_active: bool = True
-    created_by: str
-    created_at: str
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
 class ContactLensInventoryListResponse(BaseModel):
@@ -161,10 +163,11 @@ class LensTypeResponse(BaseModel):
     id: str
     name: str
     description: Optional[str] = ""
-    default_price: float
+    default_price: Optional[float] = 0
+    price: Optional[float] = 0
     is_active: bool = True
-    created_by: str
-    created_at: str
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
 class LensTypeListResponse(BaseModel):

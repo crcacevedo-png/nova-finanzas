@@ -15,6 +15,7 @@ import UnidadesIGSS from './pages/UnidadesIGSS';
 // Módulo Óptica
 import OpticaInventario from './pages/OpticaInventario';
 import OpticaVentas from './pages/OpticaVentas';
+import OpticaPOS from './pages/OpticaPOS';
 import OpticaCompras from './pages/OpticaCompras';
 import Medicos from './pages/Medicos';
 import TiposLente from './pages/TiposLente';
@@ -194,6 +195,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_optica">
             <OpticaVentas />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/punto-venta" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <OpticaPOS />
           </ProtectedRoute>
         } 
       />

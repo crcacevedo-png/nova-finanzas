@@ -170,7 +170,7 @@ const Layout = ({ children }) => {
   // Optica sub-items (solo para rol optica y superadmin) - Sin Médicos
   const opticaItems = canViewOptica ? [
     { path: '/optica/inventario', icon: Package, label: 'Inventario', testId: 'nav-optica-inventario' },
-    { path: '/optica/ventas', icon: ShoppingCart, label: 'Ventas', testId: 'nav-optica-ventas' },
+    { path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' },
     { path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' },
     { path: '/optica/tipos-lente', icon: Eye, label: 'Tipos de Lente', testId: 'nav-optica-tipos-lente' },
   ] : [];
