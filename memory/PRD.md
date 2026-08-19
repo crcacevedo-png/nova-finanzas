@@ -65,6 +65,9 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - [x] Tipos de lente (`optica_lens_types`)
 - [x] Ventas de óptica (`optica_sales`) - Colecciones SEPARADAS de clínica
 - [x] **Punto de Venta Óptica** (`/optica/punto-venta`) - Interfaz POS dedicada
+  - [x] Categoría unificada "Lentes" con filtro (Contacto/Oftálmico/Todos) - 2026-08-19
+  - [x] Precios de lentes oftálmicos visibles (mapeo default_price → sale_price)
+  - [x] Lentes de contacto seleccionables (lens_type opcional)
 - [x] **Cuentas por Cobrar Óptica** (`/optica/cuentas-cobrar`) - CxC vinculadas al paciente/cliente
 - [x] **NOTA CRÍTICA**: Óptica NO usa Kardex inmutable ni sistema de bodegas
 

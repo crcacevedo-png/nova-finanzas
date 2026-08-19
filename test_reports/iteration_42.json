@@ -1,0 +1,39 @@
+{
+  "summary": "Verificados los 3 bugs del POS de Óptica sobre categoría 'Lentes'. Backend: 3/3 pytest OK. UI: flujo completo verificado - se muestran ambos tipos combinados (7 contacto + 12 oftálmicos), filtro 'Tipo de Lente' funciona (Todos/Contacto/Oftálmico), badges de color correctos (Contacto verde, Oftálmico púrpura), precios de lentes oftálmicos aparecen correctamente (default_price mapeado), lentes de contacto se agregan al carrito (Q580), y lente oftálmico se agrega (Q100). Total del carrito: Q680.00. Botón 'Cobrar Q 680.00' habilitado.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/optica/sales (ventas del día)", "issue": "Devuelve 500 al cargar el POS ('Error fetching ventas del día' en consola). No relacionado con los 3 bugs actuales pero visible en OpticaPOS."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "OpticaPOS - lista de Lentes", "issues": ["Un lente oftálmico ('Bifocal Flat Top (PRB)') muestra precio Q 0.00. Verificar si es dato semilla o falta configurar default_price."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_optica_lentes_bugs.py",
+    "/app/test_reports/pytest/optica_lentes_bugs.xml"
+  ],
+  "action_items": [
+    "Investigar y corregir el 500 en GET /api/optica/sales (endpoint de ventas del día) que aparece al abrir el POS - no bloquea el flujo pero contamina consola.",
+    "Revisar semilla 'Bifocal Flat Top (PRB)' que tiene default_price=0 en catálogo de tipos de lente."
+  ],
+  "critical_code_review_comments": [
+    "optica.py:774-783 mapeo default_price -> price/sale_price en /lens-types se hace en memoria post-consulta. Considerar exponer default_price directamente en el frontend o hacer el mapeo con $addFields en aggregation para menos boilerplate.",
+    "OpticaPOS.js:196-214 emite 2 requests paralelos (contact-lenses y lens-types) cuando filtro='todos'. Está bien, pero podría beneficiarse de Promise.all para paralelizar realmente.",
+    "OpticaPOS.js:575-577 el uso de _tipoInterno como campo prefijado con guión bajo es correcto (convención para campo interno), pero un union type discriminado sería más limpio."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_optica_lentes_bugs.py (nuevo test - 3 casos)"
+  ],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100% en flujos verificados"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Ninguno. Los datos PRB de laboratorio de pruebas ya existían. Venta v2 de prueba fue creada y cancelada en el mismo test para restaurar stock.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Los 3 bugs de la categoría 'Lentes' unificada están corregidos y verificados. Backend: /api/optica/contact-lenses acepta lens_type opcional; /api/optica/lens-types mapea default_price a price/sale_price. Frontend OpticaPOS.js combina lentesContacto+tiposLente en un solo grid con badges y filtro dropdown. Bug secundario detectado: GET /api/optica/sales devuelve 500 al montar el componente (afecta widget 'Ventas de hoy' pero no bloquea el flujo POS).",
+  "rca of the issue": "Bug 1 (lentes de contacto no seleccionables): lens_type era requerido en ContactLensInventoryResponse y datos legacy fallaban validación Pydantic. Fix: lens_type ahora Optional con default 'esferico'. Bug 2 (precios oftálmicos no aparecían): frontend leía producto.sale_price || producto.price, pero /lens-types solo devolvía default_price. Fix: mapear default_price -> price/sale_price en el endpoint. Bug 3 (unificación en categoría 'Lentes'): implementado a nivel de UI con dos states (lentesContacto, tiposLente) combinados en renderProductos() con _tipoInterno para discriminar, y filtro dropdown 'Tipo de Lente'."
+}

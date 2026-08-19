@@ -125,7 +125,7 @@ class ContactLensInventoryUpdate(BaseModel):
 class ContactLensInventoryResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
-    lens_type: str
+    lens_type: Optional[str] = "esferico"  # Default para datos legacy
     brand: Optional[str] = ""
     name: Optional[str] = ""
     description: Optional[str] = ""
@@ -165,6 +165,7 @@ class LensTypeResponse(BaseModel):
     description: Optional[str] = ""
     default_price: Optional[float] = 0
     price: Optional[float] = 0
+    sale_price: Optional[float] = 0  # Agregado para compatibilidad con POS
     is_active: bool = True
     created_by: Optional[str] = None
     created_at: Optional[str] = None
@@ -396,8 +397,10 @@ async def enrich_sale(sale: dict) -> dict:
     if sale.get("contact_lens_id"):
         contact_lens = await db.optica_contact_lenses.find_one({"id": sale["contact_lens_id"]}, {"_id": 0})
         if contact_lens:
-            sale["contact_lens_info"] = f"{contact_lens['lens_type'].capitalize()} - {contact_lens.get('brand', '')}"
-            sale["contact_lens_price"] = sale.get("contact_lens_price", contact_lens["sale_price"])
+            # Usar .get() para manejar datos legacy sin lens_type
+            lens_type = contact_lens.get('lens_type', 'esferico')
+            sale["contact_lens_info"] = f"{lens_type.capitalize()} - {contact_lens.get('brand', '')}"
+            sale["contact_lens_price"] = sale.get("contact_lens_price", contact_lens.get("sale_price", 0))
     else:
         sale["contact_lens_info"] = ""
         sale["contact_lens_price"] = 0
@@ -774,6 +777,11 @@ async def delete_contact_lens(lens_id: str, current_user: dict = Depends(require
 async def get_lens_types(current_user: dict = Depends(require_permission("view_optica"))):
     """Listar catálogo de tipos de lente"""
     lens_types = await db.optica_lens_types.find({"is_active": True}, {"_id": 0}).sort("name", 1).to_list(1000)
+    # Mapear default_price a price y sale_price para compatibilidad con POS
+    for lt in lens_types:
+        default_p = lt.get("default_price", 0) or 0
+        lt["price"] = default_p
+        lt["sale_price"] = default_p
     return LensTypeListResponse(data=lens_types, total=len(lens_types))
 
 

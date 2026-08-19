@@ -80,8 +80,14 @@ const METODOS_PAGO = [
 // Categorías de productos óptica
 const CATEGORIAS_OPTICA = [
   { value: 'armazones', label: 'Armazones', icon: Glasses, color: 'bg-blue-500' },
-  { value: 'lentes_contacto', label: 'Lentes de Contacto', icon: CircleDot, color: 'bg-green-500' },
-  { value: 'tipos_lente', label: 'Lentes Oftálmicos', icon: Eye, color: 'bg-purple-500' },
+  { value: 'lentes', label: 'Lentes', icon: Eye, color: 'bg-purple-500' },
+];
+
+// Tipos de lentes para el filtro
+const TIPOS_LENTE_FILTRO = [
+  { value: 'todos', label: 'Todos los Lentes' },
+  { value: 'contacto', label: 'Lentes de Contacto' },
+  { value: 'oftalmico', label: 'Lentes Oftálmicos' },
 ];
 
 const OpticaPOS = () => {
@@ -108,6 +114,9 @@ const OpticaPOS = () => {
   const [filtroMarca, setFiltroMarca] = useState('all');
   const [filtroMaterial, setFiltroMaterial] = useState('all');
   const [marcasDisponibles, setMarcasDisponibles] = useState([]);
+  
+  // Filtro de tipo de lente (contacto/oftálmico)
+  const [filtroTipoLente, setFiltroTipoLente] = useState('todos');
   
   // Búsqueda de pacientes
   const [pacienteSearch, setPacienteSearch] = useState('');
@@ -153,7 +162,7 @@ const OpticaPOS = () => {
   
   useEffect(() => {
     fetchProductos();
-  }, [categoriaActiva, searchQuery, filtroMarca, filtroMaterial]);
+  }, [categoriaActiva, searchQuery, filtroMarca, filtroMaterial, filtroTipoLente]);
   
   // Búsqueda de pacientes con debounce
   useEffect(() => {
@@ -184,20 +193,25 @@ const OpticaPOS = () => {
         
         const response = await axios.get(`${API_URL}/optica/frames?${params}`, { headers });
         setArmazones(response.data?.data || response.data || []);
-      } else if (categoriaActiva === 'lentes_contacto') {
+      } else if (categoriaActiva === 'lentes') {
+        // Cargar lentes de contacto y/o oftálmicos según el filtro
         const params = new URLSearchParams();
         if (searchQuery) params.append('search', searchQuery);
         params.append('is_active', 'true');
         
-        const response = await axios.get(`${API_URL}/optica/contact-lenses?${params}`, { headers });
-        setLentesContacto(response.data?.data || response.data || []);
-      } else if (categoriaActiva === 'tipos_lente') {
-        const params = new URLSearchParams();
-        if (searchQuery) params.append('search', searchQuery);
-        params.append('is_active', 'true');
+        if (filtroTipoLente === 'todos' || filtroTipoLente === 'contacto') {
+          const responseContacto = await axios.get(`${API_URL}/optica/contact-lenses?${params}`, { headers });
+          setLentesContacto(responseContacto.data?.data || responseContacto.data || []);
+        } else {
+          setLentesContacto([]);
+        }
         
-        const response = await axios.get(`${API_URL}/optica/lens-types?${params}`, { headers });
-        setTiposLente(response.data?.data || response.data || []);
+        if (filtroTipoLente === 'todos' || filtroTipoLente === 'oftalmico') {
+          const responseTipos = await axios.get(`${API_URL}/optica/lens-types?${params}`, { headers });
+          setTiposLente(responseTipos.data?.data || responseTipos.data || []);
+        } else {
+          setTiposLente([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching productos:', error);
@@ -551,13 +565,16 @@ const OpticaPOS = () => {
 
   const renderProductos = () => {
     let productos = [];
+    let tipoProductos = []; // Para rastrear el tipo de cada producto
     
     if (categoriaActiva === 'armazones') {
       productos = armazones;
-    } else if (categoriaActiva === 'lentes_contacto') {
-      productos = lentesContacto;
-    } else {
-      productos = tiposLente;
+      tipoProductos = armazones.map(() => 'armazones');
+    } else if (categoriaActiva === 'lentes') {
+      // Combinar lentes de contacto y oftálmicos
+      const contactoConTipo = lentesContacto.map(p => ({ ...p, _tipoInterno: 'lentes_contacto' }));
+      const oftalmicosConTipo = tiposLente.map(p => ({ ...p, _tipoInterno: 'tipos_lente' }));
+      productos = [...contactoConTipo, ...oftalmicosConTipo];
     }
     
     if (loadingProductos) {
@@ -582,73 +599,90 @@ const OpticaPOS = () => {
     
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {productos.map((producto) => (
-          <Card 
-            key={producto.id}
-            className="cursor-pointer hover:border-teal-500 transition-all hover:shadow-lg group"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-            onClick={() => agregarAlCarrito(producto, categoriaActiva)}
-          >
-            <CardContent className="p-3">
-              {/* Imagen o ícono */}
-              <div 
-                className="h-20 rounded-md mb-2 flex items-center justify-center"
-                style={{ background: 'var(--bg-hover)' }}
-              >
-                {categoriaActiva === 'armazones' ? (
-                  <Glasses className="h-10 w-10 text-teal-500" />
-                ) : categoriaActiva === 'lentes_contacto' ? (
-                  <CircleDot className="h-10 w-10 text-green-500" />
-                ) : (
-                  <Eye className="h-10 w-10 text-purple-500" />
-                )}
-              </div>
-              
-              {/* Info del producto */}
-              <div className="space-y-1">
-                <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>
-                  {categoriaActiva === 'armazones' 
-                    ? `${producto.brand} ${producto.model}`
-                    : categoriaActiva === 'lentes_contacto'
-                      ? `${producto.brand} ${producto.name}`
-                      : producto.name
-                  }
-                </p>
-                
-                {categoriaActiva === 'armazones' && producto.color && (
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    Color: {producto.color}
-                  </p>
+        {productos.map((producto) => {
+          // Determinar el tipo de producto para el carrito
+          const tipoProducto = producto._tipoInterno || categoriaActiva;
+          const esLenteContacto = tipoProducto === 'lentes_contacto';
+          const esLenteOftalmico = tipoProducto === 'tipos_lente';
+          
+          return (
+            <Card 
+              key={producto.id}
+              className="cursor-pointer hover:border-teal-500 transition-all hover:shadow-lg group"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
+              onClick={() => agregarAlCarrito(producto, tipoProducto)}
+            >
+              <CardContent className="p-3">
+                {/* Badge de tipo de lente */}
+                {categoriaActiva === 'lentes' && (
+                  <Badge 
+                    className={`mb-2 text-xs ${esLenteContacto ? 'bg-green-500' : 'bg-purple-500'}`}
+                  >
+                    {esLenteContacto ? 'Contacto' : 'Oftálmico'}
+                  </Badge>
                 )}
                 
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-teal-500">
-                    {formatCurrency(producto.sale_price || producto.price || 0)}
-                  </p>
-                  
-                  {categoriaActiva !== 'tipos_lente' && (
-                    <Badge 
-                      variant={producto.stock > 5 ? 'default' : producto.stock > 0 ? 'warning' : 'destructive'}
-                      className="text-xs"
-                    >
-                      {producto.stock || 0}
-                    </Badge>
+                {/* Imagen o ícono */}
+                <div 
+                  className="h-20 rounded-md mb-2 flex items-center justify-center"
+                  style={{ background: 'var(--bg-hover)' }}
+                >
+                  {categoriaActiva === 'armazones' ? (
+                    <Glasses className="h-10 w-10 text-teal-500" />
+                  ) : esLenteContacto ? (
+                    <CircleDot className="h-10 w-10 text-green-500" />
+                  ) : (
+                    <Eye className="h-10 w-10 text-purple-500" />
                   )}
                 </div>
-              </div>
-              
-              {/* Botón agregar (visible en hover) */}
-              <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button 
-                  size="sm" 
-                  className="w-full bg-teal-600 hover:bg-teal-700"
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Agregar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                
+                {/* Info del producto */}
+                <div className="space-y-1">
+                  <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                    {categoriaActiva === 'armazones' 
+                      ? `${producto.brand} ${producto.model}`
+                      : esLenteContacto
+                        ? `${producto.brand || ''} ${producto.name || ''}`.trim()
+                        : producto.name
+                    }
+                  </p>
+                  
+                  {categoriaActiva === 'armazones' && producto.color && (
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      Color: {producto.color}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-teal-500">
+                      {formatCurrency(producto.sale_price || producto.price || 0)}
+                    </p>
+                    
+                    {/* Mostrar stock para armazones y lentes de contacto, no para oftálmicos */}
+                    {(categoriaActiva === 'armazones' || esLenteContacto) && (
+                      <Badge 
+                        variant={producto.stock > 5 ? 'default' : producto.stock > 0 ? 'warning' : 'destructive'}
+                        className="text-xs"
+                      >
+                        {producto.stock || 0}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Botón agregar (visible en hover) */}
+                <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button 
+                    size="sm" 
+                    className="w-full bg-teal-600 hover:bg-teal-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Agregar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     );
   };
@@ -698,6 +732,7 @@ const OpticaPOS = () => {
                     onClick={() => {
                       setCategoriaActiva(cat.value);
                       setSearchQuery('');
+                      setFiltroTipoLente('todos'); // Resetear filtro de lentes
                     }}
                   >
                     <Icon className="h-4 w-4 mr-2" />
@@ -735,6 +770,19 @@ const OpticaPOS = () => {
                     </SelectContent>
                   </Select>
                 </>
+              )}
+              
+              {categoriaActiva === 'lentes' && (
+                <Select value={filtroTipoLente} onValueChange={setFiltroTipoLente}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Tipo de Lente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_LENTE_FILTRO.map(tipo => (
+                      <SelectItem key={tipo.value} value={tipo.value}>{tipo.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
               
               <Button variant="outline" onClick={fetchProductos}>
