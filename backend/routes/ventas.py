@@ -583,16 +583,35 @@ async def crear_venta(
             fp_dict["tipo_pagador_id"] = fp.tipo_pagador_id
             fp_dict["tipo_pagador_nombre"] = fp.tipo_pagador_nombre
             
-            # Crear cuenta por cobrar
+            # Buscar información del responsable en el catálogo de CxC
+            responsable_nombre = fp.tipo_pagador_nombre or "Otro"
+            tipo_responsable = "otro"
+            
+            if fp.tipo_pagador_id:
+                responsable_doc = await db.responsables_cxc.find_one(
+                    {"id": fp.tipo_pagador_id, "is_active": True},
+                    {"_id": 0}
+                )
+                if responsable_doc:
+                    responsable_nombre = responsable_doc.get("nombre", fp.tipo_pagador_nombre or "Otro")
+                    tipo_responsable = responsable_doc.get("tipo", "otro")
+            
+            # Crear cuenta por cobrar con el nuevo esquema
             cxc_id = str(uuid.uuid4())
             cxc_doc = {
                 "id": cxc_id,
                 "origen": "clinica",
+                "numero_cuenta": f"CXC-CLI-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}",
                 "paciente_id": venta.paciente_id,
                 "paciente_nombre": venta.paciente_nombre or "Cliente General",
+                # Campos del nuevo sistema de responsables
+                "responsable_id": fp.tipo_pagador_id,
+                "responsable_nombre": responsable_nombre,
+                "tipo_responsable": tipo_responsable,
+                # Campos legacy para compatibilidad
                 "tipo_pagador_id": fp.tipo_pagador_id,
-                "tipo_pagador_nombre": fp.tipo_pagador_nombre,
-                "pagador_nombre": "",
+                "tipo_pagador_nombre": responsable_nombre,
+                "pagador_nombre": responsable_nombre,
                 "concepto": f"Venta {numero_venta}",
                 "referencia": numero_venta,
                 "monto_total": fp.monto,
