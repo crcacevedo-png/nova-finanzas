@@ -37,7 +37,8 @@ import {
   Store,
   Upload,
   FlaskConical,
-  CreditCard
+  CreditCard,
+  CircleDot
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -171,11 +172,12 @@ const Layout = ({ children }) => {
 
   // Optica sub-items (solo para rol optica y superadmin) - Sin Médicos
   const opticaItems = canViewOptica ? [
-    { path: '/optica/inventario', icon: Package, label: 'Inventario', testId: 'nav-optica-inventario' },
+    { path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' },
+    { path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' },
+    { path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' },
     { path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' },
     { path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' },
     { path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' },
-    { path: '/optica/tipos-lente', icon: Eye, label: 'Tipos de Lente', testId: 'nav-optica-tipos-lente' },
   ] : [];
 
   const NavLink = ({ item }) => {

@@ -68,6 +68,10 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - [x] Categoría unificada "Lentes" con filtro (Contacto/Oftálmico/Todos) - 2026-08-19
   - [x] Precios de lentes oftálmicos visibles (mapeo default_price → sale_price)
   - [x] Lentes de contacto seleccionables (lens_type opcional)
+- [x] **Gestión de Lentes de Contacto** (`/optica/lentes-contacto`) - 2026-08-19
+  - [x] CRUD completo de lentes de contacto
+  - [x] Campos: tipo, marca, nombre, descripción, precio costo, precio venta, stock
+  - [x] Filtros por tipo de lente y stock bajo
 - [x] **Cuentas por Cobrar Óptica** (`/optica/cuentas-cobrar`) - CxC vinculadas al paciente/cliente
 - [x] **NOTA CRÍTICA**: Óptica NO usa Kardex inmutable ni sistema de bodegas
 

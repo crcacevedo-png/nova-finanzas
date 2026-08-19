@@ -105,6 +105,7 @@ class FrameInventoryListResponse(BaseModel):
 class ContactLensInventoryBase(BaseModel):
     lens_type: Literal["esferico", "torico", "multifocal", "cosmetico"]
     brand: Optional[str] = ""
+    name: Optional[str] = ""  # Nombre del producto
     description: Optional[str] = ""
     cost_price: float = Field(ge=0)
     sale_price: float = Field(ge=0)
@@ -116,6 +117,7 @@ class ContactLensInventoryCreate(ContactLensInventoryBase):
 class ContactLensInventoryUpdate(BaseModel):
     lens_type: Optional[Literal["esferico", "torico", "multifocal", "cosmetico"]] = None
     brand: Optional[str] = None
+    name: Optional[str] = None
     description: Optional[str] = None
     cost_price: Optional[float] = None
     sale_price: Optional[float] = None
@@ -722,6 +724,7 @@ async def create_contact_lens(lens_data: ContactLensInventoryCreate, current_use
         "id": str(uuid.uuid4()),
         "lens_type": lens_data.lens_type,
         "brand": lens_data.brand or "",
+        "name": lens_data.name or "",
         "description": lens_data.description or "",
         "cost_price": lens_data.cost_price,
         "sale_price": lens_data.sale_price,
