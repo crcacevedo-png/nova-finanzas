@@ -543,24 +543,69 @@ async def registrar_abono(
         }
     )
     
-    # Crear movimiento de caja si es de clínica
+    # Crear movimiento de caja si es de clínica y hay caja abierta
     if cuenta.get("origen") == "clinica":
-        mov_caja = {
-            "id": str(uuid.uuid4()),
-            "tipo": "Ingreso",
-            "categoria": "Abono CxC",
-            "subcategoria": cuenta.get("tipo_responsable", "General"),
-            "monto": abono.monto,
-            "metodo_pago": abono.metodo_pago,
-            "referencia": cuenta.get("numero_cuenta"),
-            "descripcion": f"Abono a {cuenta.get('numero_cuenta')} - {cuenta.get('responsable_nombre', cuenta.get('paciente_nombre'))}",
-            "fecha": now.isoformat(),
-            "usuario_id": current_user.get("id"),
-            "usuario_nombre": current_user.get("name", current_user.get("username")),
-            "origen": "clinica",
-            "cxc_id": cuenta_id
-        }
-        await db.caja_movimientos.insert_one(mov_caja)
+        # Buscar sesión de caja activa (está en caja_cierres con estado="Abierto")
+        sesion_activa = await db.caja_cierres.find_one(
+            {"estado": "Abierto", "origen": "clinica"},
+            {"_id": 0}
+        )
+        
+        if sesion_activa:
+            mov_caja = {
+                "id": str(uuid.uuid4()),
+                "sesion_id": sesion_activa.get("id"),
+                "tipo": "Ingreso",
+                "categoria": "Abono CxC",
+                "concepto": f"Abono a cuenta {cuenta.get('numero_cuenta')}",
+                "descripcion": f"Abono a {cuenta.get('numero_cuenta')} - {cuenta.get('responsable_nombre', cuenta.get('paciente_nombre', 'Cliente'))}",
+                "monto": abono.monto,
+                "metodo_pago": abono.metodo_pago,
+                "referencia": abono.referencia or cuenta.get("numero_cuenta"),
+                "paciente_id": cuenta.get("paciente_id"),
+                "paciente_nombre": cuenta.get("paciente_nombre"),
+                "fecha": now.isoformat(),
+                "usuario_id": current_user.get("id"),
+                "usuario_nombre": current_user.get("name", current_user.get("username")),
+                "cajero_id": current_user.get("id"),
+                "cajero_nombre": current_user.get("name", current_user.get("username")),
+                "origen": "clinica",
+                "cxc_id": cuenta_id,
+                "bloqueado": False
+            }
+            await db.caja_movimientos.insert_one(mov_caja)
+    
+    # También crear movimiento para óptica
+    elif cuenta.get("origen") == "optica":
+        # Buscar sesión de caja activa
+        sesion_activa = await db.caja_cierres.find_one(
+            {"estado": "Abierto"},
+            {"_id": 0}
+        )
+        
+        if sesion_activa:
+            mov_caja = {
+                "id": str(uuid.uuid4()),
+                "sesion_id": sesion_activa.get("id"),
+                "tipo": "Ingreso",
+                "categoria": "Abono CxC Óptica",
+                "concepto": f"Abono CxC Óptica - {cuenta.get('paciente_nombre', 'Cliente')}",
+                "descripcion": f"Abono CxC Óptica - {cuenta.get('paciente_nombre', 'Cliente')}",
+                "monto": abono.monto,
+                "metodo_pago": abono.metodo_pago,
+                "referencia": abono.referencia or cuenta.get("numero_cuenta"),
+                "paciente_id": cuenta.get("paciente_id"),
+                "paciente_nombre": cuenta.get("paciente_nombre"),
+                "fecha": now.isoformat(),
+                "usuario_id": current_user.get("id"),
+                "usuario_nombre": current_user.get("name", current_user.get("username")),
+                "cajero_id": current_user.get("id"),
+                "cajero_nombre": current_user.get("name", current_user.get("username")),
+                "origen": "clinica",  # Se registra en caja principal
+                "cxc_id": cuenta_id,
+                "bloqueado": False
+            }
+            await db.caja_movimientos.insert_one(mov_caja)
     
     return {
         "success": True,
