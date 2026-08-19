@@ -987,7 +987,7 @@ const CRMCirugias = () => {
                               </Badge>
                             </div>
                             <span className="text-xs text-gray-500">
-                              {seg.fecha ? new Date(seg.fecha).toLocaleDateString('es-GT') : ''}
+                              {seg.fecha ? new Date(seg.fecha).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' }) : ''}
                             </span>
                           </div>
                           <p className="text-sm mt-1">{seg.notas}</p>
@@ -1007,7 +1007,7 @@ const CRMCirugias = () => {
                   <span>Origen: {selectedCandidate.origen === 'evaluacion' ? 'Evaluación Oftalmológica' : 'Registro Manual'}</span>
                   {selectedCandidate.created_at && (
                     <span className="ml-4">
-                      Creado: {new Date(selectedCandidate.created_at).toLocaleDateString('es-GT')}
+                      Creado: {new Date(selectedCandidate.created_at).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}
                     </span>
                   )}
                 </div>

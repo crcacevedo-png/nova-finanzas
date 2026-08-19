@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { ventasApi, inventarioApi, formatCurrency, formatDate } from '../services/api';
+import { ventasApi, inventarioApi, formatCurrency, formatDate, formatTime } from '../services/api';
 import axios from 'axios';
 import { 
   Search, 
@@ -1643,7 +1643,7 @@ const PuntoVenta = () => {
                         {venta.paciente_nombre || 'Cliente General'} • {venta.cantidad_items} items
                       </p>
                       <p className="text-xs text-slate-400">
-                        {venta.fecha?.split('T')[1]?.substring(0, 5)} • {venta.vendedor_nombre}
+                        {formatTime(venta.fecha)} • {venta.vendedor_nombre}
                       </p>
                     </div>
                     <div className="text-right">

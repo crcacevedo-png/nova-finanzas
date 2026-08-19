@@ -37,6 +37,7 @@ import PanelInventario from './pages/inventario/PanelInventario';
 import ProductosInventario from './pages/inventario/Productos';
 import LotesInventario from './pages/inventario/Lotes';
 import MovimientosInventario from './pages/inventario/Movimientos';
+import BodegasInventario from './pages/inventario/Bodegas';
 // Punto de Venta (POS)
 import PuntoVenta from './pages/PuntoVenta';
 import './App.css';
@@ -370,6 +371,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MovimientosInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/inventario/bodegas" 
+        element={
+          <ProtectedRoute>
+            <BodegasInventario />
           </ProtectedRoute>
         } 
       />

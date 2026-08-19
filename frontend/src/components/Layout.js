@@ -38,7 +38,8 @@ import {
   Upload,
   FlaskConical,
   CreditCard,
-  CircleDot
+  CircleDot,
+  Warehouse
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -126,6 +127,7 @@ const Layout = ({ children }) => {
   // Inventario sub-items (visible para todos excepto optica)
   const inventarioItems = user?.role !== 'optica' ? [
     { path: '/inventario', icon: LayoutDashboard, label: 'Panel', testId: 'nav-inv-panel' },
+    { path: '/inventario/bodegas', icon: Warehouse, label: 'Bodegas', testId: 'nav-inv-bodegas' },
     { path: '/inventario/productos', icon: Package, label: 'Productos', testId: 'nav-inv-productos' },
     { path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' },
     { path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' },

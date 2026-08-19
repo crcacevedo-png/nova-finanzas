@@ -4,7 +4,19 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-08-19
+**Última actualización**: 2026-08-19 (Sesión 2)
+
+### Últimos Cambios (2026-08-19 Sesión 2)
+- ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario
+  - `Bodegas.js` - UI CRUD completa para gestión de almacenes
+  - `Productos.js` - Entrada Rápida con selector de bodega
+  - `Lotes.js` - Filtro por bodega funcional
+  - `Movimientos.js` - Filtro por bodega funcional
+  - `PuntoVenta.js` - Usa bodegaPOS configurada
+- ✅ **Zona Horaria Guatemala (UTC-6)**: Sistema corregido para mostrar fechas/horas en horario local
+  - Funciones `formatDate`, `formatDateTime`, `formatTime` actualizadas con `timeZone: 'America/Guatemala'`
+  - Todas las llamadas `toLocaleString`, `toLocaleDateString`, `toLocaleTimeString` actualizadas
+  - `Caja.js` y `PuntoVenta.js` usan `formatTime()` para mostrar horas correctamente
 
 ### ✅ Funcionalidades Completadas
 
@@ -55,7 +67,11 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 
 #### Inventario
 - [x] Control de lotes con FEFO (First Expire First Out)
-- [x] Multi-almacén
+- [x] Multi-almacén (Bodegas)
+- [x] **Gestión de Bodegas** (`/inventario/bodegas`) - CRUD completo 2026-08-19
+  - [x] Crear/Editar/Eliminar/Desactivar bodegas
+  - [x] Filtros de búsqueda y toggle de inactivas
+  - [x] Integración en Productos, Lotes, Movimientos y POS
 - [x] Kardex inmutable
 - [x] Alertas de stock bajo y vencimiento
 
@@ -105,6 +121,9 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - [x] Índices compuestos en MongoDB
 - [x] ErrorBoundary global en React
 - [x] Performance tests (scripts en /backend/scripts/)
+- [x] **Zona Horaria Guatemala (UTC-6)** - 2026-08-19
+  - Funciones de formateo con `timeZone: 'America/Guatemala'`
+  - `formatDate`, `formatDateTime`, `formatTime`, `getGuatemalaDate`, `getGuatemalaDateTime` en `api.js`
 
 ### 🔄 En Progreso
 - [x] WebSockets para Caja y Agenda - **COMPLETADO** (2026-08-17)

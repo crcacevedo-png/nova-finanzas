@@ -373,7 +373,8 @@ const PanelInventario = () => {
                       <span className="text-sm">{mov.cantidad} und</span>
                       <span className="text-xs text-gray-500">
                         {new Date(mov.fecha).toLocaleString('es-GT', { 
-                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                          timeZone: 'America/Guatemala'
                         })}
                       </span>
                     </div>

@@ -323,16 +323,55 @@ export const formatCurrency = (amount) => {
   return `Q ${formatted}`;
 };
 
-// Format date helper - Formato dd/mm/yy (estándar Guatemala)
+// Zona horaria de Guatemala (UTC-6)
+const GUATEMALA_TIMEZONE = 'America/Guatemala';
+
+// Format date helper - Formato dd/mm/yy (estándar Guatemala) con zona horaria correcta
 export const formatDate = (dateString) => {
   if (!dateString) return '-';
-  // Agregar T00:00:00 para evitar problemas de zona horaria con fechas YYYY-MM-DD
-  const dateStr = dateString.includes('T') ? dateString : dateString + 'T00:00:00';
-  const date = new Date(dateStr);
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear().toString().slice(-2); // Solo últimos 2 dígitos
-  return `${day}/${month}/${year}`;
+  const date = new Date(dateString);
+  // Usar Intl.DateTimeFormat con zona horaria de Guatemala
+  return date.toLocaleDateString('es-GT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    timeZone: GUATEMALA_TIMEZONE
+  });
+};
+
+// Formatear fecha y hora completa en zona horaria de Guatemala
+export const formatDateTime = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleString('es-GT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: GUATEMALA_TIMEZONE
+  });
+};
+
+// Formatear solo hora en zona horaria de Guatemala
+export const formatTime = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('es-GT', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: GUATEMALA_TIMEZONE
+  });
+};
+
+// Obtener fecha actual en Guatemala (para comparaciones)
+export const getGuatemalaDate = () => {
+  return new Date().toLocaleDateString('en-CA', { timeZone: GUATEMALA_TIMEZONE }); // Formato YYYY-MM-DD
+};
+
+// Obtener fecha y hora actual en Guatemala
+export const getGuatemalaDateTime = () => {
+  return new Date().toLocaleString('es-GT', { timeZone: GUATEMALA_TIMEZONE });
 };
 
 // Type labels (categorías)

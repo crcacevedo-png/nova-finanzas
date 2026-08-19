@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useCajaWebSocket } from '../hooks/useWebSocket';
 import axios from 'axios';
-import { formatCurrency, formatDate } from '../services/api';
+import { formatCurrency, formatDate, formatTime } from '../services/api';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 import { 
@@ -1123,7 +1123,7 @@ const Caja = () => {
                         {movimientos.map((mov) => (
                           <TableRow key={mov.id}>
                             <TableCell className="text-sm">
-                              {mov.fecha?.split('T')[1]?.substring(0, 5) || '-'}
+                              {formatTime(mov.fecha)}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">{mov.categoria}</Badge>

@@ -251,7 +251,8 @@ const Movimientos = () => {
                             month: '2-digit',
                             year: '2-digit',
                             hour: '2-digit',
-                            minute: '2-digit'
+                            minute: '2-digit',
+                            timeZone: 'America/Guatemala'
                           })}
                         </td>
                         <td className="px-4 py-3">{getTipoBadge(mov.tipo)}</td>

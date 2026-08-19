@@ -285,7 +285,7 @@ export default function LaboratorioPruebas() {
           <AlertTriangle className="h-5 w-5 text-amber-500" />
           <AlertTitle className="text-amber-500">Datos de Prueba Activos</AlertTitle>
           <AlertDescription className="text-amber-400">
-            Hay {totalDatosPrueba.toLocaleString()} registros de prueba en la base de datos.
+            Hay {totalDatosPrueba.toLocaleString('es-GT', { timeZone: 'America/Guatemala' })} registros de prueba en la base de datos.
             Estos datos tienen el prefijo PRB- y la bandera esDatoPrueba: true.
           </AlertDescription>
         </Alert>
@@ -375,7 +375,7 @@ export default function LaboratorioPruebas() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                   <span className="text-slate-300">Total registros de prueba</span>
-                  <span className="text-2xl font-bold text-teal-400">{totalDatosPrueba.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-teal-400">{totalDatosPrueba.toLocaleString('es-GT', { timeZone: 'America/Guatemala' })}</span>
                 </div>
                 
                 {Object.keys(estado.conteo_por_coleccion).length > 0 ? (
@@ -394,7 +394,7 @@ export default function LaboratorioPruebas() {
                 {estado.fecha_ultimo_seed && (
                   <div className="flex items-center gap-2 text-sm text-slate-500">
                     <Clock className="h-4 w-4" />
-                    Último seed: {new Date(estado.fecha_ultimo_seed).toLocaleString()}
+                    Último seed: {new Date(estado.fecha_ultimo_seed).toLocaleString('es-GT', { timeZone: 'America/Guatemala' })}
                   </div>
                 )}
                 

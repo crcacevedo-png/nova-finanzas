@@ -61,7 +61,7 @@ const TIPOS_CITA = [
 
 // Helper para formatear fecha
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString('es-GT', { 
+  return new Date(date).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
 };
@@ -161,7 +161,7 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
           <div>
             <div className="font-semibold">{paciente.paciente_nombre}</div>
             <div className="text-xs text-gray-500 flex items-center gap-2">
-              <span>Llegó: {new Date(paciente.hora_llegada).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span>Llegó: {new Date(paciente.hora_llegada).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' })}</span>
               <span className={`font-medium ${colorEspera}`}>
                 • Espera: {tiempoEspera} min
               </span>

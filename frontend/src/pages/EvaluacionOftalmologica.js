@@ -616,7 +616,7 @@ const EvaluacionOftalmologica = () => {
           const savedId = saveOfflineData(dataToSave, evaluacionActual?.id ? 'update' : 'create');
           
           if (savedId) {
-            const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+            const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
             setAutoguardadoStatus(`Guardado offline ${now}`);
             lastSavedRef.current = new Date();
             // Si es nueva evaluación, guardar ID temporal
@@ -656,7 +656,7 @@ const EvaluacionOftalmologica = () => {
           fetchEvaluaciones(); // Actualizar lista
         }
         
-        const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+        const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
         setAutoguardadoStatus(`Guardado a las ${now}`);
         lastSavedRef.current = new Date();
       } catch (error) {
@@ -673,7 +673,7 @@ const EvaluacionOftalmologica = () => {
           };
           const savedId = saveOfflineData(dataToSave, evaluacionActual?.id ? 'update' : 'create');
           if (savedId) {
-            const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+            const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
             setAutoguardadoStatus(`Guardado offline ${now}`);
           } else {
             setAutoguardadoStatus('Error al guardar');
@@ -871,7 +871,7 @@ const EvaluacionOftalmologica = () => {
         }
       }
       
-      const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+      const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
       setAutoguardadoStatus(`Guardado a las ${now}`);
       fetchEvaluaciones();
     } catch (error) {
@@ -1036,7 +1036,7 @@ const EvaluacionOftalmologica = () => {
         setEvaluacionActual(response.data);
         evaluacionId = response.data.id;
         fetchEvaluaciones();
-        const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+        const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
         setAutoguardadoStatus(`Guardado a las ${now}`);
       }
       
@@ -2615,7 +2615,7 @@ const EvaluacionOftalmologica = () => {
             <div className="mt-12 pt-8 border-t">
               <div className="flex justify-between items-end">
                 <div className="text-sm text-gray-600">
-                  <p>Fecha de emisión: {new Date().toLocaleDateString('es-GT')}</p>
+                  <p>Fecha de emisión: {new Date().toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}</p>
                 </div>
                 <div className="text-center">
                   <div className="border-t border-black w-48 mb-2"></div>
