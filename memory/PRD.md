@@ -4,7 +4,7 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-08-18
+**Última actualización**: 2026-08-19
 
 ### ✅ Funcionalidades Completadas
 
@@ -117,11 +117,10 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - ✅ Frontend: CuentasCobrarOptica.js con resumen y tabla
   - ✅ Frontend: CuentasCobrarFinanzas.js con tabs (Cuentas/Responsables)
   - ✅ Submenús agregados en Layout.js para Óptica y Finanzas
-  - ✅ Fase 3: 9 Recorridos E2E automatizados
-  - ✅ Fase 4: 50 pruebas de verificación (100% PASA)
-  - ✅ Fase 5: Pruebas de volumen y rendimiento
-  - ✅ Fase 6: Generación de informe automático
-  - ✅ Fase 7: Función de purga funcionando
+- [x] Bug Fix: POS Óptica - **COMPLETADO** (2026-08-19)
+  - ✅ Bug P0 (CxC con monto incorrecto): VERIFICADO - NO SE REPRODUJO (funciona correctamente)
+  - ✅ Bug P1 (Búsqueda pacientes sin nombre): CORREGIDO - Campos en español añadidos al endpoint `/api/pacientes/buscar`
+  - ✅ Bug Adicional (Mismatch ?q= vs ?search=): CORREGIDO - Alias añadido en backend
 
 ### 📋 Backlog (Próximas Tareas)
 

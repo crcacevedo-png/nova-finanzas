@@ -247,10 +247,13 @@ def generate_accent_regex(text: str) -> str:
 @pacientes_router.get("/buscar")
 async def buscar_pacientes_rapido(
     search: str = Query("", min_length=0),
+    q: str = Query("", min_length=0),
     limit: int = Query(10, ge=1, le=50),
     current_user: dict = Depends(get_current_user)
 ):
     """Búsqueda rápida de pacientes para autocomplete"""
+    # Aceptar tanto ?search= como ?q= (frontend usa ?q=)
+    search = search or q
     query = {"is_active": True}
     if search:
         search_pattern = generate_accent_regex(search)
@@ -264,12 +267,18 @@ async def buscar_pacientes_rapido(
     
     pacientes = await db.patients.find(
         query, 
-        {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "record_number": 1, "birth_date": 1, "gender": 1, "phone": 1}
+        {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "record_number": 1, "birth_date": 1, "gender": 1, "phone": 1, "dpi": 1}
     ).limit(limit).to_list(limit)
     
     for p in pacientes:
         p["nombre_completo"] = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
         p["edad"] = calcular_edad(p.get("birth_date", "")) if p.get("birth_date") else 0
+        # Agregar campos en español para compatibilidad con POS de Óptica
+        p["primer_nombre"] = p.get("first_name", "")
+        p["primer_apellido"] = p.get("last_name", "")
+        p["segundo_nombre"] = ""
+        p["segundo_apellido"] = ""
+        p["telefono"] = p.get("phone", "")
     
     return pacientes
 

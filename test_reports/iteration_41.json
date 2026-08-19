@@ -1,0 +1,38 @@
+{
+  "summary": "Verificación de bugs P0 (CxC monto correcto tras pago parcial) y P1 (búsqueda pacientes). Backend: 3/3 pytest pass. UI verificada. Se detectó y corrigió un desajuste adicional en el endpoint /api/pacientes/buscar: frontend enviaba ?q= pero backend leía ?search=, provocando que la búsqueda no filtrara y devolviera los primeros 10 pacientes sin importar la consulta. Se añadió alias q= en el backend. La lógica de CxC funciona correctamente: en escenario Total Q550 + Pago Q200, la venta v2 registra balance_due=350 y la CxC de óptica se crea con monto_total=350 (no 550).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/pacientes/buscar", "issue": "El endpoint aceptaba ?search= pero frontend enviaba ?q=, por lo que retornaba pacientes sin filtrar. Corregido añadiendo alias ?q= en patients.py."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pos_cxc_correct_amount.py",
+    "/app/test_reports/pytest/pos_cxc_amount.xml"
+  ],
+  "action_items": [
+    "Considerar en el futuro estandarizar el nombre del parámetro de búsqueda (?q= o ?search=) en todos los endpoints de autocompletado para consistencia. Actualmente coexisten ambos en /pacientes/buscar."
+  ],
+  "critical_code_review_comments": [
+    "OpticaPOS.js:389-409 calcularPendiente()=total-totalPagado y agregarCxCPendiente() envía correctamente 'pendiente' como monto de CxC. Comportamiento correcto.",
+    "OpticaPOS.js:494-519 crea la CxC con monto_total=montoCxC (suma de pagos con es_cxc=true), que corresponde al pendiente. Correcto.",
+    "Backend optica.py:1131-1133 excluye pagos 'Cuenta por Cobrar' del total_paid y calcula balance_due correctamente.",
+    "patients.py:247-280: el endpoint /pacientes/buscar aceptaba parámetro 'search' pero el POS envía 'q'. Fix aplicado (alias q)."
+  ],
+  "updated_files": [
+    "/app/backend/routes/patients.py (añadido alias q= al endpoint /pacientes/buscar)",
+    "/app/backend/tests/test_pos_cxc_correct_amount.py (nuevo test)"
+  ],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100% en flujos verificados"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Se creó armazón de prueba TEST-RB-* (Ray-Ban Wayfarer Q550, stock 10). Ventas de prueba se cancelan para restaurar stock.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "El bug P0 (CxC monto incorrecto) no se reprodujo — el sistema calcula correctamente el saldo pendiente. Backend tests confirman: total=550, pago=200 → balance_due=350 y CxC monto_total=350. El bug P1 (campos de paciente) estaba parcialmente arreglado: los campos primer_nombre/primer_apellido/telefono se devuelven, pero el filtro de búsqueda no funcionaba por mismatch de nombre de parámetro (q vs search). Ambos ahora funcionan.",
+  "rca of the issue": "P0 (CxC con monto incorrecto): NO REPRODUCIBLE. La función agregarCxCPendiente() en OpticaPOS.js:389 usa calcularPendiente() que resta pagos previos del total. El monto_cxc enviado al backend y usado para crear la CxC es el saldo pendiente, no el total. P1 (búsqueda pacientes): confirmado que campos primer_nombre/primer_apellido/telefono se devuelven correctamente. Bug adicional encontrado: mismatch de nombre de parámetro entre frontend (q=) y backend (search=) que hacía que la búsqueda no filtrara. Fix: agregado alias q= al endpoint /pacientes/buscar."
+}
