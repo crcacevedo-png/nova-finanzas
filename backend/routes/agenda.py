@@ -65,7 +65,7 @@ async def calcular_tiempo_espera(hora_llegada: str) -> int:
         llegada = datetime.fromisoformat(hora_llegada.replace('Z', '+00:00'))
         ahora = datetime.now(timezone.utc)
         return int((ahora - llegada).total_seconds() / 60)
-    except:
+    except (ValueError, TypeError):
         return 0
 
 async def get_agenda_config():

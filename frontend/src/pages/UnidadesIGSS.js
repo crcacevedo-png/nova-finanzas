@@ -325,7 +325,7 @@ const UnidadesIGSS = () => {
           <CardContent className="p-4">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               <strong>Nota:</strong> Este catálogo permite administrar las unidades del IGSS que pueden ser asignadas 
-              a pacientes cuando su institución referente es "IGSS". El catálogo inicia vacío y puede ser 
+              a pacientes cuando su institución referente es &quot;IGSS&quot;. El catálogo inicia vacío y puede ser 
               completado según las necesidades de la clínica.
             </p>
           </CardContent>
@@ -413,7 +413,7 @@ const UnidadesIGSS = () => {
                 Eliminar Unidad IGSS
               </DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de eliminar la unidad "{selectedUnit?.name}"? 
+                ¿Estás seguro de eliminar la unidad &quot;{selectedUnit?.name}&quot;? 
                 Esta acción no se puede deshacer.
                 <br /><br />
                 <strong className="text-amber-600">Nota:</strong> No se podrá eliminar si hay pacientes usando esta unidad.

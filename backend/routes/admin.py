@@ -198,7 +198,7 @@ async def get_integridad_datos(current_user: dict = Depends(require_role("supera
                 if nombre:
                     nombres[nombre] = nombres.get(nombre, 0) + 1
             resultado["catalogos_duplicados"][campo] = [n for n, c in nombres.items() if c > 1]
-        except:
+        except Exception:
             pass
     
     resultado["estadisticas"] = {

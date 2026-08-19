@@ -365,7 +365,7 @@ const CuentasBancarias = () => {
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--text-primary)' }}>Eliminar Cuenta</DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de que deseas eliminar la cuenta "{accountToDelete?.account_alias}"? 
+                ¿Estás seguro de que deseas eliminar la cuenta &quot;{accountToDelete?.account_alias}&quot;? 
                 Esta acción no se puede deshacer.
               </DialogDescription>
             </DialogHeader>

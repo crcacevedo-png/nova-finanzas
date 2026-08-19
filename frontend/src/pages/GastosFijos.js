@@ -675,7 +675,7 @@ const GastosFijos = () => {
                 Eliminar Gasto Fijo
               </DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de eliminar el gasto fijo "{selectedExpense?.expense_name}"? 
+                ¿Estás seguro de eliminar el gasto fijo &quot;{selectedExpense?.expense_name}&quot;? 
                 Los gastos ya generados no serán eliminados, pero no se generarán nuevos.
               </DialogDescription>
             </DialogHeader>

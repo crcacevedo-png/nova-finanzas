@@ -122,7 +122,7 @@ async def generar_numero_cuenta(origen: str) -> str:
         try:
             ultimo_num = int(ultimo["numero_cuenta"].split("-")[-1])
             nuevo_num = ultimo_num + 1
-        except:
+        except (ValueError, IndexError, KeyError):
             nuevo_num = 1
     else:
         nuevo_num = 1
@@ -140,7 +140,7 @@ def calcular_estado(monto_total: float, monto_pagado: float, fecha_vencimiento: 
             vencimiento = datetime.fromisoformat(fecha_vencimiento.replace('Z', '+00:00'))
             if datetime.now(timezone.utc) > vencimiento and monto_pagado < monto_total:
                 return "Vencido"
-        except:
+        except (ValueError, TypeError):
             pass
     
     if monto_pagado > 0:

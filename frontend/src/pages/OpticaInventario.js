@@ -474,7 +474,7 @@ const OpticaInventario = () => {
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--text-primary)' }}>Eliminar Aro</DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de eliminar "{selectedFrame?.brand} - {selectedFrame?.code}"?
+                ¿Estás seguro de eliminar &quot;{selectedFrame?.brand} - {selectedFrame?.code}&quot;?
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

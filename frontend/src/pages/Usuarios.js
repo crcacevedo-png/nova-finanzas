@@ -702,7 +702,7 @@ const Usuarios = () => {
             <DialogHeader>
               <DialogTitle className="font-['Outfit']">Eliminar Usuario</DialogTitle>
               <DialogDescription>
-                ¿Estás seguro de que deseas eliminar a "{userToDelete?.name}"? 
+                ¿Estás seguro de que deseas eliminar a &quot;{userToDelete?.name}&quot;? 
                 Esta acción no se puede deshacer.
               </DialogDescription>
             </DialogHeader>

@@ -446,7 +446,7 @@ const Proveedores = () => {
                 Eliminar Proveedor
               </DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de eliminar al proveedor "{selectedSupplier?.name}"? 
+                ¿Estás seguro de eliminar al proveedor &quot;{selectedSupplier?.name}&quot;? 
                 Esta acción no se puede deshacer.
               </DialogDescription>
             </DialogHeader>

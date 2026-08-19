@@ -381,7 +381,7 @@ const TiposLente = () => {
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--text-primary)' }}>Eliminar Tipo de Lente</DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                ¿Estás seguro de eliminar "{selectedLensType?.name}"?
+                ¿Estás seguro de eliminar &quot;{selectedLensType?.name}&quot;?
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
