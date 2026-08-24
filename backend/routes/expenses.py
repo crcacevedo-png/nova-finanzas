@@ -21,7 +21,7 @@ payments_router = APIRouter(prefix="/payments", tags=["Pagos"])
 class ExpenseBase(BaseModel):
     provider: Optional[str] = None
     name: str = Field(..., min_length=1)
-    type: str = Field(..., pattern="^(fijo|proveedor|variable)$")
+    type: str = Field(..., pattern="^(fijo|proveedor|variable|igss)$")
     amount: float = Field(..., gt=0)
     date: str
     due_date: Optional[str] = None
@@ -213,7 +213,7 @@ async def get_expenses(
     query = {}
     
     # Filtro por tipo
-    if type and type in ["fijo", "proveedor", "variable"]:
+    if type and type in ["fijo", "proveedor", "variable", "igss"]:
         query["type"] = type
     
     # Filtro por estado

@@ -2949,7 +2949,7 @@ async def get_dashboard_summary(current_user: dict = Depends(require_permission(
     
     # Calculate by type
     by_type = []
-    for expense_type in ["fijo", "proveedor", "variable"]:
+    for expense_type in ["fijo", "proveedor", "variable", "igss"]:
         type_total = sum(e["amount"] for e in expenses if e["type"] == expense_type)
         percentage = (type_total / total_month * 100) if total_month > 0 else 0
         by_type.append(TypeBreakdown(
