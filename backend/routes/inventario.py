@@ -2060,8 +2060,9 @@ async def registrar_ajuste(
     """Registra un ajuste de inventario"""
     db = get_db()
     
-    if current_user.get("role") != "superadmin":
-        raise HTTPException(status_code=403, detail="Solo SuperAdmin puede realizar ajustes")
+    # Permitir a admin y superadmin realizar ajustes
+    if current_user.get("role") not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo Administradores pueden realizar ajustes de inventario")
     
     if not ajuste.motivo or len(ajuste.motivo.strip()) < 5:
         raise HTTPException(status_code=400, detail="El motivo es obligatorio (mínimo 5 caracteres)")

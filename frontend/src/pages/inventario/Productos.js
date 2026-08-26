@@ -73,6 +73,16 @@ const Productos = () => {
     observaciones: ''
   });
   
+  // Modal de Ajuste de Inventario
+  const [ajusteModalOpen, setAjusteModalOpen] = useState(false);
+  const [productoParaAjuste, setProductoParaAjuste] = useState(null);
+  const [ajusteSubmitting, setAjusteSubmitting] = useState(false);
+  const [ajusteData, setAjusteData] = useState({
+    bodega_id: '',
+    cantidad_nueva: 0,
+    motivo: ''
+  });
+  
   const [formData, setFormData] = useState({
     codigo: '',
     codigo_barras: '',
@@ -492,6 +502,53 @@ const Productos = () => {
     }
   };
 
+  // Función para abrir modal de ajuste
+  const handleOpenAjuste = (producto) => {
+    setProductoParaAjuste(producto);
+    setAjusteData({
+      bodega_id: bodegas[0]?.id || '',
+      cantidad_nueva: producto.existencia_total || 0,
+      motivo: ''
+    });
+    setAjusteModalOpen(true);
+  };
+
+  // Función para realizar ajuste de inventario
+  const handleAjusteSubmit = async () => {
+    if (!ajusteData.bodega_id) {
+      toast.error('Seleccione una bodega');
+      return;
+    }
+    if (ajusteData.cantidad_nueva < 0) {
+      toast.error('La cantidad no puede ser negativa');
+      return;
+    }
+    if (!ajusteData.motivo || ajusteData.motivo.trim().length < 5) {
+      toast.error('Ingrese un motivo válido (mínimo 5 caracteres)');
+      return;
+    }
+
+    setAjusteSubmitting(true);
+    try {
+      const response = await inventarioApi.registrarAjuste({
+        producto_id: productoParaAjuste.id,
+        bodega_id: ajusteData.bodega_id,
+        cantidad_nueva: parseInt(ajusteData.cantidad_nueva),
+        motivo: ajusteData.motivo.trim()
+      });
+      
+      toast.success(response.data.message || 'Ajuste realizado correctamente');
+      setAjusteModalOpen(false);
+      loadProductos();
+      
+    } catch (error) {
+      console.error('Error en ajuste:', error);
+      toast.error(error.response?.data?.detail || 'Error al realizar ajuste');
+    } finally {
+      setAjusteSubmitting(false);
+    }
+  };
+
   const getStockBadge = (producto) => {
     if (!producto.controla_inventario) return null;
     
@@ -676,6 +733,19 @@ const Productos = () => {
                                   data-testid={`btn-entrada-${producto.id}`}
                                 >
                                   <ArrowDownToLine className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {/* Botón de Ajuste de Inventario - Solo admin/superadmin */}
+                              {producto.controla_inventario && isAdminOrSuperAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenAjuste(producto)}
+                                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                  title="Ajustar existencia"
+                                  data-testid={`btn-ajuste-${producto.id}`}
+                                >
+                                  <Package className="w-4 h-4" />
                                 </Button>
                               )}
                               <Button
@@ -1439,6 +1509,102 @@ const Productos = () => {
                 data-testid="btn-confirmar-importar"
               >
                 {importing ? 'Importando...' : `Importar ${importPreview.length} Productos`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Ajuste de Inventario */}
+        <Dialog open={ajusteModalOpen} onOpenChange={setAjusteModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-purple-600" />
+                Ajustar Existencia
+              </DialogTitle>
+              <DialogDescription>
+                Modifique la cantidad en inventario de {productoParaAjuste?.nombre}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Información del producto */}
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="font-medium text-gray-900">{productoParaAjuste?.nombre}</p>
+                <p className="text-sm text-gray-600">Código: {productoParaAjuste?.codigo}</p>
+                <p className="text-sm text-purple-600 font-medium mt-1">
+                  Existencia actual: {productoParaAjuste?.existencia_total || 0} unidades
+                </p>
+              </div>
+
+              {/* Bodega */}
+              <div className="space-y-2">
+                <Label>Bodega *</Label>
+                <Select 
+                  value={ajusteData.bodega_id} 
+                  onValueChange={(v) => setAjusteData({ ...ajusteData, bodega_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar bodega" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bodegas.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Nueva cantidad */}
+              <div className="space-y-2">
+                <Label>Nueva cantidad *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={ajusteData.cantidad_nueva}
+                  onChange={(e) => setAjusteData({ ...ajusteData, cantidad_nueva: parseInt(e.target.value) || 0 })}
+                  className="text-lg font-medium"
+                />
+                {productoParaAjuste && (
+                  <p className={`text-sm ${
+                    ajusteData.cantidad_nueva > (productoParaAjuste?.existencia_total || 0) 
+                      ? 'text-green-600' 
+                      : ajusteData.cantidad_nueva < (productoParaAjuste?.existencia_total || 0)
+                        ? 'text-red-600'
+                        : 'text-gray-500'
+                  }`}>
+                    {ajusteData.cantidad_nueva > (productoParaAjuste?.existencia_total || 0) 
+                      ? `↑ Aumentará ${ajusteData.cantidad_nueva - (productoParaAjuste?.existencia_total || 0)} unidades`
+                      : ajusteData.cantidad_nueva < (productoParaAjuste?.existencia_total || 0)
+                        ? `↓ Disminuirá ${(productoParaAjuste?.existencia_total || 0) - ajusteData.cantidad_nueva} unidades`
+                        : 'Sin cambios'}
+                  </p>
+                )}
+              </div>
+
+              {/* Motivo */}
+              <div className="space-y-2">
+                <Label>Motivo del ajuste *</Label>
+                <Textarea
+                  value={ajusteData.motivo}
+                  onChange={(e) => setAjusteData({ ...ajusteData, motivo: e.target.value })}
+                  placeholder="Ej: Ajuste por inventario físico, corrección de error, etc."
+                  rows={2}
+                />
+                <p className="text-xs text-gray-500">Mínimo 5 caracteres. Este registro quedará en el historial.</p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAjusteModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleAjusteSubmit}
+                disabled={ajusteSubmitting || !ajusteData.motivo || ajusteData.motivo.length < 5}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {ajusteSubmitting ? 'Guardando...' : 'Realizar Ajuste'}
               </Button>
             </DialogFooter>
           </DialogContent>
