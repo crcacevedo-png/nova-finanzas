@@ -74,6 +74,7 @@ class ProductoBase(BaseModel):
     controla_inventario: bool = True
     controla_lotes: bool = False
     requiere_receta: bool = False
+    es_sociedad: bool = False  # Productos para sociedades médicas
     precio_compra: float = 0.0
     precio_venta: float = 0.0
     afecto_iva: bool = True
@@ -101,6 +102,7 @@ class ProductoUpdate(BaseModel):
     controla_inventario: Optional[bool] = None
     controla_lotes: Optional[bool] = None
     requiere_receta: Optional[bool] = None
+    es_sociedad: Optional[bool] = None
     precio_compra: Optional[float] = None
     precio_venta: Optional[float] = None
     afecto_iva: Optional[bool] = None
@@ -2474,5 +2476,630 @@ async def reporte_rentabilidad_historico(
         variacion_ultimo_mes=round(variacion, 2),
         fecha_generacion=datetime.now(timezone.utc).isoformat()
     )
+
+
+# ==================== MÓDULO SOCIEDADES ====================
+
+class ConsumoSociedadItem(BaseModel):
+    id: str
+    fecha: str
+    producto_id: str
+    producto_codigo: str
+    producto_nombre: str
+    bodega_id: str
+    bodega_nombre: str
+    cantidad: int
+    costo_unitario: float
+    costo_total: float
+    tipo: str
+    referencia_tipo: Optional[str] = None
+    referencia_id: Optional[str] = None
+    motivo: Optional[str] = None
+    usuario_nombre: Optional[str] = None
+
+class ConsumosSociedadResponse(BaseModel):
+    data: List[ConsumoSociedadItem]
+    total: int
+    page: int
+    limit: int
+    resumen: dict
+
+@router.get("/sociedades/consumos")
+async def listar_consumos_sociedades(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    producto_id: Optional[str] = None,
+    bodega_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """
+    Lista todos los consumos/movimientos de salida de productos marcados como sociedad.
+    Solo accesible para admin y superadmin.
+    """
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    # Obtener IDs de productos que son sociedad
+    productos_sociedad = await db.productos_inventario.find(
+        {"es_sociedad": True, "origen": "clinica"},
+        {"id": 1, "codigo": 1, "nombre": 1}
+    ).to_list(1000)
+    
+    if not productos_sociedad:
+        return ConsumosSociedadResponse(
+            data=[],
+            total=0,
+            page=page,
+            limit=limit,
+            resumen={"total_consumos": 0, "total_costo": 0, "productos_distintos": 0}
+        )
+    
+    productos_ids = [p["id"] for p in productos_sociedad]
+    productos_map = {p["id"]: {"codigo": p.get("codigo", ""), "nombre": p["nombre"]} for p in productos_sociedad}
+    
+    # Filtro para movimientos de salida (consumos)
+    tipos_consumo = ["salida", "venta", "consumo", "ajuste_negativo", "baja"]
+    filtro = {
+        "producto_id": {"$in": productos_ids},
+        "tipo": {"$in": tipos_consumo},
+        "origen": "clinica"
+    }
+    
+    if fecha_inicio:
+        filtro["fecha"] = {"$gte": fecha_inicio}
+    if fecha_fin:
+        if "fecha" in filtro:
+            filtro["fecha"]["$lte"] = fecha_fin
+        else:
+            filtro["fecha"] = {"$lte": fecha_fin}
+    if producto_id:
+        filtro["producto_id"] = producto_id
+    if bodega_id:
+        filtro["bodega_id"] = bodega_id
+    
+    # Obtener total
+    total = await db.movimientos_inventario.count_documents(filtro)
+    
+    # Obtener movimientos paginados
+    skip = (page - 1) * limit
+    movimientos = await db.movimientos_inventario.find(filtro).sort("fecha", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Obtener bodegas y usuarios
+    bodegas = {b["id"]: b["nombre"] for b in await db.bodegas_inventario.find({"origen": "clinica"}).to_list(100)}
+    usuarios_ids = list(set(m.get("usuario_id") for m in movimientos if m.get("usuario_id")))
+    usuarios = {u["id"]: u.get("name", u.get("username", "")) for u in await db.users.find({"id": {"$in": usuarios_ids}}).to_list(100)}
+    
+    # Construir respuesta
+    data = []
+    for mov in movimientos:
+        prod_info = productos_map.get(mov["producto_id"], {})
+        data.append(ConsumoSociedadItem(
+            id=mov["id"],
+            fecha=mov["fecha"],
+            producto_id=mov["producto_id"],
+            producto_codigo=prod_info.get("codigo", ""),
+            producto_nombre=prod_info.get("nombre", "Desconocido"),
+            bodega_id=mov["bodega_id"],
+            bodega_nombre=bodegas.get(mov["bodega_id"], "Desconocida"),
+            cantidad=mov["cantidad"],
+            costo_unitario=mov.get("costo_unitario", 0),
+            costo_total=mov.get("costo_total", 0),
+            tipo=mov["tipo"],
+            referencia_tipo=mov.get("referencia_tipo"),
+            referencia_id=mov.get("referencia_id"),
+            motivo=mov.get("motivo"),
+            usuario_nombre=usuarios.get(mov.get("usuario_id"), "")
+        ))
+    
+    # Calcular resumen
+    pipeline = [
+        {"$match": filtro},
+        {"$group": {
+            "_id": None,
+            "total_costo": {"$sum": "$costo_total"},
+            "total_cantidad": {"$sum": "$cantidad"},
+            "productos_distintos": {"$addToSet": "$producto_id"}
+        }}
+    ]
+    resumen_result = await db.movimientos_inventario.aggregate(pipeline).to_list(1)
+    
+    resumen = {
+        "total_consumos": total,
+        "total_costo": round(resumen_result[0]["total_costo"], 2) if resumen_result else 0,
+        "total_cantidad": resumen_result[0]["total_cantidad"] if resumen_result else 0,
+        "productos_distintos": len(resumen_result[0]["productos_distintos"]) if resumen_result else 0
+    }
+    
+    return ConsumosSociedadResponse(
+        data=data,
+        total=total,
+        page=page,
+        limit=limit,
+        resumen=resumen
+    )
+
+
+@router.get("/sociedades/productos")
+async def listar_productos_sociedad(
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Lista todos los productos marcados como sociedad con sus existencias."""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    productos = await db.productos_inventario.find(
+        {"es_sociedad": True, "origen": "clinica", "activo": True}
+    ).to_list(500)
+    
+    # Obtener existencias totales
+    existencias = await db.existencias_inventario.aggregate([
+        {"$match": {"origen": "clinica"}},
+        {"$group": {"_id": "$producto_id", "total": {"$sum": "$cantidad"}}}
+    ]).to_list(1000)
+    existencias_map = {e["_id"]: e["total"] for e in existencias}
+    
+    # Obtener categorías
+    categorias = {c["id"]: c["nombre"] for c in await db.categorias_inventario.find({"origen": "clinica"}).to_list(100)}
+    
+    resultado = []
+    for p in productos:
+        resultado.append({
+            "id": p["id"],
+            "codigo": p.get("codigo", ""),
+            "nombre": p["nombre"],
+            "categoria_nombre": categorias.get(p.get("categoria_id")),
+            "existencia_total": existencias_map.get(p["id"], 0),
+            "precio_compra": p.get("precio_compra", 0),
+            "precio_venta": p.get("precio_venta", 0),
+            "controla_inventario": p.get("controla_inventario", True)
+        })
+    
+    return resultado
+
+
+@router.get("/sociedades/resumen")
+async def obtener_resumen_sociedades(
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Obtiene resumen de consumos de sociedades para el mes/año especificado."""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    # Si no se especifica, usar mes actual
+    ahora = datetime.now(timezone.utc)
+    mes = mes or ahora.month
+    anio = anio or ahora.year
+    
+    # Rango de fechas
+    fecha_inicio = f"{anio}-{mes:02d}-01T00:00:00"
+    if mes == 12:
+        fecha_fin = f"{anio + 1}-01-01T00:00:00"
+    else:
+        fecha_fin = f"{anio}-{mes + 1:02d}-01T00:00:00"
+    
+    # Obtener productos sociedad
+    productos_sociedad = await db.productos_inventario.find(
+        {"es_sociedad": True, "origen": "clinica"},
+        {"id": 1}
+    ).to_list(1000)
+    productos_ids = [p["id"] for p in productos_sociedad]
+    
+    if not productos_ids:
+        return {
+            "mes": mes,
+            "anio": anio,
+            "total_consumos": 0,
+            "total_costo": 0,
+            "por_producto": [],
+            "por_tipo": []
+        }
+    
+    tipos_consumo = ["salida", "venta", "consumo", "ajuste_negativo", "baja"]
+    
+    # Resumen por producto
+    por_producto = await db.movimientos_inventario.aggregate([
+        {
+            "$match": {
+                "producto_id": {"$in": productos_ids},
+                "tipo": {"$in": tipos_consumo},
+                "fecha": {"$gte": fecha_inicio, "$lt": fecha_fin},
+                "origen": "clinica"
+            }
+        },
+        {
+            "$group": {
+                "_id": "$producto_id",
+                "cantidad": {"$sum": "$cantidad"},
+                "costo_total": {"$sum": "$costo_total"}
+            }
+        },
+        {"$sort": {"costo_total": -1}}
+    ]).to_list(100)
+    
+    # Agregar nombres de productos
+    productos_info = {p["id"]: p for p in await db.productos_inventario.find({"id": {"$in": productos_ids}}).to_list(100)}
+    for item in por_producto:
+        prod = productos_info.get(item["_id"], {})
+        item["producto_nombre"] = prod.get("nombre", "Desconocido")
+        item["producto_codigo"] = prod.get("codigo", "")
+    
+    # Resumen por tipo
+    por_tipo = await db.movimientos_inventario.aggregate([
+        {
+            "$match": {
+                "producto_id": {"$in": productos_ids},
+                "tipo": {"$in": tipos_consumo},
+                "fecha": {"$gte": fecha_inicio, "$lt": fecha_fin},
+                "origen": "clinica"
+            }
+        },
+        {
+            "$group": {
+                "_id": "$tipo",
+                "cantidad": {"$sum": "$cantidad"},
+                "costo_total": {"$sum": "$costo_total"}
+            }
+        }
+    ]).to_list(20)
+    
+    total_consumos = sum(p["cantidad"] for p in por_producto)
+    total_costo = sum(p["costo_total"] for p in por_producto)
+    
+    return {
+        "mes": mes,
+        "anio": anio,
+        "total_consumos": total_consumos,
+        "total_costo": round(total_costo, 2),
+        "por_producto": por_producto,
+        "por_tipo": por_tipo
+    }
+
+
+@router.get("/sociedades/exportar/excel")
+async def exportar_sociedades_excel(
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Exportar consumos de sociedades a Excel"""
+    from fastapi.responses import StreamingResponse
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+    
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    # Determinar rango de fechas
+    ahora = datetime.now(timezone.utc)
+    if fecha_inicio and fecha_fin:
+        f_inicio = fecha_inicio
+        f_fin = fecha_fin
+    else:
+        mes = mes or ahora.month
+        anio = anio or ahora.year
+        f_inicio = f"{anio}-{mes:02d}-01T00:00:00"
+        if mes == 12:
+            f_fin = f"{anio + 1}-01-01T00:00:00"
+        else:
+            f_fin = f"{anio}-{mes + 1:02d}-01T00:00:00"
+    
+    # Obtener productos sociedad
+    productos_sociedad = await db.productos_inventario.find(
+        {"es_sociedad": True, "origen": "clinica"},
+        {"id": 1, "codigo": 1, "nombre": 1}
+    ).to_list(1000)
+    
+    if not productos_sociedad:
+        raise HTTPException(status_code=404, detail="No hay productos de sociedad configurados")
+    
+    productos_ids = [p["id"] for p in productos_sociedad]
+    productos_map = {p["id"]: {"codigo": p.get("codigo", ""), "nombre": p["nombre"]} for p in productos_sociedad}
+    
+    # Obtener movimientos
+    tipos_consumo = ["salida", "venta", "consumo", "ajuste_negativo", "baja"]
+    filtro = {
+        "producto_id": {"$in": productos_ids},
+        "tipo": {"$in": tipos_consumo},
+        "fecha": {"$gte": f_inicio, "$lt": f_fin},
+        "origen": "clinica"
+    }
+    
+    movimientos = await db.movimientos_inventario.find(filtro).sort("fecha", -1).to_list(5000)
+    
+    # Obtener bodegas
+    bodegas = {b["id"]: b["nombre"] for b in await db.bodegas_inventario.find({"origen": "clinica"}).to_list(100)}
+    
+    # Crear Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Consumos Sociedades"
+    
+    # Estilos
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="6B21A8", end_color="6B21A8", fill_type="solid")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Título
+    ws.merge_cells('A1:H1')
+    ws['A1'] = f"Reporte de Consumos - Sociedades Médicas"
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+    
+    ws.merge_cells('A2:H2')
+    periodo = f"Período: {f_inicio[:10]} a {f_fin[:10]}"
+    ws['A2'] = periodo
+    ws['A2'].alignment = Alignment(horizontal='center')
+    
+    # Headers
+    headers = ["Fecha", "Código", "Producto", "Bodega", "Tipo", "Cantidad", "Costo Unit.", "Costo Total"]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = border
+    
+    # Datos
+    total_cantidad = 0
+    total_costo = 0
+    
+    tipo_labels = {
+        "salida": "Salida",
+        "venta": "Venta", 
+        "consumo": "Consumo",
+        "ajuste_negativo": "Ajuste -",
+        "baja": "Baja"
+    }
+    
+    for row, mov in enumerate(movimientos, 5):
+        prod_info = productos_map.get(mov["producto_id"], {})
+        
+        ws.cell(row=row, column=1, value=mov["fecha"][:10]).border = border
+        ws.cell(row=row, column=2, value=prod_info.get("codigo", "")).border = border
+        ws.cell(row=row, column=3, value=prod_info.get("nombre", "")).border = border
+        ws.cell(row=row, column=4, value=bodegas.get(mov["bodega_id"], "")).border = border
+        ws.cell(row=row, column=5, value=tipo_labels.get(mov["tipo"], mov["tipo"])).border = border
+        ws.cell(row=row, column=6, value=mov["cantidad"]).border = border
+        ws.cell(row=row, column=7, value=mov.get("costo_unitario", 0)).border = border
+        ws.cell(row=row, column=8, value=mov.get("costo_total", 0)).border = border
+        
+        total_cantidad += mov["cantidad"]
+        total_costo += mov.get("costo_total", 0)
+    
+    # Fila de totales
+    total_row = len(movimientos) + 5
+    ws.merge_cells(f'A{total_row}:E{total_row}')
+    ws.cell(row=total_row, column=1, value="TOTALES").font = Font(bold=True)
+    ws.cell(row=total_row, column=6, value=total_cantidad).font = Font(bold=True)
+    ws.cell(row=total_row, column=8, value=round(total_costo, 2)).font = Font(bold=True)
+    
+    # Ajustar anchos
+    column_widths = [12, 12, 35, 20, 12, 10, 12, 12]
+    for i, width in enumerate(column_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    
+    # Guardar a buffer
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    filename = f"sociedades_consumos_{f_inicio[:10]}_{f_fin[:10]}.xlsx"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/sociedades/exportar/pdf")
+async def exportar_sociedades_pdf(
+    mes: Optional[int] = None,
+    anio: Optional[int] = None,
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Exportar consumos de sociedades a PDF"""
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    # Determinar rango de fechas
+    ahora = datetime.now(timezone.utc)
+    if fecha_inicio and fecha_fin:
+        f_inicio = fecha_inicio
+        f_fin = fecha_fin
+    else:
+        mes = mes or ahora.month
+        anio = anio or ahora.year
+        f_inicio = f"{anio}-{mes:02d}-01T00:00:00"
+        if mes == 12:
+            f_fin = f"{anio + 1}-01-01T00:00:00"
+        else:
+            f_fin = f"{anio}-{mes + 1:02d}-01T00:00:00"
+    
+    # Obtener productos sociedad
+    productos_sociedad = await db.productos_inventario.find(
+        {"es_sociedad": True, "origen": "clinica"},
+        {"id": 1, "codigo": 1, "nombre": 1}
+    ).to_list(1000)
+    
+    if not productos_sociedad:
+        raise HTTPException(status_code=404, detail="No hay productos de sociedad configurados")
+    
+    productos_ids = [p["id"] for p in productos_sociedad]
+    productos_map = {p["id"]: {"codigo": p.get("codigo", ""), "nombre": p["nombre"]} for p in productos_sociedad}
+    
+    # Obtener movimientos
+    tipos_consumo = ["salida", "venta", "consumo", "ajuste_negativo", "baja"]
+    filtro = {
+        "producto_id": {"$in": productos_ids},
+        "tipo": {"$in": tipos_consumo},
+        "fecha": {"$gte": f_inicio, "$lt": f_fin},
+        "origen": "clinica"
+    }
+    
+    movimientos = await db.movimientos_inventario.find(filtro).sort("fecha", -1).to_list(5000)
+    
+    # Obtener bodegas
+    bodegas = {b["id"]: b["nombre"] for b in await db.bodegas_inventario.find({"origen": "clinica"}).to_list(100)}
+    
+    # Calcular resumen por producto
+    resumen_productos = {}
+    for mov in movimientos:
+        pid = mov["producto_id"]
+        if pid not in resumen_productos:
+            prod_info = productos_map.get(pid, {})
+            resumen_productos[pid] = {
+                "codigo": prod_info.get("codigo", ""),
+                "nombre": prod_info.get("nombre", ""),
+                "cantidad": 0,
+                "costo_total": 0
+            }
+        resumen_productos[pid]["cantidad"] += mov["cantidad"]
+        resumen_productos[pid]["costo_total"] += mov.get("costo_total", 0)
+    
+    # Crear PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        alignment=1,  # Center
+        spaceAfter=20
+    )
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,
+        spaceAfter=10
+    )
+    
+    elements = []
+    
+    # Título
+    elements.append(Paragraph("Reporte de Consumos - Sociedades Médicas", title_style))
+    elements.append(Paragraph(f"Período: {f_inicio[:10]} a {f_fin[:10]}", subtitle_style))
+    elements.append(Spacer(1, 20))
+    
+    # Resumen por producto
+    elements.append(Paragraph("<b>Resumen por Producto</b>", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+    
+    resumen_data = [["Código", "Producto", "Cantidad", "Costo Total"]]
+    total_cant = 0
+    total_cost = 0
+    for pid, data in sorted(resumen_productos.items(), key=lambda x: x[1]["costo_total"], reverse=True):
+        resumen_data.append([
+            data["codigo"],
+            data["nombre"][:40],
+            str(data["cantidad"]),
+            f"Q {data['costo_total']:,.2f}"
+        ])
+        total_cant += data["cantidad"]
+        total_cost += data["costo_total"]
+    
+    resumen_data.append(["", "TOTAL", str(total_cant), f"Q {total_cost:,.2f}"])
+    
+    resumen_table = Table(resumen_data, colWidths=[80, 280, 80, 100])
+    resumen_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6B21A8')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#F3E8FF')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAF5FF')])
+    ]))
+    elements.append(resumen_table)
+    elements.append(Spacer(1, 30))
+    
+    # Detalle de movimientos (máximo 100 para el PDF)
+    if movimientos:
+        elements.append(Paragraph("<b>Detalle de Movimientos (últimos 100)</b>", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        tipo_labels = {
+            "salida": "Salida", "venta": "Venta", "consumo": "Consumo",
+            "ajuste_negativo": "Ajuste -", "baja": "Baja"
+        }
+        
+        detail_data = [["Fecha", "Código", "Producto", "Bodega", "Tipo", "Cant.", "Costo"]]
+        for mov in movimientos[:100]:
+            prod_info = productos_map.get(mov["producto_id"], {})
+            detail_data.append([
+                mov["fecha"][:10],
+                prod_info.get("codigo", "")[:10],
+                prod_info.get("nombre", "")[:25],
+                bodegas.get(mov["bodega_id"], "")[:15],
+                tipo_labels.get(mov["tipo"], mov["tipo"]),
+                str(mov["cantidad"]),
+                f"Q {mov.get('costo_total', 0):,.2f}"
+            ])
+        
+        detail_table = Table(detail_data, colWidths=[70, 70, 180, 100, 60, 50, 80])
+        detail_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6B21A8')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (2, 1), (2, -1), 'LEFT'),
+            ('ALIGN', (3, 1), (3, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAF5FF')])
+        ]))
+        elements.append(detail_table)
+    
+    # Generar PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    filename = f"sociedades_consumos_{f_inicio[:10]}_{f_fin[:10]}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 
 

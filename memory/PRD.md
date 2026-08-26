@@ -8,21 +8,15 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 
 ### Últimos Cambios (2026-08-26 Sesión 4)
 - ✅ **Configuración Dinámica de Menús por Rol** (`/usuarios` - Tab "Menús por Rol")
-  - UI completa para que SuperAdmin asigne/revoque menús a cada rol
-  - API backend: `/api/menu-config/*` (available-menus, role/{role}, all-roles, my-menus)
-  - Categorías organizadas: Principal, Clínica, Óptica, Finanzas, Inventario, Configuración
-  - Checkboxes individuales por menú con contador de habilitados
-  - Botones Restaurar (reset a default) y Guardar Cambios
-  - `Layout.js` consume API para mostrar/ocultar menús dinámicamente según configuración
 - ✅ **CRUD de Roles Personalizados** (`/usuarios` - Tab "Roles")
-  - Nueva pestaña "Roles" en Gestión de Usuarios
-  - Visualización de roles del sistema (superadmin, admin, usuario, optica) con badge "Sistema"
-  - Crear roles personalizados con identificador, nombre visible, descripción y color
-  - Editar permisos de cualquier rol (40 permisos organizados en 7 categorías)
-  - Restaurar permisos por defecto de roles del sistema
-  - Eliminar roles personalizados (solo si no tienen usuarios asignados)
-  - Backend: `/api/roles/*` (CRUD completo, available-permissions, reset-permissions)
-  - Colección MongoDB: `roles` para almacenar configuraciones personalizadas
+- ✅ **Campo "Sociedad" en Productos** - Switch para marcar productos de sociedades médicas
+- ✅ **Nuevo Menú Sociedades** (`/sociedades`)
+  - Control de consumos de productos marcados como sociedad
+  - 3 pestañas: Consumos, Productos, Resumen mensual
+  - Filtros por fecha y producto
+  - Estadísticas: total productos, consumos, costo, productos distintos
+  - API: `/api/inventario/sociedades/consumos`, `/productos`, `/resumen`
+- ✅ **Superadmin puede modificar cantidades** - Endpoint de ajuste ya existente solo para superadmin
 
 ### Cambios Previos (2026-08-26 Sesión 3)
 - ✅ **Campo "Precio de Compra" agregado a Productos de Inventario**

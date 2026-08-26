@@ -41,6 +41,7 @@ import MovimientosInventario from './pages/inventario/Movimientos';
 import BodegasInventario from './pages/inventario/Bodegas';
 import CategoriasInventario from './pages/inventario/Categorias';
 import ReporteRentabilidad from './pages/inventario/ReporteRentabilidad';
+import Sociedades from './pages/inventario/Sociedades';
 // Punto de Venta (POS)
 import PuntoVenta from './pages/PuntoVenta';
 import './App.css';
@@ -416,6 +417,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="superadmin">
             <ReporteRentabilidad />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/sociedades" 
+        element={
+          <ProtectedRoute requiredPermission="manage_users">
+            <Sociedades />
           </ProtectedRoute>
         } 
       />

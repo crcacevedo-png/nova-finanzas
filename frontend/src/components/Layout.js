@@ -179,6 +179,7 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('inventario_kardex')) inventarioItems.push({ path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('inventario_categorias')) inventarioItems.push({ path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' });
     if (isSuperAdmin && isMenuEnabled('inventario_rentabilidad')) inventarioItems.push({ path: '/inventario/rentabilidad', icon: PieChart, label: 'Rentabilidad', testId: 'nav-inv-rentabilidad' });
+    if (isAdminOrSuperAdmin && isMenuEnabled('inventario_sociedades')) inventarioItems.push({ path: '/sociedades', icon: Users, label: 'Sociedades', testId: 'nav-inv-sociedades' });
   }
 
   // Config sub-items

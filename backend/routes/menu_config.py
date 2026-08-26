@@ -263,6 +263,14 @@ AVAILABLE_MENUS = {
         "category": "inventario",
         "description": "Reporte de rentabilidad por categoría"
     },
+    "inventario_sociedades": {
+        "id": "inventario_sociedades",
+        "label": "Sociedades",
+        "path": "/sociedades",
+        "icon": "Users",
+        "category": "inventario",
+        "description": "Control de consumos para sociedades médicas"
+    },
     "inventario_pos": {
         "id": "inventario_pos",
         "label": "Punto de Venta",
@@ -307,7 +315,8 @@ DEFAULT_MENU_CONFIG = {
         "finanzas_pos", "finanzas_caja", "finanzas_cxc", "finanzas_gastos", 
         "finanzas_pagos", "finanzas_proveedores", "finanzas_gastos_fijos", "finanzas_autorizaciones",
         "inventario_panel", "inventario_bodegas", "inventario_productos",
-        "inventario_lotes", "inventario_kardex", "inventario_categorias", "inventario_pos"
+        "inventario_lotes", "inventario_kardex", "inventario_categorias", "inventario_pos",
+        "inventario_sociedades"
     ],
     "usuario": [
         "pacientes", "evaluacion_oftalmologica", "agenda",

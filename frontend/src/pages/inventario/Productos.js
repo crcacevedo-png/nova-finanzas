@@ -86,6 +86,7 @@ const Productos = () => {
     controla_inventario: true,
     controla_lotes: false,
     requiere_receta: false,
+    es_sociedad: false,
     precio_compra: 0,
     precio_venta: 0,
     afecto_iva: true,
@@ -178,6 +179,7 @@ const Productos = () => {
         controla_inventario: producto.controla_inventario ?? true,
         controla_lotes: producto.controla_lotes ?? false,
         requiere_receta: producto.requiere_receta ?? false,
+        es_sociedad: producto.es_sociedad ?? false,
         precio_compra: producto.precio_compra || 0,
         precio_venta: producto.precio_venta || 0,
         afecto_iva: producto.afecto_iva ?? true,
@@ -204,6 +206,7 @@ const Productos = () => {
         controla_inventario: true,
         controla_lotes: false,
         requiere_receta: false,
+        es_sociedad: false,
         precio_compra: 0,
         precio_venta: 0,
         afecto_iva: true,
@@ -617,10 +620,17 @@ const Productos = () => {
                         <tr key={producto.id} className="hover:bg-gray-50" data-testid={`producto-row-${producto.id}`}>
                           <td className="px-4 py-3 text-sm font-mono">{producto.codigo}</td>
                           <td className="px-4 py-3">
-                            <div>
-                              <p className="text-sm font-medium">{producto.nombre}</p>
-                              {producto.nombre_generico && (
-                                <p className="text-xs text-gray-500">{producto.nombre_generico}</p>
+                            <div className="flex items-start gap-2">
+                              <div>
+                                <p className="text-sm font-medium">{producto.nombre}</p>
+                                {producto.nombre_generico && (
+                                  <p className="text-xs text-gray-500">{producto.nombre_generico}</p>
+                                )}
+                              </div>
+                              {producto.es_sociedad && (
+                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                                  👥 Sociedad
+                                </Badge>
                               )}
                             </div>
                           </td>
@@ -961,6 +971,17 @@ const Productos = () => {
                       onCheckedChange={(v) => setFormData({ ...formData, requiere_receta: v })}
                     />
                     <Label htmlFor="requiere_receta">Requiere Receta</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="es_sociedad"
+                      checked={formData.es_sociedad}
+                      onCheckedChange={(v) => setFormData({ ...formData, es_sociedad: v })}
+                    />
+                    <Label htmlFor="es_sociedad" className="flex items-center gap-1">
+                      <span className="text-purple-600">👥</span> Sociedad
+                    </Label>
                   </div>
                   
                   <div className="flex items-center space-x-2">
