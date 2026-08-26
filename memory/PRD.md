@@ -44,6 +44,13 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - Tab Por Origen: Gráfica pastel de distribución, detalle por origen (Particular, IGSS, Seguro Privado, Otras), desglose por unidad IGSS
   - Tab Informes: Informe mensual completo (ventas, compras, balance), Top 10 productos vendidos, exportación CSV
   - Endpoints backend: `/optica/dashboard/ventas-dia`, `/optica/dashboard/rentabilidad`, `/optica/dashboard/ventas-por-origen`, `/optica/dashboard/informe-mensual`, `/optica/dashboard/historial-mensual`
+- ✅ **Restricción de Dashboards a SuperAdmin**
+  - Dashboard del Sistema (`/dashboard`): Solo SuperAdmin
+  - Dashboard Financiero (`/dashboard-financiero`): Solo SuperAdmin
+  - Dashboard de Óptica (`/optica/dashboard`): Solo SuperAdmin
+  - Reporte de Rentabilidad Inventario (`/inventario/rentabilidad`): Solo SuperAdmin
+  - Usuarios no-superadmin son redirigidos a `/pacientes` por defecto
+  - Menú lateral oculta enlaces de dashboards para roles no autorizados
 
 ### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario

@@ -78,8 +78,8 @@ const Layout = ({ children }) => {
   // Items principales del sidebar
   const navItems = [];
   
-  // Dashboard - Solo para roles que no sean optica
-  if (user?.role !== 'optica') {
+  // Dashboard del Sistema - Solo SuperAdmin
+  if (isSuperAdmin) {
     navItems.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' });
   }
   
@@ -134,7 +134,10 @@ const Layout = ({ children }) => {
     { path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' },
     { path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' },
     ...(isAdminOrSuperAdmin ? [
-      { path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' },
+      { path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' }
+    ] : []),
+    // Rentabilidad - Solo SuperAdmin
+    ...(isSuperAdmin ? [
       { path: '/inventario/rentabilidad', icon: PieChart, label: 'Rentabilidad', testId: 'nav-inv-rentabilidad' }
     ] : []),
   ] : [];
@@ -180,7 +183,8 @@ const Layout = ({ children }) => {
 
   // Optica sub-items (solo para rol optica y superadmin) - Sin Médicos
   const opticaItems = canViewOptica ? [
-    { path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' },
+    // Dashboard de Óptica - Solo SuperAdmin
+    ...(isSuperAdmin ? [{ path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' }] : []),
     { path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' },
     { path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' },
     { path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' },

@@ -46,8 +46,8 @@ import PuntoVenta from './pages/PuntoVenta';
 import './App.css';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, requiredPermission }) => {
-  const { isAuthenticated, loading, hasPermission } = useAuth();
+const ProtectedRoute = ({ children, requiredPermission, requiredRole }) => {
+  const { isAuthenticated, loading, hasPermission, user } = useAuth();
 
   if (loading) {
     return (
@@ -64,8 +64,16 @@ const ProtectedRoute = ({ children, requiredPermission }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Determinar página de redirección basada en rol
+  const defaultPage = user?.role === 'superadmin' ? '/dashboard' : '/pacientes';
+
+  // Verificar rol requerido (ej: 'superadmin')
+  if (requiredRole && user?.role !== requiredRole) {
+    return <Navigate to={defaultPage} replace />;
+  }
+
   if (requiredPermission && !hasPermission(requiredPermission)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={defaultPage} replace />;
   }
 
   return children;
@@ -73,7 +81,7 @@ const ProtectedRoute = ({ children, requiredPermission }) => {
 
 // Public Route Component (redirect if already logged in)
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -87,7 +95,9 @@ const PublicRoute = ({ children }) => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    // Superadmin va al dashboard, otros usuarios van a pacientes
+    const redirectTo = user?.role === 'superadmin' ? '/dashboard' : '/pacientes';
+    return <Navigate to={redirectTo} replace />;
   }
 
   return children;
@@ -110,7 +120,7 @@ function AppRoutes() {
       <Route 
         path="/dashboard" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="superadmin">
             <Dashboard />
           </ProtectedRoute>
         } 
@@ -118,7 +128,7 @@ function AppRoutes() {
       <Route 
         path="/dashboard-financiero" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="superadmin">
             <DashboardFinanciero />
           </ProtectedRoute>
         } 
@@ -200,7 +210,7 @@ function AppRoutes() {
       <Route 
         path="/optica/dashboard" 
         element={
-          <ProtectedRoute requiredPermission="view_optica">
+          <ProtectedRoute requiredRole="superadmin">
             <OpticaDashboard />
           </ProtectedRoute>
         } 
@@ -404,7 +414,7 @@ function AppRoutes() {
       <Route 
         path="/inventario/rentabilidad" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="superadmin">
             <ReporteRentabilidad />
           </ProtectedRoute>
         } 
@@ -430,12 +440,25 @@ function AppRoutes() {
         } 
       />
 
-      {/* Default Redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Default Redirect - basado en rol */}
+      <Route path="/" element={<DefaultRedirect />} />
+      <Route path="*" element={<DefaultRedirect />} />
     </Routes>
   );
 }
+
+// Componente para redirección por defecto basada en rol
+const DefaultRedirect = () => {
+  const { user, isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Superadmin va al dashboard, otros usuarios van a pacientes
+  const redirectTo = user?.role === 'superadmin' ? '/dashboard' : '/pacientes';
+  return <Navigate to={redirectTo} replace />;
+};
 
 function App() {
   return (
