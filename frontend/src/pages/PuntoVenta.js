@@ -305,8 +305,8 @@ const PuntoVenta = () => {
       const existente = prev.find(item => item.producto_id === producto.id);
       
       if (existente) {
-        // Verificar stock disponible
-        if (producto.existencia >= 0 && existente.cantidad >= producto.existencia) {
+        // Si controla inventario, verificar stock disponible
+        if (producto.controla_inventario && producto.existencia >= 0 && existente.cantidad >= producto.existencia) {
           toast.error(`Stock máximo: ${producto.existencia} unidades`);
           return prev;
         }
@@ -317,8 +317,8 @@ const PuntoVenta = () => {
             : item
         );
       } else {
-        // Verificar stock disponible para productos con inventario
-        if (producto.existencia === 0 && producto.existencia !== -1) {
+        // Verificar stock disponible solo para productos que controlan inventario
+        if (producto.controla_inventario && producto.existencia === 0) {
           toast.error('Producto sin stock disponible');
           return prev;
         }
@@ -333,6 +333,7 @@ const PuntoVenta = () => {
           subtotal: producto.precio_venta,
           afecto_iva: producto.afecto_iva,
           existencia: producto.existencia,
+          controla_inventario: producto.controla_inventario,
           controla_lotes: producto.controla_lotes
         }];
       }
@@ -352,7 +353,8 @@ const PuntoVenta = () => {
     
     setCarrito(prev => {
       const item = prev.find(i => i.producto_id === productoId);
-      if (item && item.existencia >= 0 && nuevaCantidad > item.existencia) {
+      // Solo verificar stock si el producto controla inventario
+      if (item && item.controla_inventario && item.existencia >= 0 && nuevaCantidad > item.existencia) {
         toast.error(`Stock máximo: ${item.existencia} unidades`);
         return prev;
       }
@@ -1018,11 +1020,11 @@ const PuntoVenta = () => {
                         className={`
                           p-2 rounded-lg border-2 text-center transition-all
                           hover:border-amber-400 hover:shadow-md hover:bg-amber-50 active:scale-95
-                          ${producto.existencia === 0 && producto.existencia !== -1 
+                          ${producto.controla_inventario && producto.existencia === 0
                             ? 'bg-slate-100 border-slate-200 opacity-60' 
                             : 'bg-gradient-to-b from-amber-50 to-white border-amber-200'}
                         `}
-                        disabled={producto.existencia === 0 && producto.existencia !== -1}
+                        disabled={producto.controla_inventario && producto.existencia === 0}
                         data-testid={`producto-rapido-${producto.id}`}
                       >
                         <p className="font-medium text-xs text-slate-700 line-clamp-2 mb-1 min-h-[2rem]">
@@ -1031,9 +1033,15 @@ const PuntoVenta = () => {
                         <p className="text-sm font-bold text-amber-600">
                           {formatCurrency(producto.precio_venta)}
                         </p>
-                        {producto.existencia >= 0 && producto.existencia <= 5 && (
-                          <Badge variant="destructive" className="text-[10px] mt-1 px-1">
-                            {producto.existencia}
+                        {producto.controla_inventario ? (
+                          producto.existencia >= 0 && producto.existencia <= 5 && (
+                            <Badge variant="destructive" className="text-[10px] mt-1 px-1">
+                              {producto.existencia}
+                            </Badge>
+                          )
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] mt-1 px-1 bg-blue-50 text-blue-600">
+                            ∞
                           </Badge>
                         )}
                       </button>
@@ -1081,18 +1089,24 @@ const PuntoVenta = () => {
                         className={`
                           p-3 rounded-lg border-2 text-left transition-all
                           hover:border-blue-500 hover:shadow-md active:scale-95
-                          ${producto.existencia === 0 && producto.existencia !== -1 
+                          ${producto.controla_inventario && producto.existencia === 0
                             ? 'bg-slate-100 border-slate-200 opacity-60' 
                             : 'bg-white border-slate-200'}
                         `}
-                        disabled={producto.existencia === 0 && producto.existencia !== -1}
+                        disabled={producto.controla_inventario && producto.existencia === 0}
                         data-testid={`producto-${producto.id}`}
                       >
                         <div className="flex items-start justify-between mb-1">
                           <span className="text-xs font-mono text-slate-400">{producto.codigo}</span>
-                          {producto.existencia >= 0 && (
-                            <Badge variant={producto.existencia > 5 ? "outline" : "destructive"} className="text-xs">
-                              {producto.existencia}
+                          {producto.controla_inventario ? (
+                            producto.existencia >= 0 && (
+                              <Badge variant={producto.existencia > 5 ? "outline" : "destructive"} className="text-xs">
+                                {producto.existencia}
+                              </Badge>
+                            )
+                          ) : (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
+                              Sin límite
                             </Badge>
                           )}
                         </div>

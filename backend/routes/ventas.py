@@ -110,6 +110,7 @@ class ProductoPOSResponse(BaseModel):
     precio_venta: float
     afecto_iva: bool
     existencia: int
+    controla_inventario: bool = True
     controla_lotes: bool
     requiere_receta: bool
     imagen: Optional[str] = None
@@ -215,7 +216,9 @@ async def buscar_productos_pos(
     
     resultado = []
     for p in productos:
-        existencia = existencias_map.get(p["id"], 0) if bodega_id else 0
+        controla_inv = p.get("controla_inventario", True)
+        # Si no controla inventario, mostrar existencia como -1 (ilimitado)
+        existencia = existencias_map.get(p["id"], 0) if bodega_id and controla_inv else (-1 if not controla_inv else 0)
         
         resultado.append(ProductoPOSResponse(
             id=p["id"],
@@ -225,6 +228,7 @@ async def buscar_productos_pos(
             precio_venta=p.get("precio_venta", 0),
             afecto_iva=p.get("afecto_iva", True),
             existencia=existencia,
+            controla_inventario=controla_inv,
             controla_lotes=p.get("controla_lotes", False),
             requiere_receta=p.get("requiere_receta", False),
             imagen=p.get("imagen")
@@ -305,7 +309,9 @@ async def obtener_productos_rapidos(
     
     resultado = []
     for p in productos[:limit]:
-        existencia = existencias_map.get(p["id"], 0) if bodega_id else 0
+        controla_inv = p.get("controla_inventario", True)
+        # Si no controla inventario, mostrar existencia como -1 (ilimitado)
+        existencia = existencias_map.get(p["id"], 0) if bodega_id and controla_inv else (-1 if not controla_inv else 0)
         
         resultado.append(ProductoPOSResponse(
             id=p["id"],
@@ -315,6 +321,7 @@ async def obtener_productos_rapidos(
             precio_venta=p.get("precio_venta", 0),
             afecto_iva=p.get("afecto_iva", True),
             existencia=existencia,
+            controla_inventario=controla_inv,
             controla_lotes=p.get("controla_lotes", False),
             requiere_receta=p.get("requiere_receta", False),
             imagen=p.get("imagen")
