@@ -86,6 +86,7 @@ const Productos = () => {
     controla_inventario: true,
     controla_lotes: false,
     requiere_receta: false,
+    precio_compra: 0,
     precio_venta: 0,
     afecto_iva: true,
     existencia_minima: 0,
@@ -177,6 +178,7 @@ const Productos = () => {
         controla_inventario: producto.controla_inventario ?? true,
         controla_lotes: producto.controla_lotes ?? false,
         requiere_receta: producto.requiere_receta ?? false,
+        precio_compra: producto.precio_compra || 0,
         precio_venta: producto.precio_venta || 0,
         afecto_iva: producto.afecto_iva ?? true,
         existencia_minima: producto.existencia_minima || 0,
@@ -202,6 +204,7 @@ const Productos = () => {
         controla_inventario: true,
         controla_lotes: false,
         requiere_receta: false,
+        precio_compra: 0,
         precio_venta: 0,
         afecto_iva: true,
         existencia_minima: 0,
@@ -373,14 +376,14 @@ const Productos = () => {
     // Crear CSV de plantilla
     const headers = [
       'codigo', 'codigo_barras', 'nombre', 'nombre_generico', 'descripcion',
-      'categoria', 'tipo', 'presentacion', 'unidad_medida', 'precio_venta',
+      'categoria', 'tipo', 'presentacion', 'unidad_medida', 'precio_compra', 'precio_venta',
       'existencia_minima', 'existencia_maxima', 'controla_inventario', 'controla_lotes',
       'requiere_receta', 'afecto_iva'
     ];
     
     const sampleRow = [
       'PROD-001', '7501234567890', 'Producto Ejemplo', 'Nombre Genérico', 'Descripción del producto',
-      'Medicamentos', 'producto', 'Caja x 10', 'unidad', '100.00',
+      'Medicamentos', 'producto', 'Caja x 10', 'unidad', '80.00', '100.00',
       '5', '100', 'true', 'false', 'false', 'true'
     ];
     
@@ -832,12 +835,26 @@ const Productos = () => {
               </div>
               
               <div className="space-y-2">
+                <Label>Precio de Compra (GTQ)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.precio_compra}
+                  onChange={(e) => setFormData({ ...formData, precio_compra: parseFloat(e.target.value) || 0 })}
+                  data-testid="input-precio-compra"
+                />
+              </div>
+              
+              <div className="space-y-2">
                 <Label>Precio de Venta (GTQ)</Label>
                 <Input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.precio_venta}
                   onChange={(e) => setFormData({ ...formData, precio_venta: parseFloat(e.target.value) || 0 })}
+                  data-testid="input-precio-venta"
                 />
               </div>
               
@@ -1177,7 +1194,7 @@ const Productos = () => {
                   <li>• <strong>nombre</strong> (obligatorio)</li>
                   <li>• codigo, codigo_barras, nombre_generico, descripcion</li>
                   <li>• categoria, tipo (producto/servicio/insumo), presentacion</li>
-                  <li>• unidad_medida, precio_venta, existencia_minima, existencia_maxima</li>
+                  <li>• unidad_medida, precio_compra, precio_venta, existencia_minima, existencia_maxima</li>
                   <li>• controla_inventario, controla_lotes, requiere_receta, afecto_iva (true/false)</li>
                 </ul>
                 <Button 

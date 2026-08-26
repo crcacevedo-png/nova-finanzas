@@ -4,9 +4,16 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-08-19 (Sesión 2)
+**Última actualización**: 2026-08-26 (Sesión 3)
 
-### Últimos Cambios (2026-08-19 Sesión 2)
+### Últimos Cambios (2026-08-26 Sesión 3)
+- ✅ **Campo "Precio de Compra" agregado a Productos de Inventario**
+  - Nuevo campo `precio_compra` en formulario de Nuevo Producto y Edición
+  - Backend actualizado: Modelo Pydantic (`ProductoBase`, `ProductoUpdate`, `ProductoResponse`)
+  - Soporte en importación Excel (columna `precio_compra`)
+  - Plantilla CSV actualizada con el nuevo campo
+
+### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario
   - `Bodegas.js` - UI CRUD completa para gestión de almacenes
   - `Productos.js` - Entrada Rápida con selector de bodega
@@ -72,6 +79,9 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - [x] Crear/Editar/Eliminar/Desactivar bodegas
   - [x] Filtros de búsqueda y toggle de inactivas
   - [x] Integración en Productos, Lotes, Movimientos y POS
+- [x] **Precio de Compra en Productos** - 2026-08-26
+  - [x] Campo `precio_compra` en formulario de productos
+  - [x] Soporte en importación Excel
 - [x] Kardex inmutable
 - [x] Alertas de stock bajo y vencimiento
 

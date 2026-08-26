@@ -525,6 +525,7 @@ export const inventarioApi = {
   getCategorias: (params) => axios.get(`${API_URL}/inventario/categorias`, { params }),
   createCategoria: (data) => axios.post(`${API_URL}/inventario/categorias`, data),
   updateCategoria: (id, data) => axios.put(`${API_URL}/inventario/categorias/${id}`, data),
+  deleteCategoria: (id) => axios.delete(`${API_URL}/inventario/categorias/${id}`),
   
   // Productos
   getProductos: (params) => axios.get(`${API_URL}/inventario/productos`, { params }),

@@ -74,6 +74,7 @@ class ProductoBase(BaseModel):
     controla_inventario: bool = True
     controla_lotes: bool = False
     requiere_receta: bool = False
+    precio_compra: float = 0.0
     precio_venta: float = 0.0
     afecto_iva: bool = True
     existencia_minima: int = 0
@@ -100,6 +101,7 @@ class ProductoUpdate(BaseModel):
     controla_inventario: Optional[bool] = None
     controla_lotes: Optional[bool] = None
     requiere_receta: Optional[bool] = None
+    precio_compra: Optional[float] = None
     precio_venta: Optional[float] = None
     afecto_iva: Optional[bool] = None
     existencia_minima: Optional[int] = None
@@ -110,6 +112,7 @@ class ProductoUpdate(BaseModel):
 
 class ProductoResponse(ProductoBase):
     id: str
+    precio_compra: float = 0.0
     costo_promedio: float = 0.0
     ultimo_costo: float = 0.0
     existencia_total: int = 0
@@ -977,6 +980,39 @@ async def actualizar_categoria(
     return CategoriaResponse(**actualizada)
 
 
+@router.delete("/categorias/{categoria_id}")
+async def eliminar_categoria(
+    categoria_id: str,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Elimina una categoría de inventario (solo si no tiene productos asociados)"""
+    db = get_db()
+    
+    if current_user.get("role") not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar categorías")
+    
+    # Verificar que existe
+    categoria = await db.categorias_inventario.find_one({"id": categoria_id, "origen": "clinica"})
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    # Verificar que no tiene productos
+    productos_count = await db.productos_inventario.count_documents({
+        "categoria_id": categoria_id,
+        "origen": "clinica"
+    })
+    
+    if productos_count > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No se puede eliminar. La categoría tiene {productos_count} productos asociados."
+        )
+    
+    await db.categorias_inventario.delete_one({"id": categoria_id})
+    
+    return {"message": "Categoría eliminada", "nombre": categoria.get("nombre", "")}
+
+
 # ==================== ENDPOINTS DE PRODUCTOS ====================
 
 @router.get("/productos", response_model=ProductoListResponse)
@@ -1050,6 +1086,7 @@ async def listar_productos(
             controla_inventario=p.get("controla_inventario", True),
             controla_lotes=p.get("controla_lotes", False),
             requiere_receta=p.get("requiere_receta", False),
+            precio_compra=p.get("precio_compra", 0),
             precio_venta=p.get("precio_venta", 0),
             costo_promedio=p.get("costo_promedio", 0),
             ultimo_costo=p.get("ultimo_costo", 0),
@@ -1100,6 +1137,7 @@ async def obtener_producto(
         controla_inventario=producto.get("controla_inventario", True),
         controla_lotes=producto.get("controla_lotes", False),
         requiere_receta=producto.get("requiere_receta", False),
+        precio_compra=producto.get("precio_compra", 0),
         precio_venta=producto.get("precio_venta", 0),
         costo_promedio=producto.get("costo_promedio", 0),
         ultimo_costo=producto.get("ultimo_costo", 0),
@@ -1531,6 +1569,7 @@ def parse_import_row(row: dict, row_num: int) -> Optional[dict]:
         "controla_inventario": parse_bool(row.get("controla_inventario"), True),
         "controla_lotes": parse_bool(row.get("controla_lotes"), False),
         "requiere_receta": parse_bool(row.get("requiere_receta"), False),
+        "precio_compra": parse_float(row.get("precio_compra")),
         "precio_venta": parse_float(row.get("precio_venta")),
         "afecto_iva": parse_bool(row.get("afecto_iva"), True),
         "existencia_minima": parse_int(row.get("existencia_minima")),

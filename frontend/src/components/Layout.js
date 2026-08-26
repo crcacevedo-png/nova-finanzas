@@ -39,7 +39,8 @@ import {
   FlaskConical,
   CreditCard,
   CircleDot,
-  Warehouse
+  Warehouse,
+  Tag
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
@@ -131,6 +132,7 @@ const Layout = ({ children }) => {
     { path: '/inventario/productos', icon: Package, label: 'Productos', testId: 'nav-inv-productos' },
     { path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' },
     { path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' },
+    ...(isAdminOrSuperAdmin ? [{ path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' }] : []),
   ] : [];
   
   // Config sub-items
