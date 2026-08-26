@@ -160,13 +160,13 @@ const Layout = ({ children }) => {
   // Finanzas sub-items - Filtrados por configuración de menús
   const finanzasItems = [];
   if (user?.role !== 'optica') {
-    if (isMenuEnabled('inventario_pos')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
+    if (isMenuEnabled('finanzas_pos')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
+    if (isMenuEnabled('finanzas_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
     if (isMenuEnabled('finanzas_cxc')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
     if (isMenuEnabled('finanzas_gastos')) finanzasItems.push({ path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' });
     if (isMenuEnabled('finanzas_pagos')) finanzasItems.push({ path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_autorizaciones')) finanzasItems.push({ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' });
-    if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
   }
   
   // Inventario sub-items - Filtrados por configuración de menús

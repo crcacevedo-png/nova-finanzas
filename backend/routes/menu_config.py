@@ -142,6 +142,30 @@ AVAILABLE_MENUS = {
         "description": "Registro de compras de óptica"
     },
     # Módulo Finanzas
+    "finanzas_pos": {
+        "id": "finanzas_pos",
+        "label": "Punto de Venta",
+        "path": "/punto-venta",
+        "icon": "Store",
+        "category": "finanzas",
+        "description": "Punto de venta y facturación"
+    },
+    "finanzas_caja": {
+        "id": "finanzas_caja",
+        "label": "Caja",
+        "path": "/caja",
+        "icon": "Wallet",
+        "category": "finanzas",
+        "description": "Control de caja y efectivo"
+    },
+    "finanzas_cxc": {
+        "id": "finanzas_cxc",
+        "label": "Cuentas por Cobrar",
+        "path": "/cuentas-cobrar-finanzas",
+        "icon": "CreditCard",
+        "category": "finanzas",
+        "description": "Cuentas por cobrar general"
+    },
     "finanzas_gastos": {
         "id": "finanzas_gastos",
         "label": "Gastos",
@@ -165,22 +189,6 @@ AVAILABLE_MENUS = {
         "icon": "Truck",
         "category": "finanzas",
         "description": "Gestión de proveedores"
-    },
-    "finanzas_caja": {
-        "id": "finanzas_caja",
-        "label": "Caja",
-        "path": "/caja",
-        "icon": "Wallet",
-        "category": "finanzas",
-        "description": "Control de caja y efectivo"
-    },
-    "finanzas_cxc": {
-        "id": "finanzas_cxc",
-        "label": "Cuentas por Cobrar",
-        "path": "/cuentas-cobrar-finanzas",
-        "icon": "CreditCard",
-        "category": "finanzas",
-        "description": "Cuentas por cobrar general"
     },
     "finanzas_gastos_fijos": {
         "id": "finanzas_gastos_fijos",
@@ -296,8 +304,8 @@ DEFAULT_MENU_CONFIG = {
     "admin": [
         "pacientes", "importar_pacientes", "evaluacion_oftalmologica",
         "sala_operaciones", "crm_cirugias", "agenda", "medicos",
-        "finanzas_gastos", "finanzas_pagos", "finanzas_proveedores", "finanzas_caja",
-        "finanzas_cxc", "finanzas_gastos_fijos", "finanzas_autorizaciones",
+        "finanzas_pos", "finanzas_caja", "finanzas_cxc", "finanzas_gastos", 
+        "finanzas_pagos", "finanzas_proveedores", "finanzas_gastos_fijos", "finanzas_autorizaciones",
         "inventario_panel", "inventario_bodegas", "inventario_productos",
         "inventario_lotes", "inventario_kardex", "inventario_categorias", "inventario_pos"
     ],
