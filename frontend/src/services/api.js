@@ -284,11 +284,22 @@ export const opticaSaleApi = {
   getPending: () => axios.get(`${API_URL}/optica/sales/pending`),
   addPayment: (saleId, data) => axios.post(`${API_URL}/optica/sales/${saleId}/payments`, data),
   cancel: (saleId) => axios.put(`${API_URL}/optica/sales/${saleId}/cancel`),
-  // Dashboard
+  // Dashboard básico
   getDashboardStats: () => axios.get(`${API_URL}/optica/dashboard/stats`),
   getMonthlyChart: () => axios.get(`${API_URL}/optica/dashboard/monthly-chart`),
   getTopDoctors: (limit = 5) => axios.get(`${API_URL}/optica/dashboard/top-doctors?limit=${limit}`),
   getTopBrands: (limit = 5) => axios.get(`${API_URL}/optica/dashboard/top-brands?limit=${limit}`),
+  // Dashboard avanzado
+  getVentasDelDia: () => axios.get(`${API_URL}/optica/dashboard/ventas-dia`),
+  getRentabilidad: (periodo = 'mes') => axios.get(`${API_URL}/optica/dashboard/rentabilidad?periodo=${periodo}`),
+  getVentasPorOrigen: (params = {}) => {
+    const urlParams = new URLSearchParams();
+    if (params.fecha_inicio) urlParams.append('fecha_inicio', params.fecha_inicio);
+    if (params.fecha_fin) urlParams.append('fecha_fin', params.fecha_fin);
+    return axios.get(`${API_URL}/optica/dashboard/ventas-por-origen?${urlParams.toString()}`);
+  },
+  getInformeMensual: (year, month) => axios.get(`${API_URL}/optica/dashboard/informe-mensual?year=${year}&month=${month}`),
+  getHistorialMensual: (meses = 12) => axios.get(`${API_URL}/optica/dashboard/historial-mensual?meses=${meses}`),
   // Reports
   getMonthlyReport: (year, month, format = 'json') => {
     const url = `${API_URL}/optica/reports/monthly?year=${year}&month=${month}&format=${format}`;

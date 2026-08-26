@@ -17,6 +17,7 @@ import OpticaInventario from './pages/OpticaInventario';
 import OpticaVentas from './pages/OpticaVentas';
 import OpticaPOS from './pages/OpticaPOS';
 import OpticaCompras from './pages/OpticaCompras';
+import OpticaDashboard from './pages/OpticaDashboard';
 import Medicos from './pages/Medicos';
 import TiposLente from './pages/TiposLente';
 import LentesContacto from './pages/LentesContacto';
@@ -193,6 +194,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_optica">
             <OpticaInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/dashboard" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <OpticaDashboard />
           </ProtectedRoute>
         } 
       />

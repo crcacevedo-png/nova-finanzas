@@ -38,6 +38,12 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 - ✅ **Corrección de bugs detectados en evaluación**
   - Fix: Método `getProveedores` agregado a `inventarioApi` en api.js
   - Fix: Gráficas recharts solo se renderizan cuando el tab está activo (evita warning width=-1)
+- ✅ **Dashboard Completo de Óptica** (`/optica/dashboard`)
+  - Tab Resumen: Ventas del día, historial de ventas y compras (12 meses)
+  - Tab Rentabilidad: Margen por período (día/semana/mes/año), desglose por categoría (Aros, Lentes Contacto, Lentes Oftálmicos)
+  - Tab Por Origen: Gráfica pastel de distribución, detalle por origen (Particular, IGSS, Seguro Privado, Otras), desglose por unidad IGSS
+  - Tab Informes: Informe mensual completo (ventas, compras, balance), Top 10 productos vendidos, exportación CSV
+  - Endpoints backend: `/optica/dashboard/ventas-dia`, `/optica/dashboard/rentabilidad`, `/optica/dashboard/ventas-por-origen`, `/optica/dashboard/informe-mensual`, `/optica/dashboard/historial-mensual`
 
 ### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario

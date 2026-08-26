@@ -180,6 +180,7 @@ const Layout = ({ children }) => {
 
   // Optica sub-items (solo para rol optica y superadmin) - Sin Médicos
   const opticaItems = canViewOptica ? [
+    { path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' },
     { path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' },
     { path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' },
     { path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' },

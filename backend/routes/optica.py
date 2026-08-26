@@ -1553,3 +1553,459 @@ async def delete_optica_purchase(
     await db.optica_purchases.delete_one({"id": purchase_id})
     
     return {"message": "Compra eliminada correctamente"}
+
+
+# ==================== DASHBOARD AVANZADO DE ÓPTICA ====================
+
+@router.get("/dashboard/ventas-dia")
+async def get_ventas_del_dia(current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtener ventas del día actual con desglose"""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    pipeline = [
+        {"$match": {
+            "created_at": {"$gte": today_start.isoformat()},
+            "status": {"$ne": "cancelado"}
+        }},
+        {"$group": {
+            "_id": None,
+            "total_ventas": {"$sum": "$total"},
+            "total_cobrado": {"$sum": "$paid_amount"},
+            "total_descuentos": {"$sum": "$discount_amount"},
+            "num_ordenes": {"$sum": 1}
+        }}
+    ]
+    
+    result = await db.optica_sales.aggregate(pipeline).to_list(1)
+    stats = result[0] if result else {"total_ventas": 0, "total_cobrado": 0, "total_descuentos": 0, "num_ordenes": 0}
+    
+    # Obtener ventas individuales del día
+    ventas_dia = await db.optica_sales.find(
+        {"created_at": {"$gte": today_start.isoformat()}, "status": {"$ne": "cancelado"}},
+        {"_id": 0, "id": 1, "order_number": 1, "patient_name": 1, "total": 1, "paid_amount": 1, "status": 1, "created_at": 1}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {
+        "fecha": today_start.isoformat(),
+        "total_ventas": stats.get("total_ventas", 0),
+        "total_cobrado": stats.get("total_cobrado", 0),
+        "total_descuentos": stats.get("total_descuentos", 0),
+        "num_ordenes": stats.get("num_ordenes", 0),
+        "saldo_pendiente": stats.get("total_ventas", 0) - stats.get("total_cobrado", 0),
+        "ventas": ventas_dia
+    }
+
+
+@router.get("/dashboard/rentabilidad")
+async def get_rentabilidad_optica(
+    periodo: str = Query("mes", description="dia, semana, mes, año"),
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Calcular rentabilidad entre precio costo y precio venta de productos vendidos"""
+    now = datetime.now(timezone.utc)
+    
+    # Determinar rango de fechas según período
+    if periodo == "dia":
+        fecha_inicio = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif periodo == "semana":
+        fecha_inicio = now - timedelta(days=7)
+    elif periodo == "año":
+        fecha_inicio = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:  # mes
+        fecha_inicio = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Obtener todas las ventas del período
+    ventas = await db.optica_sales.find({
+        "created_at": {"$gte": fecha_inicio.isoformat()},
+        "status": {"$ne": "cancelado"}
+    }, {"_id": 0}).to_list(5000)
+    
+    # Cargar catálogos de productos
+    frames = {f["id"]: f for f in await db.optica_frames.find({}, {"_id": 0}).to_list(1000)}
+    lentes_contacto = {l["id"]: l for l in await db.optica_contact_lenses.find({}, {"_id": 0}).to_list(1000)}
+    tipos_lente = {t["id"]: t for t in await db.optica_lens_types.find({}, {"_id": 0}).to_list(1000)}
+    
+    # Calcular rentabilidad
+    total_ingresos = 0
+    total_costos = 0
+    desglose_categorias = {
+        "aros": {"ingresos": 0, "costos": 0, "cantidad": 0},
+        "lentes_contacto": {"ingresos": 0, "costos": 0, "cantidad": 0},
+        "tipos_lente": {"ingresos": 0, "costos": 0, "cantidad": 0}
+    }
+    
+    for venta in ventas:
+        # Procesar aros
+        if venta.get("frame_id"):
+            frame = frames.get(venta["frame_id"])
+            if frame:
+                precio_venta = venta.get("frame_price", frame.get("sale_price", 0))
+                precio_costo = frame.get("cost_price", 0)
+                total_ingresos += precio_venta
+                total_costos += precio_costo
+                desglose_categorias["aros"]["ingresos"] += precio_venta
+                desglose_categorias["aros"]["costos"] += precio_costo
+                desglose_categorias["aros"]["cantidad"] += 1
+        
+        # Procesar lentes de contacto
+        if venta.get("contact_lens_id"):
+            lente = lentes_contacto.get(venta["contact_lens_id"])
+            if lente:
+                precio_venta = venta.get("contact_lens_price", lente.get("sale_price", 0))
+                precio_costo = lente.get("cost_price", 0)
+                total_ingresos += precio_venta
+                total_costos += precio_costo
+                desglose_categorias["lentes_contacto"]["ingresos"] += precio_venta
+                desglose_categorias["lentes_contacto"]["costos"] += precio_costo
+                desglose_categorias["lentes_contacto"]["cantidad"] += 1
+        
+        # Procesar tipos de lente (lens_items)
+        for item in venta.get("lens_items", []):
+            tipo = tipos_lente.get(item.get("lens_type_id"))
+            if tipo:
+                subtotal = item.get("subtotal", 0)
+                cantidad = item.get("quantity", 1)
+                # Estimar costo (usar default_price como referencia de costo si no hay cost_price)
+                costo_unitario = tipo.get("cost_price", tipo.get("default_price", 0) * 0.5)
+                total_ingresos += subtotal
+                total_costos += costo_unitario * cantidad
+                desglose_categorias["tipos_lente"]["ingresos"] += subtotal
+                desglose_categorias["tipos_lente"]["costos"] += costo_unitario * cantidad
+                desglose_categorias["tipos_lente"]["cantidad"] += cantidad
+        
+        # Procesar items V2 (POS)
+        for item in venta.get("items", []):
+            tipo_item = item.get("type")
+            producto_id = item.get("product_id")
+            subtotal = item.get("subtotal", 0)
+            cantidad = item.get("quantity", 1)
+            
+            if tipo_item == "frame":
+                frame = frames.get(producto_id)
+                costo = frame.get("cost_price", 0) * cantidad if frame else 0
+                desglose_categorias["aros"]["ingresos"] += subtotal
+                desglose_categorias["aros"]["costos"] += costo
+                desglose_categorias["aros"]["cantidad"] += cantidad
+                total_ingresos += subtotal
+                total_costos += costo
+            elif tipo_item == "contact_lens":
+                lente = lentes_contacto.get(producto_id)
+                costo = lente.get("cost_price", 0) * cantidad if lente else 0
+                desglose_categorias["lentes_contacto"]["ingresos"] += subtotal
+                desglose_categorias["lentes_contacto"]["costos"] += costo
+                desglose_categorias["lentes_contacto"]["cantidad"] += cantidad
+                total_ingresos += subtotal
+                total_costos += costo
+            elif tipo_item == "lens_type":
+                tipo = tipos_lente.get(producto_id)
+                costo = tipo.get("cost_price", tipo.get("default_price", 0) * 0.5) * cantidad if tipo else 0
+                desglose_categorias["tipos_lente"]["ingresos"] += subtotal
+                desglose_categorias["tipos_lente"]["costos"] += costo
+                desglose_categorias["tipos_lente"]["cantidad"] += cantidad
+                total_ingresos += subtotal
+                total_costos += costo
+    
+    ganancia = total_ingresos - total_costos
+    margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0
+    
+    # Calcular margen por categoría
+    for cat in desglose_categorias:
+        ing = desglose_categorias[cat]["ingresos"]
+        cost = desglose_categorias[cat]["costos"]
+        desglose_categorias[cat]["ganancia"] = ing - cost
+        desglose_categorias[cat]["margen"] = round((ing - cost) / ing * 100, 2) if ing > 0 else 0
+    
+    return {
+        "periodo": periodo,
+        "fecha_inicio": fecha_inicio.isoformat(),
+        "fecha_fin": now.isoformat(),
+        "total_ingresos": round(total_ingresos, 2),
+        "total_costos": round(total_costos, 2),
+        "ganancia_bruta": round(ganancia, 2),
+        "margen_porcentaje": round(margen, 2),
+        "desglose_categorias": desglose_categorias,
+        "num_ventas": len(ventas)
+    }
+
+
+@router.get("/dashboard/ventas-por-origen")
+async def get_ventas_por_origen(
+    fecha_inicio: Optional[str] = None,
+    fecha_fin: Optional[str] = None,
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Obtener ventas agrupadas por origen de paciente (Particular, IGSS, Seguro Privado, Otra institución)"""
+    now = datetime.now(timezone.utc)
+    
+    # Fechas por defecto: mes actual
+    if not fecha_inicio:
+        fecha_inicio = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    if not fecha_fin:
+        fecha_fin = now.isoformat()
+    
+    # Obtener ventas del período
+    ventas = await db.optica_sales.find({
+        "created_at": {"$gte": fecha_inicio, "$lte": fecha_fin},
+        "status": {"$ne": "cancelado"}
+    }, {"_id": 0, "patient_id": 1, "total": 1, "paid_amount": 1, "discount_amount": 1}).to_list(10000)
+    
+    # Obtener info de pacientes
+    patient_ids = list(set(v.get("patient_id") for v in ventas if v.get("patient_id")))
+    patients = {p["id"]: p for p in await db.patients.find(
+        {"id": {"$in": patient_ids}}, 
+        {"_id": 0, "id": 1, "referral_institution": 1, "other_institution_name": 1, "igss_unit_id": 1}
+    ).to_list(10000)}
+    
+    # Obtener unidades IGSS
+    igss_units = {u["id"]: u["name"] for u in await db.igss_units.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(100)}
+    
+    # Agrupar por origen
+    origenes = {
+        "particular": {"label": "Particular", "total": 0, "cobrado": 0, "descuentos": 0, "count": 0},
+        "igss": {"label": "IGSS", "total": 0, "cobrado": 0, "descuentos": 0, "count": 0, "unidades": {}},
+        "seguro_privado": {"label": "Seguro Privado", "total": 0, "cobrado": 0, "descuentos": 0, "count": 0},
+        "otra": {"label": "Otra Institución", "total": 0, "cobrado": 0, "descuentos": 0, "count": 0, "instituciones": {}},
+        "sin_paciente": {"label": "Sin Paciente Asociado", "total": 0, "cobrado": 0, "descuentos": 0, "count": 0}
+    }
+    
+    for venta in ventas:
+        patient = patients.get(venta.get("patient_id"))
+        
+        if not patient:
+            origenes["sin_paciente"]["total"] += venta.get("total", 0)
+            origenes["sin_paciente"]["cobrado"] += venta.get("paid_amount", 0)
+            origenes["sin_paciente"]["descuentos"] += venta.get("discount_amount", 0)
+            origenes["sin_paciente"]["count"] += 1
+            continue
+        
+        origen = patient.get("referral_institution", "particular")
+        
+        if origen not in origenes:
+            origen = "particular"
+        
+        origenes[origen]["total"] += venta.get("total", 0)
+        origenes[origen]["cobrado"] += venta.get("paid_amount", 0)
+        origenes[origen]["descuentos"] += venta.get("discount_amount", 0)
+        origenes[origen]["count"] += 1
+        
+        # Desglose por unidad IGSS
+        if origen == "igss":
+            igss_unit_id = patient.get("igss_unit_id")
+            if igss_unit_id:
+                unit_name = igss_units.get(igss_unit_id, "Unidad Desconocida")
+                if unit_name not in origenes["igss"]["unidades"]:
+                    origenes["igss"]["unidades"][unit_name] = {"total": 0, "count": 0}
+                origenes["igss"]["unidades"][unit_name]["total"] += venta.get("total", 0)
+                origenes["igss"]["unidades"][unit_name]["count"] += 1
+        
+        # Desglose por otra institución
+        if origen == "otra":
+            inst_name = patient.get("other_institution_name", "Sin especificar")
+            if inst_name not in origenes["otra"]["instituciones"]:
+                origenes["otra"]["instituciones"][inst_name] = {"total": 0, "count": 0}
+            origenes["otra"]["instituciones"][inst_name]["total"] += venta.get("total", 0)
+            origenes["otra"]["instituciones"][inst_name]["count"] += 1
+    
+    # Calcular totales
+    total_general = sum(o["total"] for o in origenes.values())
+    
+    # Agregar porcentaje a cada origen
+    for key in origenes:
+        origenes[key]["porcentaje"] = round(origenes[key]["total"] / total_general * 100, 2) if total_general > 0 else 0
+    
+    return {
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "total_general": round(total_general, 2),
+        "origenes": origenes
+    }
+
+
+@router.get("/dashboard/informe-mensual")
+async def get_informe_mensual_optica(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Generar informe mensual completo de ventas y compras de óptica"""
+    # Calcular rango de fechas
+    fecha_inicio = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        fecha_fin = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        fecha_fin = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    
+    month_names = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    
+    # === VENTAS ===
+    ventas = await db.optica_sales.find({
+        "created_at": {"$gte": fecha_inicio.isoformat(), "$lt": fecha_fin.isoformat()},
+        "status": {"$ne": "cancelado"}
+    }, {"_id": 0}).to_list(5000)
+    
+    total_ventas = sum(v.get("total", 0) for v in ventas)
+    total_cobrado = sum(v.get("paid_amount", 0) for v in ventas)
+    total_descuentos = sum(v.get("discount_amount", 0) for v in ventas)
+    
+    # Ventas por día
+    ventas_por_dia = {}
+    for v in ventas:
+        fecha = v.get("created_at", "")[:10]
+        if fecha not in ventas_por_dia:
+            ventas_por_dia[fecha] = {"total": 0, "count": 0}
+        ventas_por_dia[fecha]["total"] += v.get("total", 0)
+        ventas_por_dia[fecha]["count"] += 1
+    
+    # === COMPRAS ===
+    compras = await db.optica_purchases.find({
+        "purchase_date": {"$gte": fecha_inicio.isoformat(), "$lt": fecha_fin.isoformat()}
+    }, {"_id": 0}).to_list(1000)
+    
+    total_compras = sum(c.get("total_amount", 0) for c in compras)
+    
+    # Compras por categoría
+    compras_por_categoria = {}
+    for c in compras:
+        cat = c.get("category", "Otros")
+        if cat not in compras_por_categoria:
+            compras_por_categoria[cat] = {"total": 0, "count": 0}
+        compras_por_categoria[cat]["total"] += c.get("total_amount", 0)
+        compras_por_categoria[cat]["count"] += 1
+    
+    # === TOP PRODUCTOS ===
+    productos_vendidos = {}
+    frames_db = {f["id"]: f for f in await db.optica_frames.find({}, {"_id": 0}).to_list(1000)}
+    
+    for v in ventas:
+        if v.get("frame_id"):
+            frame = frames_db.get(v["frame_id"])
+            if frame:
+                key = f"ARO: {frame.get('brand', '')} {frame.get('model', '')}"
+                if key not in productos_vendidos:
+                    productos_vendidos[key] = {"cantidad": 0, "total": 0}
+                productos_vendidos[key]["cantidad"] += 1
+                productos_vendidos[key]["total"] += v.get("frame_price", 0)
+        
+        for item in v.get("items", []):
+            if item.get("type") == "frame":
+                frame = frames_db.get(item.get("product_id"))
+                if frame:
+                    key = f"ARO: {frame.get('brand', '')} {frame.get('model', '')}"
+                    if key not in productos_vendidos:
+                        productos_vendidos[key] = {"cantidad": 0, "total": 0}
+                    productos_vendidos[key]["cantidad"] += item.get("quantity", 1)
+                    productos_vendidos[key]["total"] += item.get("subtotal", 0)
+    
+    top_productos = sorted(
+        [{"nombre": k, **v} for k, v in productos_vendidos.items()],
+        key=lambda x: x["total"],
+        reverse=True
+    )[:10]
+    
+    return {
+        "periodo": f"{month_names[month]} {year}",
+        "year": year,
+        "month": month,
+        "fecha_inicio": fecha_inicio.isoformat(),
+        "fecha_fin": fecha_fin.isoformat(),
+        "ventas": {
+            "total": round(total_ventas, 2),
+            "cobrado": round(total_cobrado, 2),
+            "pendiente": round(total_ventas - total_cobrado, 2),
+            "descuentos": round(total_descuentos, 2),
+            "num_ordenes": len(ventas),
+            "promedio_orden": round(total_ventas / len(ventas), 2) if ventas else 0,
+            "por_dia": ventas_por_dia
+        },
+        "compras": {
+            "total": round(total_compras, 2),
+            "num_compras": len(compras),
+            "por_categoria": compras_por_categoria
+        },
+        "balance": {
+            "ingresos": round(total_cobrado, 2),
+            "egresos": round(total_compras, 2),
+            "resultado": round(total_cobrado - total_compras, 2)
+        },
+        "top_productos": top_productos
+    }
+
+
+@router.get("/dashboard/historial-mensual")
+async def get_historial_mensual_optica(
+    meses: int = Query(12, ge=1, le=24),
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Obtener historial de ventas y compras mensuales"""
+    now = datetime.now(timezone.utc)
+    
+    month_names = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    
+    historial = []
+    
+    for i in range(meses):
+        # Calcular mes
+        year = now.year
+        month = now.month - i
+        while month <= 0:
+            month += 12
+            year -= 1
+        
+        fecha_inicio = datetime(year, month, 1, tzinfo=timezone.utc)
+        if month == 12:
+            fecha_fin = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            fecha_fin = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+        
+        # Ventas
+        pipeline_ventas = [
+            {"$match": {
+                "created_at": {"$gte": fecha_inicio.isoformat(), "$lt": fecha_fin.isoformat()},
+                "status": {"$ne": "cancelado"}
+            }},
+            {"$group": {
+                "_id": None,
+                "total": {"$sum": "$total"},
+                "cobrado": {"$sum": "$paid_amount"},
+                "count": {"$sum": 1}
+            }}
+        ]
+        ventas_result = await db.optica_sales.aggregate(pipeline_ventas).to_list(1)
+        ventas = ventas_result[0] if ventas_result else {"total": 0, "cobrado": 0, "count": 0}
+        
+        # Compras
+        pipeline_compras = [
+            {"$match": {
+                "purchase_date": {"$gte": fecha_inicio.isoformat(), "$lt": fecha_fin.isoformat()}
+            }},
+            {"$group": {
+                "_id": None,
+                "total": {"$sum": "$total_amount"},
+                "count": {"$sum": 1}
+            }}
+        ]
+        compras_result = await db.optica_purchases.aggregate(pipeline_compras).to_list(1)
+        compras = compras_result[0] if compras_result else {"total": 0, "count": 0}
+        
+        historial.append({
+            "mes": f"{month_names[month]} {year}",
+            "year": year,
+            "month": month,
+            "ventas": round(ventas.get("total", 0), 2),
+            "cobrado": round(ventas.get("cobrado", 0), 2),
+            "compras": round(compras.get("total", 0), 2),
+            "ganancia": round(ventas.get("cobrado", 0) - compras.get("total", 0), 2),
+            "num_ventas": ventas.get("count", 0),
+            "num_compras": compras.get("count", 0)
+        })
+    
+    # Invertir para tener el más antiguo primero
+    historial.reverse()
+    
+    return {
+        "meses_analizados": meses,
+        "historial": historial
+    }
+
