@@ -2732,6 +2732,11 @@ api_router.include_router(dashboard_financiero_router, tags=["Dashboard Financie
 from routes.menu_config import router as menu_config_router
 api_router.include_router(menu_config_router, tags=["Configuración de Menús"])
 
+# ==================== MÓDULO DE ROLES ====================
+from routes.roles import router as roles_router
+api_router.include_router(roles_router, tags=["Roles"])
+
+
 # ==================== MÓDULO DE PACIENTES (Refactorizado) ====================
 from routes.patients import router as patients_router, pacientes_router
 

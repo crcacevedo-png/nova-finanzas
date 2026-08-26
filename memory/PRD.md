@@ -14,6 +14,15 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - Checkboxes individuales por menú con contador de habilitados
   - Botones Restaurar (reset a default) y Guardar Cambios
   - `Layout.js` consume API para mostrar/ocultar menús dinámicamente según configuración
+- ✅ **CRUD de Roles Personalizados** (`/usuarios` - Tab "Roles")
+  - Nueva pestaña "Roles" en Gestión de Usuarios
+  - Visualización de roles del sistema (superadmin, admin, usuario, optica) con badge "Sistema"
+  - Crear roles personalizados con identificador, nombre visible, descripción y color
+  - Editar permisos de cualquier rol (40 permisos organizados en 7 categorías)
+  - Restaurar permisos por defecto de roles del sistema
+  - Eliminar roles personalizados (solo si no tienen usuarios asignados)
+  - Backend: `/api/roles/*` (CRUD completo, available-permissions, reset-permissions)
+  - Colección MongoDB: `roles` para almacenar configuraciones personalizadas
 
 ### Cambios Previos (2026-08-26 Sesión 3)
 - ✅ **Campo "Precio de Compra" agregado a Productos de Inventario**

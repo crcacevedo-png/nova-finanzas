@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { userApi, menuConfigApi, roleLabels, formatDate } from '../services/api';
+import { userApi, menuConfigApi, rolesApi, roleLabels, formatDate } from '../services/api';
 import { 
   Plus, 
   Trash2,
@@ -21,7 +21,13 @@ import {
   Check,
   X,
   RotateCcw,
-  Save
+  Save,
+  Users,
+  Lock,
+  Palette,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -70,6 +76,23 @@ const roleColors = {
   optica: 'bg-purple-100 text-purple-800 border border-purple-200',
 };
 
+// Colores disponibles para roles personalizados
+const availableColors = [
+  { id: 'red', label: 'Rojo', class: 'bg-red-100 text-red-800 border-red-200' },
+  { id: 'blue', label: 'Azul', class: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { id: 'green', label: 'Verde', class: 'bg-green-100 text-green-800 border-green-200' },
+  { id: 'purple', label: 'Morado', class: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { id: 'orange', label: 'Naranja', class: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { id: 'teal', label: 'Turquesa', class: 'bg-teal-100 text-teal-800 border-teal-200' },
+  { id: 'pink', label: 'Rosa', class: 'bg-pink-100 text-pink-800 border-pink-200' },
+  { id: 'gray', label: 'Gris', class: 'bg-gray-100 text-gray-800 border-gray-200' },
+];
+
+const getColorClass = (color) => {
+  const found = availableColors.find(c => c.id === color);
+  return found ? found.class : 'bg-gray-100 text-gray-800 border-gray-200';
+};
+
 const getRoleIcon = (role) => {
   switch (role) {
     case 'superadmin': return <ShieldCheck className="w-4 h-4" />;
@@ -100,6 +123,24 @@ const Usuarios = () => {
   const [loadingMenus, setLoadingMenus] = useState(false);
   const [savingMenus, setSavingMenus] = useState(false);
   const [hasMenuChanges, setHasMenuChanges] = useState(false);
+  
+  // Estados para gestión de roles
+  const [roles, setRoles] = useState([]);
+  const [availablePermissions, setAvailablePermissions] = useState(null);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState(null);
+  const [deleteRoleDialogOpen, setDeleteRoleDialogOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState(null);
+  const [roleFormData, setRoleFormData] = useState({
+    name: '',
+    display_name: '',
+    description: '',
+    color: 'gray',
+    permissions: {}
+  });
+  const [savingRole, setSavingRole] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState({});
 
   const fetchUsers = async () => {
     try {
@@ -138,6 +179,24 @@ const Usuarios = () => {
     }
   }, []);
 
+  // Función para cargar roles
+  const fetchRoles = useCallback(async () => {
+    try {
+      setLoadingRoles(true);
+      const [rolesRes, permissionsRes] = await Promise.all([
+        rolesApi.getAll(),
+        rolesApi.getAvailablePermissions()
+      ]);
+      setRoles(rolesRes.data);
+      setAvailablePermissions(permissionsRes.data);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      toast.error('Error al cargar roles');
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -146,7 +205,10 @@ const Usuarios = () => {
     if (activeTab === 'menus') {
       fetchMenuConfigs();
     }
-  }, [activeTab, fetchMenuConfigs]);
+    if (activeTab === 'roles') {
+      fetchRoles();
+    }
+  }, [activeTab, fetchMenuConfigs, fetchRoles]);
 
   // Detectar cambios en menús
   useEffect(() => {
@@ -225,6 +287,146 @@ const Usuarios = () => {
       }
       
       return { ...prev, [selectedRole]: newMenus };
+    });
+  };
+
+  // === FUNCIONES CRUD DE ROLES ===
+  
+  const handleNewRole = () => {
+    setEditingRole(null);
+    setRoleFormData({
+      name: '',
+      display_name: '',
+      description: '',
+      color: 'gray',
+      permissions: {}
+    });
+    setExpandedCategories({});
+    setRoleDialogOpen(true);
+  };
+
+  const handleEditRole = (role) => {
+    setEditingRole(role);
+    setRoleFormData({
+      name: role.name,
+      display_name: role.display_name,
+      description: role.description || '',
+      color: role.color || 'gray',
+      permissions: role.permissions || {}
+    });
+    // Expandir todas las categorías que tienen permisos activos
+    if (availablePermissions?.categories) {
+      const expanded = {};
+      Object.keys(availablePermissions.categories).forEach(catId => {
+        const catPerms = availablePermissions.categories[catId].permissions;
+        const hasActivePerms = catPerms.some(p => role.permissions?.[p.id]);
+        if (hasActivePerms) expanded[catId] = true;
+      });
+      setExpandedCategories(expanded);
+    }
+    setRoleDialogOpen(true);
+  };
+
+  const handleDeleteRoleClick = (role) => {
+    setRoleToDelete(role);
+    setDeleteRoleDialogOpen(true);
+  };
+
+  const handleConfirmDeleteRole = async () => {
+    if (!roleToDelete) return;
+    
+    try {
+      await rolesApi.delete(roleToDelete.name);
+      toast.success(`Rol "${roleToDelete.display_name}" eliminado correctamente`);
+      setDeleteRoleDialogOpen(false);
+      setRoleToDelete(null);
+      fetchRoles();
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      toast.error(error.response?.data?.detail || 'Error al eliminar rol');
+    }
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleFormData.display_name) {
+      toast.error('El nombre del rol es requerido');
+      return;
+    }
+
+    try {
+      setSavingRole(true);
+      
+      if (editingRole) {
+        // Actualizar rol existente
+        await rolesApi.update(editingRole.name, {
+          display_name: roleFormData.display_name,
+          description: roleFormData.description,
+          color: roleFormData.color,
+          permissions: roleFormData.permissions
+        });
+        toast.success(`Rol "${roleFormData.display_name}" actualizado correctamente`);
+      } else {
+        // Crear nuevo rol
+        if (!roleFormData.name) {
+          toast.error('El identificador del rol es requerido');
+          setSavingRole(false);
+          return;
+        }
+        await rolesApi.create({
+          name: roleFormData.name,
+          display_name: roleFormData.display_name,
+          description: roleFormData.description,
+          color: roleFormData.color,
+          permissions: roleFormData.permissions
+        });
+        toast.success(`Rol "${roleFormData.display_name}" creado correctamente`);
+      }
+      
+      setRoleDialogOpen(false);
+      fetchRoles();
+    } catch (error) {
+      console.error('Error saving role:', error);
+      toast.error(error.response?.data?.detail || 'Error al guardar rol');
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleResetRolePermissions = async (roleName) => {
+    try {
+      await rolesApi.resetPermissions(roleName);
+      toast.success('Permisos restaurados a valores por defecto');
+      fetchRoles();
+    } catch (error) {
+      console.error('Error resetting role permissions:', error);
+      toast.error(error.response?.data?.detail || 'Error al restaurar permisos');
+    }
+  };
+
+  const togglePermission = (permissionId) => {
+    setRoleFormData(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [permissionId]: !prev.permissions[permissionId]
+      }
+    }));
+  };
+
+  const toggleCategoryExpanded = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
+  const toggleAllCategoryPermissions = (categoryPerms, enable) => {
+    setRoleFormData(prev => {
+      const newPermissions = { ...prev.permissions };
+      categoryPerms.forEach(p => {
+        newPermissions[p.id] = enable;
+      });
+      return { ...prev, permissions: newPermissions };
     });
   };
 
@@ -333,10 +535,14 @@ const Usuarios = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="usuarios" className="flex items-center gap-2">
               <User className="w-4 h-4" />
               Usuarios
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="flex items-center gap-2" data-testid="tab-roles">
+              <Shield className="w-4 h-4" />
+              Roles
             </TabsTrigger>
             <TabsTrigger value="menus" className="flex items-center gap-2">
               <Menu className="w-4 h-4" />
@@ -433,6 +639,116 @@ const Usuarios = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Tab: Gestión de Roles */}
+          <TabsContent value="roles" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-500">
+                Administra los roles del sistema y sus permisos asociados
+              </p>
+              <Button onClick={handleNewRole} data-testid="create-role-button">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Rol
+              </Button>
+            </div>
+
+            {loadingRoles ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {roles.map((role) => (
+                  <Card key={role.id} className={`overflow-hidden ${!role.is_active ? 'opacity-60' : ''}`} data-testid={`role-card-${role.name}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge className={`${getColorClass(role.color)} flex items-center gap-1`}>
+                            {role.is_system ? <Lock className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                            {role.display_name}
+                          </Badge>
+                          {role.is_system && (
+                            <Badge variant="outline" className="text-xs">Sistema</Badge>
+                          )}
+                          {!role.is_active && (
+                            <Badge variant="secondary" className="text-xs">Inactivo</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500 flex items-center gap-1">
+                            <Users className="w-4 h-4" />
+                            {role.user_count} usuario{role.user_count !== 1 ? 's' : ''}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditRole(role)}
+                            title="Editar permisos"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          {role.is_system ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleResetRolePermissions(role.name)}
+                              title="Restaurar permisos por defecto"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteRoleClick(role)}
+                              disabled={role.user_count > 0}
+                              title={role.user_count > 0 ? 'No se puede eliminar: tiene usuarios asignados' : 'Eliminar rol'}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {role.description && (
+                        <CardDescription className="mt-2">{role.description}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(role.permissions || {})
+                          .filter(([_, enabled]) => enabled)
+                          .slice(0, 8)
+                          .map(([permId]) => (
+                            <Badge key={permId} variant="outline" className="text-xs font-normal">
+                              {permId.replace(/_/g, ' ')}
+                            </Badge>
+                          ))}
+                        {Object.values(role.permissions || {}).filter(Boolean).length > 8 && (
+                          <Badge variant="outline" className="text-xs font-normal">
+                            +{Object.values(role.permissions || {}).filter(Boolean).length - 8} más
+                          </Badge>
+                        )}
+                        {Object.values(role.permissions || {}).filter(Boolean).length === 0 && (
+                          <span className="text-sm text-gray-400 italic">Sin permisos configurados</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {roles.length === 0 && (
+                  <Card className="p-8 text-center">
+                    <Shield className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">No hay roles configurados</p>
+                    <Button className="mt-4" onClick={handleNewRole}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Crear primer rol
+                    </Button>
+                  </Card>
+                )}
+              </div>
+            )}
           </TabsContent>
 
           {/* Tab: Configuración de Menús */}
@@ -571,7 +887,7 @@ const Usuarios = () => {
                 {hasMenuChanges && (
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
                     <p className="text-sm text-amber-700">
-                      Tienes cambios sin guardar para el rol "{roleLabels[selectedRole]}"
+                      Tienes cambios sin guardar para el rol &quot;{roleLabels[selectedRole]}&quot;
                     </p>
                     <div className="flex gap-2">
                       <Button 
@@ -751,6 +1067,221 @@ const Usuarios = () => {
                 data-testid="confirm-delete-user-button"
               >
                 Eliminar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Crear/Editar Rol */}
+        <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <Shield className="w-5 h-5 text-blue-600" />
+                {editingRole ? `Editar Rol: ${editingRole.display_name}` : 'Nuevo Rol'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingRole 
+                  ? 'Modifica los permisos y configuración del rol.'
+                  : 'Crea un nuevo rol personalizado con permisos específicos.'
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Información básica del rol */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="role-name">Identificador</Label>
+                  <Input
+                    id="role-name"
+                    value={roleFormData.name}
+                    onChange={(e) => setRoleFormData(prev => ({ ...prev, name: e.target.value.toLowerCase().replace(/\s+/g, '_') }))}
+                    disabled={!!editingRole}
+                    placeholder="mi_rol"
+                    data-testid="input-role-name"
+                  />
+                  <p className="text-xs text-gray-500">Solo letras, números y guiones bajos</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role-display-name">Nombre visible</Label>
+                  <Input
+                    id="role-display-name"
+                    value={roleFormData.display_name}
+                    onChange={(e) => setRoleFormData(prev => ({ ...prev, display_name: e.target.value }))}
+                    placeholder="Mi Rol Personalizado"
+                    data-testid="input-role-display-name"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role-description">Descripción</Label>
+                <Input
+                  id="role-description"
+                  value={roleFormData.description}
+                  onChange={(e) => setRoleFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Descripción del rol y sus responsabilidades"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Color del badge</Label>
+                <div className="flex flex-wrap gap-2">
+                  {availableColors.map(color => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      onClick={() => setRoleFormData(prev => ({ ...prev, color: color.id }))}
+                      className={`px-3 py-1.5 rounded-full text-sm transition-all ${color.class} ${
+                        roleFormData.color === color.id ? 'ring-2 ring-offset-2 ring-blue-500' : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      {color.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Permisos */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Permisos
+                </Label>
+                
+                {editingRole?.is_system && editingRole?.name === 'superadmin' ? (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      El rol SuperAdmin tiene todos los permisos del sistema y no puede ser modificado.
+                    </p>
+                  </div>
+                ) : availablePermissions?.categories && (
+                  <div className="border rounded-lg divide-y">
+                    {Object.entries(availablePermissions.categories).map(([catId, category]) => {
+                      const isExpanded = expandedCategories[catId];
+                      const enabledCount = category.permissions.filter(p => roleFormData.permissions[p.id]).length;
+                      const totalCount = category.permissions.length;
+                      
+                      return (
+                        <div key={catId}>
+                          <button
+                            type="button"
+                            onClick={() => toggleCategoryExpanded(catId)}
+                            className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{category.label}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {enabledCount}/{totalCount}
+                              </Badge>
+                            </div>
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-gray-400" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-gray-400" />
+                            )}
+                          </button>
+                          
+                          {isExpanded && (
+                            <div className="px-3 pb-3 space-y-2">
+                              <div className="flex gap-2 mb-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleAllCategoryPermissions(category.permissions, true)}
+                                >
+                                  Seleccionar todos
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleAllCategoryPermissions(category.permissions, false)}
+                                >
+                                  Quitar todos
+                                </Button>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 gap-2">
+                                {category.permissions.map(perm => (
+                                  <label
+                                    key={perm.id}
+                                    className={`flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                      roleFormData.permissions[perm.id] ? 'bg-green-50' : 'hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <Checkbox
+                                      checked={roleFormData.permissions[perm.id] || false}
+                                      onCheckedChange={() => togglePermission(perm.id)}
+                                    />
+                                    <div className="flex-1">
+                                      <span className="font-medium text-sm">{perm.label}</span>
+                                      <p className="text-xs text-gray-500">{perm.description}</p>
+                                    </div>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setRoleDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveRole}
+                disabled={savingRole || (editingRole?.is_system && editingRole?.name === 'superadmin')}
+                data-testid="submit-role-button"
+              >
+                {savingRole ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                {editingRole ? 'Guardar Cambios' : 'Crear Rol'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Confirmar Eliminación de Rol */}
+        <Dialog open={deleteRoleDialogOpen} onOpenChange={setDeleteRoleDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                Eliminar Rol
+              </DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que deseas eliminar el rol &quot;{roleToDelete?.display_name}&quot;? 
+                Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteRoleDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDeleteRole}
+                data-testid="confirm-delete-role-button"
+              >
+                Eliminar Rol
               </Button>
             </DialogFooter>
           </DialogContent>

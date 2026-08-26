@@ -186,6 +186,18 @@ export const menuConfigApi = {
   getMyMenus: () => axios.get(`${API_URL}/menu-config/my-menus`),
 };
 
+// Roles API (CRUD de roles y permisos)
+export const rolesApi = {
+  getAll: () => axios.get(`${API_URL}/roles/`),
+  getById: (roleName) => axios.get(`${API_URL}/roles/${roleName}`),
+  create: (data) => axios.post(`${API_URL}/roles/`, data),
+  update: (roleName, data) => axios.put(`${API_URL}/roles/${roleName}`, data),
+  delete: (roleName) => axios.delete(`${API_URL}/roles/${roleName}`),
+  getAvailablePermissions: () => axios.get(`${API_URL}/roles/available-permissions`),
+  resetPermissions: (roleName) => axios.post(`${API_URL}/roles/${roleName}/reset-permissions`),
+  getRoleUsers: (roleName) => axios.get(`${API_URL}/roles/${roleName}/users`),
+};
+
 // Patients API (Base de Datos de Pacientes)
 export const patientApi = {
   getAll: (filters = {}) => {
