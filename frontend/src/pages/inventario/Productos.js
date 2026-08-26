@@ -986,28 +986,31 @@ const Productos = () => {
                     />
                     <Label htmlFor="requiere_receta">Requiere Receta</Label>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="es_sociedad"
-                      checked={formData.es_sociedad}
-                      onCheckedChange={(v) => setFormData({ ...formData, es_sociedad: v, sociedad_id: v ? formData.sociedad_id : '' })}
-                    />
-                    <Label htmlFor="es_sociedad" className="flex items-center gap-1">
-                      <span className="text-purple-600">👥</span> Sociedad
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="activo"
-                      checked={formData.activo}
-                      onCheckedChange={(v) => setFormData({ ...formData, activo: v })}
-                    />
-                    <Label htmlFor="activo">Activo</Label>
-                  </div>
                 </div>
               )}
+              
+              {/* Switches de Sociedad y Activo - siempre visibles */}
+              <div className="col-span-2 flex flex-wrap gap-6 pt-2 border-t">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="es_sociedad"
+                    checked={formData.es_sociedad}
+                    onCheckedChange={(v) => setFormData({ ...formData, es_sociedad: v, sociedad_id: v ? formData.sociedad_id : '' })}
+                  />
+                  <Label htmlFor="es_sociedad" className="flex items-center gap-1">
+                    <span className="text-purple-600">👥</span> Sociedad
+                  </Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="activo"
+                    checked={formData.activo}
+                    onCheckedChange={(v) => setFormData({ ...formData, activo: v })}
+                  />
+                  <Label htmlFor="activo">Activo</Label>
+                </div>
+              </div>
               
               {/* Selector de Sociedad - aparece cuando es_sociedad está activo */}
               {formData.es_sociedad && (
