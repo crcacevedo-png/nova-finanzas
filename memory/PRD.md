@@ -8,10 +8,18 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 
 ### Últimos Cambios (2026-08-26 Sesión 3)
 - ✅ **Campo "Precio de Compra" agregado a Productos de Inventario**
-  - Nuevo campo `precio_compra` en formulario de Nuevo Producto y Edición
-  - Backend actualizado: Modelo Pydantic (`ProductoBase`, `ProductoUpdate`, `ProductoResponse`)
+  - Nuevo campo `precio_compra` en formulario de Nuevo/Editar Producto
+  - Backend actualizado: Modelos Pydantic (`ProductoBase`, `ProductoUpdate`, `ProductoResponse`)
   - Soporte en importación Excel (columna `precio_compra`)
   - Plantilla CSV actualizada con el nuevo campo
+- ✅ **Cálculo de Margen en Tiempo Real**
+  - Indicador visual en el formulario de producto al editar precios
+  - Muestra: Margen %, Ganancia por unidad (Q), Markup sobre costo
+  - Colores: Verde (≥30%), Amarillo (15-30%), Rojo (<15%)
+- ✅ **Columna de Rentabilidad en Tabla de Productos**
+  - Columna "P. Compra" agregada a la tabla
+  - Margen calculado en base a precio de compra (no costo promedio)
+  - Código de colores para identificar rápidamente rentabilidad
 
 ### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario

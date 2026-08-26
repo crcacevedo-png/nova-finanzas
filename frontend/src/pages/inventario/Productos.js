@@ -599,16 +599,18 @@ const Productos = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Presentación</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Existencia</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Prom.</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Precio Venta</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">P. Compra</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">P. Venta</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Margen</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {productos.map((producto) => {
-                      const margen = producto.precio_venta > 0 && producto.costo_promedio > 0
-                        ? ((producto.precio_venta - producto.costo_promedio) / producto.precio_venta * 100).toFixed(1)
+                      // Usar precio_compra para calcular margen, fallback a costo_promedio
+                      const precioCompra = producto.precio_compra || producto.costo_promedio || 0;
+                      const margen = producto.precio_venta > 0 && precioCompra > 0
+                        ? ((producto.precio_venta - precioCompra) / producto.precio_venta * 100).toFixed(1)
                         : '-';
                       
                       return (
@@ -626,11 +628,13 @@ const Productos = () => {
                           <td className="px-4 py-3">{getTipoBadge(producto.tipo)}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">{producto.presentacion || '-'}</td>
                           <td className="px-4 py-3 text-right">{getStockBadge(producto)}</td>
-                          <td className="px-4 py-3 text-right text-sm">{formatCurrency(producto.costo_promedio)}</td>
+                          <td className="px-4 py-3 text-right text-sm text-gray-600">
+                            {precioCompra > 0 ? formatCurrency(precioCompra) : '-'}
+                          </td>
                           <td className="px-4 py-3 text-right text-sm font-medium">{formatCurrency(producto.precio_venta)}</td>
                           <td className="px-4 py-3 text-right text-sm">
                             {margen !== '-' ? (
-                              <span className={parseFloat(margen) >= 30 ? 'text-green-600' : 'text-amber-600'}>
+                              <span className={parseFloat(margen) >= 30 ? 'text-green-600 font-medium' : parseFloat(margen) >= 15 ? 'text-amber-600' : 'text-red-600'}>
                                 {margen}%
                               </span>
                             ) : '-'}
@@ -857,6 +861,47 @@ const Productos = () => {
                   data-testid="input-precio-venta"
                 />
               </div>
+              
+              {/* Indicador de Margen en Tiempo Real */}
+              {formData.precio_compra > 0 && formData.precio_venta > 0 && (
+                <div className="col-span-2">
+                  <div className={`p-3 rounded-lg border ${
+                    formData.precio_venta > formData.precio_compra 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Margen de Ganancia:</span>
+                        <span className={`text-lg font-bold ${
+                          formData.precio_venta > formData.precio_compra 
+                            ? ((formData.precio_venta - formData.precio_compra) / formData.precio_venta * 100) >= 30
+                              ? 'text-green-600'
+                              : 'text-amber-600'
+                            : 'text-red-600'
+                        }`}>
+                          {formData.precio_venta > formData.precio_compra 
+                            ? `${((formData.precio_venta - formData.precio_compra) / formData.precio_venta * 100).toFixed(1)}%`
+                            : 'Precio venta menor que compra'
+                          }
+                        </span>
+                      </div>
+                      {formData.precio_venta > formData.precio_compra && (
+                        <div className="text-sm text-gray-600">
+                          Ganancia: <span className="font-semibold text-green-700">
+                            Q{(formData.precio_venta - formData.precio_compra).toFixed(2)}
+                          </span> por unidad
+                        </div>
+                      )}
+                    </div>
+                    {formData.precio_venta > formData.precio_compra && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Markup: {((formData.precio_venta - formData.precio_compra) / formData.precio_compra * 100).toFixed(1)}% sobre costo
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {formData.tipo !== 'servicio' && (
                 <>
