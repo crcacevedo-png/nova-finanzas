@@ -20,6 +20,13 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - Columna "P. Compra" agregada a la tabla
   - Margen calculado en base a precio de compra (no costo promedio)
   - Código de colores para identificar rápidamente rentabilidad
+- ✅ **Reporte de Rentabilidad por Categoría** (`/inventario/rentabilidad`)
+  - Vista completa con resumen general: margen promedio, ganancia potencial, valor inventario
+  - Tabla detallada por categoría: margen promedio, mín, máx, ganancia/unidad, valores
+  - Barra de progreso visual para cada categoría
+  - Estados: Excelente (≥40%), Bueno (30-39%), Regular (20-29%), Bajo (10-19%), Crítico (<10%)
+  - Exportación a CSV
+  - Toggle "Solo con stock" para filtrar productos con existencias
 
 ### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario

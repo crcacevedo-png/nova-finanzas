@@ -2110,4 +2110,162 @@ async def registrar_ajuste(
     }
 
 
-# Continuará en la siguiente parte del archivo...
+# ==================== REPORTE DE RENTABILIDAD POR CATEGORÍA ====================
+
+class RentabilidadCategoriaItem(BaseModel):
+    categoria_id: Optional[str] = None
+    categoria_nombre: str
+    total_productos: int
+    productos_con_precio: int
+    margen_promedio: float
+    margen_minimo: float
+    margen_maximo: float
+    ganancia_promedio: float
+    valor_inventario_costo: float
+    valor_inventario_venta: float
+    ganancia_potencial: float
+
+class RentabilidadCategoriaResponse(BaseModel):
+    categorias: List[RentabilidadCategoriaItem]
+    resumen: dict
+    fecha_generacion: str
+
+@router.get("/reportes/rentabilidad-categorias", response_model=RentabilidadCategoriaResponse)
+async def reporte_rentabilidad_categorias(
+    solo_con_stock: bool = Query(False, description="Solo mostrar productos con existencias"),
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """
+    Genera un reporte de rentabilidad promedio agrupado por categoría.
+    Calcula margen promedio, mínimo, máximo y ganancia potencial por categoría.
+    """
+    db = get_db()
+    
+    # Obtener todas las categorías
+    categorias = {c["id"]: c["nombre"] for c in await db.categorias_inventario.find({"origen": "clinica"}).to_list(100)}
+    
+    # Filtro base para productos
+    filtro_productos = {
+        "origen": "clinica",
+        "activo": True,
+        "tipo": {"$ne": "servicio"}  # Excluir servicios
+    }
+    
+    productos = await db.productos_inventario.find(filtro_productos).to_list(5000)
+    
+    # Obtener existencias si se requiere filtrar por stock
+    existencias_map = {}
+    if solo_con_stock:
+        existencias = await db.existencias_inventario.find({"origen": "clinica"}).to_list(10000)
+        for e in existencias:
+            pid = e["producto_id"]
+            existencias_map[pid] = existencias_map.get(pid, 0) + e.get("cantidad", 0)
+    
+    # Agrupar productos por categoría
+    datos_por_categoria = {}
+    productos_sin_categoria = []
+    
+    for p in productos:
+        # Si solo_con_stock, verificar existencias
+        if solo_con_stock:
+            stock = existencias_map.get(p["id"], 0)
+            if stock <= 0:
+                continue
+        else:
+            stock = await obtener_existencia_total(db, p["id"]) if not solo_con_stock else existencias_map.get(p["id"], 0)
+        
+        # Calcular margen
+        precio_compra = p.get("precio_compra") or p.get("costo_promedio") or 0
+        precio_venta = p.get("precio_venta") or 0
+        
+        if precio_venta > 0 and precio_compra > 0:
+            margen = ((precio_venta - precio_compra) / precio_venta) * 100
+            ganancia = precio_venta - precio_compra
+        else:
+            margen = 0
+            ganancia = 0
+        
+        cat_id = p.get("categoria_id")
+        cat_nombre = categorias.get(cat_id, "Sin Categoría") if cat_id else "Sin Categoría"
+        
+        if cat_id not in datos_por_categoria:
+            datos_por_categoria[cat_id] = {
+                "categoria_id": cat_id,
+                "categoria_nombre": cat_nombre,
+                "productos": [],
+                "margenes": [],
+                "ganancias": [],
+                "valor_costo": 0,
+                "valor_venta": 0
+            }
+        
+        datos_por_categoria[cat_id]["productos"].append(p)
+        
+        if precio_venta > 0 and precio_compra > 0:
+            datos_por_categoria[cat_id]["margenes"].append(margen)
+            datos_por_categoria[cat_id]["ganancias"].append(ganancia)
+        
+        # Calcular valor de inventario
+        if not solo_con_stock:
+            stock = await obtener_existencia_total(db, p["id"])
+        
+        datos_por_categoria[cat_id]["valor_costo"] += stock * precio_compra
+        datos_por_categoria[cat_id]["valor_venta"] += stock * precio_venta
+    
+    # Construir respuesta
+    resultado_categorias = []
+    total_productos = 0
+    total_valor_costo = 0
+    total_valor_venta = 0
+    todos_margenes = []
+    
+    for cat_id, datos in datos_por_categoria.items():
+        margenes = datos["margenes"]
+        ganancias = datos["ganancias"]
+        
+        margen_promedio = sum(margenes) / len(margenes) if margenes else 0
+        margen_minimo = min(margenes) if margenes else 0
+        margen_maximo = max(margenes) if margenes else 0
+        ganancia_promedio = sum(ganancias) / len(ganancias) if ganancias else 0
+        
+        item = RentabilidadCategoriaItem(
+            categoria_id=cat_id,
+            categoria_nombre=datos["categoria_nombre"],
+            total_productos=len(datos["productos"]),
+            productos_con_precio=len(margenes),
+            margen_promedio=round(margen_promedio, 2),
+            margen_minimo=round(margen_minimo, 2),
+            margen_maximo=round(margen_maximo, 2),
+            ganancia_promedio=round(ganancia_promedio, 2),
+            valor_inventario_costo=round(datos["valor_costo"], 2),
+            valor_inventario_venta=round(datos["valor_venta"], 2),
+            ganancia_potencial=round(datos["valor_venta"] - datos["valor_costo"], 2)
+        )
+        resultado_categorias.append(item)
+        
+        total_productos += len(datos["productos"])
+        total_valor_costo += datos["valor_costo"]
+        total_valor_venta += datos["valor_venta"]
+        todos_margenes.extend(margenes)
+    
+    # Ordenar por margen promedio descendente
+    resultado_categorias.sort(key=lambda x: x.margen_promedio, reverse=True)
+    
+    # Resumen general
+    margen_general = sum(todos_margenes) / len(todos_margenes) if todos_margenes else 0
+    
+    resumen = {
+        "total_categorias": len(resultado_categorias),
+        "total_productos": total_productos,
+        "margen_promedio_general": round(margen_general, 2),
+        "valor_total_costo": round(total_valor_costo, 2),
+        "valor_total_venta": round(total_valor_venta, 2),
+        "ganancia_potencial_total": round(total_valor_venta - total_valor_costo, 2)
+    }
+    
+    return RentabilidadCategoriaResponse(
+        categorias=resultado_categorias,
+        resumen=resumen,
+        fecha_generacion=datetime.now(timezone.utc).isoformat()
+    )
+

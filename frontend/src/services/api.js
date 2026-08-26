@@ -581,6 +581,9 @@ export const inventarioApi = {
   actualizarConteo: (id, items) => axios.put(`${API_URL}/inventario/tomas/${id}/conteo`, items),
   cerrarToma: (id) => axios.post(`${API_URL}/inventario/tomas/${id}/cerrar`),
   getHojaConteo: (id) => axios.get(`${API_URL}/inventario/tomas/${id}/hoja-conteo`),
+  
+  // Reportes
+  getReporteRentabilidadCategorias: (params) => axios.get(`${API_URL}/inventario/reportes/rentabilidad-categorias`, { params }),
 };
 
 // ==================== API DE PUNTO DE VENTA (POS) ====================

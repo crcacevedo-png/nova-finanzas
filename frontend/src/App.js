@@ -39,6 +39,7 @@ import LotesInventario from './pages/inventario/Lotes';
 import MovimientosInventario from './pages/inventario/Movimientos';
 import BodegasInventario from './pages/inventario/Bodegas';
 import CategoriasInventario from './pages/inventario/Categorias';
+import ReporteRentabilidad from './pages/inventario/ReporteRentabilidad';
 // Punto de Venta (POS)
 import PuntoVenta from './pages/PuntoVenta';
 import './App.css';
@@ -388,6 +389,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CategoriasInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/inventario/rentabilidad" 
+        element={
+          <ProtectedRoute>
+            <ReporteRentabilidad />
           </ProtectedRoute>
         } 
       />
