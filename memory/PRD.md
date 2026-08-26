@@ -35,6 +35,9 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - Tabla de detalle mensual con ventas, productos, ingresos, costos, ganancia, margen
   - Selector de período (6, 12, 18, 24 meses)
   - Exportación CSV del histórico
+- ✅ **Corrección de bugs detectados en evaluación**
+  - Fix: Método `getProveedores` agregado a `inventarioApi` en api.js
+  - Fix: Gráficas recharts solo se renderizan cuando el tab está activo (evita warning width=-1)
 
 ### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario

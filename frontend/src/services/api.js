@@ -521,6 +521,9 @@ export const inventarioApi = {
   updateBodega: (id, data) => axios.put(`${API_URL}/inventario/bodegas/${id}`, data),
   deleteBodega: (id) => axios.delete(`${API_URL}/inventario/bodegas/${id}`),
   
+  // Proveedores (wrapper para inventario)
+  getProveedores: () => axios.get(`${API_URL}/suppliers`),
+  
   // Categorías
   getCategorias: (params) => axios.get(`${API_URL}/inventario/categorias`, { params }),
   createCategoria: (data) => axios.post(`${API_URL}/inventario/categorias`, data),

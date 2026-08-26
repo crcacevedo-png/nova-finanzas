@@ -510,7 +510,7 @@ const ReporteRentabilidad = () => {
             )}
 
             {/* Gráfica Principal: Margen y Ganancia */}
-            {dataHistorico && dataHistorico.datos_mensuales.length > 0 ? (
+            {activeTab === 'historico' && dataHistorico && dataHistorico.datos_mensuales.length > 0 ? (
               <>
                 <Card>
                   <CardHeader>

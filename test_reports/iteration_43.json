@@ -1,0 +1,44 @@
+{
+  "summary": "Testeo completo del módulo Inventario (rentabilidad + productos con precio_compra + categorías) y Finanzas (dashboard, gastos), excluyendo Óptica. Backend: 12/12 tests pytest OK (1 skip para endpoint /income inexistente). Frontend: Reporte de Rentabilidad funciona 100% (4 tarjetas resumen, 9 columnas de tabla, tab Evolución Mensual con 2 gráficas recharts, tabla detalle mensual con 7 columnas, botón Exportar CSV). Formulario Producto muestra correctamente en tiempo real 'Margen de Ganancia: 37.5%', 'Ganancia: Q30.00 por unidad', 'Markup: 60.0% sobre costo' cuando precio_compra=50 y precio_venta=80. Página /gastos accesible con botón 'Nuevo Gasto', muestra gastos Fijos, Variables, IGSS, Proveedor con filtros de fecha y tipo. Dashboard /finanzas muestra Total Gastos, Pagos Pendientes, Gastos Fijos y Variables. Categorías /inventario/categorias carga correctamente (CRUD backend verificado).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/income (o /incomes)", "issue": "No existe endpoint dedicado de ingresos manuales - devuelve 404. Test skippeado. Los ingresos se gestionan mediante ventas/POS. Verificar si el playbook requiere un endpoint separado."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Productos.js", "issue": "inventarioApi.getProveedores is not a function - error de consola al cargar página de productos. No bloquea el flujo (bodegas y proveedores no se cargan en el dropdown de crear producto), pero contamina la consola con TypeError repetido.", "selector": "/inventario/productos", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ReporteRentabilidad - tab Evolución Mensual", "issues": ["Recharts warnings 'width(-1) and height(-1) of chart should be greater than 0' aparecen en consola durante el mount inicial. La gráfica se renderiza correctamente al mostrar el tab, pero el ResponsiveContainer intenta medir antes de que el tab sea visible. Considerar lazy mount de gráficas o key en TabsContent."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_rentabilidad_finanzas.py",
+    "/app/test_reports/pytest/rentabilidad_finanzas.xml"
+  ],
+  "action_items": [
+    "Fix: Agregar método `getProveedores` (y verificar `getBodegas`) al servicio inventarioApi en /app/frontend/src/services/api.js - actualmente lanza TypeError al montar Productos.js.",
+    "Considerar exponer endpoint /api/income o similar para el registro de ingresos manuales que el user request menciona ('creación de un ingreso manual y verificar que se refleje en el balance'). Actualmente solo hay expenses en el módulo finanzas.",
+    "Mejora menor: Envolver ResponsiveContainer de las gráficas históricas para renderizar solo cuando el tab 'historico' está activo, evitando los warnings width(-1)/height(-1) de recharts."
+  ],
+  "critical_code_review_comments": [
+    "inventario.py:1174 - `{\"_id\": None}` como cláusula OR para el filtro de código de barras vacío es un hack; mejor construir el filtro condicionalmente.",
+    "inventario.py archivo tiene >2000 líneas (muy grande) - considerar dividir en módulos: productos, categorías, bodegas, lotes, movimientos, reportes.",
+    "ReporteRentabilidad.js - la lógica de coloración de márgenes (getMargenColor, getMargenBadge, getProgressColor) se repite; extraer a un helper compartido con Productos.js que usa umbrales similares.",
+    "Productos.js:611-613 - Cálculo de margen se duplica entre lista y formulario; extraer a util `computeMargen(precio_compra, precio_venta)`.",
+    "expenses.py Expense model: campo `notes` con default '' y luego se serializa como Optional[str]='' - consistente, pero considerar None."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_rentabilidad_finanzas.py (nuevo, 13 casos)"
+  ],
+  "success_rate": {"backend": "100% (12/12 pass, 1 skip)", "frontend": "~95% (todo funciona; 1 error de consola no bloqueante en Productos)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Datos de prueba TEST_ creados y eliminados durante test_crear_editar_eliminar_categoria y test_crear_producto_con_precio_compra_y_verificar. Ningún dato residual.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verificado: (1) Reporte de rentabilidad UI+API funciona (5 categorías, márgenes 46-50%, Q135k valor venta, Q63k ganancia potencial). (2) Formulario crear producto muestra margen 37.5% + Ganancia Q30 + Markup 60% en tiempo real. (3) /gastos carga con listado Fijos/Variables/IGSS. (4) Dashboard /finanzas OK. Ruta correcta de gastos es /gastos (no /finanzas/gastos). Bug menor: inventarioApi.getProveedores no existe, causa error en consola en Productos.js. No hay endpoint /api/income - los ingresos vienen del POS/ventas.",
+  "rca of the issue": "Bug getProveedores: la página Productos.js hace `inventarioApi.getProveedores()` pero el servicio api.js no expone ese método. Solución: agregar `getProveedores: () => api.get('/suppliers')` o el endpoint correspondiente en /app/frontend/src/services/api.js. El error no bloquea la creación de productos, pero impide poblar el dropdown de proveedor preferido."
+}
