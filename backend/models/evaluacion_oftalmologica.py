@@ -212,6 +212,18 @@ class Recetas(BaseModel):
     lentes_contacto: RecetaLentesContacto = Field(default_factory=RecetaLentesContacto)
 
 
+# ==================== PRÓXIMA CITA ====================
+
+class ProximaCita(BaseModel):
+    agendar: bool = False
+    fecha: str = ""
+    hora: str = ""
+    medico_id: str = ""
+    medico_nombre: str = ""
+    tipo_cita: str = ""
+    notas: str = ""
+
+
 # ==================== EVALUACIÓN COMPLETA ====================
 
 class EvaluacionOftalmologicaBase(BaseModel):
@@ -250,6 +262,9 @@ class EvaluacionOftalmologicaBase(BaseModel):
     
     # Recetas
     recetas: Recetas = Field(default_factory=Recetas)
+    
+    # Próxima cita
+    proxima_cita: ProximaCita = Field(default_factory=ProximaCita)
 
 
 class EvaluacionOftalmologicaCreate(EvaluacionOftalmologicaBase):
@@ -277,6 +292,7 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
     recomendaciones: Optional[Recomendaciones] = None
     procedimientos: Optional[List[Procedimiento]] = None
     recetas: Optional[Recetas] = None
+    proxima_cita: Optional[ProximaCita] = None
 
 
 class EvaluacionOftalmologicaResponse(EvaluacionOftalmologicaBase):

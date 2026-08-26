@@ -1129,12 +1129,12 @@ const EvaluacionOftalmologica = () => {
     <Layout>
       <Toaster position="top-right" richColors />
       
-      {/* Print Styles - Optimizado para Media Carta (5.5" x 8.5") */}
+      {/* Print Styles - Optimizado para Media Carta HORIZONTAL (8.5" x 5.5" landscape) */}
       <style>{`
         @media print {
           @page {
-            size: 5.5in 8.5in;
-            margin: 0.4in;
+            size: 8.5in 5.5in landscape;
+            margin: 0.3in 0.4in;
           }
           body * { visibility: hidden; }
           .print-area, .print-area * { visibility: visible; }
@@ -1142,8 +1142,8 @@ const EvaluacionOftalmologica = () => {
             position: absolute; 
             left: 0; 
             top: 0; 
-            width: 5.5in;
-            font-size: 10pt;
+            width: 8in;
+            font-size: 9pt;
           }
           .no-print { display: none !important; }
           .print-header { border-bottom: 2px solid #0F6E56 !important; }
@@ -1157,6 +1157,17 @@ const EvaluacionOftalmologica = () => {
             border: 1px solid #e5e7eb !important;
             break-inside: avoid;
             page-break-inside: avoid;
+          }
+          .print-med-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+          }
+          .print-cita-box {
+            background-color: #eff6ff !important;
+            border: 2px solid #3b82f6 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
         }
       `}</style>
@@ -2534,30 +2545,26 @@ const EvaluacionOftalmologica = () => {
         </div>
       </div>
 
-      {/* Área de Impresión - Optimizada para Media Carta */}
+      {/* Área de Impresión - Optimizada para Media Carta HORIZONTAL */}
       {printDialogOpen && (
-        <div className="print-area fixed inset-0 bg-white p-4" style={{ zIndex: 9999 }}>
-          <div className="max-w-md mx-auto" style={{ maxWidth: '5in' }}>
-            {/* Encabezado Compacto */}
-            <div className="print-header flex items-center justify-between mb-3 border-b-2 pb-2" style={{ borderColor: '#0F6E56' }}>
-              <img 
-                src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/qvzbrum6_logo%20nova%20transparente.png" 
-                alt="Logo" 
-                className="h-10"
-              />
-              <div className="text-right">
-                <h1 className="print-title text-base font-bold" style={{ color: '#0F6E56' }}>NovaVision</h1>
-                <p className="text-xs text-gray-600">Clínica Oftalmológica</p>
-                <p className="text-xs text-gray-500">Tel: (502) 2222-3333</p>
+        <div className="print-area fixed inset-0 bg-white p-3" style={{ zIndex: 9999 }}>
+          <div className="mx-auto" style={{ maxWidth: '8in' }}>
+            {/* Encabezado Compacto - Horizontal */}
+            <div className="print-header flex items-center justify-between mb-2 border-b-2 pb-2" style={{ borderColor: '#0F6E56' }}>
+              <div className="flex items-center gap-3">
+                <img 
+                  src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/qvzbrum6_logo%20nova%20transparente.png" 
+                  alt="Logo" 
+                  className="h-8"
+                />
+                <div>
+                  <h1 className="print-title text-sm font-bold" style={{ color: '#0F6E56' }}>NovaVision</h1>
+                  <p className="text-xs text-gray-500">Clínica Oftalmológica | Tel: (502) 2222-3333</p>
+                </div>
               </div>
-            </div>
-            
-            {/* Datos del Paciente - Compacto */}
-            <div className="mb-3 p-2 bg-gray-50 rounded text-xs">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <div className="text-right text-xs">
                 <div><span className="font-semibold">Paciente:</span> {formData.paciente_nombre}</div>
-                <div><span className="font-semibold">Expediente:</span> {formData.paciente_expediente}</div>
-                <div><span className="font-semibold">Edad:</span> {formData.paciente_edad} años</div>
+                <div><span className="font-semibold">Exp:</span> {formData.paciente_expediente} | <span className="font-semibold">Edad:</span> {formData.paciente_edad} años</div>
                 <div><span className="font-semibold">Fecha:</span> {formData.fecha}</div>
               </div>
             </div>
@@ -2569,27 +2576,25 @@ const EvaluacionOftalmologica = () => {
                   Receta Médica
                 </h2>
                 
-                {/* Lista de medicamentos en formato tarjeta */}
-                <div className="space-y-2">
+                {/* Lista de medicamentos en GRID 2 columnas para horizontal */}
+                <div className="print-med-grid grid grid-cols-2 gap-2">
                   {formData.recetas.medicamentos.items.map((item, idx) => (
-                    <div key={idx} className="print-med-card border rounded p-2 bg-white">
-                      <div className="flex items-start gap-2">
-                        <span className="font-bold text-sm" style={{ color: '#0F6E56' }}>{idx + 1}.</span>
+                    <div key={idx} className="print-med-card border rounded p-2 bg-white text-xs">
+                      <div className="flex items-start gap-1">
+                        <span className="font-bold" style={{ color: '#0F6E56' }}>{idx + 1}.</span>
                         <div className="flex-1">
                           <div className="font-semibold text-sm">{item.medicamento}</div>
                           {item.presentacion && (
-                            <div className="text-xs text-gray-600">{item.presentacion}</div>
+                            <div className="text-gray-600">{item.presentacion}</div>
                           )}
-                          <div className="mt-1 text-xs grid grid-cols-3 gap-2">
-                            {item.dosis && <div><span className="font-medium">Dosis:</span> {item.dosis}</div>}
-                            {item.frecuencia && <div><span className="font-medium">Frec:</span> {item.frecuencia}</div>}
-                            {item.duracion && <div><span className="font-medium">Dur:</span> {item.duracion}</div>}
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0">
+                            {item.dosis && <span><b>Dosis:</b> {item.dosis}</span>}
+                            {item.frecuencia && <span><b>Frec:</b> {item.frecuencia}</span>}
+                            {item.duracion && <span><b>Dur:</b> {item.duracion}</span>}
+                            {item.via && <span><b>Vía:</b> {item.via}</span>}
                           </div>
-                          {item.via && (
-                            <div className="text-xs mt-1"><span className="font-medium">Vía:</span> {item.via}</div>
-                          )}
                           {item.indicaciones && (
-                            <div className="text-xs mt-1 italic text-gray-600 border-t pt-1">
+                            <div className="mt-1 italic text-gray-600 border-t pt-1 text-xs">
                               {item.indicaciones}
                             </div>
                           )}
@@ -2601,9 +2606,8 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* Indicaciones generales */}
                 {formData.recetas.medicamentos.indicaciones_generales && (
-                  <div className="mt-3 p-2 border rounded bg-yellow-50 text-xs">
-                    <div className="font-semibold mb-1">Indicaciones Generales:</div>
-                    {formData.recetas.medicamentos.indicaciones_generales}
+                  <div className="mt-2 p-2 border rounded bg-yellow-50 text-xs">
+                    <span className="font-semibold">Indicaciones:</span> {formData.recetas.medicamentos.indicaciones_generales}
                   </div>
                 )}
               </div>
@@ -2614,42 +2618,50 @@ const EvaluacionOftalmologica = () => {
                 <h2 className="print-title text-sm font-bold mb-2 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
                   Receta de Anteojos
                 </h2>
-                <table className="print-table w-full text-xs mb-3 border-collapse">
-                  <thead>
-                    <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
-                      <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Esfera</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Cilindro</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Eje</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Adición</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.od.esfera || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.od.cilindro || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.od.eje || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.od.adicion || '-'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.os.esfera || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.os.cilindro || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.os.eje || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.anteojos.os.adicion || '-'}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div className="grid grid-cols-2 gap-2 text-xs p-2 bg-gray-50 rounded">
-                  <div><span className="font-medium">DP:</span> {formData.recetas.anteojos.distancia_pupilar || '-'}</div>
-                  <div><span className="font-medium">Tipo:</span> {formData.recetas.anteojos.tipo_lente || '-'}</div>
-                  <div><span className="font-medium">Material:</span> {formData.recetas.anteojos.material || '-'}</div>
-                  <div><span className="font-medium">Uso:</span> {formData.recetas.anteojos.uso || '-'}</div>
+                <div className="flex gap-4">
+                  {/* Tabla de graduación */}
+                  <div className="flex-1">
+                    <table className="print-table w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
+                          <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Esfera</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Cilindro</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Eje</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Adición</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.od.esfera || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.od.cilindro || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.od.eje || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.od.adicion || '-'}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.os.esfera || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.os.cilindro || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.os.eje || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.anteojos.os.adicion || '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Datos adicionales */}
+                  <div className="w-48 text-xs p-2 bg-gray-50 rounded">
+                    <div className="space-y-1">
+                      <div><span className="font-semibold">DP:</span> {formData.recetas.anteojos.distancia_pupilar || '-'}</div>
+                      <div><span className="font-semibold">Tipo:</span> {formData.recetas.anteojos.tipo_lente || '-'}</div>
+                      <div><span className="font-semibold">Material:</span> {formData.recetas.anteojos.material || '-'}</div>
+                      <div><span className="font-semibold">Uso:</span> {formData.recetas.anteojos.uso || '-'}</div>
+                      {formData.recetas.anteojos.tratamientos && (
+                        <div className="pt-1 border-t"><span className="font-semibold">Tratamientos:</span> {formData.recetas.anteojos.tratamientos}</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {formData.recetas.anteojos.tratamientos && (
-                  <p className="mt-2 text-xs"><span className="font-medium">Tratamientos:</span> {formData.recetas.anteojos.tratamientos}</p>
-                )}
               </div>
             )}
             
@@ -2658,71 +2670,80 @@ const EvaluacionOftalmologica = () => {
                 <h2 className="print-title text-sm font-bold mb-2 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
                   Receta de Lentes de Contacto
                 </h2>
-                <table className="print-table w-full text-xs mb-3 border-collapse">
-                  <thead>
-                    <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
-                      <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Poder</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Curva Base</th>
-                      <th className="text-center py-1 px-2 bg-gray-50">Diámetro</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
-                      <td className="text-center py-2">{formData.recetas.lentes_contacto.od.poder || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.lentes_contacto.od.curva_base || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.lentes_contacto.od.diametro || '-'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
-                      <td className="text-center py-2">{formData.recetas.lentes_contacto.os.poder || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.lentes_contacto.os.curva_base || '-'}</td>
-                      <td className="text-center py-2">{formData.recetas.lentes_contacto.os.diametro || '-'}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div className="grid grid-cols-3 gap-2 text-xs p-2 bg-gray-50 rounded">
-                  <div><span className="font-medium">Marca:</span> {formData.recetas.lentes_contacto.marca || '-'}</div>
-                  <div><span className="font-medium">Tipo:</span> {formData.recetas.lentes_contacto.tipo || '-'}</div>
-                  <div><span className="font-medium">Reemplazo:</span> {formData.recetas.lentes_contacto.regimen_reemplazo || '-'}</div>
+                <div className="flex gap-4">
+                  {/* Tabla de parámetros */}
+                  <div className="flex-1">
+                    <table className="print-table w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
+                          <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Poder</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Curva Base</th>
+                          <th className="text-center py-1 px-2 bg-gray-50">Diámetro</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
+                          <td className="text-center py-2">{formData.recetas.lentes_contacto.od.poder || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.lentes_contacto.od.curva_base || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.lentes_contacto.od.diametro || '-'}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
+                          <td className="text-center py-2">{formData.recetas.lentes_contacto.os.poder || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.lentes_contacto.os.curva_base || '-'}</td>
+                          <td className="text-center py-2">{formData.recetas.lentes_contacto.os.diametro || '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Datos adicionales */}
+                  <div className="w-56 text-xs p-2 bg-gray-50 rounded">
+                    <div className="space-y-1">
+                      <div><span className="font-semibold">Marca:</span> {formData.recetas.lentes_contacto.marca || '-'}</div>
+                      <div><span className="font-semibold">Tipo:</span> {formData.recetas.lentes_contacto.tipo || '-'}</div>
+                      <div><span className="font-semibold">Reemplazo:</span> {formData.recetas.lentes_contacto.regimen_reemplazo || '-'}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
             
-            {/* Próxima Cita (si está agendada) */}
+            {/* Próxima Cita (si está agendada) - Formato destacado */}
             {formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && (
-              <div className="mt-4 p-2 border-2 border-blue-200 rounded bg-blue-50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  <span className="font-bold text-xs text-blue-700 uppercase">Próxima Cita</span>
-                </div>
-                <div className="text-xs grid grid-cols-2 gap-1">
-                  <p><span className="font-medium">Fecha:</span> {new Date(formData.proxima_cita.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Guatemala' })}</p>
-                  <p><span className="font-medium">Hora:</span> {formData.proxima_cita.hora}</p>
-                  <p><span className="font-medium">Médico:</span> {formData.proxima_cita.medico_nombre}</p>
-                  {formData.proxima_cita.tipo_cita && <p><span className="font-medium">Tipo:</span> {formData.proxima_cita.tipo_cita}</p>}
+              <div className="print-cita-box mt-3 p-2 border-2 border-blue-300 rounded bg-blue-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    <span className="font-bold text-sm text-blue-700">PRÓXIMA CITA</span>
+                  </div>
+                  <div className="text-xs flex gap-4">
+                    <span><b>Fecha:</b> {new Date(formData.proxima_cita.fecha + 'T12:00:00').toLocaleDateString('es-GT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guatemala' })}</span>
+                    <span><b>Hora:</b> {formData.proxima_cita.hora}</span>
+                    <span><b>Médico:</b> {formData.proxima_cita.medico_nombre}</span>
+                    {formData.proxima_cita.tipo_cita && <span><b>Tipo:</b> {formData.proxima_cita.tipo_cita}</span>}
+                  </div>
                 </div>
               </div>
             )}
             
-            {/* Pie de Receta - Compacto para Media Carta */}
-            <div className="mt-6 pt-4 border-t" style={{ borderColor: '#0F6E56' }}>
-              <div className="flex justify-between items-end">
-                <div className="text-xs text-gray-600">
-                  <p>Fecha: {new Date().toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}</p>
-                </div>
-                <div className="text-center">
-                  <div className="border-t border-gray-800 w-36 mb-1"></div>
-                  <p className="font-medium text-xs">{formData.medico_nombre || 'Médico'}</p>
-                  <p className="text-xs text-gray-600">Médico Oftalmólogo</p>
-                  <p className="text-xs text-gray-500">Col. No. _______</p>
-                </div>
+            {/* Pie de Receta - Formato Horizontal */}
+            <div className="mt-4 pt-3 border-t flex justify-between items-end" style={{ borderColor: '#0F6E56' }}>
+              <div className="text-xs text-gray-600">
+                <p>Fecha de emisión: {new Date().toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}</p>
+                <p className="text-gray-400 mt-1">NovaVision © {new Date().getFullYear()}</p>
+              </div>
+              <div className="text-center">
+                <div className="border-t border-gray-800 w-44 mb-1"></div>
+                <p className="font-semibold text-sm">{formData.medico_nombre || 'Médico'}</p>
+                <p className="text-xs text-gray-600">Médico Oftalmólogo</p>
+                <p className="text-xs text-gray-500">Colegiado No. _______</p>
               </div>
             </div>
             
             {/* Botón para cerrar (no se imprime) */}
-            <div className="mt-6 text-center no-print">
+            <div className="mt-4 text-center no-print">
               <Button onClick={() => setPrintDialogOpen(false)} className="btn-primary">
                 Cerrar Vista Previa
               </Button>
