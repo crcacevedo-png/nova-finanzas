@@ -530,6 +530,12 @@ export const inventarioApi = {
   updateProducto: (id, data) => axios.put(`${API_URL}/inventario/productos/${id}`, data),
   deleteProducto: (id) => axios.delete(`${API_URL}/inventario/productos/${id}`),
   cambiarEstadoProducto: (id, activo) => axios.patch(`${API_URL}/inventario/productos/${id}/estado`, { activo }),
+  importarProductosPreview: (formData) => axios.post(`${API_URL}/inventario/productos/importar/preview`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  importarProductos: (formData) => axios.post(`${API_URL}/inventario/productos/importar`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   
   // Existencias
   getExistencias: (params) => axios.get(`${API_URL}/inventario/existencias`, { params }),

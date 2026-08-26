@@ -2,13 +2,15 @@
 # Módulo de Inventario Completo para NovaVision
 # Control de productos, lotes, existencias, kardex, órdenes de compra, recepciones, transferencias y tomas físicas
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 import uuid
 import logging
+import csv
+import io
 
 logger = logging.getLogger("inventario")
 
@@ -64,7 +66,7 @@ class ProductoBase(BaseModel):
     nombre_generico: Optional[str] = None
     descripcion: Optional[str] = None
     categoria_id: Optional[str] = None
-    tipo: Literal["producto", "servicio", "insumo"] = "producto"
+    tipo: Literal["producto", "servicio", "insumo", "medicamento"] = "producto"
     presentacion: Optional[str] = None
     unidad_medida: str = "unidad"
     unidad_compra: Optional[str] = None
@@ -90,7 +92,7 @@ class ProductoUpdate(BaseModel):
     nombre_generico: Optional[str] = None
     descripcion: Optional[str] = None
     categoria_id: Optional[str] = None
-    tipo: Optional[Literal["producto", "servicio", "insumo"]] = None
+    tipo: Optional[Literal["producto", "servicio", "insumo", "medicamento"]] = None
     presentacion: Optional[str] = None
     unidad_medida: Optional[str] = None
     unidad_compra: Optional[str] = None
@@ -1237,6 +1239,256 @@ async def eliminar_producto(
     
     await db.productos_inventario.delete_one({"id": producto_id})
     return {"message": "Producto eliminado"}
+
+
+# ==================== IMPORTACIÓN MASIVA DESDE EXCEL/CSV ====================
+
+@router.post("/productos/importar/preview")
+async def preview_importar_productos(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Vista previa de importación de productos desde Excel/CSV"""
+    db = get_db()
+    
+    try:
+        content = await file.read()
+        
+        # Detectar tipo de archivo y parsear
+        productos_preview = []
+        errors = []
+        
+        if file.filename.endswith('.csv'):
+            # Parsear CSV
+            decoded = content.decode('utf-8-sig')  # UTF-8 con BOM
+            reader = csv.DictReader(io.StringIO(decoded))
+            for idx, row in enumerate(reader, start=2):
+                try:
+                    producto = parse_import_row(row, idx)
+                    if producto:
+                        productos_preview.append(producto)
+                except ValueError as e:
+                    errors.append({"row": idx, "message": str(e)})
+        else:
+            # Parsear Excel (xlsx/xls)
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                ws = wb.active
+                
+                # Obtener headers de la primera fila
+                headers = [cell.value.lower().strip() if cell.value else f"col_{i}" 
+                          for i, cell in enumerate(ws[1])]
+                
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if not any(row):  # Fila vacía
+                        continue
+                    try:
+                        row_dict = dict(zip(headers, row))
+                        producto = parse_import_row(row_dict, idx)
+                        if producto:
+                            productos_preview.append(producto)
+                    except ValueError as e:
+                        errors.append({"row": idx, "message": str(e)})
+            except ImportError:
+                # Fallback sin openpyxl - solo CSV
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Para archivos Excel, use formato CSV. O contacte soporte para habilitar xlsx."
+                )
+        
+        return {
+            "preview": productos_preview[:50],  # Max 50 para preview
+            "total": len(productos_preview),
+            "errors": errors[:20]  # Max 20 errores
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en preview importación: {e}")
+        raise HTTPException(status_code=400, detail=f"Error al procesar archivo: {str(e)}")
+
+
+@router.post("/productos/importar")
+async def importar_productos(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Importar productos desde Excel/CSV"""
+    db = get_db()
+    
+    try:
+        content = await file.read()
+        
+        productos_to_import = []
+        errors = []
+        
+        # Parsear archivo
+        if file.filename.endswith('.csv'):
+            decoded = content.decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(decoded))
+            for idx, row in enumerate(reader, start=2):
+                try:
+                    producto = parse_import_row(row, idx)
+                    if producto:
+                        productos_to_import.append(producto)
+                except ValueError as e:
+                    errors.append({"row": idx, "message": str(e)})
+        else:
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                ws = wb.active
+                
+                headers = [cell.value.lower().strip() if cell.value else f"col_{i}" 
+                          for i, cell in enumerate(ws[1])]
+                
+                for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                    if not any(row):
+                        continue
+                    try:
+                        row_dict = dict(zip(headers, row))
+                        producto = parse_import_row(row_dict, idx)
+                        if producto:
+                            productos_to_import.append(producto)
+                    except ValueError as e:
+                        errors.append({"row": idx, "message": str(e)})
+            except ImportError:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Para archivos Excel, use formato CSV."
+                )
+        
+        # Obtener categorías existentes para mapeo
+        categorias = {c["nombre"].lower(): c["id"] 
+                     for c in await db.categorias_inventario.find({"origen": "clinica"}).to_list(100)}
+        
+        # Insertar productos
+        imported = 0
+        skipped = 0
+        now = datetime.now(timezone.utc).isoformat()
+        
+        for prod in productos_to_import:
+            # Verificar si ya existe por código
+            if prod.get("codigo"):
+                existing = await db.productos_inventario.find_one({
+                    "codigo": prod["codigo"],
+                    "origen": "clinica"
+                })
+                if existing:
+                    skipped += 1
+                    continue
+            
+            # Mapear categoría
+            if prod.get("categoria"):
+                cat_name = prod["categoria"].lower()
+                prod["categoria_id"] = categorias.get(cat_name, None)
+            if "categoria" in prod:
+                del prod["categoria"]
+            
+            # Generar ID y código si no existe
+            prod["id"] = str(uuid.uuid4())
+            if not prod.get("codigo"):
+                # Generar código automático
+                last = await db.productos_inventario.find_one(
+                    {"origen": "clinica"}, 
+                    sort=[("codigo", -1)]
+                )
+                last_num = 0
+                if last and last.get("codigo", "").startswith("PROD-"):
+                    try:
+                        last_num = int(last["codigo"].split("-")[1])
+                    except:
+                        pass
+                prod["codigo"] = f"PROD-{last_num + 1:04d}"
+            
+            prod["origen"] = "clinica"
+            prod["created_at"] = now
+            prod["updated_at"] = now
+            prod["created_by"] = current_user["id"]
+            
+            await db.productos_inventario.insert_one(prod)
+            imported += 1
+        
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "errors": errors[:20],
+            "message": f"Se importaron {imported} productos, {skipped} omitidos por duplicado"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en importación: {e}")
+        raise HTTPException(status_code=400, detail=f"Error al importar: {str(e)}")
+
+
+def parse_import_row(row: dict, row_num: int) -> Optional[dict]:
+    """Parsea una fila de importación y retorna el producto"""
+    # Normalizar keys a lowercase
+    row = {k.lower().strip(): v for k, v in row.items() if k}
+    
+    # Campo obligatorio: nombre
+    nombre = row.get("nombre", "").strip() if row.get("nombre") else ""
+    if not nombre:
+        raise ValueError("El nombre es obligatorio")
+    
+    # Parsear booleanos
+    def parse_bool(val, default=True):
+        if val is None:
+            return default
+        if isinstance(val, bool):
+            return val
+        val_str = str(val).lower().strip()
+        return val_str in ["true", "1", "si", "sí", "yes", "verdadero"]
+    
+    # Parsear números
+    def parse_float(val, default=0.0):
+        if val is None:
+            return default
+        try:
+            # Remover símbolos de moneda y comas
+            val_str = str(val).replace("Q", "").replace(",", "").strip()
+            return float(val_str) if val_str else default
+        except:
+            return default
+    
+    def parse_int(val, default=0):
+        if val is None:
+            return default
+        try:
+            return int(float(str(val).strip()))
+        except:
+            return default
+    
+    # Validar tipo
+    tipo = (row.get("tipo", "") or "producto").lower().strip()
+    if tipo not in ["producto", "servicio", "insumo"]:
+        tipo = "producto"
+    
+    return {
+        "codigo": (row.get("codigo", "") or "").strip(),
+        "codigo_barras": (row.get("codigo_barras", "") or "").strip(),
+        "nombre": nombre,
+        "nombre_generico": (row.get("nombre_generico", "") or "").strip(),
+        "descripcion": (row.get("descripcion", "") or "").strip(),
+        "categoria": (row.get("categoria", "") or "").strip(),
+        "tipo": tipo,
+        "presentacion": (row.get("presentacion", "") or "").strip(),
+        "unidad_medida": (row.get("unidad_medida", "") or "unidad").strip(),
+        "unidad_compra": (row.get("unidad_compra", "") or "").strip(),
+        "factor_conversion": parse_int(row.get("factor_conversion"), 1),
+        "controla_inventario": parse_bool(row.get("controla_inventario"), True),
+        "controla_lotes": parse_bool(row.get("controla_lotes"), False),
+        "requiere_receta": parse_bool(row.get("requiere_receta"), False),
+        "precio_venta": parse_float(row.get("precio_venta")),
+        "afecto_iva": parse_bool(row.get("afecto_iva"), True),
+        "existencia_minima": parse_int(row.get("existencia_minima")),
+        "existencia_maxima": parse_int(row.get("existencia_maxima")),
+        "activo": True
+    }
 
 
 # ==================== ENDPOINTS DE EXISTENCIAS ====================

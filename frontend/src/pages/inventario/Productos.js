@@ -15,12 +15,15 @@ import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
 import {
   Search, Plus, Edit, Package, AlertTriangle, Filter, ChevronLeft, ChevronRight,
-  ArrowDownToLine, Truck, Calendar
+  ArrowDownToLine, Truck, Calendar, Trash2, Upload, FileSpreadsheet, Download
 } from 'lucide-react';
 import { inventarioApi, formatCurrency } from '../../services/api';
 import { toast } from 'sonner';
+import { useAuth } from '../../context/AuthContext';
 
 const Productos = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin';
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState([]);
@@ -40,6 +43,18 @@ const Productos = () => {
   // Modal de producto
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  
+  // Modal de confirmación eliminar
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  
+  // Modal de importar Excel
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
   
   // Modal de Entrada Rápida
   const [entradaModalOpen, setEntradaModalOpen] = useState(false);
@@ -227,6 +242,135 @@ const Productos = () => {
     }
   };
 
+  // ==================== ELIMINAR PRODUCTO (Solo SuperAdmin) ====================
+  
+  const handleDeleteClick = (producto) => {
+    setProductToDelete(producto);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+    
+    setDeleting(true);
+    try {
+      await inventarioApi.deleteProducto(productToDelete.id);
+      toast.success(`Producto "${productToDelete.nombre}" eliminado correctamente`);
+      setDeleteModalOpen(false);
+      setProductToDelete(null);
+      loadProductos();
+    } catch (error) {
+      console.error('Error eliminando producto:', error);
+      toast.error(error.response?.data?.detail || 'Error al eliminar producto');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ==================== IMPORTAR DESDE EXCEL ====================
+  
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validar tipo de archivo
+    const validTypes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv'
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+      toast.error('Por favor seleccione un archivo Excel (.xlsx, .xls) o CSV');
+      return;
+    }
+    
+    setImportFile(file);
+    setImportErrors([]);
+    
+    // Leer preview del archivo
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('preview_only', 'true');
+      
+      const response = await inventarioApi.importarProductosPreview(formData);
+      setImportPreview(response.data.preview || []);
+      setImportErrors(response.data.errors || []);
+    } catch (error) {
+      console.error('Error leyendo archivo:', error);
+      toast.error('Error al leer el archivo. Verifique el formato.');
+      setImportPreview([]);
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    if (!importFile) {
+      toast.error('Seleccione un archivo primero');
+      return;
+    }
+    
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      
+      const response = await inventarioApi.importarProductos(formData);
+      const { imported, errors, skipped } = response.data;
+      
+      if (imported > 0) {
+        toast.success(`Se importaron ${imported} productos correctamente`);
+      }
+      if (skipped > 0) {
+        toast.info(`Se omitieron ${skipped} productos (ya existentes)`);
+      }
+      if (errors?.length > 0) {
+        toast.warning(`${errors.length} filas con errores`);
+      }
+      
+      setImportModalOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      setImportErrors([]);
+      loadProductos();
+    } catch (error) {
+      console.error('Error importando:', error);
+      toast.error(error.response?.data?.detail || 'Error al importar productos');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    // Crear CSV de plantilla
+    const headers = [
+      'codigo', 'codigo_barras', 'nombre', 'nombre_generico', 'descripcion',
+      'categoria', 'tipo', 'presentacion', 'unidad_medida', 'precio_venta',
+      'existencia_minima', 'existencia_maxima', 'controla_inventario', 'controla_lotes',
+      'requiere_receta', 'afecto_iva'
+    ];
+    
+    const sampleRow = [
+      'PROD-001', '7501234567890', 'Producto Ejemplo', 'Nombre Genérico', 'Descripción del producto',
+      'Medicamentos', 'producto', 'Caja x 10', 'unidad', '100.00',
+      '5', '100', 'true', 'false', 'false', 'true'
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      sampleRow.join(','),
+      '# tipo: producto, servicio, insumo',
+      '# unidad_medida: unidad, caja, frasco, tubo, sobre, ampolla, ml, litro, mg, gramo, kg',
+      '# controla_inventario, controla_lotes, requiere_receta, afecto_iva: true o false'
+    ].join('\n');
+    
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'plantilla_inventario.csv';
+    link.click();
+  };
+
   // ==================== ENTRADA RÁPIDA ====================
   
   const abrirEntradaRapida = (producto) => {
@@ -334,10 +478,20 @@ const Productos = () => {
             <h1 className="text-2xl font-bold text-gray-900">Catálogo de Productos</h1>
             <p className="text-gray-500">{total} productos en el sistema</p>
           </div>
-          <Button onClick={() => handleOpenModal()} data-testid="btn-nuevo-producto">
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Producto
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={downloadTemplate} data-testid="btn-descargar-plantilla">
+              <Download className="w-4 h-4 mr-2" />
+              Plantilla
+            </Button>
+            <Button variant="outline" onClick={() => setImportModalOpen(true)} data-testid="btn-importar-excel">
+              <Upload className="w-4 h-4 mr-2" />
+              Importar Excel
+            </Button>
+            <Button onClick={() => handleOpenModal()} data-testid="btn-nuevo-producto">
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Producto
+            </Button>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -472,6 +626,18 @@ const Productos = () => {
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
+                              {isSuperAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteClick(producto)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Eliminar producto"
+                                  data-testid={`btn-delete-${producto.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -856,6 +1022,180 @@ const Productos = () => {
                 data-testid="btn-confirmar-entrada"
               >
                 {entradaSubmitting ? 'Registrando...' : 'Registrar Entrada'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Confirmación Eliminar (Solo SuperAdmin) */}
+        <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="w-5 h-5" />
+                Eliminar Producto
+              </DialogTitle>
+              <DialogDescription>
+                Esta acción no se puede deshacer. El producto será eliminado permanentemente del sistema.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {productToDelete && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="font-medium text-red-800">{productToDelete.nombre}</p>
+                <p className="text-sm text-red-600">Código: {productToDelete.codigo || 'Sin código'}</p>
+                {productToDelete.existencia_total > 0 && (
+                  <p className="text-sm text-red-600 mt-2">
+                    <strong>⚠️ Advertencia:</strong> Este producto tiene {productToDelete.existencia_total} unidades en stock.
+                  </p>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                data-testid="btn-confirmar-eliminar"
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar Permanentemente'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Importar Excel */}
+        <Dialog open={importModalOpen} onOpenChange={setImportModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5" />
+                Importar Productos desde Excel
+              </DialogTitle>
+              <DialogDescription>
+                Suba un archivo Excel (.xlsx, .xls) o CSV con los productos a importar.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {/* Instrucciones */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                <p className="font-medium text-blue-800 mb-2">Columnas requeridas:</p>
+                <ul className="text-blue-700 space-y-1 text-xs">
+                  <li>• <strong>nombre</strong> (obligatorio)</li>
+                  <li>• codigo, codigo_barras, nombre_generico, descripcion</li>
+                  <li>• categoria, tipo (producto/servicio/insumo), presentacion</li>
+                  <li>• unidad_medida, precio_venta, existencia_minima, existencia_maxima</li>
+                  <li>• controla_inventario, controla_lotes, requiere_receta, afecto_iva (true/false)</li>
+                </ul>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="p-0 h-auto mt-2"
+                  onClick={downloadTemplate}
+                >
+                  <Download className="w-3 h-3 mr-1" />
+                  Descargar plantilla de ejemplo
+                </Button>
+              </div>
+
+              {/* Selector de archivo */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="import-file-input"
+                  data-testid="input-import-file"
+                />
+                <label 
+                  htmlFor="import-file-input" 
+                  className="cursor-pointer"
+                >
+                  <Upload className="w-10 h-10 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600">
+                    {importFile ? (
+                      <span className="text-green-600 font-medium">{importFile.name}</span>
+                    ) : (
+                      <>Click para seleccionar archivo o arrástrelo aquí</>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Excel (.xlsx, .xls) o CSV</p>
+                </label>
+              </div>
+
+              {/* Preview */}
+              {importPreview.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b">
+                    <p className="text-sm font-medium">Vista previa ({importPreview.length} productos)</p>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-2 py-1 text-left">Código</th>
+                          <th className="px-2 py-1 text-left">Nombre</th>
+                          <th className="px-2 py-1 text-left">Tipo</th>
+                          <th className="px-2 py-1 text-right">Precio</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {importPreview.slice(0, 10).map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="px-2 py-1 font-mono">{item.codigo || '-'}</td>
+                            <td className="px-2 py-1">{item.nombre}</td>
+                            <td className="px-2 py-1">{item.tipo || 'producto'}</td>
+                            <td className="px-2 py-1 text-right">{formatCurrency(item.precio_venta || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {importPreview.length > 10 && (
+                      <p className="text-xs text-gray-500 p-2 text-center">
+                        ... y {importPreview.length - 10} más
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Errores */}
+              {importErrors.length > 0 && (
+                <div className="border border-red-200 bg-red-50 rounded-lg p-3">
+                  <p className="text-sm font-medium text-red-800 mb-2">Errores encontrados:</p>
+                  <ul className="text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                    {importErrors.map((err, idx) => (
+                      <li key={idx}>• Fila {err.row}: {err.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setImportModalOpen(false);
+                  setImportFile(null);
+                  setImportPreview([]);
+                  setImportErrors([]);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleImportSubmit}
+                disabled={importing || !importFile || importPreview.length === 0}
+                data-testid="btn-confirmar-importar"
+              >
+                {importing ? 'Importando...' : `Importar ${importPreview.length} Productos`}
               </Button>
             </DialogFooter>
           </DialogContent>
