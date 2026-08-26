@@ -1,0 +1,45 @@
+{
+  "summary": "E2E testing del flujo de Servicios + Sociedades + Ajuste de inventario. Frontend oculta correctamente switches (controla_inventario, controla_lotes, requiere_receta) y campos existencia_minima/maxima cuando tipo=servicio. Servicio con switch Sociedad + selector se guarda y aparece en /sociedades tab Productos con existencia 'infinita' (∞). En POS aparece con badge 'Sin límite', se agrega al carrito sin validación de stock (Q300 + IVA = Q336). Modal 'Ajustar Existencia' abre, permite editar cantidad, motivo, y guarda correctamente. Backend pytest: 8/8 tests PASS. Se encontró y arregló un bug HIGH que bloqueaba la creación de productos desde la UI: generar_codigo_producto usaba sort por 'codigo' sin filtrar prefijo PROD-, y como existen códigos SERV-XXXX/PRB-XXXX (lexicográficamente > PROD-), el sort devolvía uno de esos, num se reseteaba a 1 y colisionaba con PROD-00001.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/inventario/sociedades/productos", "issue": "El endpoint devuelve una lista plana sin 'es_sociedad' en la respuesta (solo sociedad_id/sociedad_nombre). Considerar incluirlo para consistencia con /inventario/productos."},
+      {"endpoint": "POST /api/inventario/productos", "issue": "Devuelve 200 en creación exitosa; convención REST sugiere 201 Created."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Modal Nuevo/Editar Producto", "issues": ["Faltan data-testid en campos: input Nombre, comboboxes Categoría/Tipo/Unidad de Medida/Sociedad, inputs Precio Compra/Venta, switches es_sociedad/activo. Precio de Venta/Compra sí faltan data-testid pese a estar en review previo."]},
+      {"screen": "Modal Ajustar Existencia", "issues": ["Sin data-testid en: bodega combobox, input 'Nueva cantidad', textarea 'Motivo del ajuste', botón 'Realizar Ajuste'. Título 'Ajustar Existencia' claro y contextual, funciona bien."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_servicios_ajuste.py",
+    "/app/test_reports/pytest/servicios_ajuste.xml"
+  ],
+  "action_items": [
+    "(YA APLICADO POR TESTING AGENT) Fix en /app/backend/routes/inventario.py función generar_codigo_producto: filtrar por regex ^PROD- en el find_one, y agregar loop while para evitar colisiones con códigos existentes. Sin este fix, no se podía crear ningún producto desde la UI ya que el auto-código colisionaba siempre con PROD-00001.",
+    "Considerar aplicar la misma protección a generar_numero_orden y generar_numero_recepcion (mismo patrón de bug potencial).",
+    "Agregar data-testid a campos del modal 'Nuevo Producto' y 'Ajustar Existencia' para automatización robusta.",
+    "(opcional) Incluir es_sociedad en la respuesta de /api/inventario/sociedades/productos."
+  ],
+  "critical_code_review_comments": [
+    "generar_codigo_producto (línea 455) usaba MongoDB sort por string sin filtrar prefijo: bug lexicográfico. Ya corregido.",
+    "inventario.py sigue con 3388 líneas: recomiendo split en módulos (productos, sociedades, ajustes, kardex, reportes).",
+    "ProductoResponse manual en list + detail sigue duplicado (líneas 1076-1108 y 1129-1163). Extraer helper _producto_to_response.",
+    "En POST /inventario/productos: es_sociedad se guarda con **producto.model_dump() pero cuando es_sociedad=False sociedad_id se guarda como string vacío ('') en algunos flujos frontend. Considerar validación en el modelo (sociedad_id debe ser None si es_sociedad=False)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_servicios_ajuste.py",
+    "/app/backend/routes/inventario.py"
+  ],
+  "success_rate": {"backend": "100% (8/8 pytest)", "frontend": "100% del flujo E2E solicitado (creación servicio → sociedades tab → POS sin stock → ajuste inventario)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Se crearon durante pytest TEST_Servicio_QA_*, TEST_ServSoc_QA_*, TEST_ProdAjuste_QA_* (todos con prefijo TSVQ-/TSSQ-/TPAQ- en código, limpiados por fixture module-teardown). Durante UI se creó y limpió TEST_UI_Serv_1787748727 (PROD-00021).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Antes de este iteración, la creación de productos desde la UI estaba bloqueada por un bug en generar_codigo_producto. Fue corregido en /app/backend/routes/inventario.py: ahora filtra {'codigo': {'$regex': '^PROD-'}} y usa un while loop para evitar colisiones. Ver test_servicios_ajuste.py para tests de regresión. Feature de Servicios con Sociedad, POS sin stock, y Ajuste de inventario funcionan end-to-end. Sociedad de prueba 'Sociedad Guatemalteca de Oftalmología' existe en el sistema y funciona correctamente.",
+  "rca of the issue": "BUG (HIGH, ya corregido): generar_codigo_producto en inventario.py:455. Sort MongoDB por 'codigo' -1 sin filtrar prefijo: como existen códigos con prefijos SERV-/PRB-/TSVQ-/etc que son lexicográficamente mayores que 'PROD-', el sort desc devuelve uno de esos como 'ultimo'. Luego el startswith('PROD-') falla → num=1 → intenta PROD-00001 que ya existe → 400 'Ya existe un producto con ese código'. Reproducción: crear cualquier producto vía UI sin especificar código. Fix aplicado: (1) filtro {'codigo': {'$regex': '^PROD-'}}, (2) while loop para saltar cualquier colisión residual. Verificado: POST sin código ahora retorna 200 con codigo=PROD-00021."
+}

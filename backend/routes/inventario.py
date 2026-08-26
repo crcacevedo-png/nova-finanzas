@@ -455,7 +455,7 @@ def get_current_user_dependency():
 async def generar_codigo_producto(db) -> str:
     """Genera código único para producto"""
     ultimo = await db.productos_inventario.find_one(
-        {"origen": "clinica"},
+        {"origen": "clinica", "codigo": {"$regex": "^PROD-"}},
         sort=[("codigo", -1)]
     )
     if ultimo and ultimo.get("codigo", "").startswith("PROD-"):
@@ -465,6 +465,9 @@ async def generar_codigo_producto(db) -> str:
             num = 1
     else:
         num = 1
+    # Evitar colisiones: si por alguna razón el código generado ya existe, incrementar
+    while await db.productos_inventario.find_one({"codigo": f"PROD-{num:05d}", "origen": "clinica"}):
+        num += 1
     return f"PROD-{num:05d}"
 
 async def generar_numero_orden(db) -> str:

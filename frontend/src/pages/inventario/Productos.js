@@ -891,7 +891,21 @@ const Productos = () => {
                 <Label>Tipo</Label>
                 <Select 
                   value={formData.tipo} 
-                  onValueChange={(v) => setFormData({ ...formData, tipo: v })}
+                  onValueChange={(v) => {
+                    // Si cambia a servicio, desactivar controles de inventario automáticamente
+                    if (v === 'servicio') {
+                      setFormData({ 
+                        ...formData, 
+                        tipo: v, 
+                        controla_inventario: false, 
+                        controla_lotes: false,
+                        existencia_minima: 0,
+                        existencia_maxima: 0
+                      });
+                    } else {
+                      setFormData({ ...formData, tipo: v });
+                    }
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
