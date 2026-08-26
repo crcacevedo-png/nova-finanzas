@@ -4,18 +4,23 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-08-26 (Sesión 3)
+**Última actualización**: 2026-08-26 (Sesión 5)
+
+### Últimos Cambios (2026-08-26 Sesión 5)
+- ✅ **Módulo Completo de Sociedades Médicas** (`/sociedades`)
+  - CRUD de Sociedades: Crear, editar, eliminar sociedades médicas con campos (nombre, descripción, NIT, teléfono, email, contacto, dirección, color identificador)
+  - 4 pestañas: Sociedades, Consumos, Productos, Resumen mensual
+  - Asignación de productos a sociedades específicas mediante dropdown en formulario de productos
+  - Contador de productos asignados por sociedad
+  - Exportación PDF y Excel de consumos
+  - API: `/api/inventario/sociedades/catalogo` (CRUD), `/sociedades/productos`, `/sociedades/consumos`, `/sociedades/resumen`, `/sociedades/exportar/excel`, `/sociedades/exportar/pdf`
+- ✅ **Bug Fix**: Campos `es_sociedad` y `sociedad_id` ahora se devuelven correctamente en GET `/api/inventario/productos` y GET `/api/inventario/productos/{id}`
+- ✅ **Dropdown de Sociedad en Productos**: Al activar el switch "Sociedad" aparece un selector para elegir la sociedad médica a la que pertenece el producto
 
 ### Últimos Cambios (2026-08-26 Sesión 4)
 - ✅ **Configuración Dinámica de Menús por Rol** (`/usuarios` - Tab "Menús por Rol")
 - ✅ **CRUD de Roles Personalizados** (`/usuarios` - Tab "Roles")
 - ✅ **Campo "Sociedad" en Productos** - Switch para marcar productos de sociedades médicas
-- ✅ **Nuevo Menú Sociedades** (`/sociedades`)
-  - Control de consumos de productos marcados como sociedad
-  - 3 pestañas: Consumos, Productos, Resumen mensual
-  - Filtros por fecha y producto
-  - Estadísticas: total productos, consumos, costo, productos distintos
-  - API: `/api/inventario/sociedades/consumos`, `/productos`, `/resumen`
 - ✅ **Superadmin puede modificar cantidades** - Endpoint de ajuste ya existente solo para superadmin
 
 ### Cambios Previos (2026-08-26 Sesión 3)

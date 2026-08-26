@@ -1,0 +1,86 @@
+{
+  "summary": "End-to-end testing of Módulo de Sociedades Médicas (backend + frontend). Backend CRUD works. Frontend UI for creating/editing sociedades, Producto form 'Sociedad' switch + dropdown, Productos tab in /sociedades, and Excel/PDF export all work. Found ONE HIGH-priority backend bug: GET /api/inventario/productos and GET /api/inventario/productos/{id} do NOT include the `es_sociedad` and `sociedad_id` fields in the response (they are stored correctly in the DB but the response omits them, defaulting to False/None). Also the list endpoint does not support `es_sociedad` / `sociedad_id` query filters. This causes the Productos tab in /sociedades to show 'Sin asignar' for all 6 flagged products, and prevents the frontend from showing the switch/dropdown pre-populated when editing a product that was saved as sociedad. 9/10 backend pytest tests pass.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/inventario/productos/{producto_id}",
+        "issue": "Response is built manually via ProductoResponse(...) and does NOT include `es_sociedad` and `sociedad_id` (see /app/backend/routes/inventario.py lines 1127-1158). Values are stored in Mongo but the API returns default False/None. This breaks the edit form: opening a product previously marked as 'Sociedad' shows the switch OFF and no sociedad selected.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "GET /api/inventario/productos (list)",
+        "issue": "Same fields (`es_sociedad`, `sociedad_id`) missing from ProductoResponse construction (lines 1076-1107). Additionally the endpoint accepts no `es_sociedad` / `sociedad_id` query filters. Confirmed empirically: calling ?es_sociedad=true returns all products with es_sociedad=false. Because of this all 6 rows in the Productos tab of /sociedades appear as 'Sin asignar', even after assigning.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/inventario/sociedades/catalogo",
+        "issue": "Returns 200 OK on create; conventionally should return 201 Created."
+      },
+      {
+        "endpoint": "GET /api/inventario/sociedades/catalogo",
+        "issue": "Hard-coded to_list(100) — will silently truncate above 100 sociedades. Consider pagination or removing limit."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Assign product to sociedad via /inventario/productos edit form",
+        "issue": "Because the backend GET returns es_sociedad=false / sociedad_id=null, when the user re-opens a product previously saved as 'Sociedad' the switch is OFF and the dropdown is empty. UI state cannot be trusted.",
+        "affected_selectors": ["#producto-edit-modal switch[Sociedad]", "Asignar a Sociedad Médica"]
+      },
+      {
+        "flow": "Productos tab in /sociedades",
+        "issue": "All 6 products marked as sociedad show 'Sin asignar' even after backend assigns sociedad_id (verified via /sociedades/catalogo/{id}/productos endpoint — assignment DOES persist, but the sociedad_nombre resolution in the aggregate endpoint /inventario/sociedades/productos returns 'Sin asignar' when the product-collection field es_sociedad might be missing on legacy rows). Suggest re-checking sociedad_nombre resolution and how flagged-but-unassigned products are displayed."
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Nuevo/Editar Producto modal",
+        "issues": [
+          "Many inputs (Nombre, Nombre Genérico, Categoría, Tipo, Presentación, Unidad de Medida, Existencia Mínima/Máxima, Descripción, all switches including 'Sociedad', and the 'Asignar a Sociedad Médica' dropdown) do not have data-testid attributes. Only precio-compra, precio-venta have them. This makes automated testing brittle.",
+          "The 'Sociedad' switch icon (👥) uses an emoji instead of a lucide icon like the other switches — inconsistent visual style."
+        ]
+      },
+      {
+        "screen": "Nueva Sociedad modal",
+        "issues": [
+          "Fields NIT, Teléfono, Email, Persona de Contacto, Dirección and the color-selector buttons lack data-testid attributes; only input-sociedad-nombre and submit-sociedad-btn are tagged.",
+          "Sociedad card edit/delete icon buttons have no data-testid; automation must query by button index."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sociedades.py",
+    "/app/test_reports/pytest/pytest_sociedades.xml"
+  ],
+  "action_items": [
+    "FIX (HIGH): In /app/backend/routes/inventario.py, add `es_sociedad=p.get('es_sociedad', False)` and `sociedad_id=p.get('sociedad_id')` to both ProductoResponse constructions (listar_productos lines 1076-1107 AND obtener_producto lines 1127-1158). Verify ProductoResponse model includes these fields.",
+    "FIX (HIGH): Add `es_sociedad: Optional[bool] = None` and `sociedad_id: Optional[str] = None` query params to listar_productos (line 1022) and apply them to the Mongo `filtro` dict.",
+    "Add data-testid attributes to all Producto form inputs and switches (especially the Sociedad switch and the sociedad dropdown, e.g. `data-testid=\"switch-es-sociedad\"`, `data-testid=\"select-sociedad-id\"`).",
+    "Add data-testid attributes to remaining fields in Nueva/Editar Sociedad modal and to edit/delete icon buttons on sociedad cards.",
+    "Verify sociedad_nombre resolution on the /inventario/sociedades/productos endpoint — right now 6 flagged products show 'Sin asignar' even after assignment; confirm behavior after fixing #1 and #2."
+  ],
+  "critical_code_review_comments": [
+    "inventario.py is 3382 lines — exceeds 700 LOC guideline; split into productos.py, categorias.py, sociedades.py, stock.py, reportes.py.",
+    "ProductoResponse is being built by hand in TWO places (list + detail) with duplicated field mapping — the two constructions drifted (both currently omit es_sociedad/sociedad_id). Extract a single `_producto_to_response(p, categoria_name, existencia)` helper.",
+    "listar_productos performs an N+1 query pattern: calls `obtener_existencia_total` inside the loop. Consider aggregating existencia once per page.",
+    "SociedadCreate model does not validate email format when email is provided (Optional[str]). Consider EmailStr.",
+    "DELETE /sociedades/catalogo/{id} returns None on success (no message body).",
+    "Endpoint prefix inconsistency: `/sociedades/catalogo` for CRUD but `/sociedades/productos` for the products aggregate — non-uniform routing."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_sociedades.py"
+  ],
+  "success_rate": {"backend": "90% (9/10 pytest passed, 1 fails documenting the missing-fields bug)", "frontend": "100% for visible flows (CRUD, switch, dropdown, tab Productos, Excel & PDF export)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Created and cleaned up TEST_Sociedad_QA (pytest fixture), TEST_UI_Sociedad_QA_Edit (frontend). Also created and cleaned TEST-SOC-001 product via pytest. All test data removed at the end.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests: /app/backend/tests/test_sociedades.py — auth uses `username` field (NOT `usuario`). Sociedad routes are under /api/inventario/sociedades/catalogo. Product creation requires `existencia_minima`/`existencia_maxima` (NOT `stock`/`stock_minimo`). Categorias endpoint returns {data: [...]}. Product list endpoint also returns {data: [...], total, page, limit}. The main open bug is that ProductoResponse construction in inventario.py omits es_sociedad and sociedad_id — verify these are returned after the main-agent fix. Also verify GET /api/inventario/productos?es_sociedad=true actually filters after fix.",
+  "rca of the issue": "Root cause: ProductoResponse is manually constructed in listar_productos (lines 1076-1107) and obtener_producto (lines 1127-1158). Both constructions omit `es_sociedad` and `sociedad_id`. Even though POST /productos saves them via `**producto.model_dump()` (line 1192) — verified because /inventario/sociedades/catalogo/{id}/productos returns the assigned product with correct sociedad_id — the GET endpoints strip these fields from the response. Fix: add the two missing keyword args in both ProductoResponse(...) calls. Reproduction: (1) POST /api/inventario/productos with {es_sociedad:true, sociedad_id:'<id>', ...}, (2) GET /api/inventario/productos/{new_id} → response shows es_sociedad:false, sociedad_id:null. Mitigation: patch inventario.py per action_items #1 and #2."
+}

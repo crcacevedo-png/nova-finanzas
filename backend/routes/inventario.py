@@ -75,6 +75,7 @@ class ProductoBase(BaseModel):
     controla_lotes: bool = False
     requiere_receta: bool = False
     es_sociedad: bool = False  # Productos para sociedades médicas
+    sociedad_id: Optional[str] = None  # ID de la sociedad asignada
     precio_compra: float = 0.0
     precio_venta: float = 0.0
     afecto_iva: bool = True
@@ -103,6 +104,7 @@ class ProductoUpdate(BaseModel):
     controla_lotes: Optional[bool] = None
     requiere_receta: Optional[bool] = None
     es_sociedad: Optional[bool] = None
+    sociedad_id: Optional[str] = None
     precio_compra: Optional[float] = None
     precio_venta: Optional[float] = None
     afecto_iva: Optional[bool] = None
@@ -1088,6 +1090,8 @@ async def listar_productos(
             controla_inventario=p.get("controla_inventario", True),
             controla_lotes=p.get("controla_lotes", False),
             requiere_receta=p.get("requiere_receta", False),
+            es_sociedad=p.get("es_sociedad", False),
+            sociedad_id=p.get("sociedad_id"),
             precio_compra=p.get("precio_compra", 0),
             precio_venta=p.get("precio_venta", 0),
             costo_promedio=p.get("costo_promedio", 0),
@@ -1139,6 +1143,8 @@ async def obtener_producto(
         controla_inventario=producto.get("controla_inventario", True),
         controla_lotes=producto.get("controla_lotes", False),
         requiere_receta=producto.get("requiere_receta", False),
+        es_sociedad=producto.get("es_sociedad", False),
+        sociedad_id=producto.get("sociedad_id"),
         precio_compra=producto.get("precio_compra", 0),
         precio_venta=producto.get("precio_venta", 0),
         costo_promedio=producto.get("costo_promedio", 0),
@@ -2480,6 +2486,266 @@ async def reporte_rentabilidad_historico(
 
 # ==================== MÓDULO SOCIEDADES ====================
 
+# Modelos para Sociedades
+class SociedadBase(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    nit: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    contacto: Optional[str] = None
+    color: str = "purple"  # Color para identificar en UI
+    activo: bool = True
+
+class SociedadCreate(SociedadBase):
+    pass
+
+class SociedadUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    nit: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    contacto: Optional[str] = None
+    color: Optional[str] = None
+    activo: Optional[bool] = None
+
+class SociedadResponse(SociedadBase):
+    id: str
+    productos_count: int = 0
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+@router.get("/sociedades/catalogo")
+async def listar_sociedades(
+    activo: Optional[bool] = None,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Lista todas las sociedades médicas"""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    filtro = {"origen": "clinica"}
+    if activo is not None:
+        filtro["activo"] = activo
+    
+    sociedades = await db.sociedades.find(filtro).sort("nombre", 1).to_list(100)
+    
+    # Contar productos por sociedad
+    productos_count = await db.productos_inventario.aggregate([
+        {"$match": {"es_sociedad": True, "sociedad_id": {"$ne": None}, "origen": "clinica"}},
+        {"$group": {"_id": "$sociedad_id", "count": {"$sum": 1}}}
+    ]).to_list(100)
+    count_map = {p["_id"]: p["count"] for p in productos_count}
+    
+    resultado = []
+    for s in sociedades:
+        resultado.append({
+            "id": s["id"],
+            "nombre": s["nombre"],
+            "descripcion": s.get("descripcion"),
+            "nit": s.get("nit"),
+            "direccion": s.get("direccion"),
+            "telefono": s.get("telefono"),
+            "email": s.get("email"),
+            "contacto": s.get("contacto"),
+            "color": s.get("color", "purple"),
+            "activo": s.get("activo", True),
+            "productos_count": count_map.get(s["id"], 0),
+            "created_at": s.get("created_at"),
+            "updated_at": s.get("updated_at")
+        })
+    
+    return resultado
+
+
+@router.get("/sociedades/catalogo/{sociedad_id}")
+async def obtener_sociedad(
+    sociedad_id: str,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Obtiene detalle de una sociedad"""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    sociedad = await db.sociedades.find_one({"id": sociedad_id, "origen": "clinica"})
+    if not sociedad:
+        raise HTTPException(status_code=404, detail="Sociedad no encontrada")
+    
+    # Contar productos
+    productos_count = await db.productos_inventario.count_documents({
+        "sociedad_id": sociedad_id, "origen": "clinica"
+    })
+    
+    return {
+        "id": sociedad["id"],
+        "nombre": sociedad["nombre"],
+        "descripcion": sociedad.get("descripcion"),
+        "nit": sociedad.get("nit"),
+        "direccion": sociedad.get("direccion"),
+        "telefono": sociedad.get("telefono"),
+        "email": sociedad.get("email"),
+        "contacto": sociedad.get("contacto"),
+        "color": sociedad.get("color", "purple"),
+        "activo": sociedad.get("activo", True),
+        "productos_count": productos_count,
+        "created_at": sociedad.get("created_at"),
+        "updated_at": sociedad.get("updated_at")
+    }
+
+
+@router.post("/sociedades/catalogo")
+async def crear_sociedad(
+    sociedad: SociedadCreate,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Crea una nueva sociedad médica"""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    # Verificar nombre único
+    existente = await db.sociedades.find_one({
+        "nombre": {"$regex": f"^{sociedad.nombre}$", "$options": "i"},
+        "origen": "clinica"
+    })
+    if existente:
+        raise HTTPException(status_code=400, detail="Ya existe una sociedad con ese nombre")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    nueva_sociedad = {
+        "id": str(uuid.uuid4()),
+        "origen": "clinica",
+        **sociedad.model_dump(),
+        "created_at": now,
+        "updated_at": now,
+        "created_by": current_user.get("username", "system")
+    }
+    
+    await db.sociedades.insert_one(nueva_sociedad)
+    
+    return {
+        "message": f"Sociedad '{sociedad.nombre}' creada exitosamente",
+        "sociedad": {k: v for k, v in nueva_sociedad.items() if k != "_id"}
+    }
+
+
+@router.put("/sociedades/catalogo/{sociedad_id}")
+async def actualizar_sociedad(
+    sociedad_id: str,
+    sociedad: SociedadUpdate,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Actualiza una sociedad existente"""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    existente = await db.sociedades.find_one({"id": sociedad_id, "origen": "clinica"})
+    if not existente:
+        raise HTTPException(status_code=404, detail="Sociedad no encontrada")
+    
+    # Verificar nombre único si se está cambiando
+    if sociedad.nombre and sociedad.nombre != existente["nombre"]:
+        duplicado = await db.sociedades.find_one({
+            "nombre": {"$regex": f"^{sociedad.nombre}$", "$options": "i"},
+            "origen": "clinica",
+            "id": {"$ne": sociedad_id}
+        })
+        if duplicado:
+            raise HTTPException(status_code=400, detail="Ya existe otra sociedad con ese nombre")
+    
+    update_data = {k: v for k, v in sociedad.model_dump().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    update_data["updated_by"] = current_user.get("username", "system")
+    
+    await db.sociedades.update_one(
+        {"id": sociedad_id},
+        {"$set": update_data}
+    )
+    
+    return {"message": f"Sociedad actualizada exitosamente"}
+
+
+@router.delete("/sociedades/catalogo/{sociedad_id}")
+async def eliminar_sociedad(
+    sociedad_id: str,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Elimina una sociedad (solo si no tiene productos asignados)"""
+    db = get_db()
+    
+    if current_user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo superadmin puede eliminar sociedades")
+    
+    # Verificar que existe
+    sociedad = await db.sociedades.find_one({"id": sociedad_id, "origen": "clinica"})
+    if not sociedad:
+        raise HTTPException(status_code=404, detail="Sociedad no encontrada")
+    
+    # Verificar que no tiene productos asignados
+    productos_count = await db.productos_inventario.count_documents({
+        "sociedad_id": sociedad_id, "origen": "clinica"
+    })
+    if productos_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar: hay {productos_count} producto(s) asignado(s) a esta sociedad"
+        )
+    
+    await db.sociedades.delete_one({"id": sociedad_id})
+    
+    return {"message": f"Sociedad '{sociedad['nombre']}' eliminada exitosamente"}
+
+
+@router.get("/sociedades/catalogo/{sociedad_id}/productos")
+async def listar_productos_sociedad_especifica(
+    sociedad_id: str,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Lista todos los productos asignados a una sociedad específica"""
+    db = get_db()
+    
+    if current_user.get("role") not in ["admin", "superadmin"]:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    
+    productos = await db.productos_inventario.find({
+        "sociedad_id": sociedad_id,
+        "origen": "clinica",
+        "activo": True
+    }).to_list(500)
+    
+    # Obtener existencias
+    existencias = await db.existencias_inventario.aggregate([
+        {"$match": {"origen": "clinica"}},
+        {"$group": {"_id": "$producto_id", "total": {"$sum": "$cantidad"}}}
+    ]).to_list(1000)
+    existencias_map = {e["_id"]: e["total"] for e in existencias}
+    
+    resultado = []
+    for p in productos:
+        resultado.append({
+            "id": p["id"],
+            "codigo": p.get("codigo", ""),
+            "nombre": p["nombre"],
+            "existencia_total": existencias_map.get(p["id"], 0),
+            "precio_compra": p.get("precio_compra", 0),
+            "precio_venta": p.get("precio_venta", 0)
+        })
+    
+    return resultado
+
+
+# Modelos para reportes de consumos
 class ConsumoSociedadItem(BaseModel):
     id: str
     fecha: str
@@ -2512,6 +2778,7 @@ async def listar_consumos_sociedades(
     fecha_fin: Optional[str] = None,
     producto_id: Optional[str] = None,
     bodega_id: Optional[str] = None,
+    sociedad_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user_dependency())
 ):
     """
@@ -2523,10 +2790,15 @@ async def listar_consumos_sociedades(
     if current_user.get("role") not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
+    # Filtro para productos sociedad
+    productos_filtro = {"es_sociedad": True, "origen": "clinica"}
+    if sociedad_id:
+        productos_filtro["sociedad_id"] = sociedad_id
+    
     # Obtener IDs de productos que son sociedad
     productos_sociedad = await db.productos_inventario.find(
-        {"es_sociedad": True, "origen": "clinica"},
-        {"id": 1, "codigo": 1, "nombre": 1}
+        productos_filtro,
+        {"id": 1, "codigo": 1, "nombre": 1, "sociedad_id": 1}
     ).to_list(1000)
     
     if not productos_sociedad:
@@ -2625,6 +2897,7 @@ async def listar_consumos_sociedades(
 
 @router.get("/sociedades/productos")
 async def listar_productos_sociedad(
+    sociedad_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user_dependency())
 ):
     """Lista todos los productos marcados como sociedad con sus existencias."""
@@ -2633,9 +2906,11 @@ async def listar_productos_sociedad(
     if current_user.get("role") not in ["admin", "superadmin"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
-    productos = await db.productos_inventario.find(
-        {"es_sociedad": True, "origen": "clinica", "activo": True}
-    ).to_list(500)
+    filtro = {"es_sociedad": True, "origen": "clinica", "activo": True}
+    if sociedad_id:
+        filtro["sociedad_id"] = sociedad_id
+    
+    productos = await db.productos_inventario.find(filtro).to_list(500)
     
     # Obtener existencias totales
     existencias = await db.existencias_inventario.aggregate([
@@ -2647,6 +2922,9 @@ async def listar_productos_sociedad(
     # Obtener categorías
     categorias = {c["id"]: c["nombre"] for c in await db.categorias_inventario.find({"origen": "clinica"}).to_list(100)}
     
+    # Obtener sociedades
+    sociedades = {s["id"]: s["nombre"] for s in await db.sociedades.find({"origen": "clinica"}).to_list(100)}
+    
     resultado = []
     for p in productos:
         resultado.append({
@@ -2654,6 +2932,8 @@ async def listar_productos_sociedad(
             "codigo": p.get("codigo", ""),
             "nombre": p["nombre"],
             "categoria_nombre": categorias.get(p.get("categoria_id")),
+            "sociedad_id": p.get("sociedad_id"),
+            "sociedad_nombre": sociedades.get(p.get("sociedad_id"), "Sin asignar"),
             "existencia_total": existencias_map.get(p["id"], 0),
             "precio_compra": p.get("precio_compra", 0),
             "precio_venta": p.get("precio_venta", 0),

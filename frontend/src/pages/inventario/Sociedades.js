@@ -1,26 +1,68 @@
 // /app/frontend/src/pages/inventario/Sociedades.js
-// Módulo de gestión de consumos de productos para sociedades médicas
+// Módulo de gestión de sociedades médicas y sus consumos
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
+import { Textarea } from '../../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import {
-  Users, Package, Calendar, TrendingDown, Search, Download, Filter,
-  ChevronLeft, ChevronRight, DollarSign, BarChart3, RefreshCw, FileSpreadsheet, FileText
+  Users, Package, TrendingDown, Plus, Pencil, Trash2,
+  ChevronLeft, ChevronRight, DollarSign, BarChart3, RefreshCw, 
+  FileSpreadsheet, FileText, Building2, Mail, Phone, MapPin, Save
 } from 'lucide-react';
 import { inventarioApi, formatCurrency } from '../../services/api';
 import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
+// Colores disponibles para sociedades
+const COLORES_SOCIEDAD = [
+  { id: 'purple', label: 'Morado', class: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { id: 'blue', label: 'Azul', class: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { id: 'green', label: 'Verde', class: 'bg-green-100 text-green-800 border-green-200' },
+  { id: 'red', label: 'Rojo', class: 'bg-red-100 text-red-800 border-red-200' },
+  { id: 'orange', label: 'Naranja', class: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { id: 'teal', label: 'Turquesa', class: 'bg-teal-100 text-teal-800 border-teal-200' },
+  { id: 'pink', label: 'Rosa', class: 'bg-pink-100 text-pink-800 border-pink-200' },
+];
+
+const getColorClass = (colorId) => {
+  const found = COLORES_SOCIEDAD.find(c => c.id === colorId);
+  return found ? found.class : 'bg-purple-100 text-purple-800 border-purple-200';
+};
+
 const Sociedades = () => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('consumos');
+  const [activeTab, setActiveTab] = useState('sociedades');
+  
+  // Sociedades
+  const [sociedades, setSociedades] = useState([]);
+  const [loadingSociedades, setLoadingSociedades] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingSociedad, setEditingSociedad] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sociedadToDelete, setSociedadToDelete] = useState(null);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    descripcion: '',
+    nit: '',
+    direccion: '',
+    telefono: '',
+    email: '',
+    contacto: '',
+    color: 'purple'
+  });
+  const [savingSociedad, setSavingSociedad] = useState(false);
+  
+  // Filtro por sociedad
+  const [sociedadFilter, setSociedadFilter] = useState('all');
   
   // Consumos
   const [consumos, setConsumos] = useState([]);
@@ -43,6 +85,20 @@ const Sociedades = () => {
   const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth() + 1);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
 
+  // Fetch sociedades
+  const fetchSociedades = useCallback(async () => {
+    try {
+      setLoadingSociedades(true);
+      const response = await inventarioApi.getSociedades();
+      setSociedades(response.data || []);
+    } catch (error) {
+      console.error('Error fetching sociedades:', error);
+      toast.error('Error al cargar sociedades');
+    } finally {
+      setLoadingSociedades(false);
+    }
+  }, []);
+
   const fetchConsumos = useCallback(async () => {
     try {
       setLoading(true);
@@ -55,6 +111,7 @@ const Sociedades = () => {
       if (fechaInicio) params.append('fecha_inicio', fechaInicio);
       if (fechaFin) params.append('fecha_fin', fechaFin);
       if (productoFilter !== 'all') params.append('producto_id', productoFilter);
+      if (sociedadFilter !== 'all') params.append('sociedad_id', sociedadFilter);
       
       const response = await fetch(`${API_URL}/api/inventario/sociedades/consumos?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -72,13 +129,14 @@ const Sociedades = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, fechaInicio, fechaFin, productoFilter]);
+  }, [page, limit, fechaInicio, fechaFin, productoFilter, sociedadFilter]);
 
   const fetchProductosSociedad = useCallback(async () => {
     try {
       setLoadingProductos(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/inventario/sociedades/productos`, {
+      const params = sociedadFilter !== 'all' ? `?sociedad_id=${sociedadFilter}` : '';
+      const response = await fetch(`${API_URL}/api/inventario/sociedades/productos${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -91,13 +149,19 @@ const Sociedades = () => {
     } finally {
       setLoadingProductos(false);
     }
-  }, []);
+  }, [sociedadFilter]);
 
   const fetchResumenMensual = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
+      const params = new URLSearchParams({
+        mes: mesSeleccionado.toString(),
+        anio: anioSeleccionado.toString()
+      });
+      if (sociedadFilter !== 'all') params.append('sociedad_id', sociedadFilter);
+      
       const response = await fetch(
-        `${API_URL}/api/inventario/sociedades/resumen?mes=${mesSeleccionado}&anio=${anioSeleccionado}`,
+        `${API_URL}/api/inventario/sociedades/resumen?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
@@ -108,18 +172,100 @@ const Sociedades = () => {
     } catch (error) {
       console.error('Error fetching resumen:', error);
     }
-  }, [mesSeleccionado, anioSeleccionado]);
+  }, [mesSeleccionado, anioSeleccionado, sociedadFilter]);
 
   useEffect(() => {
-    fetchConsumos();
-    fetchProductosSociedad();
-  }, [fetchConsumos, fetchProductosSociedad]);
+    fetchSociedades();
+  }, [fetchSociedades]);
 
   useEffect(() => {
-    if (activeTab === 'resumen') {
+    if (activeTab === 'consumos') {
+      fetchConsumos();
+      fetchProductosSociedad();
+    } else if (activeTab === 'productos') {
+      fetchProductosSociedad();
+    } else if (activeTab === 'resumen') {
       fetchResumenMensual();
     }
-  }, [activeTab, fetchResumenMensual]);
+  }, [activeTab, fetchConsumos, fetchProductosSociedad, fetchResumenMensual]);
+
+  // CRUD Sociedades
+  const handleNewSociedad = () => {
+    setEditingSociedad(null);
+    setFormData({
+      nombre: '',
+      descripcion: '',
+      nit: '',
+      direccion: '',
+      telefono: '',
+      email: '',
+      contacto: '',
+      color: 'purple'
+    });
+    setDialogOpen(true);
+  };
+
+  const handleEditSociedad = (sociedad) => {
+    setEditingSociedad(sociedad);
+    setFormData({
+      nombre: sociedad.nombre || '',
+      descripcion: sociedad.descripcion || '',
+      nit: sociedad.nit || '',
+      direccion: sociedad.direccion || '',
+      telefono: sociedad.telefono || '',
+      email: sociedad.email || '',
+      contacto: sociedad.contacto || '',
+      color: sociedad.color || 'purple'
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDeleteClick = (sociedad) => {
+    setSociedadToDelete(sociedad);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!sociedadToDelete) return;
+    
+    try {
+      await inventarioApi.deleteSociedad(sociedadToDelete.id);
+      toast.success(`Sociedad "${sociedadToDelete.nombre}" eliminada`);
+      setDeleteDialogOpen(false);
+      setSociedadToDelete(null);
+      fetchSociedades();
+    } catch (error) {
+      console.error('Error deleting sociedad:', error);
+      toast.error(error.response?.data?.detail || 'Error al eliminar sociedad');
+    }
+  };
+
+  const handleSaveSociedad = async () => {
+    if (!formData.nombre.trim()) {
+      toast.error('El nombre es requerido');
+      return;
+    }
+
+    try {
+      setSavingSociedad(true);
+      
+      if (editingSociedad) {
+        await inventarioApi.updateSociedad(editingSociedad.id, formData);
+        toast.success(`Sociedad "${formData.nombre}" actualizada`);
+      } else {
+        await inventarioApi.createSociedad(formData);
+        toast.success(`Sociedad "${formData.nombre}" creada`);
+      }
+      
+      setDialogOpen(false);
+      fetchSociedades();
+    } catch (error) {
+      console.error('Error saving sociedad:', error);
+      toast.error(error.response?.data?.detail || 'Error al guardar sociedad');
+    } finally {
+      setSavingSociedad(false);
+    }
+  };
 
   const totalPages = Math.ceil(totalConsumos / limit);
 
@@ -135,6 +281,7 @@ const Sociedades = () => {
         params.append('mes', mesSeleccionado.toString());
         params.append('anio', anioSeleccionado.toString());
       }
+      if (sociedadFilter !== 'all') params.append('sociedad_id', sociedadFilter);
       
       const response = await fetch(`${API_URL}/api/inventario/sociedades/exportar/excel?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -174,6 +321,7 @@ const Sociedades = () => {
         params.append('mes', mesSeleccionado.toString());
         params.append('anio', anioSeleccionado.toString());
       }
+      if (sociedadFilter !== 'all') params.append('sociedad_id', sociedadFilter);
       
       const response = await fetch(`${API_URL}/api/inventario/sociedades/exportar/pdf?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -210,18 +358,12 @@ const Sociedades = () => {
   };
 
   const meses = [
-    { value: 1, label: 'Enero' },
-    { value: 2, label: 'Febrero' },
-    { value: 3, label: 'Marzo' },
-    { value: 4, label: 'Abril' },
-    { value: 5, label: 'Mayo' },
-    { value: 6, label: 'Junio' },
-    { value: 7, label: 'Julio' },
-    { value: 8, label: 'Agosto' },
-    { value: 9, label: 'Septiembre' },
-    { value: 10, label: 'Octubre' },
-    { value: 11, label: 'Noviembre' },
-    { value: 12, label: 'Diciembre' }
+    { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' },
+    { value: 3, label: 'Marzo' }, { value: 4, label: 'Abril' },
+    { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Septiembre' }, { value: 10, label: 'Octubre' },
+    { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' }
   ];
 
   return (
@@ -231,11 +373,11 @@ const Sociedades = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 font-['Outfit'] flex items-center gap-2">
-              <Users className="w-7 h-7 text-purple-600" />
-              Sociedades
+              <Building2 className="w-7 h-7 text-purple-600" />
+              Sociedades Médicas
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              Control de consumos de productos para sociedades médicas
+              Gestión de sociedades y control de consumos de productos
             </p>
           </div>
           <div className="flex gap-2">
@@ -250,16 +392,60 @@ const Sociedades = () => {
           </div>
         </div>
 
+        {/* Filtro global por sociedad */}
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium">Filtrar por Sociedad:</Label>
+              <Select value={sociedadFilter} onValueChange={setSociedadFilter}>
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue placeholder="Todas las sociedades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las sociedades</SelectItem>
+                  {sociedades.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <div className="flex items-center gap-2">
+                        <span className={`w-3 h-3 rounded-full ${getColorClass(s.color).split(' ')[0]}`} />
+                        {s.nombre}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {sociedadFilter !== 'all' && (
+                <Button variant="ghost" size="sm" onClick={() => setSociedadFilter('all')}>
+                  Limpiar filtro
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-100 rounded-lg">
-                  <Package className="w-5 h-5 text-purple-600" />
+                  <Building2 className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Productos Sociedad</p>
+                  <p className="text-sm text-gray-500">Sociedades</p>
+                  <p className="text-xl font-bold">{sociedades.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Productos Asignados</p>
                   <p className="text-xl font-bold">{productosSociedad.length}</p>
                 </div>
               </div>
@@ -293,25 +479,15 @@ const Sociedades = () => {
               </div>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Productos Distintos</p>
-                  <p className="text-xl font-bold">{resumenConsumos.productos_distintos || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-lg grid-cols-4">
+            <TabsTrigger value="sociedades" className="flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Sociedades
+            </TabsTrigger>
             <TabsTrigger value="consumos" className="flex items-center gap-2">
               <TrendingDown className="w-4 h-4" />
               Consumos
@@ -325,6 +501,102 @@ const Sociedades = () => {
               Resumen
             </TabsTrigger>
           </TabsList>
+
+          {/* Tab: Sociedades */}
+          <TabsContent value="sociedades" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-gray-500">
+                Administra las sociedades médicas y asigna productos desde el catálogo
+              </p>
+              <Button onClick={handleNewSociedad} data-testid="create-sociedad-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Sociedad
+              </Button>
+            </div>
+
+            {loadingSociedades ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+              </div>
+            ) : sociedades.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Building2 className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-500">No hay sociedades creadas</p>
+                <Button className="mt-4" onClick={handleNewSociedad}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Crear primera sociedad
+                </Button>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sociedades.map((sociedad) => (
+                  <Card key={sociedad.id} className="overflow-hidden" data-testid={`sociedad-card-${sociedad.id}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge className={`${getColorClass(sociedad.color)} text-sm`}>
+                            <Building2 className="w-3 h-3 mr-1" />
+                            {sociedad.nombre}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditSociedad(sociedad)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteClick(sociedad)}
+                            disabled={sociedad.productos_count > 0}
+                            title={sociedad.productos_count > 0 ? 'Tiene productos asignados' : 'Eliminar'}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                      {sociedad.descripcion && (
+                        <CardDescription className="mt-2 text-sm">{sociedad.descripcion}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-2 text-sm">
+                      {sociedad.nit && (
+                        <div className="text-gray-600">NIT: {sociedad.nit}</div>
+                      )}
+                      {sociedad.contacto && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Users className="w-4 h-4" />
+                          {sociedad.contacto}
+                        </div>
+                      )}
+                      {sociedad.telefono && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Phone className="w-4 h-4" />
+                          {sociedad.telefono}
+                        </div>
+                      )}
+                      {sociedad.email && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Mail className="w-4 h-4" />
+                          {sociedad.email}
+                        </div>
+                      )}
+                      {sociedad.direccion && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <MapPin className="w-4 h-4" />
+                          {sociedad.direccion}
+                        </div>
+                      )}
+                      <div className="pt-2 border-t mt-2">
+                        <Badge variant="outline">
+                          {sociedad.productos_count} producto{sociedad.productos_count !== 1 ? 's' : ''} asignado{sociedad.productos_count !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
           {/* Tab: Consumos */}
           <TabsContent value="consumos" className="space-y-4">
@@ -382,8 +654,8 @@ const Sociedades = () => {
                 ) : consumos.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No se encontraron consumos de sociedades</p>
-                    <p className="text-sm mt-1">Marca productos como &quot;Sociedad&quot; en el catálogo para verlos aquí</p>
+                    <p>No se encontraron consumos</p>
+                    <p className="text-sm mt-1">Asigna productos a sociedades para ver sus consumos aquí</p>
                   </div>
                 ) : (
                   <>
@@ -476,7 +748,10 @@ const Sociedades = () => {
           <TabsContent value="productos" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Productos Marcados como Sociedad</CardTitle>
+                <CardTitle className="text-lg">Productos Asignados a Sociedades</CardTitle>
+                <CardDescription>
+                  Para asignar productos a sociedades, ve a Inventario {'>'} Productos y edita cada producto
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {loadingProductos ? (
@@ -486,8 +761,8 @@ const Sociedades = () => {
                 ) : productosSociedad.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No hay productos marcados como sociedad</p>
-                    <p className="text-sm mt-1">Ve al Catálogo de Productos y activa el switch &quot;Sociedad&quot;</p>
+                    <p>No hay productos asignados a sociedades</p>
+                    <p className="text-sm mt-1">Ve a Productos y activa &quot;Sociedad&quot; + selecciona la sociedad</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -496,7 +771,7 @@ const Sociedades = () => {
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sociedad</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Existencia</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">P. Compra</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">P. Venta</th>
@@ -507,14 +782,18 @@ const Sociedades = () => {
                           <tr key={producto.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm font-mono">{producto.codigo}</td>
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                  👥
-                                </Badge>
-                                <span className="text-sm font-medium">{producto.nombre}</span>
-                              </div>
+                              <span className="text-sm font-medium">{producto.nombre}</span>
                             </td>
-                            <td className="px-4 py-3 text-sm">{producto.categoria_nombre || '-'}</td>
+                            <td className="px-4 py-3">
+                              {producto.sociedad_nombre ? (
+                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                  <Building2 className="w-3 h-3 mr-1" />
+                                  {producto.sociedad_nombre}
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-400 text-sm">Sin asignar</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-sm text-right">
                               {producto.controla_inventario ? (
                                 <Badge variant={producto.existencia_total > 10 ? "outline" : "destructive"}>
@@ -578,7 +857,6 @@ const Sociedades = () => {
 
             {resumenMensual && (
               <>
-                {/* Totales del mes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card className="bg-gradient-to-br from-purple-50 to-white">
                     <CardContent className="pt-6">
@@ -601,7 +879,6 @@ const Sociedades = () => {
                   </Card>
                 </div>
 
-                {/* Desglose por producto */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Consumo por Producto</CardTitle>
@@ -627,12 +904,8 @@ const Sociedades = () => {
                                     <p className="text-xs text-gray-500">{item.producto_codigo}</p>
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 text-sm text-right font-medium">
-                                  {item.cantidad}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-right">
-                                  {formatCurrency(item.costo_total)}
-                                </td>
+                                <td className="px-4 py-3 text-sm text-right font-medium">{item.cantidad}</td>
+                                <td className="px-4 py-3 text-sm text-right">{formatCurrency(item.costo_total)}</td>
                                 <td className="px-4 py-3 text-right">
                                   <Badge variant="outline">
                                     {resumenMensual.total_costo > 0 
@@ -656,6 +929,150 @@ const Sociedades = () => {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Dialog: Crear/Editar Sociedad */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-purple-600" />
+                {editingSociedad ? 'Editar Sociedad' : 'Nueva Sociedad'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingSociedad ? 'Modifica los datos de la sociedad médica.' : 'Crea una nueva sociedad médica para asignar productos.'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre *</Label>
+                <Input
+                  id="nombre"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Ej: Sociedad de Glaucoma"
+                  data-testid="input-sociedad-nombre"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="descripcion">Descripción</Label>
+                <Textarea
+                  id="descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                  placeholder="Descripción de la sociedad..."
+                  rows={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nit">NIT</Label>
+                  <Input
+                    id="nit"
+                    value={formData.nit}
+                    onChange={(e) => setFormData(prev => ({ ...prev, nit: e.target.value }))}
+                    placeholder="12345678-9"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefono">Teléfono</Label>
+                  <Input
+                    id="telefono"
+                    value={formData.telefono}
+                    onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
+                    placeholder="2222-3333"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="contacto@sociedad.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contacto">Persona de Contacto</Label>
+                <Input
+                  id="contacto"
+                  value={formData.contacto}
+                  onChange={(e) => setFormData(prev => ({ ...prev, contacto: e.target.value }))}
+                  placeholder="Dr. Juan Pérez"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="direccion">Dirección</Label>
+                <Input
+                  id="direccion"
+                  value={formData.direccion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
+                  placeholder="Zona 10, Ciudad de Guatemala"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Color identificador</Label>
+                <div className="flex flex-wrap gap-2">
+                  {COLORES_SOCIEDAD.map(color => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, color: color.id }))}
+                      className={`px-3 py-1.5 rounded-full text-sm transition-all ${color.class} ${
+                        formData.color === color.id ? 'ring-2 ring-offset-2 ring-purple-500' : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      {color.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveSociedad} disabled={savingSociedad} data-testid="submit-sociedad-btn">
+                {savingSociedad ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                {editingSociedad ? 'Guardar Cambios' : 'Crear Sociedad'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Confirmar Eliminación */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit']">Eliminar Sociedad</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que deseas eliminar la sociedad &quot;{sociedadToDelete?.nombre}&quot;? 
+                Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmDelete} data-testid="confirm-delete-sociedad-btn">
+                Eliminar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

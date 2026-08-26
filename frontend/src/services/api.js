@@ -621,6 +621,14 @@ export const inventarioApi = {
   // Reportes
   getReporteRentabilidadCategorias: (params) => axios.get(`${API_URL}/inventario/reportes/rentabilidad-categorias`, { params }),
   getReporteRentabilidadHistorico: (params) => axios.get(`${API_URL}/inventario/reportes/rentabilidad-historico`, { params }),
+  
+  // Sociedades - Catálogo
+  getSociedades: (activo) => axios.get(`${API_URL}/inventario/sociedades/catalogo`, { params: activo !== undefined ? { activo } : {} }),
+  getSociedad: (id) => axios.get(`${API_URL}/inventario/sociedades/catalogo/${id}`),
+  createSociedad: (data) => axios.post(`${API_URL}/inventario/sociedades/catalogo`, data),
+  updateSociedad: (id, data) => axios.put(`${API_URL}/inventario/sociedades/catalogo/${id}`, data),
+  deleteSociedad: (id) => axios.delete(`${API_URL}/inventario/sociedades/catalogo/${id}`),
+  getProductosSociedad: (sociedadId) => axios.get(`${API_URL}/inventario/sociedades/catalogo/${sociedadId}/productos`),
 };
 
 // ==================== API DE PUNTO DE VENTA (POS) ====================

@@ -31,6 +31,7 @@ const Productos = () => {
   const [categorias, setCategorias] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [proveedores, setProveedores] = useState([]);
+  const [sociedades, setSociedades] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -87,6 +88,7 @@ const Productos = () => {
     controla_lotes: false,
     requiere_receta: false,
     es_sociedad: false,
+    sociedad_id: '',
     precio_compra: 0,
     precio_venta: 0,
     afecto_iva: true,
@@ -119,6 +121,15 @@ const Productos = () => {
     }
   }, []);
 
+  const loadSociedades = useCallback(async () => {
+    try {
+      const res = await inventarioApi.getSociedades(true);
+      setSociedades(res.data || []);
+    } catch (error) {
+      console.error('Error cargando sociedades:', error);
+    }
+  }, []);
+
   const loadProductos = useCallback(async () => {
     try {
       setLoading(true);
@@ -144,7 +155,8 @@ const Productos = () => {
   useEffect(() => {
     loadCategorias();
     loadBodegasYProveedores();
-  }, [loadCategorias, loadBodegasYProveedores]);
+    loadSociedades();
+  }, [loadCategorias, loadBodegasYProveedores, loadSociedades]);
 
   // Abrir modal de entrada si viene desde el panel
   useEffect(() => {
@@ -180,6 +192,7 @@ const Productos = () => {
         controla_lotes: producto.controla_lotes ?? false,
         requiere_receta: producto.requiere_receta ?? false,
         es_sociedad: producto.es_sociedad ?? false,
+        sociedad_id: producto.sociedad_id || '',
         precio_compra: producto.precio_compra || 0,
         precio_venta: producto.precio_venta || 0,
         afecto_iva: producto.afecto_iva ?? true,
@@ -207,6 +220,7 @@ const Productos = () => {
         controla_lotes: false,
         requiere_receta: false,
         es_sociedad: false,
+        sociedad_id: '',
         precio_compra: 0,
         precio_venta: 0,
         afecto_iva: true,
@@ -977,7 +991,7 @@ const Productos = () => {
                     <Switch
                       id="es_sociedad"
                       checked={formData.es_sociedad}
-                      onCheckedChange={(v) => setFormData({ ...formData, es_sociedad: v })}
+                      onCheckedChange={(v) => setFormData({ ...formData, es_sociedad: v, sociedad_id: v ? formData.sociedad_id : '' })}
                     />
                     <Label htmlFor="es_sociedad" className="flex items-center gap-1">
                       <span className="text-purple-600">👥</span> Sociedad
@@ -992,6 +1006,50 @@ const Productos = () => {
                     />
                     <Label htmlFor="activo">Activo</Label>
                   </div>
+                </div>
+              )}
+              
+              {/* Selector de Sociedad - aparece cuando es_sociedad está activo */}
+              {formData.es_sociedad && (
+                <div className="col-span-2 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <Label className="text-purple-700 font-medium mb-2 block">
+                    Asignar a Sociedad Médica
+                  </Label>
+                  <Select 
+                    value={formData.sociedad_id} 
+                    onValueChange={(v) => setFormData({ ...formData, sociedad_id: v })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Selecciona una sociedad..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sociedades.length === 0 ? (
+                        <SelectItem value="" disabled>No hay sociedades creadas</SelectItem>
+                      ) : (
+                        sociedades.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${
+                                s.color === 'blue' ? 'bg-blue-500' :
+                                s.color === 'green' ? 'bg-green-500' :
+                                s.color === 'red' ? 'bg-red-500' :
+                                s.color === 'orange' ? 'bg-orange-500' :
+                                s.color === 'teal' ? 'bg-teal-500' :
+                                s.color === 'pink' ? 'bg-pink-500' :
+                                'bg-purple-500'
+                              }`}></span>
+                              {s.nombre}
+                            </span>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {sociedades.length === 0 && (
+                    <p className="text-xs text-purple-600 mt-2">
+                      Debes crear sociedades en el menú Inventario → Sociedades para asignar productos.
+                    </p>
+                  )}
                 </div>
               )}
               
