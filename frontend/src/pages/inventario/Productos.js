@@ -25,6 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 const Productos = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
+  const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState([]);
@@ -935,7 +936,12 @@ const Productos = () => {
                       type="number"
                       value={formData.existencia_minima}
                       onChange={(e) => setFormData({ ...formData, existencia_minima: parseInt(e.target.value) || 0 })}
+                      disabled={!isAdminOrSuperAdmin}
+                      className={!isAdminOrSuperAdmin ? 'bg-gray-100 cursor-not-allowed' : ''}
                     />
+                    {!isAdminOrSuperAdmin && (
+                      <p className="text-xs text-gray-500">Solo administradores pueden modificar</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -944,7 +950,12 @@ const Productos = () => {
                       type="number"
                       value={formData.existencia_maxima}
                       onChange={(e) => setFormData({ ...formData, existencia_maxima: parseInt(e.target.value) || 0 })}
+                      disabled={!isAdminOrSuperAdmin}
+                      className={!isAdminOrSuperAdmin ? 'bg-gray-100 cursor-not-allowed' : ''}
                     />
+                    {!isAdminOrSuperAdmin && (
+                      <p className="text-xs text-gray-500">Solo administradores pueden modificar</p>
+                    )}
                   </div>
                 </>
               )}
@@ -1027,7 +1038,7 @@ const Productos = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {sociedades.length === 0 ? (
-                        <SelectItem value="" disabled>No hay sociedades creadas</SelectItem>
+                        <SelectItem value="__empty__" disabled>No hay sociedades creadas</SelectItem>
                       ) : (
                         sociedades.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
