@@ -502,6 +502,8 @@ export const auditActionLabels = {
   PATIENT_CREATED: 'Paciente creado',
   PATIENT_UPDATED: 'Paciente actualizado',
   PATIENT_DELETED: 'Paciente eliminado',
+  PRODUCT_DELETED: 'Producto eliminado de inventario',
+  PRODUCT_IMPORTED: 'Productos importados',
 };
 
 // ==================== API DE INVENTARIO ====================

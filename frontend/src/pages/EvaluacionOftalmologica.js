@@ -5,7 +5,7 @@ import {
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
   ChevronDown, ChevronUp, Lock, Clock, Calendar,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
-  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud
+  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud, FileDown
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -33,6 +33,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
@@ -1009,6 +1010,49 @@ const EvaluacionOftalmologica = () => {
     }, 500);
   };
 
+  // Exportar evaluación completa a PDF
+  const handleExportPDF = async () => {
+    if (!evaluacionActual?.id) {
+      toast.error('Debe guardar la evaluación antes de exportar a PDF');
+      return;
+    }
+    
+    try {
+      toast.loading('Generando PDF...', { id: 'pdf-loading' });
+      
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/evaluaciones/${evaluacionActual.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      
+      // Crear enlace de descarga
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Obtener nombre del archivo del header o usar default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'evaluacion_oftalmologica.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('PDF descargado correctamente', { id: 'pdf-loading' });
+    } catch (error) {
+      console.error('Error exportando PDF:', error);
+      toast.error('Error al generar PDF', { id: 'pdf-loading' });
+    }
+  };
+
   // Enviar a CRM de Cirugías
   const handleEnviarCRM = async () => {
     if (!crmForm.tipo_cirugia) {
@@ -1329,6 +1373,11 @@ const EvaluacionOftalmologica = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExportPDF()}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Exportar PDF Completo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handlePrint('medicamentos')}>
                     <Pill className="w-4 h-4 mr-2" />
                     Receta de Medicamentos

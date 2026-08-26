@@ -1229,6 +1229,11 @@ async def eliminar_producto(
     if current_user.get("role") != "superadmin":
         raise HTTPException(status_code=403, detail="Solo SuperAdmin puede eliminar productos")
     
+    # Obtener datos del producto antes de eliminar (para auditoría)
+    producto = await db.productos_inventario.find_one({"id": producto_id, "origen": "clinica"}, {"_id": 0})
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
     # Verificar movimientos
     movimiento = await db.movimientos_inventario.find_one({
         "producto_id": producto_id,
@@ -1237,8 +1242,29 @@ async def eliminar_producto(
     if movimiento:
         raise HTTPException(status_code=400, detail="No se puede eliminar un producto con movimientos. Desactívelo en su lugar.")
     
+    # Eliminar producto
     await db.productos_inventario.delete_one({"id": producto_id})
-    return {"message": "Producto eliminado"}
+    
+    # Registrar en auditoría
+    audit_entry = {
+        "id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "action": "PRODUCT_DELETED",
+        "user_id": current_user.get("id"),
+        "user_name": current_user.get("name", current_user.get("username", "Unknown")),
+        "ip_address": None,
+        "details": {
+            "producto_id": producto_id,
+            "producto_codigo": producto.get("codigo", ""),
+            "producto_nombre": producto.get("nombre", ""),
+            "producto_tipo": producto.get("tipo", ""),
+            "precio_venta": producto.get("precio_venta", 0),
+            "existencia_total": producto.get("existencia_total", 0)
+        }
+    }
+    await db.audit_logs.insert_one(audit_entry)
+    
+    return {"message": "Producto eliminado", "producto_nombre": producto.get("nombre", "")}
 
 
 # ==================== IMPORTACIÓN MASIVA DESDE EXCEL/CSV ====================

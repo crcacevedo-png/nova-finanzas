@@ -2,11 +2,13 @@
 # Módulo de Evaluaciones Oftalmológicas - CRUD y catálogos
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi.responses import StreamingResponse
 from typing import Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel
 import uuid
 import re
+import io
 
 from config.database import db
 from routes.auth import get_current_user, require_role
@@ -18,6 +20,14 @@ from models.evaluacion_oftalmologica import (
     EvaluacionOftalmologicaListResponse,
     CatalogoItemResponse
 )
+
+# PDF imports
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 router = APIRouter(prefix="/evaluaciones", tags=["Evaluaciones Oftalmológicas"])
 catalogos_router = APIRouter(prefix="/catalogos", tags=["Catálogos - Evaluaciones"])
@@ -257,6 +267,282 @@ async def get_evaluacion(
         evaluacion["fecha_sellado"] = datetime.now(timezone.utc).isoformat()
     
     return evaluacion
+
+
+@router.get("/{evaluacion_id}/pdf")
+async def get_evaluacion_pdf(
+    evaluacion_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generar PDF de evaluación oftalmológica completa"""
+    evaluacion = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
+    if not evaluacion:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # Obtener datos del paciente
+    paciente = await db.patients.find_one({"id": evaluacion.get("paciente_id")}, {"_id": 0})
+    
+    # Crear PDF en memoria
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    
+    # Estilos
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='TitleCenter', parent=styles['Heading1'], alignment=TA_CENTER, fontSize=16, spaceAfter=6))
+    styles.add(ParagraphStyle(name='SubtitleCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10, textColor=colors.grey))
+    styles.add(ParagraphStyle(name='SectionTitle', parent=styles['Heading2'], fontSize=12, spaceBefore=12, spaceAfter=6, textColor=colors.HexColor('#0F6E56')))
+    styles.add(ParagraphStyle(name='FieldLabel', parent=styles['Normal'], fontSize=9, textColor=colors.grey))
+    styles.add(ParagraphStyle(name='FieldValue', parent=styles['Normal'], fontSize=10, spaceBefore=2))
+    styles.add(ParagraphStyle(name='SmallText', parent=styles['Normal'], fontSize=8, textColor=colors.grey))
+    
+    elements = []
+    
+    # ===== ENCABEZADO =====
+    elements.append(Paragraph("EVALUACIÓN OFTALMOLÓGICA", styles['TitleCenter']))
+    elements.append(Paragraph("NovaVision - Clínica Oftalmológica", styles['SubtitleCenter']))
+    elements.append(Spacer(1, 10))
+    
+    # Línea divisoria
+    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#0F6E56')))
+    elements.append(Spacer(1, 10))
+    
+    # ===== DATOS DEL PACIENTE =====
+    fecha_eval = evaluacion.get("fecha", "")
+    if fecha_eval:
+        try:
+            fecha_obj = datetime.fromisoformat(fecha_eval.replace("Z", "+00:00"))
+            fecha_eval = fecha_obj.strftime("%d/%m/%Y")
+        except:
+            pass
+    
+    paciente_data = [
+        ['Paciente:', evaluacion.get("paciente_nombre", "N/A"), 'Expediente:', evaluacion.get("paciente_expediente", "N/A")],
+        ['Edad:', f'{evaluacion.get("paciente_edad", 0)} años', 'Sexo:', evaluacion.get("paciente_sexo", "N/A")],
+        ['Fecha:', fecha_eval, 'Médico:', evaluacion.get("medico_nombre", "N/A")],
+    ]
+    
+    t = Table(paciente_data, colWidths=[1.2*inch, 2.3*inch, 1.2*inch, 2.3*inch])
+    t.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.grey),
+        ('TEXTCOLOR', (2, 0), (2, -1), colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 10))
+    
+    # ===== MOTIVO DE CONSULTA =====
+    elements.append(Paragraph("MOTIVO DE CONSULTA", styles['SectionTitle']))
+    elements.append(Paragraph(evaluacion.get("motivo_consulta", "No especificado") or "No especificado", styles['FieldValue']))
+    
+    # ===== PADECIMIENTO ACTUAL =====
+    if evaluacion.get("padecimiento_actual"):
+        elements.append(Paragraph("PADECIMIENTO ACTUAL", styles['SectionTitle']))
+        elements.append(Paragraph(evaluacion.get("padecimiento_actual", ""), styles['FieldValue']))
+    
+    # ===== ANTECEDENTES =====
+    antecedentes = evaluacion.get("antecedentes", {})
+    if any(antecedentes.values()):
+        elements.append(Paragraph("ANTECEDENTES", styles['SectionTitle']))
+        
+        # Patológicos
+        patologicos = []
+        if antecedentes.get("diabetes"): patologicos.append("Diabetes")
+        if antecedentes.get("hipertension"): patologicos.append("Hipertensión")
+        if antecedentes.get("cardiopatia"): patologicos.append("Cardiopatía")
+        if antecedentes.get("enfermedad_tiroidea"): patologicos.append("Enf. Tiroidea")
+        
+        if patologicos or antecedentes.get("personales_patologicos"):
+            elementos_ant = ", ".join(patologicos)
+            if antecedentes.get("personales_patologicos"):
+                elementos_ant += f". {antecedentes.get('personales_patologicos')}" if elementos_ant else antecedentes.get('personales_patologicos')
+            elements.append(Paragraph(f"<b>Personales Patológicos:</b> {elementos_ant or 'Ninguno'}", styles['FieldValue']))
+        
+        if antecedentes.get("oftalmologicos"):
+            elements.append(Paragraph(f"<b>Oftalmológicos:</b> {antecedentes.get('oftalmologicos')}", styles['FieldValue']))
+        if antecedentes.get("quirurgicos"):
+            elements.append(Paragraph(f"<b>Quirúrgicos:</b> {antecedentes.get('quirurgicos')}", styles['FieldValue']))
+        if antecedentes.get("alergias"):
+            elements.append(Paragraph(f"<b>Alergias:</b> {antecedentes.get('alergias')}", styles['FieldValue']))
+        if antecedentes.get("familiares"):
+            elements.append(Paragraph(f"<b>Familiares:</b> {antecedentes.get('familiares')}", styles['FieldValue']))
+    
+    # ===== EXAMEN OFTALMOLÓGICO =====
+    examen = evaluacion.get("examen", {})
+    elements.append(Paragraph("EXAMEN OFTALMOLÓGICO", styles['SectionTitle']))
+    
+    # Agudeza Visual y PIO en tabla
+    av_data = [
+        ['', 'OD (Ojo Derecho)', 'OS (Ojo Izquierdo)'],
+        ['AV sin corrección', examen.get("avsc_od", "-"), examen.get("avsc_os", examen.get("avsc_oi", "-"))],
+        ['AV con corrección', examen.get("avcc_od", "-"), examen.get("avcc_os", examen.get("avcc_oi", "-"))],
+        ['Presión Intraocular', examen.get("pio_od", "-"), examen.get("pio_os", examen.get("pio_oi", "-"))],
+    ]
+    
+    av_table = Table(av_data, colWidths=[2*inch, 2.2*inch, 2.2*inch])
+    av_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(av_table)
+    elements.append(Spacer(1, 8))
+    
+    # Refracción
+    ref_od = examen.get("refraccion_od", {})
+    ref_os = examen.get("refraccion_os", examen.get("refraccion_oi", {}))
+    
+    if any([ref_od.get("esfera"), ref_od.get("cilindro"), ref_os.get("esfera"), ref_os.get("cilindro")]):
+        ref_data = [
+            ['Refracción', 'Esfera', 'Cilindro', 'Eje', 'Adición'],
+            ['OD', ref_od.get("esfera", "-"), ref_od.get("cilindro", "-"), ref_od.get("eje", "-"), ref_od.get("adicion", "-")],
+            ['OS', ref_os.get("esfera", "-"), ref_os.get("cilindro", "-"), ref_os.get("eje", "-"), ref_os.get("adicion", "-")],
+        ]
+        
+        ref_table = Table(ref_data, colWidths=[1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
+        ref_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(Paragraph("<b>Refracción:</b>", styles['FieldValue']))
+        elements.append(ref_table)
+        elements.append(Spacer(1, 8))
+    
+    # Segmento anterior y posterior
+    if examen.get("segmento_anterior"):
+        elements.append(Paragraph(f"<b>Segmento Anterior:</b> {examen.get('segmento_anterior')}", styles['FieldValue']))
+    if examen.get("segmento_posterior"):
+        elements.append(Paragraph(f"<b>Segmento Posterior / Fondo de Ojo:</b> {examen.get('segmento_posterior')}", styles['FieldValue']))
+    if examen.get("motilidad_ocular"):
+        elements.append(Paragraph(f"<b>Motilidad Ocular:</b> {examen.get('motilidad_ocular')}", styles['FieldValue']))
+    if examen.get("pupilas_reflejos"):
+        elements.append(Paragraph(f"<b>Pupilas y Reflejos:</b> {examen.get('pupilas_reflejos')}", styles['FieldValue']))
+    
+    # ===== DIAGNÓSTICOS =====
+    diagnosticos = evaluacion.get("diagnosticos", [])
+    if diagnosticos:
+        elements.append(Paragraph("DIAGNÓSTICOS", styles['SectionTitle']))
+        for idx, diag in enumerate(diagnosticos, 1):
+            ojo_str = {"OD": "Ojo Derecho", "OS": "Ojo Izquierdo", "OU": "Ambos Ojos"}.get(diag.get("ojo", "OU"), "Ambos")
+            cie = f" (CIE-10: {diag.get('codigo_cie10')})" if diag.get("codigo_cie10") else ""
+            elements.append(Paragraph(f"{idx}. {diag.get('descripcion', 'N/A')} - {ojo_str}{cie}", styles['FieldValue']))
+    
+    # ===== PLAN DE TRATAMIENTO =====
+    if evaluacion.get("plan"):
+        elements.append(Paragraph("PLAN DE TRATAMIENTO", styles['SectionTitle']))
+        elements.append(Paragraph(evaluacion.get("plan", ""), styles['FieldValue']))
+    
+    # ===== RECOMENDACIONES =====
+    recomendaciones = evaluacion.get("recomendaciones", {})
+    estudios = recomendaciones.get("estudios_a_realizar", [])
+    rec_generales = recomendaciones.get("recomendaciones_generales", "")
+    
+    if estudios or rec_generales:
+        elements.append(Paragraph("RECOMENDACIONES", styles['SectionTitle']))
+        if estudios:
+            elements.append(Paragraph("<b>Estudios a realizar:</b>", styles['FieldValue']))
+            for est in estudios:
+                ojo_str = {"OD": "OD", "OS": "OS", "OU": "AO"}.get(est.get("ojo", "OU"), "AO")
+                elements.append(Paragraph(f"• {est.get('estudio', '')} ({ojo_str})", styles['FieldValue']))
+        if rec_generales:
+            elements.append(Paragraph(f"<b>Generales:</b> {rec_generales}", styles['FieldValue']))
+    
+    # ===== RECETAS =====
+    recetas = evaluacion.get("recetas", {})
+    
+    # Receta de Medicamentos
+    med_receta = recetas.get("medicamentos", {}).get("items", [])
+    if med_receta:
+        elements.append(Paragraph("RECETA DE MEDICAMENTOS", styles['SectionTitle']))
+        for med in med_receta:
+            med_line = f"• <b>{med.get('medicamento', '')}</b>"
+            if med.get("presentacion"): med_line += f" ({med.get('presentacion')})"
+            if med.get("dosis"): med_line += f" - {med.get('dosis')}"
+            if med.get("frecuencia"): med_line += f", {med.get('frecuencia')}"
+            if med.get("duracion"): med_line += f" por {med.get('duracion')}"
+            if med.get("via"): med_line += f" ({med.get('via')})"
+            elements.append(Paragraph(med_line, styles['FieldValue']))
+            if med.get("indicaciones"):
+                elements.append(Paragraph(f"   <i>Indicaciones: {med.get('indicaciones')}</i>", styles['SmallText']))
+    
+    # Receta de Anteojos
+    anteojos = recetas.get("anteojos", {})
+    ant_od = anteojos.get("od", {})
+    ant_os = anteojos.get("os", anteojos.get("oi", {}))
+    
+    if any([ant_od.get("esfera"), ant_od.get("cilindro"), ant_os.get("esfera"), ant_os.get("cilindro")]):
+        elements.append(Paragraph("RECETA DE ANTEOJOS", styles['SectionTitle']))
+        
+        ant_data = [
+            ['', 'Esfera', 'Cilindro', 'Eje', 'Adición'],
+            ['OD', ant_od.get("esfera", "-"), ant_od.get("cilindro", "-"), ant_od.get("eje", "-"), ant_od.get("adicion", "-")],
+            ['OS', ant_os.get("esfera", "-"), ant_os.get("cilindro", "-"), ant_os.get("eje", "-"), ant_os.get("adicion", "-")],
+        ]
+        
+        ant_table = Table(ant_data, colWidths=[1*inch, 1.2*inch, 1.2*inch, 1*inch, 1*inch])
+        ant_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fff9e6')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(ant_table)
+        
+        extras = []
+        if anteojos.get("distancia_pupilar"): extras.append(f"DP: {anteojos.get('distancia_pupilar')}")
+        if anteojos.get("tipo_lente"): extras.append(f"Tipo: {anteojos.get('tipo_lente')}")
+        if anteojos.get("material"): extras.append(f"Material: {anteojos.get('material')}")
+        if anteojos.get("uso"): extras.append(f"Uso: {anteojos.get('uso')}")
+        if extras:
+            elements.append(Paragraph(" | ".join(extras), styles['SmallText']))
+    
+    # ===== PIE DE PÁGINA =====
+    elements.append(Spacer(1, 20))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey))
+    elements.append(Spacer(1, 10))
+    
+    sellado_text = "🔒 Expediente Sellado" if evaluacion.get("sellado") else "📝 Expediente Abierto"
+    fecha_creacion = evaluacion.get("fecha_creacion", "")
+    if fecha_creacion:
+        try:
+            fc = datetime.fromisoformat(fecha_creacion.replace("Z", "+00:00"))
+            fecha_creacion = fc.strftime("%d/%m/%Y %H:%M")
+        except:
+            pass
+    
+    footer_text = f"{sellado_text} | Creado: {fecha_creacion} por {evaluacion.get('creado_por_nombre', 'N/A')}"
+    elements.append(Paragraph(footer_text, styles['SmallText']))
+    
+    # Generar PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    # Nombre del archivo
+    paciente_nombre_safe = re.sub(r'[^\w\s-]', '', evaluacion.get("paciente_nombre", "paciente")).replace(" ", "_")
+    filename = f"evaluacion_{paciente_nombre_safe}_{fecha_eval.replace('/', '-')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 @router.post("", response_model=EvaluacionOftalmologicaResponse)
