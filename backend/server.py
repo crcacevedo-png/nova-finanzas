@@ -2728,6 +2728,10 @@ from routes.dashboard_financiero import router as dashboard_financiero_router
 api_router.include_router(admin_router, tags=["Administración"])
 api_router.include_router(dashboard_financiero_router, tags=["Dashboard Financiero"])
 
+# ==================== CONFIGURACIÓN DE MENÚS ====================
+from routes.menu_config import router as menu_config_router
+api_router.include_router(menu_config_router, tags=["Configuración de Menús"])
+
 # ==================== MÓDULO DE PACIENTES (Refactorizado) ====================
 from routes.patients import router as patients_router, pacientes_router
 

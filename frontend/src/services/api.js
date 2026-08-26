@@ -176,6 +176,16 @@ export const igssUnitApi = {
   delete: (id) => axios.delete(`${API_URL}/igss-units/${id}`),
 };
 
+// Menu Configuration API
+export const menuConfigApi = {
+  getAvailableMenus: () => axios.get(`${API_URL}/menu-config/available-menus`),
+  getMenuConfigForRole: (role) => axios.get(`${API_URL}/menu-config/role/${role}`),
+  getAllMenuConfigs: () => axios.get(`${API_URL}/menu-config/all-roles`),
+  updateMenuConfig: (role, data) => axios.put(`${API_URL}/menu-config/role/${role}`, data),
+  resetMenuConfig: (role) => axios.post(`${API_URL}/menu-config/reset/${role}`),
+  getMyMenus: () => axios.get(`${API_URL}/menu-config/my-menus`),
+};
+
 // Patients API (Base de Datos de Pacientes)
 export const patientApi = {
   getAll: (filters = {}) => {

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { menuConfigApi } from '../services/api';
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -65,88 +66,126 @@ const Layout = ({ children }) => {
     ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta'].some(p => location.pathname.startsWith(p))
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
+  
+  // Estado para menús habilitados del usuario
+  const [enabledMenuIds, setEnabledMenuIds] = useState(null);
+  const [menusLoaded, setMenusLoaded] = useState(false);
 
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const canViewOptica = hasPermission('view_optica');
+
+  // Cargar menús habilitados para el usuario
+  useEffect(() => {
+    const loadUserMenus = async () => {
+      if (!user) return;
+      
+      // SuperAdmin siempre tiene todos los menús
+      if (user.role === 'superadmin') {
+        setEnabledMenuIds(null); // null = todos los menús
+        setMenusLoaded(true);
+        return;
+      }
+      
+      try {
+        const res = await menuConfigApi.getMyMenus();
+        setEnabledMenuIds(res.data.menu_ids || []);
+      } catch (error) {
+        console.error('Error loading user menus:', error);
+        // En caso de error, mostrar menús por defecto según rol
+        setEnabledMenuIds(null);
+      } finally {
+        setMenusLoaded(true);
+      }
+    };
+    
+    loadUserMenus();
+  }, [user]);
+
+  // Función helper para verificar si un menú está habilitado
+  const isMenuEnabled = (menuId) => {
+    // SuperAdmin o si no se han cargado los menús, mostrar todo
+    if (isSuperAdmin || enabledMenuIds === null) return true;
+    return enabledMenuIds.includes(menuId);
+  };
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  // Items principales del sidebar
+  // Items principales del sidebar - Filtrados por configuración de menús
   const navItems = [];
   
-  // Dashboard del Sistema - Solo SuperAdmin
-  if (isSuperAdmin) {
+  // Dashboard del Sistema - Solo SuperAdmin y si está habilitado
+  if (isSuperAdmin && isMenuEnabled('dashboard')) {
     navItems.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' });
   }
   
-  // Dashboard Financiero - Solo SuperAdmin
-  if (isSuperAdmin) {
+  // Dashboard Financiero - Solo SuperAdmin y si está habilitado
+  if (isSuperAdmin && isMenuEnabled('dashboard_financiero')) {
     navItems.push({ path: '/dashboard-financiero', icon: TrendingUp, label: 'Dashboard Financiero', testId: 'nav-dashboard-financiero' });
   }
   
-  // Pacientes - Visible para todos
-  navItems.push({ path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' });
+  // Pacientes - Visible si está habilitado
+  if (isMenuEnabled('pacientes')) {
+    navItems.push({ path: '/pacientes', icon: UserRound, label: 'Pacientes', testId: 'nav-pacientes' });
+  }
   
-  // Importación Masiva - Solo Admin y SuperAdmin
-  if (isAdminOrSuperAdmin) {
+  // Importación Masiva - Solo Admin y SuperAdmin y si está habilitado
+  if (isAdminOrSuperAdmin && isMenuEnabled('importar_pacientes')) {
     navItems.push({ path: '/importar-pacientes', icon: Upload, label: 'Importar Pacientes', testId: 'nav-importar-pacientes' });
   }
   
-  // Evaluación Oftalmológica - Visible para todos (Admin/SuperAdmin editan, Usuario solo lectura)
-  navItems.push({ path: '/evaluacion-oftalmologica', icon: Eye, label: 'Evaluación Oftalmológica', testId: 'nav-evaluacion' });
+  // Evaluación Oftalmológica - Visible si está habilitado
+  if (isMenuEnabled('evaluacion_oftalmologica')) {
+    navItems.push({ path: '/evaluacion-oftalmologica', icon: Eye, label: 'Evaluación Oftalmológica', testId: 'nav-evaluacion' });
+  }
   
-  // Sala de Operaciones - Visible para todos
-  navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
+  // Sala de Operaciones - Visible si está habilitado
+  if (isMenuEnabled('sala_operaciones')) {
+    navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
+  }
   
-  // CRM Cirugías - Gestión de candidatos a cirugía (Admin y SuperAdmin)
-  if (isAdminOrSuperAdmin) {
+  // CRM Cirugías - Admin/SuperAdmin y si está habilitado
+  if (isAdminOrSuperAdmin && isMenuEnabled('crm_cirugias')) {
     navItems.push({ path: '/crm-cirugias', icon: Stethoscope, label: 'CRM Cirugías', testId: 'nav-crm-cirugias' });
   }
   
-  // Agenda de Pacientes - Visible para todos (NO es la de Sala de Operaciones)
-  navItems.push({ path: '/agenda', icon: CalendarDays, label: 'Agenda', testId: 'nav-agenda' });
+  // Agenda de Pacientes - Visible si está habilitado
+  if (isMenuEnabled('agenda')) {
+    navItems.push({ path: '/agenda', icon: CalendarDays, label: 'Agenda', testId: 'nav-agenda' });
+  }
 
-  // Finanzas sub-items (visible para todos los roles autenticados)
-  // Finanzas sub-items (NO visible para optica)
-  const finanzasItems = user?.role !== 'optica' ? [
-    // Punto de Venta - Destacado como primer item
-    { path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' },
-    { path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' },
-    { path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' },
-    { path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' },
-    // Gastos Fijos - Admin y SuperAdmin
-    ...(isAdminOrSuperAdmin ? [{ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' }] : []),
-    // Autorizaciones Pendientes - Admin y SuperAdmin (SuperAdmin puede ver y cancelar, Admin ejecuta pagos)
-    ...(isAdminOrSuperAdmin ? [{ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' }] : []),
-    // Caja - Solo Admin y SuperAdmin
-    ...(isAdminOrSuperAdmin ? [{ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' }] : []),
-  ] : [];
+  // Finanzas sub-items - Filtrados por configuración de menús
+  const finanzasItems = [];
+  if (user?.role !== 'optica') {
+    if (isMenuEnabled('inventario_pos')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
+    if (isMenuEnabled('finanzas_cxc')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
+    if (isMenuEnabled('finanzas_gastos')) finanzasItems.push({ path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' });
+    if (isMenuEnabled('finanzas_pagos')) finanzasItems.push({ path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' });
+    if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });
+    if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_autorizaciones')) finanzasItems.push({ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' });
+    if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
+  }
   
-  // Inventario sub-items (visible para todos excepto optica)
-  const inventarioItems = user?.role !== 'optica' ? [
-    { path: '/inventario', icon: LayoutDashboard, label: 'Panel', testId: 'nav-inv-panel' },
-    { path: '/inventario/bodegas', icon: Warehouse, label: 'Bodegas', testId: 'nav-inv-bodegas' },
-    { path: '/inventario/productos', icon: Package, label: 'Productos', testId: 'nav-inv-productos' },
-    { path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' },
-    { path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' },
-    ...(isAdminOrSuperAdmin ? [
-      { path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' }
-    ] : []),
-    // Rentabilidad - Solo SuperAdmin
-    ...(isSuperAdmin ? [
-      { path: '/inventario/rentabilidad', icon: PieChart, label: 'Rentabilidad', testId: 'nav-inv-rentabilidad' }
-    ] : []),
-  ] : [];
-  
+  // Inventario sub-items - Filtrados por configuración de menús
+  const inventarioItems = [];
+  if (user?.role !== 'optica') {
+    if (isMenuEnabled('inventario_panel')) inventarioItems.push({ path: '/inventario', icon: LayoutDashboard, label: 'Panel', testId: 'nav-inv-panel' });
+    if (isMenuEnabled('inventario_bodegas')) inventarioItems.push({ path: '/inventario/bodegas', icon: Warehouse, label: 'Bodegas', testId: 'nav-inv-bodegas' });
+    if (isMenuEnabled('inventario_productos')) inventarioItems.push({ path: '/inventario/productos', icon: Package, label: 'Productos', testId: 'nav-inv-productos' });
+    if (isMenuEnabled('inventario_lotes')) inventarioItems.push({ path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' });
+    if (isMenuEnabled('inventario_kardex')) inventarioItems.push({ path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' });
+    if (isAdminOrSuperAdmin && isMenuEnabled('inventario_categorias')) inventarioItems.push({ path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' });
+    if (isSuperAdmin && isMenuEnabled('inventario_rentabilidad')) inventarioItems.push({ path: '/inventario/rentabilidad', icon: PieChart, label: 'Rentabilidad', testId: 'nav-inv-rentabilidad' });
+  }
+
   // Config sub-items
   const configItems = [];
   
   // Proveedores - disponible para Admin, SuperAdmin y Optica
-  if (isAdminOrSuperAdmin || canViewOptica) {
+  if ((isAdminOrSuperAdmin || canViewOptica) && isMenuEnabled('finanzas_proveedores')) {
     configItems.push({ 
       path: '/configuracion/proveedores', 
       icon: Truck, 
@@ -181,17 +220,17 @@ const Layout = ({ children }) => {
     return classes[role] || 'badge-usuario';
   };
 
-  // Optica sub-items (solo para rol optica y superadmin) - Sin Médicos
-  const opticaItems = canViewOptica ? [
-    // Dashboard de Óptica - Solo SuperAdmin
-    ...(isSuperAdmin ? [{ path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' }] : []),
-    { path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' },
-    { path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' },
-    { path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' },
-    { path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' },
-    { path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' },
-    { path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' },
-  ] : [];
+  // Optica sub-items - Filtrados por configuración de menús
+  const opticaItems = [];
+  if (canViewOptica) {
+    if (isSuperAdmin && isMenuEnabled('optica_dashboard')) opticaItems.push({ path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' });
+    if (isMenuEnabled('optica_armazones')) opticaItems.push({ path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' });
+    if (isMenuEnabled('optica_lentes_contacto')) opticaItems.push({ path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' });
+    if (isMenuEnabled('optica_tipos_lente')) opticaItems.push({ path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' });
+    if (isMenuEnabled('optica_pos')) opticaItems.push({ path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' });
+    if (isMenuEnabled('optica_cxc')) opticaItems.push({ path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' });
+    if (isMenuEnabled('optica_compras')) opticaItems.push({ path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' });
+  }
 
   const NavLink = ({ item }) => {
     const isActive = location.pathname === item.path;

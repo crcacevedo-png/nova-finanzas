@@ -6,7 +6,16 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-08-26 (Sesión 3)
 
-### Últimos Cambios (2026-08-26 Sesión 3)
+### Últimos Cambios (2026-08-26 Sesión 4)
+- ✅ **Configuración Dinámica de Menús por Rol** (`/usuarios` - Tab "Menús por Rol")
+  - UI completa para que SuperAdmin asigne/revoque menús a cada rol
+  - API backend: `/api/menu-config/*` (available-menus, role/{role}, all-roles, my-menus)
+  - Categorías organizadas: Principal, Clínica, Óptica, Finanzas, Inventario, Configuración
+  - Checkboxes individuales por menú con contador de habilitados
+  - Botones Restaurar (reset a default) y Guardar Cambios
+  - `Layout.js` consume API para mostrar/ocultar menús dinámicamente según configuración
+
+### Cambios Previos (2026-08-26 Sesión 3)
 - ✅ **Campo "Precio de Compra" agregado a Productos de Inventario**
   - Nuevo campo `precio_compra` en formulario de Nuevo/Editar Producto
   - Backend actualizado: Modelos Pydantic (`ProductoBase`, `ProductoUpdate`, `ProductoResponse`)
@@ -201,6 +210,7 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 
 #### P1 - Alta Prioridad
 - [ ] **Google Calendar Sync**: Sincronización bidireccional con calendarios de médicos (requiere credenciales OAuth de Google Cloud)
+- [ ] **Auditoría de Seguridad AppSec Comprehensiva**: Revisión completa de seguridad de la aplicación
 - [ ] **FEL Guatemala**: Estructura de Facturación Electrónica (deshabilitada con `FEL_ENABLED=false`)
 
 #### P2 - Media Prioridad
