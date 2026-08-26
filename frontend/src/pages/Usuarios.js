@@ -141,6 +141,8 @@ const Usuarios = () => {
   });
   const [savingRole, setSavingRole] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState({});
+  const [resetRoleDialogOpen, setResetRoleDialogOpen] = useState(false);
+  const [roleToReset, setRoleToReset] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -392,10 +394,19 @@ const Usuarios = () => {
     }
   };
 
-  const handleResetRolePermissions = async (roleName) => {
+  const handleResetRoleClick = (role) => {
+    setRoleToReset(role);
+    setResetRoleDialogOpen(true);
+  };
+
+  const handleConfirmResetPermissions = async () => {
+    if (!roleToReset) return;
+    
     try {
-      await rolesApi.resetPermissions(roleName);
-      toast.success('Permisos restaurados a valores por defecto');
+      await rolesApi.resetPermissions(roleToReset.name);
+      toast.success(`Permisos de "${roleToReset.display_name}" restaurados a valores por defecto`);
+      setResetRoleDialogOpen(false);
+      setRoleToReset(null);
       fetchRoles();
     } catch (error) {
       console.error('Error resetting role permissions:', error);
@@ -692,7 +703,7 @@ const Usuarios = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleResetRolePermissions(role.name)}
+                              onClick={() => handleResetRoleClick(role)}
                               title="Restaurar permisos por defecto"
                             >
                               <RotateCcw className="w-4 h-4" />
@@ -1282,6 +1293,38 @@ const Usuarios = () => {
                 data-testid="confirm-delete-role-button"
               >
                 Eliminar Rol
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Confirmar Restauración de Permisos */}
+        <Dialog open={resetRoleDialogOpen} onOpenChange={setResetRoleDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-amber-500" />
+                Restaurar Permisos
+              </DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que deseas restaurar los permisos del rol &quot;{roleToReset?.display_name}&quot; 
+                a sus valores por defecto? Se eliminarán todas las personalizaciones realizadas.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setResetRoleDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmResetPermissions}
+                className="bg-amber-500 hover:bg-amber-600"
+                data-testid="confirm-reset-role-button"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Restaurar
               </Button>
             </DialogFooter>
           </DialogContent>

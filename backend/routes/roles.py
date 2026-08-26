@@ -144,11 +144,16 @@ async def get_all_roles(
     """Obtener todos los roles (sistema + personalizados)"""
     roles = []
     
+    # Obtener conteo de usuarios por rol en una sola query (optimización)
+    user_counts_pipeline = [
+        {"$group": {"_id": "$role", "count": {"$sum": 1}}}
+    ]
+    user_counts_cursor = db.users.aggregate(user_counts_pipeline)
+    user_counts_list = await user_counts_cursor.to_list(100)
+    user_counts = {item["_id"]: item["count"] for item in user_counts_list}
+    
     # 1. Agregar roles del sistema (desde PERMISSIONS)
     for role_name in SYSTEM_ROLES:
-        # Contar usuarios con este rol
-        user_count = await db.users.count_documents({"role": role_name})
-        
         # Buscar si hay personalización en DB
         custom_config = await db.roles.find_one({"name": role_name})
         
@@ -175,8 +180,8 @@ async def get_all_roles(
             "color": custom_config.get("color") if custom_config else colors.get(role_name, "gray"),
             "is_system": True,
             "is_active": True,
-            "user_count": user_count,
-            "created_at": custom_config.get("created_at") if custom_config else "Sistema",
+            "user_count": user_counts.get(role_name, 0),
+            "created_at": custom_config.get("created_at") if custom_config else None,
             "updated_at": custom_config.get("updated_at") if custom_config else None
         })
     
@@ -184,7 +189,6 @@ async def get_all_roles(
     custom_roles = await db.roles.find({"name": {"$nin": SYSTEM_ROLES}}).to_list(100)
     
     for role in custom_roles:
-        user_count = await db.users.count_documents({"role": role["name"]})
         roles.append({
             "id": str(role["_id"]),
             "name": role["name"],
@@ -194,8 +198,8 @@ async def get_all_roles(
             "color": role.get("color", "gray"),
             "is_system": False,
             "is_active": role.get("is_active", True),
-            "user_count": user_count,
-            "created_at": role.get("created_at", ""),
+            "user_count": user_counts.get(role["name"], 0),
+            "created_at": role.get("created_at"),
             "updated_at": role.get("updated_at")
         })
     
@@ -356,6 +360,9 @@ async def delete_role(
             detail=f"No se puede eliminar el rol porque hay {user_count} usuario(s) asignado(s)"
         )
     
+    # Obtener datos del rol antes de eliminarlo para el log de auditoría
+    role_data = await db.roles.find_one({"name": role_name})
+    
     result = await db.roles.delete_one({"name": role_name})
     
     if result.deleted_count == 0:
@@ -363,6 +370,21 @@ async def delete_role(
     
     # También eliminar configuración de menús para este rol
     await db.menu_configurations.delete_one({"role": role_name})
+    
+    # Registrar en log de auditoría
+    audit_entry = {
+        "action": "role_deleted",
+        "role_name": role_name,
+        "role_display_name": role_data.get("display_name", role_name) if role_data else role_name,
+        "deleted_by": current_user.get("username", "system"),
+        "deleted_at": datetime.now(timezone.utc).isoformat(),
+        "role_data_backup": {
+            "permissions": role_data.get("permissions", {}) if role_data else {},
+            "description": role_data.get("description", "") if role_data else "",
+            "color": role_data.get("color", "gray") if role_data else "gray"
+        }
+    }
+    await db.audit_logs.insert_one(audit_entry)
     
     return {"message": f"Rol '{role_name}' eliminado exitosamente"}
 
