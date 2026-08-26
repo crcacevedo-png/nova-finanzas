@@ -503,6 +503,7 @@ export const auditActionLabels = {
   PATIENT_UPDATED: 'Paciente actualizado',
   PATIENT_DELETED: 'Paciente eliminado',
   PRODUCT_DELETED: 'Producto eliminado de inventario',
+  PRODUCT_DELETED_FORCE: '⚠️ Producto eliminado FORZADAMENTE (con movimientos)',
   PRODUCT_IMPORTED: 'Productos importados',
 };
 
@@ -530,7 +531,7 @@ export const inventarioApi = {
   getProducto: (id) => axios.get(`${API_URL}/inventario/productos/${id}`),
   createProducto: (data) => axios.post(`${API_URL}/inventario/productos`, data),
   updateProducto: (id, data) => axios.put(`${API_URL}/inventario/productos/${id}`, data),
-  deleteProducto: (id) => axios.delete(`${API_URL}/inventario/productos/${id}`),
+  deleteProducto: (id, force = false) => axios.delete(`${API_URL}/inventario/productos/${id}`, { params: { force } }),
   cambiarEstadoProducto: (id, activo) => axios.patch(`${API_URL}/inventario/productos/${id}/estado`, { activo }),
   importarProductosPreview: (formData) => axios.post(`${API_URL}/inventario/productos/importar/preview`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

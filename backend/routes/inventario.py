@@ -1221,9 +1221,10 @@ async def cambiar_estado_producto(
 @router.delete("/productos/{producto_id}")
 async def eliminar_producto(
     producto_id: str,
+    force: bool = Query(False, description="Forzar eliminación incluso con movimientos (solo superadmin)"),
     current_user: dict = Depends(get_current_user_dependency())
 ):
-    """Elimina un producto (solo si no tiene movimientos)"""
+    """Elimina un producto. Con force=true elimina incluso si tiene movimientos (solo superadmin)"""
     db = get_db()
     
     if current_user.get("role") != "superadmin":
@@ -1235,12 +1236,27 @@ async def eliminar_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
     # Verificar movimientos
-    movimiento = await db.movimientos_inventario.find_one({
+    movimientos_count = await db.movimientos_inventario.count_documents({
         "producto_id": producto_id,
         "origen": "clinica"
     })
-    if movimiento:
-        raise HTTPException(status_code=400, detail="No se puede eliminar un producto con movimientos. Desactívelo en su lugar.")
+    
+    tiene_movimientos = movimientos_count > 0
+    
+    if tiene_movimientos and not force:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Este producto tiene {movimientos_count} movimientos registrados. Use force=true para eliminación forzada o desactívelo."
+        )
+    
+    # Si es eliminación forzada, también eliminar movimientos y existencias relacionadas
+    if tiene_movimientos and force:
+        # Eliminar movimientos
+        await db.movimientos_inventario.delete_many({"producto_id": producto_id, "origen": "clinica"})
+        # Eliminar existencias por bodega
+        await db.existencias_bodega.delete_many({"producto_id": producto_id})
+        # Eliminar lotes
+        await db.lotes_inventario.delete_many({"producto_id": producto_id, "origen": "clinica"})
     
     # Eliminar producto
     await db.productos_inventario.delete_one({"id": producto_id})
@@ -1249,7 +1265,7 @@ async def eliminar_producto(
     audit_entry = {
         "id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "action": "PRODUCT_DELETED",
+        "action": "PRODUCT_DELETED_FORCE" if (tiene_movimientos and force) else "PRODUCT_DELETED",
         "user_id": current_user.get("id"),
         "user_name": current_user.get("name", current_user.get("username", "Unknown")),
         "ip_address": None,
@@ -1259,12 +1275,18 @@ async def eliminar_producto(
             "producto_nombre": producto.get("nombre", ""),
             "producto_tipo": producto.get("tipo", ""),
             "precio_venta": producto.get("precio_venta", 0),
-            "existencia_total": producto.get("existencia_total", 0)
+            "existencia_total": producto.get("existencia_total", 0),
+            "movimientos_eliminados": movimientos_count if (tiene_movimientos and force) else 0,
+            "eliminacion_forzada": force and tiene_movimientos
         }
     }
     await db.audit_logs.insert_one(audit_entry)
     
-    return {"message": "Producto eliminado", "producto_nombre": producto.get("nombre", "")}
+    return {
+        "message": "Producto eliminado" + (" (forzado)" if tiene_movimientos and force else ""),
+        "producto_nombre": producto.get("nombre", ""),
+        "movimientos_eliminados": movimientos_count if (tiene_movimientos and force) else 0
+    }
 
 
 # ==================== IMPORTACIÓN MASIVA DESDE EXCEL/CSV ====================

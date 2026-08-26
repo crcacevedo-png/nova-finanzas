@@ -15,7 +15,8 @@ import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
 import {
   Search, Plus, Edit, Package, AlertTriangle, Filter, ChevronLeft, ChevronRight,
-  ArrowDownToLine, Truck, Calendar, Trash2, Upload, FileSpreadsheet, Download
+  ArrowDownToLine, Truck, Calendar, Trash2, Upload, FileSpreadsheet, Download, 
+  Power, PowerOff
 } from 'lucide-react';
 import { inventarioApi, formatCurrency } from '../../services/api';
 import { toast } from 'sonner';
@@ -249,21 +250,48 @@ const Productos = () => {
     setDeleteModalOpen(true);
   };
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = async (forceDelete = false) => {
     if (!productToDelete) return;
     
     setDeleting(true);
     try {
-      await inventarioApi.deleteProducto(productToDelete.id);
-      toast.success(`Producto "${productToDelete.nombre}" eliminado correctamente`);
+      const response = await inventarioApi.deleteProducto(productToDelete.id, forceDelete);
+      const movimientosEliminados = response.data.movimientos_eliminados || 0;
+      
+      if (movimientosEliminados > 0) {
+        toast.success(`Producto "${productToDelete.nombre}" eliminado con ${movimientosEliminados} movimientos`);
+      } else {
+        toast.success(`Producto "${productToDelete.nombre}" eliminado correctamente`);
+      }
+      
       setDeleteModalOpen(false);
       setProductToDelete(null);
       loadProductos();
     } catch (error) {
       console.error('Error eliminando producto:', error);
-      toast.error(error.response?.data?.detail || 'Error al eliminar producto');
+      const errorMsg = error.response?.data?.detail || 'Error al eliminar producto';
+      
+      // Si tiene movimientos y no se forzó, mostrar opción de forzar
+      if (errorMsg.includes('movimientos') && !forceDelete) {
+        toast.error(errorMsg);
+      } else {
+        toast.error(errorMsg);
+      }
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // ==================== DESACTIVAR PRODUCTO ====================
+  
+  const handleToggleActive = async (producto) => {
+    try {
+      await inventarioApi.cambiarEstadoProducto(producto.id, !producto.activo);
+      toast.success(`Producto ${producto.activo ? 'desactivado' : 'activado'} correctamente`);
+      loadProductos();
+    } catch (error) {
+      console.error('Error cambiando estado:', error);
+      toast.error(error.response?.data?.detail || 'Error al cambiar estado del producto');
     }
   };
 
@@ -627,16 +655,30 @@ const Productos = () => {
                                 <Edit className="w-4 h-4" />
                               </Button>
                               {isSuperAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteClick(producto)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  title="Eliminar producto"
-                                  data-testid={`btn-delete-${producto.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleToggleActive(producto)}
+                                    className={producto.activo 
+                                      ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" 
+                                      : "text-green-600 hover:text-green-700 hover:bg-green-50"}
+                                    title={producto.activo ? "Desactivar producto" : "Activar producto"}
+                                    data-testid={`btn-toggle-${producto.id}`}
+                                  >
+                                    {producto.activo ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteClick(producto)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    title="Eliminar producto"
+                                    data-testid={`btn-delete-${producto.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </td>
@@ -1029,7 +1071,7 @@ const Productos = () => {
 
         {/* Modal de Confirmación Eliminar (Solo SuperAdmin) */}
         <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600">
                 <AlertTriangle className="w-5 h-5" />
@@ -1041,29 +1083,75 @@ const Productos = () => {
             </DialogHeader>
             
             {productToDelete && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="font-medium text-red-800">{productToDelete.nombre}</p>
-                <p className="text-sm text-red-600">Código: {productToDelete.codigo || 'Sin código'}</p>
+              <div className="space-y-3">
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="font-medium text-red-800">{productToDelete.nombre}</p>
+                  <p className="text-sm text-red-600">Código: {productToDelete.codigo || 'Sin código'}</p>
+                </div>
+                
                 {productToDelete.existencia_total > 0 && (
-                  <p className="text-sm text-red-600 mt-2">
-                    <strong>⚠️ Advertencia:</strong> Este producto tiene {productToDelete.existencia_total} unidades en stock.
-                  </p>
+                  <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg">
+                    <p className="font-semibold text-amber-800 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      ¡ATENCIÓN! Producto con inventario
+                    </p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      Este producto tiene <strong>{productToDelete.existencia_total} unidades</strong> en stock 
+                      y movimientos registrados en el kardex.
+                    </p>
+                    <div className="mt-3 p-3 bg-amber-100 rounded text-xs text-amber-800">
+                      <p className="font-medium mb-1">Si elimina este producto:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>Se eliminarán TODOS los movimientos del kardex</li>
+                        <li>Se eliminarán las existencias en todas las bodegas</li>
+                        <li>Se eliminarán los lotes asociados</li>
+                        <li>Los reportes históricos pueden verse afectados</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                
+                {productToDelete.existencia_total === 0 && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+                    Este producto no tiene existencias. Se eliminará de forma segura.
+                  </div>
                 )}
               </div>
             )}
             
-            <DialogFooter>
+            <DialogFooter className="flex gap-2 sm:gap-2">
               <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button 
-                variant="destructive"
-                onClick={handleDeleteConfirm}
-                disabled={deleting}
-                data-testid="btn-confirmar-eliminar"
-              >
-                {deleting ? 'Eliminando...' : 'Eliminar Permanentemente'}
-              </Button>
+              {productToDelete?.existencia_total > 0 ? (
+                <>
+                  <Button 
+                    variant="outline"
+                    onClick={() => handleToggleActive(productToDelete)}
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    <PowerOff className="w-4 h-4 mr-1" />
+                    Solo Desactivar
+                  </Button>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => handleDeleteConfirm(true)}
+                    disabled={deleting}
+                    data-testid="btn-confirmar-eliminar-forzado"
+                  >
+                    {deleting ? 'Eliminando...' : '🗑️ Eliminar Todo'}
+                  </Button>
+                </>
+              ) : (
+                <Button 
+                  variant="destructive"
+                  onClick={() => handleDeleteConfirm(false)}
+                  disabled={deleting}
+                  data-testid="btn-confirmar-eliminar"
+                >
+                  {deleting ? 'Eliminando...' : 'Eliminar'}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
