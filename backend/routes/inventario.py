@@ -2269,3 +2269,210 @@ async def reporte_rentabilidad_categorias(
         fecha_generacion=datetime.now(timezone.utc).isoformat()
     )
 
+
+# ==================== HISTÓRICO DE RENTABILIDAD MENSUAL ====================
+
+class RentabilidadMensualItem(BaseModel):
+    mes: str  # Formato: "2024-01"
+    mes_nombre: str  # Formato: "Enero 2024"
+    total_ventas: int
+    ingresos_brutos: float
+    costo_total: float
+    ganancia_neta: float
+    margen_promedio: float
+    productos_vendidos: int
+
+class RentabilidadHistoricoResponse(BaseModel):
+    datos_mensuales: List[RentabilidadMensualItem]
+    tendencia: str  # "creciente", "decreciente", "estable"
+    variacion_ultimo_mes: float
+    fecha_generacion: str
+
+@router.get("/reportes/rentabilidad-historico", response_model=RentabilidadHistoricoResponse)
+async def reporte_rentabilidad_historico(
+    meses: int = Query(12, ge=1, le=24, description="Cantidad de meses a analizar"),
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """
+    Genera un reporte histórico de rentabilidad mes a mes basado en ventas realizadas.
+    Calcula margen, ganancia y tendencia de los últimos N meses.
+    """
+    db = get_db()
+    
+    # Nombres de meses en español
+    meses_nombres = {
+        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+        5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+        9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+    }
+    
+    # Calcular rango de fechas
+    fecha_fin = datetime.now(timezone.utc)
+    fecha_inicio = fecha_fin - timedelta(days=meses * 31)
+    
+    # Obtener productos para mapear precios de compra
+    productos = await db.productos_inventario.find({"origen": "clinica"}).to_list(5000)
+    productos_map = {p["id"]: p for p in productos}
+    
+    # Obtener ventas del período (desde movimientos de inventario tipo 'venta' o desde ventas_optica)
+    # Primero intentamos con ventas_optica
+    ventas = await db.ventas_optica.find({
+        "origen": "clinica",
+        "created_at": {"$gte": fecha_inicio.isoformat(), "$lte": fecha_fin.isoformat()}
+    }).to_list(10000)
+    
+    # Agrupar por mes
+    datos_por_mes = {}
+    
+    for venta in ventas:
+        try:
+            fecha_str = venta.get("created_at", "")
+            if not fecha_str:
+                continue
+            
+            # Parsear fecha
+            if isinstance(fecha_str, str):
+                fecha = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
+            else:
+                fecha = fecha_str
+            
+            mes_key = fecha.strftime("%Y-%m")
+            mes_num = fecha.month
+            año = fecha.year
+            mes_nombre = f"{meses_nombres[mes_num]} {año}"
+            
+            if mes_key not in datos_por_mes:
+                datos_por_mes[mes_key] = {
+                    "mes": mes_key,
+                    "mes_nombre": mes_nombre,
+                    "total_ventas": 0,
+                    "ingresos_brutos": 0,
+                    "costo_total": 0,
+                    "productos_vendidos": 0,
+                    "margenes": []
+                }
+            
+            datos_por_mes[mes_key]["total_ventas"] += 1
+            
+            # Procesar items de la venta
+            items = venta.get("items", [])
+            for item in items:
+                producto_id = item.get("producto_id")
+                cantidad = item.get("cantidad", 0)
+                precio_venta = item.get("precio_unitario", 0)
+                subtotal = item.get("subtotal", precio_venta * cantidad)
+                
+                datos_por_mes[mes_key]["ingresos_brutos"] += subtotal
+                datos_por_mes[mes_key]["productos_vendidos"] += cantidad
+                
+                # Obtener precio de compra del producto
+                producto = productos_map.get(producto_id, {})
+                precio_compra = producto.get("precio_compra") or producto.get("costo_promedio") or 0
+                costo_item = precio_compra * cantidad
+                
+                datos_por_mes[mes_key]["costo_total"] += costo_item
+                
+                # Calcular margen si hay precios válidos
+                if precio_venta > 0 and precio_compra > 0:
+                    margen = ((precio_venta - precio_compra) / precio_venta) * 100
+                    datos_por_mes[mes_key]["margenes"].append(margen)
+        except Exception as e:
+            continue
+    
+    # Si no hay ventas, intentar con movimientos de inventario tipo 'venta'
+    if not datos_por_mes:
+        movimientos = await db.movimientos_inventario.find({
+            "origen": "clinica",
+            "tipo": "venta",
+            "fecha": {"$gte": fecha_inicio.isoformat(), "$lte": fecha_fin.isoformat()}
+        }).to_list(10000)
+        
+        for mov in movimientos:
+            try:
+                fecha_str = mov.get("fecha", "")
+                if not fecha_str:
+                    continue
+                
+                if isinstance(fecha_str, str):
+                    fecha = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
+                else:
+                    fecha = fecha_str
+                
+                mes_key = fecha.strftime("%Y-%m")
+                mes_num = fecha.month
+                año = fecha.year
+                mes_nombre = f"{meses_nombres[mes_num]} {año}"
+                
+                if mes_key not in datos_por_mes:
+                    datos_por_mes[mes_key] = {
+                        "mes": mes_key,
+                        "mes_nombre": mes_nombre,
+                        "total_ventas": 0,
+                        "ingresos_brutos": 0,
+                        "costo_total": 0,
+                        "productos_vendidos": 0,
+                        "margenes": []
+                    }
+                
+                producto_id = mov.get("producto_id")
+                cantidad = abs(mov.get("cantidad", 0))
+                
+                producto = productos_map.get(producto_id, {})
+                precio_venta = producto.get("precio_venta", 0)
+                precio_compra = producto.get("precio_compra") or producto.get("costo_promedio") or 0
+                
+                datos_por_mes[mes_key]["total_ventas"] += 1
+                datos_por_mes[mes_key]["ingresos_brutos"] += precio_venta * cantidad
+                datos_por_mes[mes_key]["costo_total"] += precio_compra * cantidad
+                datos_por_mes[mes_key]["productos_vendidos"] += cantidad
+                
+                if precio_venta > 0 and precio_compra > 0:
+                    margen = ((precio_venta - precio_compra) / precio_venta) * 100
+                    datos_por_mes[mes_key]["margenes"].append(margen)
+            except Exception as e:
+                continue
+    
+    # Construir respuesta ordenada por mes
+    datos_mensuales = []
+    meses_ordenados = sorted(datos_por_mes.keys())
+    
+    for mes_key in meses_ordenados:
+        d = datos_por_mes[mes_key]
+        margen_promedio = sum(d["margenes"]) / len(d["margenes"]) if d["margenes"] else 0
+        ganancia_neta = d["ingresos_brutos"] - d["costo_total"]
+        
+        datos_mensuales.append(RentabilidadMensualItem(
+            mes=d["mes"],
+            mes_nombre=d["mes_nombre"],
+            total_ventas=d["total_ventas"],
+            ingresos_brutos=round(d["ingresos_brutos"], 2),
+            costo_total=round(d["costo_total"], 2),
+            ganancia_neta=round(ganancia_neta, 2),
+            margen_promedio=round(margen_promedio, 2),
+            productos_vendidos=d["productos_vendidos"]
+        ))
+    
+    # Calcular tendencia
+    tendencia = "estable"
+    variacion = 0
+    
+    if len(datos_mensuales) >= 2:
+        ultimo = datos_mensuales[-1].margen_promedio
+        penultimo = datos_mensuales[-2].margen_promedio
+        
+        if penultimo > 0:
+            variacion = ((ultimo - penultimo) / penultimo) * 100
+        
+        if variacion > 5:
+            tendencia = "creciente"
+        elif variacion < -5:
+            tendencia = "decreciente"
+    
+    return RentabilidadHistoricoResponse(
+        datos_mensuales=datos_mensuales,
+        tendencia=tendencia,
+        variacion_ultimo_mes=round(variacion, 2),
+        fecha_generacion=datetime.now(timezone.utc).isoformat()
+    )
+
+

@@ -584,6 +584,7 @@ export const inventarioApi = {
   
   // Reportes
   getReporteRentabilidadCategorias: (params) => axios.get(`${API_URL}/inventario/reportes/rentabilidad-categorias`, { params }),
+  getReporteRentabilidadHistorico: (params) => axios.get(`${API_URL}/inventario/reportes/rentabilidad-historico`, { params }),
 };
 
 // ==================== API DE PUNTO DE VENTA (POS) ====================

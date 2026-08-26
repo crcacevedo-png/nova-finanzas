@@ -27,6 +27,14 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
   - Estados: Excelente (≥40%), Bueno (30-39%), Regular (20-29%), Bajo (10-19%), Crítico (<10%)
   - Exportación a CSV
   - Toggle "Solo con stock" para filtrar productos con existencias
+- ✅ **Gráfica de Evolución Histórica de Rentabilidad**
+  - Tab "Evolución Mensual" con datos de ventas mes a mes
+  - Gráfica combinada: Línea de Margen % + Área de Ganancia Neta
+  - Gráfica de barras: Ingresos vs Costos Mensuales
+  - Indicadores de tendencia (creciente/estable/decreciente) y variación último mes
+  - Tabla de detalle mensual con ventas, productos, ingresos, costos, ganancia, margen
+  - Selector de período (6, 12, 18, 24 meses)
+  - Exportación CSV del histórico
 
 ### Cambios Previos (2026-08-19 Sesión 2)
 - ✅ **P0 Verificado**: Integración completa de Bodegas en todo el sistema de inventario
