@@ -4,7 +4,16 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-08-26 (Sesión 5)
+**Última actualización**: 2026-06 (Sesión 6)
+
+### Últimos Cambios (2026-06 Sesión 6)
+- ✅ **Verificación E2E de Modificación de Permisos de Roles** (solicitado por usuario)
+  - Bug de `display_name: None` (rol admin) al abrir modal de edición: CONFIRMADO RESUELTO
+  - Agente de pruebas: Backend 13/13 pytest PASS (`test_roles_crud.py`), Frontend 100% de flujos
+  - Modal de edición abre sin error para admin, usuario, optica; superadmin muestra mensaje de bloqueo
+  - Toggle de permisos + Guardar → persiste; Reset a valores por defecto → OK; Crear/Eliminar rol personalizado → OK
+  - Reporte: `/app/test_reports/iteration_47.json`
+  - Pendientes cosméticos (opcionales): ocultar botón editar en superadmin; agregar data-testid a botones lápiz/reset/delete de tarjetas; POST /api/roles/ podría devolver 201
 
 ### Últimos Cambios (2026-08-26 Sesión 5)
 - ✅ **Módulo Completo de Sociedades Médicas** (`/sociedades`)

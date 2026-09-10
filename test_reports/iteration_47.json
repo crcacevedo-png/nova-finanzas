@@ -1,0 +1,38 @@
+{
+  "summary": "E2E testing del flujo de modificación de permisos de roles (Gestión de Usuarios → Roles). Backend pytest: 13/13 PASS (test_roles_crud.py). Frontend UI verificado en Chrome: (1) Login superadmin OK; (2) Todas las 4 tarjetas de rol de sistema (superadmin, admin, usuario, optica) visibles con data-testid='role-card-{name}'; (3) Modal de edición ABRE SIN ERROR para admin, usuario y optica con títulos correctos ('Editar Rol: Administrador', 'Editar Rol: Usuario', 'Editar Rol: Óptica') — bug de display_name NoneType queda confirmado como resuelto; (4) Modal de superadmin abre y muestra el mensaje 'El rol SuperAdmin tiene todos los permisos del sistema y no puede ser modificado.' (aunque el botón lápiz sigue habilitado); (5) Toggle de checkbox 'Eliminar Gastos' en admin + Guardar Cambios → toast 'Rol Administrador actualizado correctamente', tarjeta pasó de '+7 más' a mostrar 'delete expenses' y '+8 más' (persistencia OK); (6) Reset de permisos admin (RotateCcw) → confirm modal → toast 'Permisos de Administrador restaurados a valores por defecto', tarjeta vuelve a '+7 más'; (7) Crear rol personalizado nuevo (test_qa_{ts}) → toast 'Rol \"QA Test ...\" creado correctamente' y card visible; (8) Eliminar rol personalizado desde UI OK.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/roles/", "issue": "Devuelve 200 en creación exitosa; convención REST sugiere 201 Created."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Roles - Tarjeta superadmin", "issues": ["El botón lápiz (Editar permisos) sigue habilitado para superadmin y abre el modal aunque no se puede modificar. Sería más consistente ocultar/deshabilitar el botón como se hace con el botón Eliminar (que sí está oculto para rol de sistema). El mensaje interno es correcto pero el flujo genera un click sin propósito."]},
+      {"screen": "Modal Editar Rol", "issues": ["El botón lápiz de editar permisos en la tarjeta de rol NO tiene data-testid propio (se localiza por title='Editar permisos'). Agregar data-testid='edit-role-button-{name}' facilitaría el testing automático. Igual para el botón RotateCcw (title='Restaurar permisos por defecto')."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_roles_crud.py",
+    "/app/test_reports/pytest/roles_iter47.xml"
+  ],
+  "action_items": [
+    "(Opcional, cosmético) Ocultar o deshabilitar el botón 'Editar permisos' (lápiz) en la tarjeta del rol superadmin para consistencia con el botón Eliminar. Actualmente el modal abre y muestra un mensaje aclaratorio; funcionalmente correcto pero UX mejorable.",
+    "(Opcional) Agregar data-testid a los botones de acción en la tarjeta de rol: 'edit-role-button-{name}' (lápiz) y 'reset-role-button-{name}' (RotateCcw) y 'delete-role-button-{name}' (trash). Actualmente solo confirm-reset-role-button, create-role-button, submit-role-button y role-card-{name} están tageados.",
+    "(Opcional) POST /api/roles/ podría devolver 201 en lugar de 200."
+  ],
+  "critical_code_review_comments": [
+    "roles.py línea 140: el fallback para display_name está bien implementado (previene NoneType). Correcto.",
+    "PUT /api/roles/{role_name} con upsert para roles de sistema es un buen patrón: si el rol no existe todavía en la colección (rol pre-definido en memoria), lo crea al primer update. Verificado que persiste."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (13/13 pytest)", "frontend": "100% de los flujos solicitados"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Rol temporal test_qa_{timestamp} creado y eliminado dentro del mismo run. Permisos del rol 'admin' modificados durante test y restaurados a defaults al final vía botón UI Restaurar. Estado del sistema al finalizar: LIMPIO — rol admin con permisos por defecto (+7 más), sin roles TEST_ residuales.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "El bug de display_name None en el modal de edición de roles está confirmado como corregido en /app/backend/routes/roles.py (fallback en construcción de display_name). Test suite /app/backend/tests/test_roles_crud.py cubre CRUD completo + edición de rol sistema + reset. Login usa 'username' (no email). El botón lápiz para editar permisos no tiene data-testid: usar `card.query_selector('button[title=\"Editar permisos\"]')`. Confirm de reset usa data-testid='confirm-reset-role-button'.",
+  "rca of the issue": "El bug original reportado (NoneType al abrir modal de edición de rol admin) ya estaba resuelto por el agente previo mediante fallback de display_name en roles.py. Verificación en esta iteración: modal abre sin error para admin, usuario, optica y muestra títulos correctos usando editingRole.display_name. Sin regresiones detectadas."
+}
