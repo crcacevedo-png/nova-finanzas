@@ -32,8 +32,9 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 router = APIRouter(prefix="/evaluaciones", tags=["Evaluaciones Oftalmológicas"])
 catalogos_router = APIRouter(prefix="/catalogos", tags=["Catálogos - Evaluaciones"])
 
-# Tiempo límite para sellado (24 horas)
-SELLADO_HORAS = 24
+# NOTA: El límite de 24 horas ha sido eliminado a petición del usuario.
+# Los expedientes ahora pueden editarse sin restricción temporal.
+# Solo el sellado manual (sellado=True) bloquea la edición.
 
 
 # ==================== HELPERS ====================
@@ -50,19 +51,10 @@ def calcular_edad(fecha_nacimiento: str) -> int:
 
 
 def verificar_sellado(evaluacion: dict) -> tuple:
-    """Verifica si una evaluación debe estar sellada"""
+    """Verifica si una evaluación está sellada manualmente.
+    Ya no se aplica el límite automático de 24 horas."""
     if evaluacion.get("sellado", False):
-        return True, "Expediente sellado"
-    
-    fecha_creacion = evaluacion.get("fecha_creacion", "")
-    if fecha_creacion:
-        try:
-            creacion = datetime.fromisoformat(fecha_creacion.replace("Z", "+00:00"))
-            ahora = datetime.now(timezone.utc)
-            if (ahora - creacion).total_seconds() > SELLADO_HORAS * 3600:
-                return True, "Expediente sellado por tiempo (24h)"
-        except Exception:
-            pass
+        return True, "Expediente sellado manualmente"
     return False, ""
 
 
@@ -312,7 +304,7 @@ async def get_evaluacion_pdf(
         try:
             fecha_obj = datetime.fromisoformat(fecha_eval.replace("Z", "+00:00"))
             fecha_eval = fecha_obj.strftime("%d/%m/%Y")
-        except:
+        except Exception:
             pass
     
     paciente_data = [
@@ -524,7 +516,7 @@ async def get_evaluacion_pdf(
         try:
             fc = datetime.fromisoformat(fecha_creacion.replace("Z", "+00:00"))
             fecha_creacion = fc.strftime("%d/%m/%Y %H:%M")
-        except:
+        except Exception:
             pass
     
     footer_text = f"{sellado_text} | Creado: {fecha_creacion} por {evaluacion.get('creado_por_nombre', 'N/A')}"

@@ -12,6 +12,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import {
   Select,
@@ -35,7 +36,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
-import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import axios from 'axios';
@@ -212,6 +212,9 @@ const EvaluacionOftalmologica = () => {
   const [tiposCirugia, setTiposCirugia] = useState([]);
   const [crmEnviado, setCrmEnviado] = useState(false); // Para mostrar si ya se envió al CRM
   
+  // Estado para índice de receta a imprimir
+  const [printRecetaIndex, setPrintRecetaIndex] = useState(0);
+  
   // Estados para soporte offline
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingSync, setPendingSync] = useState([]);
@@ -285,6 +288,10 @@ const EvaluacionOftalmologica = () => {
     procedimientos: [],
     recetas: {
       medicamentos: { items: [] },
+      // Arrays de múltiples recetas
+      anteojos_lista: [],
+      lentes_contacto_lista: [],
+      // Receta activa (para edición - compatibilidad hacia atrás)
       anteojos: {
         od: { esfera: '', cilindro: '', eje: '', adicion: '' },
         os: { esfera: '', cilindro: '', eje: '', adicion: '' },
@@ -296,8 +303,8 @@ const EvaluacionOftalmologica = () => {
         observaciones: ''
       },
       lentes_contacto: {
-        od: { poder: '', curva_base: '', diametro: '' },
-        os: { poder: '', curva_base: '', diametro: '' },
+        od: { poder: '', curva_base: '', diametro: '', adicion: '' },
+        os: { poder: '', curva_base: '', diametro: '', adicion: '' },
         marca: '',
         tipo: '',
         regimen_reemplazo: '',
@@ -305,6 +312,32 @@ const EvaluacionOftalmologica = () => {
       }
     }
   };
+
+  // Template para nueva receta de anteojos
+  const nuevaRecetaAnteojos = () => ({
+    id: `ant_${Date.now()}`,
+    od: { esfera: '', cilindro: '', eje: '', adicion: '' },
+    os: { esfera: '', cilindro: '', eje: '', adicion: '' },
+    distancia_pupilar: '',
+    tipo_lente: '',
+    material: '',
+    tratamientos: '',
+    uso: '',
+    observaciones: '',
+    fecha_creacion: new Date().toISOString()
+  });
+
+  // Template para nueva receta de lentes de contacto
+  const nuevaRecetaLentesContacto = () => ({
+    id: `lc_${Date.now()}`,
+    od: { poder: '', curva_base: '', diametro: '', adicion: '' },
+    os: { poder: '', curva_base: '', diametro: '', adicion: '' },
+    marca: '',
+    tipo: '',
+    regimen_reemplazo: '',
+    observaciones: '',
+    fecha_creacion: new Date().toISOString()
+  });
 
   const [formData, setFormData] = useState(evaluacionVacia);
 
@@ -727,22 +760,43 @@ const EvaluacionOftalmologica = () => {
       motilidad_ocular: examenData.motilidad_ocular || ''
     };
     
-    // Migrar recetas (oi → os)
+    // Migrar recetas (oi → os) y convertir a formato de múltiples recetas
     const recetasData = evaluacion.recetas || {};
+    
+    // Migrar receta de anteojos antigua a la nueva estructura
+    const anteojosLegacy = {
+      ...evaluacionVacia.recetas.anteojos,
+      ...recetasData.anteojos,
+      od: { ...evaluacionVacia.recetas.anteojos.od, ...recetasData.anteojos?.od },
+      os: { ...evaluacionVacia.recetas.anteojos.os, ...(recetasData.anteojos?.os || recetasData.anteojos?.oi) }
+    };
+    
+    // Migrar receta de lentes de contacto antigua
+    const lentesLegacy = {
+      ...evaluacionVacia.recetas.lentes_contacto,
+      ...recetasData.lentes_contacto,
+      od: { ...evaluacionVacia.recetas.lentes_contacto.od, ...recetasData.lentes_contacto?.od },
+      os: { ...evaluacionVacia.recetas.lentes_contacto.os, ...(recetasData.lentes_contacto?.os || recetasData.lentes_contacto?.oi) }
+    };
+    
+    // Si ya tiene listas, usarlas; si no, migrar la receta individual a lista
+    let anteojosLista = recetasData.anteojos_lista || [];
+    let lentesLista = recetasData.lentes_contacto_lista || [];
+    
+    // Migrar receta antigua si existe y la lista está vacía
+    if (anteojosLista.length === 0 && (anteojosLegacy.od?.esfera || anteojosLegacy.os?.esfera)) {
+      anteojosLista = [{ ...anteojosLegacy, id: `ant_migrated_${Date.now()}`, fecha_creacion: evaluacion.fecha_creacion || new Date().toISOString() }];
+    }
+    if (lentesLista.length === 0 && (lentesLegacy.od?.poder || lentesLegacy.os?.poder)) {
+      lentesLista = [{ ...lentesLegacy, id: `lc_migrated_${Date.now()}`, fecha_creacion: evaluacion.fecha_creacion || new Date().toISOString() }];
+    }
+    
     const migratedRecetas = {
       medicamentos: { items: recetasData.medicamentos?.items || [] },
-      anteojos: {
-        ...evaluacionVacia.recetas.anteojos,
-        ...recetasData.anteojos,
-        od: { ...evaluacionVacia.recetas.anteojos.od, ...recetasData.anteojos?.od },
-        os: { ...evaluacionVacia.recetas.anteojos.os, ...(recetasData.anteojos?.os || recetasData.anteojos?.oi) }
-      },
-      lentes_contacto: {
-        ...evaluacionVacia.recetas.lentes_contacto,
-        ...recetasData.lentes_contacto,
-        od: { ...evaluacionVacia.recetas.lentes_contacto.od, ...recetasData.lentes_contacto?.od },
-        os: { ...evaluacionVacia.recetas.lentes_contacto.os, ...(recetasData.lentes_contacto?.os || recetasData.lentes_contacto?.oi) }
-      }
+      anteojos_lista: anteojosLista,
+      lentes_contacto_lista: lentesLista,
+      anteojos: anteojosLegacy,
+      lentes_contacto: lentesLegacy
     };
     
     setFormData({
@@ -1369,6 +1423,18 @@ const EvaluacionOftalmologica = () => {
                         <span className="text-xs text-gray-500">
                           {ev.fecha} | {ev.paciente_expediente}
                         </span>
+                        {/* Diagnóstico - resumen */}
+                        {ev.diagnostico && (
+                          <span className="text-xs text-teal-600 mt-1 truncate max-w-[250px]">
+                            <strong>Dx:</strong> {ev.diagnostico.length > 50 ? ev.diagnostico.substring(0, 50) + '...' : ev.diagnostico}
+                          </span>
+                        )}
+                        {/* Lectura de exámenes - resumen */}
+                        {ev.lectura_examenes && (
+                          <span className="text-xs text-blue-600 truncate max-w-[250px]">
+                            <strong>Exámenes:</strong> {ev.lectura_examenes.length > 40 ? ev.lectura_examenes.substring(0, 40) + '...' : ev.lectura_examenes}
+                          </span>
+                        )}
                       </DropdownMenuItem>
                     ))
                   )}
@@ -2338,207 +2404,390 @@ const EvaluacionOftalmologica = () => {
               </div>
             </CollapsibleSection>
 
-            {/* Receta de Anteojos */}
-            <CollapsibleSection title="Receta de Anteojos" icon={Glasses} defaultOpen={false} onPrint={() => handlePrint('anteojos')}>
+            {/* Recetas de Anteojos - Lista Múltiple */}
+            <CollapsibleSection 
+              title="Recetas de Anteojos" 
+              icon={Glasses} 
+              defaultOpen={false} 
+              badge={`${formData.recetas.anteojos_lista?.length || 0}`}
+            >
               <div className="space-y-3">
-                <div className="grid grid-cols-5 gap-1 text-center text-xs">
-                  <div></div>
-                  <div className="text-gray-500">Esfera</div>
-                  <div className="text-gray-500">Cilindro</div>
-                  <div className="text-gray-500">Eje</div>
-                  <div className="text-gray-500">Adición</div>
-                </div>
-                <div className="grid grid-cols-5 gap-1 items-center">
-                  <Label className="text-xs text-right">OD</Label>
-                  {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
-                    <Input
-                      key={field}
-                      value={formData.recetas.anteojos.od[field]}
-                      onChange={(e) => updateNestedField(`recetas.anteojos.od.${field}`, e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal text-xs h-7"
-                    />
-                  ))}
-                </div>
-                <div className="grid grid-cols-5 gap-1 items-center">
-                  <Label className="text-xs text-right">OS</Label>
-                  {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
-                    <Input
-                      key={field}
-                      value={formData.recetas.anteojos.os[field]}
-                      onChange={(e) => updateNestedField(`recetas.anteojos.os.${field}`, e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal text-xs h-7"
-                    />
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Distancia Pupilar</Label>
-                    <Input
-                      value={formData.recetas.anteojos.distancia_pupilar}
-                      onChange={(e) => updateNestedField('recetas.anteojos.distancia_pupilar', e.target.value)}
-                      disabled={isReadOnly}
-                      placeholder="mm"
-                      className="input-teal text-xs h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Tipo de Lente</Label>
-                    <Select
-                      value={formData.recetas.anteojos.tipo_lente}
-                      onValueChange={(v) => updateNestedField('recetas.anteojos.tipo_lente', v)}
-                      disabled={isReadOnly}
-                    >
-                      <SelectTrigger className="input-teal h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Monofocal">Monofocal</SelectItem>
-                        <SelectItem value="Bifocal">Bifocal</SelectItem>
-                        <SelectItem value="Progresivo">Progresivo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Material</Label>
-                    <Input
-                      value={formData.recetas.anteojos.material}
-                      onChange={(e) => updateNestedField('recetas.anteojos.material', e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal text-xs h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Uso</Label>
-                    <Select
-                      value={formData.recetas.anteojos.uso}
-                      onValueChange={(v) => updateNestedField('recetas.anteojos.uso', v)}
-                      disabled={isReadOnly}
-                    >
-                      <SelectTrigger className="input-teal h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Permanente">Permanente</SelectItem>
-                        <SelectItem value="Lectura">Lectura</SelectItem>
-                        <SelectItem value="Distancia">Distancia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs">Tratamientos</Label>
-                  <Input
-                    value={formData.recetas.anteojos.tratamientos}
-                    onChange={(e) => updateNestedField('recetas.anteojos.tratamientos', e.target.value)}
-                    disabled={isReadOnly}
-                    placeholder="Antirreflejo, filtro azul..."
-                    className="input-teal text-xs h-8"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Observaciones</Label>
-                  <Textarea
-                    value={formData.recetas.anteojos.observaciones}
-                    onChange={(e) => updateNestedField('recetas.anteojos.observaciones', e.target.value)}
-                    disabled={isReadOnly}
-                    className="input-teal min-h-[40px] text-xs"
-                  />
-                </div>
+                {/* Botón agregar nueva receta */}
+                {!isReadOnly && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const nuevaReceta = nuevaRecetaAnteojos();
+                      updateNestedField('recetas.anteojos_lista', [...(formData.recetas.anteojos_lista || []), nuevaReceta]);
+                    }}
+                    className="w-full border-dashed border-teal-400 text-teal-600 hover:bg-teal-50"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Agregar Receta de Anteojos
+                  </Button>
+                )}
+                
+                {/* Lista de recetas */}
+                {(formData.recetas.anteojos_lista || []).map((receta, idx) => (
+                  <Card key={receta.id || idx} className="border border-teal-200">
+                    <CardHeader className="py-2 px-3 bg-teal-50 flex flex-row items-center justify-between">
+                      <CardTitle className="text-xs font-medium flex items-center gap-2">
+                        <Glasses className="w-4 h-4 text-teal-600" />
+                        Receta #{idx + 1}
+                        {receta.fecha_creacion && (
+                          <span className="text-gray-400 font-normal">
+                            ({new Date(receta.fecha_creacion).toLocaleDateString('es-GT')})
+                          </span>
+                        )}
+                      </CardTitle>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setPrintRecetaIndex(idx);
+                            handlePrint('anteojos');
+                          }}
+                          className="h-6 px-2 text-blue-600 hover:bg-blue-50"
+                          title="Imprimir receta"
+                        >
+                          <Printer className="w-3 h-3" />
+                        </Button>
+                        {!isReadOnly && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const lista = formData.recetas.anteojos_lista.filter((_, i) => i !== idx);
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            className="h-6 px-2 text-red-600 hover:bg-red-50"
+                            title="Eliminar receta"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                        <div></div>
+                        <div className="text-gray-500">Esfera</div>
+                        <div className="text-gray-500">Cilindro</div>
+                        <div className="text-gray-500">Eje</div>
+                        <div className="text-gray-500">ADD</div>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 items-center">
+                        <Label className="text-xs text-right">OD</Label>
+                        {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
+                          <Input
+                            key={field}
+                            value={receta.od?.[field] || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.anteojos_lista];
+                              lista[idx] = { ...lista[idx], od: { ...lista[idx].od, [field]: e.target.value }};
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            className="input-teal text-xs h-7"
+                          />
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 items-center">
+                        <Label className="text-xs text-right">OS</Label>
+                        {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
+                          <Input
+                            key={field}
+                            value={receta.os?.[field] || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.anteojos_lista];
+                              lista[idx] = { ...lista[idx], os: { ...lista[idx].os, [field]: e.target.value }};
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            className="input-teal text-xs h-7"
+                          />
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 pt-2">
+                        <div>
+                          <Label className="text-xs">DP</Label>
+                          <Input
+                            value={receta.distancia_pupilar || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.anteojos_lista];
+                              lista[idx] = { ...lista[idx], distancia_pupilar: e.target.value };
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            placeholder="mm"
+                            className="input-teal text-xs h-7"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Tipo Lente</Label>
+                          <Select
+                            value={receta.tipo_lente || ''}
+                            onValueChange={(v) => {
+                              const lista = [...formData.recetas.anteojos_lista];
+                              lista[idx] = { ...lista[idx], tipo_lente: v };
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="input-teal h-7 text-xs">
+                              <SelectValue placeholder="Tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Monofocal">Monofocal</SelectItem>
+                              <SelectItem value="Bifocal">Bifocal</SelectItem>
+                              <SelectItem value="Progresivo">Progresivo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Material</Label>
+                          <Input
+                            value={receta.material || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.anteojos_lista];
+                              lista[idx] = { ...lista[idx], material: e.target.value };
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            className="input-teal text-xs h-7"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Uso</Label>
+                          <Select
+                            value={receta.uso || ''}
+                            onValueChange={(v) => {
+                              const lista = [...formData.recetas.anteojos_lista];
+                              lista[idx] = { ...lista[idx], uso: v };
+                              updateNestedField('recetas.anteojos_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="input-teal h-7 text-xs">
+                              <SelectValue placeholder="Uso" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Permanente">Permanente</SelectItem>
+                              <SelectItem value="Lectura">Lectura</SelectItem>
+                              <SelectItem value="Distancia">Distancia</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Observaciones</Label>
+                        <Input
+                          value={receta.observaciones || ''}
+                          onChange={(e) => {
+                            const lista = [...formData.recetas.anteojos_lista];
+                            lista[idx] = { ...lista[idx], observaciones: e.target.value };
+                            updateNestedField('recetas.anteojos_lista', lista);
+                          }}
+                          disabled={isReadOnly}
+                          className="input-teal text-xs h-7"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                {(formData.recetas.anteojos_lista || []).length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-4">No hay recetas de anteojos</p>
+                )}
               </div>
             </CollapsibleSection>
 
-            {/* Receta de Lentes de Contacto */}
-            <CollapsibleSection title="Receta de Lentes de Contacto" icon={Contact} defaultOpen={false} onPrint={() => handlePrint('lentes_contacto')}>
+            {/* Recetas de Lentes de Contacto - Lista Múltiple */}
+            <CollapsibleSection 
+              title="Recetas de Lentes de Contacto" 
+              icon={Contact} 
+              defaultOpen={false}
+              badge={`${formData.recetas.lentes_contacto_lista?.length || 0}`}
+            >
               <div className="space-y-3">
-                <div className="grid grid-cols-4 gap-1 text-center text-xs">
-                  <div></div>
-                  <div className="text-gray-500">Poder</div>
-                  <div className="text-gray-500">Curva Base</div>
-                  <div className="text-gray-500">Diámetro</div>
-                </div>
-                <div className="grid grid-cols-4 gap-1 items-center">
-                  <Label className="text-xs text-right">OD</Label>
-                  {['poder', 'curva_base', 'diametro'].map(field => (
-                    <Input
-                      key={field}
-                      value={formData.recetas.lentes_contacto.od[field]}
-                      onChange={(e) => updateNestedField(`recetas.lentes_contacto.od.${field}`, e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal text-xs h-7"
-                    />
-                  ))}
-                </div>
-                <div className="grid grid-cols-4 gap-1 items-center">
-                  <Label className="text-xs text-right">OS</Label>
-                  {['poder', 'curva_base', 'diametro'].map(field => (
-                    <Input
-                      key={field}
-                      value={formData.recetas.lentes_contacto.os[field]}
-                      onChange={(e) => updateNestedField(`recetas.lentes_contacto.os.${field}`, e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal text-xs h-7"
-                    />
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Marca</Label>
-                    <Input
-                      value={formData.recetas.lentes_contacto.marca}
-                      onChange={(e) => updateNestedField('recetas.lentes_contacto.marca', e.target.value)}
-                      disabled={isReadOnly}
-                      className="input-teal text-xs h-8"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Tipo</Label>
-                    <Select
-                      value={formData.recetas.lentes_contacto.tipo}
-                      onValueChange={(v) => updateNestedField('recetas.lentes_contacto.tipo', v)}
-                      disabled={isReadOnly}
-                    >
-                      <SelectTrigger className="input-teal h-8 text-xs">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Blando">Blando</SelectItem>
-                        <SelectItem value="Rígido">Rígido</SelectItem>
-                        <SelectItem value="Tórico">Tórico</SelectItem>
-                        <SelectItem value="Multifocal">Multifocal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs">Régimen de Reemplazo</Label>
-                  <Select
-                    value={formData.recetas.lentes_contacto.regimen_reemplazo}
-                    onValueChange={(v) => updateNestedField('recetas.lentes_contacto.regimen_reemplazo', v)}
-                    disabled={isReadOnly}
+                {/* Botón agregar nueva receta */}
+                {!isReadOnly && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const nuevaReceta = nuevaRecetaLentesContacto();
+                      updateNestedField('recetas.lentes_contacto_lista', [...(formData.recetas.lentes_contacto_lista || []), nuevaReceta]);
+                    }}
+                    className="w-full border-dashed border-teal-400 text-teal-600 hover:bg-teal-50"
                   >
-                    <SelectTrigger className="input-teal h-8 text-xs">
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Diario">Diario</SelectItem>
-                      <SelectItem value="Quincenal">Quincenal</SelectItem>
-                      <SelectItem value="Mensual">Mensual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Observaciones</Label>
-                  <Textarea
-                    value={formData.recetas.lentes_contacto.observaciones}
-                    onChange={(e) => updateNestedField('recetas.lentes_contacto.observaciones', e.target.value)}
-                    disabled={isReadOnly}
-                    className="input-teal min-h-[40px] text-xs"
-                  />
-                </div>
+                    <Plus className="w-4 h-4 mr-1" /> Agregar Receta de Lentes de Contacto
+                  </Button>
+                )}
+                
+                {/* Lista de recetas */}
+                {(formData.recetas.lentes_contacto_lista || []).map((receta, idx) => (
+                  <Card key={receta.id || idx} className="border border-teal-200">
+                    <CardHeader className="py-2 px-3 bg-teal-50 flex flex-row items-center justify-between">
+                      <CardTitle className="text-xs font-medium flex items-center gap-2">
+                        <Contact className="w-4 h-4 text-teal-600" />
+                        Receta #{idx + 1}
+                        {receta.fecha_creacion && (
+                          <span className="text-gray-400 font-normal">
+                            ({new Date(receta.fecha_creacion).toLocaleDateString('es-GT')})
+                          </span>
+                        )}
+                      </CardTitle>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setPrintRecetaIndex(idx);
+                            handlePrint('lentes_contacto');
+                          }}
+                          className="h-6 px-2 text-blue-600 hover:bg-blue-50"
+                          title="Imprimir receta"
+                        >
+                          <Printer className="w-3 h-3" />
+                        </Button>
+                        {!isReadOnly && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const lista = formData.recetas.lentes_contacto_lista.filter((_, i) => i !== idx);
+                              updateNestedField('recetas.lentes_contacto_lista', lista);
+                            }}
+                            className="h-6 px-2 text-red-600 hover:bg-red-50"
+                            title="Eliminar receta"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                        <div></div>
+                        <div className="text-gray-500">Poder</div>
+                        <div className="text-gray-500">CB</div>
+                        <div className="text-gray-500">DIA</div>
+                        <div className="text-gray-500">ADD</div>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 items-center">
+                        <Label className="text-xs text-right">OD</Label>
+                        {['poder', 'curva_base', 'diametro', 'adicion'].map(field => (
+                          <Input
+                            key={field}
+                            value={receta.od?.[field] || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.lentes_contacto_lista];
+                              lista[idx] = { ...lista[idx], od: { ...lista[idx].od, [field]: e.target.value }};
+                              updateNestedField('recetas.lentes_contacto_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            className="input-teal text-xs h-7"
+                            placeholder={field === 'adicion' ? '+0.00' : ''}
+                          />
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-5 gap-1 items-center">
+                        <Label className="text-xs text-right">OS</Label>
+                        {['poder', 'curva_base', 'diametro', 'adicion'].map(field => (
+                          <Input
+                            key={field}
+                            value={receta.os?.[field] || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.lentes_contacto_lista];
+                              lista[idx] = { ...lista[idx], os: { ...lista[idx].os, [field]: e.target.value }};
+                              updateNestedField('recetas.lentes_contacto_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            className="input-teal text-xs h-7"
+                            placeholder={field === 'adicion' ? '+0.00' : ''}
+                          />
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 pt-2">
+                        <div>
+                          <Label className="text-xs">Marca</Label>
+                          <Input
+                            value={receta.marca || ''}
+                            onChange={(e) => {
+                              const lista = [...formData.recetas.lentes_contacto_lista];
+                              lista[idx] = { ...lista[idx], marca: e.target.value };
+                              updateNestedField('recetas.lentes_contacto_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                            className="input-teal text-xs h-7"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Tipo</Label>
+                          <Select
+                            value={receta.tipo || ''}
+                            onValueChange={(v) => {
+                              const lista = [...formData.recetas.lentes_contacto_lista];
+                              lista[idx] = { ...lista[idx], tipo: v };
+                              updateNestedField('recetas.lentes_contacto_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="input-teal h-7 text-xs">
+                              <SelectValue placeholder="Tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Blando">Blando</SelectItem>
+                              <SelectItem value="Rígido">Rígido</SelectItem>
+                              <SelectItem value="Tórico">Tórico</SelectItem>
+                              <SelectItem value="Multifocal">Multifocal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Reemplazo</Label>
+                          <Select
+                            value={receta.regimen_reemplazo || ''}
+                            onValueChange={(v) => {
+                              const lista = [...formData.recetas.lentes_contacto_lista];
+                              lista[idx] = { ...lista[idx], regimen_reemplazo: v };
+                              updateNestedField('recetas.lentes_contacto_lista', lista);
+                            }}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="input-teal h-7 text-xs">
+                              <SelectValue placeholder="Reemplazo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Diario">Diario</SelectItem>
+                              <SelectItem value="Quincenal">Quincenal</SelectItem>
+                              <SelectItem value="Mensual">Mensual</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Observaciones</Label>
+                        <Input
+                          value={receta.observaciones || ''}
+                          onChange={(e) => {
+                            const lista = [...formData.recetas.lentes_contacto_lista];
+                            lista[idx] = { ...lista[idx], observaciones: e.target.value };
+                            updateNestedField('recetas.lentes_contacto_lista', lista);
+                          }}
+                          disabled={isReadOnly}
+                          className="input-teal text-xs h-7"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                
+                {(formData.recetas.lentes_contacto_lista || []).length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-4">No hay recetas de lentes de contacto</p>
+                )}
               </div>
             </CollapsibleSection>
           </div>
@@ -2616,97 +2865,112 @@ const EvaluacionOftalmologica = () => {
             {printType === 'anteojos' && (
               <div>
                 <h2 className="print-title text-sm font-bold mb-2 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
-                  Receta de Anteojos
+                  Receta de Anteojos {formData.recetas.anteojos_lista?.length > 1 ? `(#${printRecetaIndex + 1})` : ''}
                 </h2>
-                <div className="flex gap-4">
-                  {/* Tabla de graduación */}
-                  <div className="flex-1">
-                    <table className="print-table w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
-                          <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Esfera</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Cilindro</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Eje</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Adición</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.od.esfera || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.od.cilindro || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.od.eje || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.od.adicion || '-'}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.os.esfera || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.os.cilindro || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.os.eje || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.anteojos.os.adicion || '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  {/* Datos adicionales */}
-                  <div className="w-48 text-xs p-2 bg-gray-50 rounded">
-                    <div className="space-y-1">
-                      <div><span className="font-semibold">DP:</span> {formData.recetas.anteojos.distancia_pupilar || '-'}</div>
-                      <div><span className="font-semibold">Tipo:</span> {formData.recetas.anteojos.tipo_lente || '-'}</div>
-                      <div><span className="font-semibold">Material:</span> {formData.recetas.anteojos.material || '-'}</div>
-                      <div><span className="font-semibold">Uso:</span> {formData.recetas.anteojos.uso || '-'}</div>
-                      {formData.recetas.anteojos.tratamientos && (
-                        <div className="pt-1 border-t"><span className="font-semibold">Tratamientos:</span> {formData.recetas.anteojos.tratamientos}</div>
-                      )}
+                {(() => {
+                  // Obtener la receta del índice seleccionado, o la primera disponible
+                  const receta = formData.recetas.anteojos_lista?.[printRecetaIndex] || formData.recetas.anteojos_lista?.[0] || formData.recetas.anteojos;
+                  return (
+                    <div className="flex gap-4">
+                      {/* Tabla de graduación */}
+                      <div className="flex-1">
+                        <table className="print-table w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
+                              <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">Esfera</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">Cilindro</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">Eje</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">ADD</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
+                              <td className="text-center py-2">{receta?.od?.esfera || '-'}</td>
+                              <td className="text-center py-2">{receta?.od?.cilindro || '-'}</td>
+                              <td className="text-center py-2">{receta?.od?.eje || '-'}</td>
+                              <td className="text-center py-2">{receta?.od?.adicion || '-'}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
+                              <td className="text-center py-2">{receta?.os?.esfera || '-'}</td>
+                              <td className="text-center py-2">{receta?.os?.cilindro || '-'}</td>
+                              <td className="text-center py-2">{receta?.os?.eje || '-'}</td>
+                              <td className="text-center py-2">{receta?.os?.adicion || '-'}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Datos adicionales */}
+                      <div className="w-48 text-xs p-2 bg-gray-50 rounded">
+                        <div className="space-y-1">
+                          <div><span className="font-semibold">DP:</span> {receta?.distancia_pupilar || '-'}</div>
+                          <div><span className="font-semibold">Tipo:</span> {receta?.tipo_lente || '-'}</div>
+                          <div><span className="font-semibold">Material:</span> {receta?.material || '-'}</div>
+                          <div><span className="font-semibold">Uso:</span> {receta?.uso || '-'}</div>
+                          {receta?.tratamientos && (
+                            <div className="pt-1 border-t"><span className="font-semibold">Tratamientos:</span> {receta.tratamientos}</div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             )}
             
             {printType === 'lentes_contacto' && (
               <div>
                 <h2 className="print-title text-sm font-bold mb-2 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
-                  Receta de Lentes de Contacto
+                  Receta de Lentes de Contacto {formData.recetas.lentes_contacto_lista?.length > 1 ? `(#${printRecetaIndex + 1})` : ''}
                 </h2>
-                <div className="flex gap-4">
-                  {/* Tabla de parámetros */}
-                  <div className="flex-1">
-                    <table className="print-table w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
-                          <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Poder</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Curva Base</th>
-                          <th className="text-center py-1 px-2 bg-gray-50">Diámetro</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
-                          <td className="text-center py-2">{formData.recetas.lentes_contacto.od.poder || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.lentes_contacto.od.curva_base || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.lentes_contacto.od.diametro || '-'}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
-                          <td className="text-center py-2">{formData.recetas.lentes_contacto.os.poder || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.lentes_contacto.os.curva_base || '-'}</td>
-                          <td className="text-center py-2">{formData.recetas.lentes_contacto.os.diametro || '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  {/* Datos adicionales */}
-                  <div className="w-56 text-xs p-2 bg-gray-50 rounded">
-                    <div className="space-y-1">
-                      <div><span className="font-semibold">Marca:</span> {formData.recetas.lentes_contacto.marca || '-'}</div>
-                      <div><span className="font-semibold">Tipo:</span> {formData.recetas.lentes_contacto.tipo || '-'}</div>
-                      <div><span className="font-semibold">Reemplazo:</span> {formData.recetas.lentes_contacto.regimen_reemplazo || '-'}</div>
+                {(() => {
+                  // Obtener la receta del índice seleccionado, o la primera disponible
+                  const receta = formData.recetas.lentes_contacto_lista?.[printRecetaIndex] || formData.recetas.lentes_contacto_lista?.[0] || formData.recetas.lentes_contacto;
+                  return (
+                    <div className="flex gap-4">
+                      {/* Tabla de parámetros */}
+                      <div className="flex-1">
+                        <table className="print-table w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b-2" style={{ borderColor: '#0F6E56' }}>
+                              <th className="text-left py-1 px-2 bg-gray-50">Ojo</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">Poder</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">CB</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">DIA</th>
+                              <th className="text-center py-1 px-2 bg-gray-50">ADD</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OD</td>
+                              <td className="text-center py-2">{receta?.od?.poder || '-'}</td>
+                              <td className="text-center py-2">{receta?.od?.curva_base || '-'}</td>
+                              <td className="text-center py-2">{receta?.od?.diametro || '-'}</td>
+                              <td className="text-center py-2">{receta?.od?.adicion || '-'}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 px-2 font-semibold" style={{ color: '#0F6E56' }}>OS</td>
+                              <td className="text-center py-2">{receta?.os?.poder || '-'}</td>
+                              <td className="text-center py-2">{receta?.os?.curva_base || '-'}</td>
+                              <td className="text-center py-2">{receta?.os?.diametro || '-'}</td>
+                              <td className="text-center py-2">{receta?.os?.adicion || '-'}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      {/* Datos adicionales */}
+                      <div className="w-56 text-xs p-2 bg-gray-50 rounded">
+                        <div className="space-y-1">
+                          <div><span className="font-semibold">Marca:</span> {receta?.marca || '-'}</div>
+                          <div><span className="font-semibold">Tipo:</span> {receta?.tipo || '-'}</div>
+                          <div><span className="font-semibold">Reemplazo:</span> {receta?.regimen_reemplazo || '-'}</div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             )}
             
