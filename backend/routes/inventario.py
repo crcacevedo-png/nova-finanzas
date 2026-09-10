@@ -1496,7 +1496,7 @@ async def importar_productos(
                 if last and last.get("codigo", "").startswith("PROD-"):
                     try:
                         last_num = int(last["codigo"].split("-")[1])
-                    except:
+                    except (ValueError, IndexError):
                         pass
                 prod["codigo"] = f"PROD-{last_num + 1:04d}"
             
@@ -1549,7 +1549,7 @@ def parse_import_row(row: dict, row_num: int) -> Optional[dict]:
             # Remover símbolos de moneda y comas
             val_str = str(val).replace("Q", "").replace(",", "").strip()
             return float(val_str) if val_str else default
-        except:
+        except (ValueError, TypeError):
             return default
     
     def parse_int(val, default=0):
@@ -1557,7 +1557,7 @@ def parse_import_row(row: dict, row_num: int) -> Optional[dict]:
             return default
         try:
             return int(float(str(val).strip()))
-        except:
+        except (ValueError, TypeError):
             return default
     
     # Validar tipo

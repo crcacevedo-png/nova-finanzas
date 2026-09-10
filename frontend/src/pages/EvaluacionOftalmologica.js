@@ -2581,6 +2581,20 @@ const EvaluacionOftalmologica = () => {
                         </div>
                       </div>
                       <div>
+                        <Label className="text-xs">Tratamientos</Label>
+                        <Input
+                          value={receta.tratamientos || ''}
+                          onChange={(e) => {
+                            const lista = [...formData.recetas.anteojos_lista];
+                            lista[idx] = { ...lista[idx], tratamientos: e.target.value };
+                            updateNestedField('recetas.anteojos_lista', lista);
+                          }}
+                          disabled={isReadOnly}
+                          placeholder="Antirreflejo, filtro azul, fotocromático..."
+                          className="input-teal text-xs h-7"
+                        />
+                      </div>
+                      <div>
                         <Label className="text-xs">Observaciones</Label>
                         <Input
                           value={receta.observaciones || ''}
@@ -2992,17 +3006,11 @@ const EvaluacionOftalmologica = () => {
               </div>
             )}
             
-            {/* Pie de Receta - Formato Horizontal */}
-            <div className="mt-4 pt-3 border-t flex justify-between items-end" style={{ borderColor: '#0F6E56' }}>
-              <div className="text-xs text-gray-600">
+            {/* Pie de Receta */}
+            <div className="mt-4 pt-3 border-t" style={{ borderColor: '#0F6E56' }}>
+              <div className="text-xs text-gray-600 text-center">
                 <p>Fecha de emisión: {new Date().toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}</p>
                 <p className="text-gray-400 mt-1">NovaVision © {new Date().getFullYear()}</p>
-              </div>
-              <div className="text-center">
-                <div className="border-t border-gray-800 w-44 mb-1"></div>
-                <p className="font-semibold text-sm">{formData.medico_nombre || 'Médico'}</p>
-                <p className="text-xs text-gray-600">Médico Oftalmólogo</p>
-                <p className="text-xs text-gray-500">Colegiado No. _______</p>
               </div>
             </div>
             
