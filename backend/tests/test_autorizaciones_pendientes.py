@@ -71,23 +71,23 @@ class TestAuthorizacionesPendientesAPI:
             for auth_id in self.created_auth_ids:
                 try:
                     self.session.delete(f"{BASE_URL}/api/payment-authorizations/{auth_id}")
-                except:
+                except Exception:
                     pass
             
             # Delete test expenses
             for expense_id in self.created_expense_ids:
                 try:
                     self.session.delete(f"{BASE_URL}/api/expenses/{expense_id}")
-                except:
+                except Exception:
                     pass
             
             # Delete test bank accounts
             for bank_id in self.created_bank_ids:
                 try:
                     self.session.delete(f"{BASE_URL}/api/bank-accounts/{bank_id}")
-                except:
+                except Exception:
                     pass
-        except:
+        except Exception:
             pass
     
     def _use_superadmin(self):

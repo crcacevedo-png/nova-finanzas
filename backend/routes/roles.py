@@ -174,10 +174,10 @@ async def get_all_roles(
         roles.append({
             "id": role_name,
             "name": role_name,
-            "display_name": custom_config.get("display_name") if custom_config else display_names.get(role_name, role_name),
-            "description": custom_config.get("description") if custom_config else f"Rol de sistema: {role_name}",
+            "display_name": custom_config.get("display_name") or display_names.get(role_name, role_name) if custom_config else display_names.get(role_name, role_name),
+            "description": custom_config.get("description") or f"Rol de sistema: {role_name}" if custom_config else f"Rol de sistema: {role_name}",
             "permissions": custom_config.get("permissions") if custom_config else PERMISSIONS.get(role_name, {}),
-            "color": custom_config.get("color") if custom_config else colors.get(role_name, "gray"),
+            "color": custom_config.get("color") or colors.get(role_name, "gray") if custom_config else colors.get(role_name, "gray"),
             "is_system": True,
             "is_active": True,
             "user_count": user_counts.get(role_name, 0),

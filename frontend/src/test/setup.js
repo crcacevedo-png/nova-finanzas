@@ -4,6 +4,7 @@
  */
 
 import '@testing-library/jest-dom'
+import { vi, afterEach } from 'vitest'
 
 // Mock de variables de entorno
 vi.stubEnv('REACT_APP_BACKEND_URL', 'http://localhost:8001')

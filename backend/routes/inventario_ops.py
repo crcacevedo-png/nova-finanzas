@@ -94,6 +94,50 @@ async def listar_ordenes_compra(
     
     return OrdenCompraListResponse(data=data, total=len(data))
 
+
+@router.get("/ordenes/sugerir-bajo-minimo")
+async def sugerir_productos_bajo_minimo(
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Sugiere productos bajo mínimo para una orden de compra"""
+    db = get_db()
+    
+    productos = await db.productos_inventario.find({
+        "origen": "clinica",
+        "activo": True,
+        "controla_inventario": True
+    }).to_list(1000)
+    
+    sugerencias = []
+    for p in productos:
+        # Calcular existencia total
+        pipeline = [
+            {"$match": {"producto_id": p["id"], "origen": "clinica"}},
+            {"$group": {"_id": None, "total": {"$sum": "$cantidad"}}}
+        ]
+        result = await db.existencias_inventario.aggregate(pipeline).to_list(1)
+        existencia = result[0]["total"] if result else 0
+        
+        min_stock = p.get("existencia_minima", 0)
+        max_stock = p.get("existencia_maxima", 0)
+        
+        if existencia < min_stock:
+            cantidad_sugerida = max(max_stock - existencia, min_stock - existencia + 10)
+            sugerencias.append({
+                "producto_id": p["id"],
+                "codigo": p.get("codigo"),
+                "nombre": p["nombre"],
+                "existencia_actual": existencia,
+                "existencia_minima": min_stock,
+                "existencia_maxima": max_stock,
+                "cantidad_sugerida": cantidad_sugerida,
+                "ultimo_costo": p.get("ultimo_costo", 0),
+                "proveedor_preferido_id": p.get("proveedor_preferido_id")
+            })
+    
+    return {"sugerencias": sugerencias, "total": len(sugerencias)}
+
+
 @router.get("/ordenes/{orden_id}", response_model=OrdenCompraResponse)
 async def obtener_orden_compra(
     orden_id: str,
@@ -299,48 +343,6 @@ async def cancelar_orden_compra(
     )
     
     return {"message": "Orden cancelada"}
-
-@router.get("/ordenes/sugerir-bajo-minimo")
-async def sugerir_productos_bajo_minimo(
-    current_user: dict = Depends(get_current_user_dependency())
-):
-    """Sugiere productos bajo mínimo para una orden de compra"""
-    db = get_db()
-    
-    productos = await db.productos_inventario.find({
-        "origen": "clinica",
-        "activo": True,
-        "controla_inventario": True
-    }).to_list(1000)
-    
-    sugerencias = []
-    for p in productos:
-        # Calcular existencia total
-        pipeline = [
-            {"$match": {"producto_id": p["id"], "origen": "clinica"}},
-            {"$group": {"_id": None, "total": {"$sum": "$cantidad"}}}
-        ]
-        result = await db.existencias_inventario.aggregate(pipeline).to_list(1)
-        existencia = result[0]["total"] if result else 0
-        
-        min_stock = p.get("existencia_minima", 0)
-        max_stock = p.get("existencia_maxima", 0)
-        
-        if existencia < min_stock:
-            cantidad_sugerida = max(max_stock - existencia, min_stock - existencia + 10)
-            sugerencias.append({
-                "producto_id": p["id"],
-                "codigo": p.get("codigo"),
-                "nombre": p["nombre"],
-                "existencia_actual": existencia,
-                "existencia_minima": min_stock,
-                "existencia_maxima": max_stock,
-                "cantidad_sugerida": cantidad_sugerida,
-                "ultimo_costo": p.get("ultimo_costo", 0),
-                "proveedor_preferido_id": p.get("proveedor_preferido_id")
-            })
-    
-    return {"sugerencias": sugerencias, "total": len(sugerencias)}
 
 
 # ==================== RECEPCIONES ====================
@@ -1338,7 +1340,7 @@ async def obtener_configuracion(
     """Obtiene la configuración del módulo de inventario"""
     db = get_db()
     
-    config = await db.config_inventario.find_one({"origen": "clinica"})
+    config = await db.config_inventario.find_one({"origen": "clinica"}, {"_id": 0})
     
     if not config:
         # Configuración por defecto
