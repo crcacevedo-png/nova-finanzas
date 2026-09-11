@@ -10,6 +10,25 @@ from config.database import db
 
 router = APIRouter(prefix="/menu-config", tags=["Menu Configuration"])
 
+# Roles de sistema para la configuración de menús.
+# Los roles personalizados (p. ej. "administrador_igss") se leen dinámicamente de db.roles.
+SYSTEM_ROLES_MENU = ["superadmin", "admin", "usuario", "optica"]
+
+
+async def _get_configurable_roles():
+    """Roles configurables en 'Menús por Rol': roles de sistema + personalizados (db.roles)."""
+    roles = list(SYSTEM_ROLES_MENU)
+    try:
+        custom = await db.roles.find({"name": {"$nin": SYSTEM_ROLES_MENU}}, {"name": 1}).to_list(200)
+        for r in custom:
+            name = r.get("name")
+            if name and name not in roles:
+                roles.append(name)
+    except Exception:
+        pass
+    return roles
+
+
 # Estructura de menús disponibles en el sistema
 AVAILABLE_MENUS = {
     "dashboard": {
@@ -280,6 +299,14 @@ AVAILABLE_MENUS = {
         "description": "Punto de venta general"
     },
     # Configuración
+    "unidades_igss": {
+        "id": "unidades_igss",
+        "label": "Unidades IGSS",
+        "path": "/configuracion/unidades-igss",
+        "icon": "Building",
+        "category": "configuracion",
+        "description": "Catálogo de unidades del IGSS"
+    },
     "gestion_usuarios": {
         "id": "gestion_usuarios",
         "label": "Gestión de Usuarios",
@@ -325,6 +352,9 @@ DEFAULT_MENU_CONFIG = {
     "optica": [
         "pacientes", "optica_armazones", "optica_lentes_contacto",
         "optica_tipos_lente", "optica_pos", "optica_cxc", "optica_compras"
+    ],
+    "administrador_igss": [
+        "pacientes", "unidades_igss"
     ]
 }
 
@@ -375,7 +405,7 @@ async def get_available_menus(current_user: dict = Depends(require_permission("m
     
     return {
         "categories": sorted_categories,
-        "roles": ["superadmin", "admin", "usuario", "optica"]
+        "roles": await _get_configurable_roles()
     }
 
 
@@ -385,7 +415,7 @@ async def get_menu_config_for_role(
     current_user: dict = Depends(require_permission("manage_users"))
 ):
     """Obtener configuración de menús para un rol específico"""
-    if role not in ["superadmin", "admin", "usuario", "optica"]:
+    if role not in await _get_configurable_roles():
         raise HTTPException(status_code=400, detail="Rol no válido")
     
     # Buscar configuración personalizada en la base de datos
@@ -413,7 +443,7 @@ async def get_all_menu_configs(current_user: dict = Depends(require_permission("
     """Obtener configuración de menús para todos los roles"""
     configs = {}
     
-    for role in ["superadmin", "admin", "usuario", "optica"]:
+    for role in await _get_configurable_roles():
         # Buscar configuración personalizada
         config = await db.menu_configurations.find_one({"role": role})
         
@@ -442,7 +472,7 @@ async def update_menu_config_for_role(
     current_user: dict = Depends(require_permission("manage_users"))
 ):
     """Actualizar configuración de menús para un rol"""
-    if role not in ["superadmin", "admin", "usuario", "optica"]:
+    if role not in await _get_configurable_roles():
         raise HTTPException(status_code=400, detail="Rol no válido")
     
     if role != config.role:
@@ -483,7 +513,7 @@ async def reset_menu_config_for_role(
     current_user: dict = Depends(require_permission("manage_users"))
 ):
     """Restaurar configuración de menús por defecto para un rol"""
-    if role not in ["superadmin", "admin", "usuario", "optica"]:
+    if role not in await _get_configurable_roles():
         raise HTTPException(status_code=400, detail="Rol no válido")
     
     # Eliminar configuración personalizada

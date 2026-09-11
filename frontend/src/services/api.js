@@ -438,6 +438,7 @@ export const roleLabels = {
   admin: 'Administrador',
   usuario: 'Usuario',
   optica: 'Óptica',
+  administrador_igss: 'Administrador IGSS',
 };
 
 // Patient referral institution labels

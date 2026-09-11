@@ -3938,6 +3938,29 @@ async def startup_event():
     await seed_sample_expenses()
     await seed_sample_patients()
     await seed_optica_data()
+
+    # Rol personalizado "Administrador IGSS" (se crea una sola vez; editable desde Usuarios → Roles).
+    # Base funcional: gestionar Unidades IGSS + pacientes. El SuperAdmin puede ajustar permisos y menús.
+    if not await db.roles.find_one({"name": "administrador_igss"}):
+        _now_igss = datetime.now(timezone.utc).isoformat()
+        await db.roles.insert_one({
+            "name": "administrador_igss",
+            "display_name": "Administrador IGSS",
+            "description": "Administra las Unidades IGSS y los pacientes IGSS",
+            "permissions": {
+                "view_patients": True,
+                "create_patients": True,
+                "edit_patients": True,
+                "import_patients": True,
+                "export_patients": True,
+                "manage_igss_units": True,
+            },
+            "color": "teal",
+            "is_active": True,
+            "created_at": _now_igss,
+            "updated_at": _now_igss,
+            "created_by": "system",
+        })
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
     # Índice único por token de la blacklist

@@ -35,7 +35,7 @@ import { toast, Toaster } from 'sonner';
 import { igssUnitApi } from '../services/api';
 
 const UnidadesIGSS = () => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -51,7 +51,8 @@ const UnidadesIGSS = () => {
     description: ''
   });
 
-  const isSuperAdmin = user?.role === 'superadmin';
+  // Acceso por permiso (SuperAdmin y roles con manage_igss_units, p. ej. Administrador IGSS)
+  const canManageIgss = user?.role === 'superadmin' || hasPermission('manage_igss_units');
 
   const fetchUnits = useCallback(async () => {
     try {
@@ -139,13 +140,13 @@ const UnidadesIGSS = () => {
     (unit.code && unit.code.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  if (!isSuperAdmin) {
+  if (!canManageIgss) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <AlertCircle className="w-12 h-12 text-amber-500 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
-          <p className="text-gray-500">Solo el SuperAdmin puede gestionar el catálogo de Unidades IGSS.</p>
+          <p className="text-gray-500">No tienes permiso para gestionar el catálogo de Unidades IGSS.</p>
         </div>
       </Layout>
     );

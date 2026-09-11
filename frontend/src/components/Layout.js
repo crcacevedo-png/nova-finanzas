@@ -208,6 +208,11 @@ const Layout = ({ children }) => {
       label: 'Cuentas Bancarias', 
       testId: 'nav-cuentas-bancarias' 
     });
+  }
+
+  // Unidades IGSS - visible para SuperAdmin (todos los menús) y para roles con el menú
+  // activado en "Menús por Rol" que además tengan el permiso manage_igss_units
+  if (isMenuEnabled('unidades_igss') && hasPermission('manage_igss_units')) {
     configItems.push({ 
       path: '/configuracion/unidades-igss', 
       icon: Building, 

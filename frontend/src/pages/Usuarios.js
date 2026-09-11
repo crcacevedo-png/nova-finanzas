@@ -27,7 +27,8 @@ import {
   Palette,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Building
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -74,6 +75,7 @@ const roleColors = {
   admin: 'bg-blue-100 text-blue-800 border border-blue-200',
   usuario: 'bg-gray-100 text-gray-800 border border-gray-200',
   optica: 'bg-purple-100 text-purple-800 border border-purple-200',
+  administrador_igss: 'bg-teal-100 text-teal-800 border border-teal-200',
 };
 
 // Colores disponibles para roles personalizados
@@ -98,6 +100,7 @@ const getRoleIcon = (role) => {
     case 'superadmin': return <ShieldCheck className="w-4 h-4" />;
     case 'admin': return <Shield className="w-4 h-4" />;
     case 'optica': return <Glasses className="w-4 h-4" />;
+    case 'administrador_igss': return <Building className="w-4 h-4" />;
     default: return <User className="w-4 h-4" />;
   }
 };
@@ -783,7 +786,7 @@ const Usuarios = () => {
                           <SelectItem key={role} value={role}>
                             <div className="flex items-center gap-2">
                               {getRoleIcon(role)}
-                              {roleLabels[role]}
+                              {roleLabels[role] || role}
                             </div>
                           </SelectItem>
                         ))}
@@ -1016,6 +1019,12 @@ const Usuarios = () => {
                       <div className="flex items-center gap-2">
                         <Glasses className="w-4 h-4" />
                         Óptica
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="administrador_igss">
+                      <div className="flex items-center gap-2">
+                        <Building className="w-4 h-4" />
+                        Administrador IGSS
                       </div>
                     </SelectItem>
                     {currentUser?.role === 'superadmin' && (
