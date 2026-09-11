@@ -51,6 +51,39 @@ const formatFechaHistorial = (f) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
 };
 
+// Determina si el formulario tiene datos clínicos reales (para no autoguardar borradores vacíos)
+const tieneDatosClinicos = (fd) => {
+  if (!fd) return false;
+  const textos = ['motivo_consulta', 'padecimiento_actual', 'plan', 'lectura_examenes'];
+  if (textos.some((k) => (fd[k] || '').toString().trim())) return true;
+  if (Array.isArray(fd.diagnosticos) && fd.diagnosticos.length > 0) return true;
+  if (Array.isArray(fd.procedimientos) && fd.procedimientos.length > 0) return true;
+  // Examen: cualquier subcampo con valor
+  const ex = fd.examen || {};
+  for (const v of Object.values(ex)) {
+    if (v && typeof v === 'object') {
+      if (Object.values(v).some((x) => (x ?? '').toString().trim())) return true;
+    } else if ((v ?? '').toString().trim()) {
+      return true;
+    }
+  }
+  // Recetas
+  const r = fd.recetas || {};
+  if ((r.medicamentos?.items || []).length > 0) return true;
+  if ((r.anteojos_lista || []).length > 0) return true;
+  if ((r.lentes_contacto_lista || []).length > 0) return true;
+  // Recomendaciones
+  const rec = fd.recomendaciones || {};
+  if ((rec.recomendaciones_generales || '').toString().trim()) return true;
+  if ((rec.estudios_a_realizar || []).length > 0) return true;
+  // Antecedentes (solo texto libre)
+  const ant = fd.antecedentes || {};
+  for (const v of Object.values(ant)) {
+    if (typeof v === 'string' && v.trim()) return true;
+  }
+  return false;
+};
+
 // Componente de Autocomplete reutilizable
 const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, className }) => {
   const [suggestions, setSuggestions] = useState([]);
@@ -667,6 +700,12 @@ const EvaluacionOftalmologica = () => {
     setAutoguardadoStatus('Cambios sin guardar');
     
     autoguardadoRef.current = setTimeout(async () => {
+      // No crear evaluaciones VACÍAS por autoguardado: si es nueva y no hay datos clínicos reales, no guardar
+      const esNueva = !evaluacionActual?.id;
+      if (esNueva && !tieneDatosClinicos(formData)) {
+        setAutoguardadoStatus('');
+        return;
+      }
       // === MODO OFFLINE ===
       if (!isOnline) {
         try {
@@ -860,6 +899,41 @@ const EvaluacionOftalmologica = () => {
       nivel_interes: 'interesado',
       notas: ''
     });
+  };
+
+  // Limpiar borradores vacíos generados por el autoguardado (solo admin/superadmin)
+  const handleLimpiarVacias = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const { data } = await axios.get(`${API_URL}/evaluaciones/vacias/contar`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const n = data.vacias || 0;
+      if (n === 0) {
+        toast.info('No hay evaluaciones vacías para eliminar');
+        return;
+      }
+      toast(`Se encontraron ${n} evaluaciones vacías`, {
+        description: 'Se eliminarán las evaluaciones sin datos (no selladas ni importadas). Esta acción no se puede deshacer.',
+        duration: 12000,
+        action: {
+          label: `Eliminar ${n}`,
+          onClick: async () => {
+            try {
+              const res = await axios.delete(`${API_URL}/evaluaciones/vacias/purgar`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              toast.success(`${res.data.eliminadas} evaluaciones vacías eliminadas`);
+              fetchEvaluaciones();
+            } catch (e) {
+              toast.error('Error al eliminar evaluaciones vacías');
+            }
+          }
+        }
+      });
+    } catch (e) {
+      toast.error('Error al contar evaluaciones vacías');
+    }
   };
 
   // Guardar evaluación
@@ -1286,6 +1360,7 @@ const EvaluacionOftalmologica = () => {
                       <div
                         key={p.id}
                         className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
+                        data-testid={`eval-paciente-option-${p.id}`}
                         onClick={() => seleccionarPaciente(p)}
                       >
                         <div className="font-medium text-sm">{p.nombre_completo}</div>
@@ -1491,6 +1566,20 @@ const EvaluacionOftalmologica = () => {
                 <Plus className="w-4 h-4 mr-1" />
                 Nueva
               </Button>
+              
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLimpiarVacias}
+                  className="btn-outline text-amber-600 border-amber-300 hover:bg-amber-50"
+                  data-testid="limpiar-vacias-btn"
+                  title="Eliminar borradores vacíos generados por el autoguardado"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Limpiar vacías
+                </Button>
+              )}
               
               {canEdit && !isReadOnly && (
                 <Button

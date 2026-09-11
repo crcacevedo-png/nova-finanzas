@@ -669,6 +669,92 @@ async def create_evaluacion(
     return evaluacion_dict
 
 
+# ==================== LIMPIEZA DE EVALUACIONES VACÍAS ====================
+
+def _evaluacion_esta_vacia(ev: dict) -> bool:
+    """Determina si una evaluación es un borrador vacío del autoguardado.
+    NO considera vacías las selladas ni las importadas (por seguridad)."""
+    if ev.get("sellado"):
+        return False
+    if ev.get("imported"):
+        return False
+    # Campos de texto libres
+    for f in ["motivo_consulta", "padecimiento_actual", "plan", "lectura_examenes"]:
+        if (ev.get(f) or "").strip():
+            return False
+    # Diagnósticos y procedimientos
+    if ev.get("diagnosticos"):
+        return False
+    if ev.get("procedimientos"):
+        return False
+    # Examen: cualquier subcampo con valor
+    examen = ev.get("examen") or {}
+    for v in examen.values():
+        if isinstance(v, dict):
+            if any(str(x).strip() for x in v.values() if x is not None):
+                return False
+        elif v is not None and str(v).strip():
+            return False
+    # Recetas
+    recetas = ev.get("recetas") or {}
+    if (recetas.get("medicamentos") or {}).get("items"):
+        return False
+    if recetas.get("anteojos_lista"):
+        return False
+    if recetas.get("lentes_contacto_lista"):
+        return False
+    # Recomendaciones
+    rec = ev.get("recomendaciones") or {}
+    if (rec.get("recomendaciones_generales") or "").strip():
+        return False
+    if rec.get("estudios_a_realizar"):
+        return False
+    # Antecedentes (solo texto libre; los booleanos en false no cuentan)
+    ant = ev.get("antecedentes") or {}
+    for v in ant.values():
+        if isinstance(v, str) and v.strip():
+            return False
+    return True
+
+
+@router.get("/vacias/contar")
+async def contar_evaluaciones_vacias(
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Cuenta las evaluaciones vacías (borradores del autoguardado, no selladas ni importadas)."""
+    total = 0
+    cursor = db.evaluaciones_oftalmologicas.find(
+        {"sellado": {"$ne": True}, "imported": {"$ne": True}}, {"_id": 0}
+    )
+    async for ev in cursor:
+        if _evaluacion_esta_vacia(ev):
+            total += 1
+    return {"vacias": total}
+
+
+@router.delete("/vacias/purgar")
+async def purgar_evaluaciones_vacias(
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Elimina de forma segura las evaluaciones vacías (no selladas ni importadas)."""
+    ids = []
+    cursor = db.evaluaciones_oftalmologicas.find(
+        {"sellado": {"$ne": True}, "imported": {"$ne": True}}, {"_id": 0, "id": 1,
+         "motivo_consulta": 1, "padecimiento_actual": 1, "plan": 1, "lectura_examenes": 1,
+         "diagnosticos": 1, "procedimientos": 1, "examen": 1, "recetas": 1,
+         "recomendaciones": 1, "antecedentes": 1, "sellado": 1, "imported": 1}
+    )
+    async for ev in cursor:
+        if _evaluacion_esta_vacia(ev):
+            ids.append(ev["id"])
+    eliminadas = 0
+    if ids:
+        res = await db.evaluaciones_oftalmologicas.delete_many({"id": {"$in": ids}})
+        eliminadas = res.deleted_count
+    return {"eliminadas": eliminadas}
+
+
+
 # ==================== IMPORTACIÓN MASIVA - ENDPOINTS ====================
 
 @router.get("/import/template")

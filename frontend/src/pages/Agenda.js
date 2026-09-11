@@ -1184,25 +1184,29 @@ const Agenda = () => {
                     />
                     {pacienteResults.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                        {pacienteResults.map(p => (
+                        {pacienteResults.map(p => {
+                          const nombre = p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+                          return (
                           <div
                             key={p.id}
                             className="p-2 hover:bg-blue-50 cursor-pointer"
+                            data-testid={`cita-paciente-option-${p.id}`}
                             onClick={() => {
                               setCitaForm(prev => ({
                                 ...prev,
                                 paciente_id: p.id,
-                                paciente_nombre: `${p.first_name} ${p.last_name}`,
+                                paciente_nombre: nombre,
                                 es_paciente_nuevo: false
                               }));
                               setPacienteSearch('');
                               setPacienteResults([]);
                             }}
                           >
-                            <div className="font-medium">{p.first_name} {p.last_name}</div>
+                            <div className="font-medium">{nombre || 'Sin nombre'}</div>
                             <div className="text-xs text-gray-500">Exp: {p.record_number}</div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

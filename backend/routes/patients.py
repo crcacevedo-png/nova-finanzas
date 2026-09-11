@@ -383,10 +383,10 @@ async def search_patients(
             seen_ids.add(p["id"])
             results.append(PatientSearchResponse(
                 id=p["id"],
-                record_number=p["record_number"],
-                full_name=f"{p['first_name']} {p['last_name']}",
+                record_number=p.get("record_number", ""),
+                full_name=f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
                 dpi=p.get("dpi", ""),
-                phone=p["phone"]
+                phone=p.get("phone", "")
             ))
     
     return results
