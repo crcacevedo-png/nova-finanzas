@@ -384,6 +384,46 @@ async def recalcular_nog(
 
 # ==================== ENDPOINTS - ACREDITACIONES / PACIENTES ====================
 
+@router.get("/nogs/alertas")
+async def alertas_nogs(
+    current_user: dict = Depends(require_permission("manage_igss_units"))
+):
+    """Alertas de límite: NOG activos que alcanzaron el 90% (por completarse) o el
+    100% (completados/bloqueados). Sirve para renovar el contrato a tiempo."""
+    nogs = await db.igss_nogs.find({"is_active": True}, {"_id": 0}).to_list(None)
+    units = {u["id"]: u for u in await db.igss_units.find(
+        {}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(1000)}
+
+    alertas = []
+    for n in nogs:
+        d = _nog_con_derivados(n)
+        if d["estado"] in ("por_completarse", "completado"):
+            u = units.get(n.get("unidad_id"), {})
+            alertas.append({
+                "unidad_id": n.get("unidad_id", ""),
+                "unidad_nombre": u.get("name", ""),
+                "unidad_codigo": u.get("code", ""),
+                "nog_id": d["id"],
+                "numero": d["numero"],
+                "nombre_servicio": d["nombre_servicio"],
+                "acreditados": d["acreditados"],
+                "cantidad": d["cantidad"],
+                "disponibles": d["disponibles"],
+                "porcentaje": d["porcentaje"],
+                "estado": d["estado"],
+            })
+
+    # Completados primero, luego por porcentaje descendente
+    alertas.sort(key=lambda a: (0 if a["estado"] == "completado" else 1, -a["porcentaje"]))
+    return {
+        "alertas": alertas,
+        "total": len(alertas),
+        "completados": sum(1 for a in alertas if a["estado"] == "completado"),
+        "por_completarse": sum(1 for a in alertas if a["estado"] == "por_completarse"),
+        "umbral_aviso": int(UMBRAL_AVISO * 100),
+    }
+
+
 @router.get("/nogs/{nog_id}/pacientes")
 async def listar_pacientes_nog(
     nog_id: str,

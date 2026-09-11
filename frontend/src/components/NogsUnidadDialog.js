@@ -289,7 +289,7 @@ const PacientesNog = ({ nogId, onAnulada }) => {
 };
 
 // Diálogo principal: gestión de NOG de una unidad IGSS
-export const NogsUnidadDialog = ({ unit, open, onOpenChange }) => {
+export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null, onChanged }) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [expanded, setExpanded] = useState(null);
@@ -312,7 +312,12 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange }) => {
     }
   }, [unit]);
 
-  useEffect(() => { if (open) { fetch(); setExpanded(null); } }, [open, fetch]);
+  const refresh = useCallback(() => {
+    fetch();
+    if (onChanged) onChanged();
+  }, [fetch, onChanged]);
+
+  useEffect(() => { if (open) { fetch(); setExpanded(initialNogId || null); } }, [open, fetch, initialNogId]);
 
   const recalcular = async (nog) => {
     setBusyNog(nog.id);
@@ -320,7 +325,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange }) => {
       const res = await igssNogApi.recalcular(nog.id);
       const nuevas = res.data?.acreditaciones_nuevas || 0;
       toast.success(nuevas > 0 ? `Recalculado: ${nuevas} acreditación(es) nueva(s).` : 'Recalculado: sin cambios.');
-      fetch();
+      refresh();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error al recalcular');
     } finally {
@@ -353,7 +358,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange }) => {
       await igssNogApi.delete(deleteTarget.id);
       toast.success('NOG eliminado');
       setDeleteTarget(null);
-      fetch();
+      refresh();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error al eliminar el NOG');
     } finally {
@@ -471,7 +476,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange }) => {
                     {expanded === n.id && (
                       <TableRow>
                         <TableCell colSpan={7} className="p-0">
-                          <PacientesNog nogId={n.id} onAnulada={fetch} />
+                          <PacientesNog nogId={n.id} onAnulada={refresh} />
                         </TableCell>
                       </TableRow>
                     )}
@@ -543,7 +548,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange }) => {
           </div>
         )}
 
-        <NogForm open={formOpen} onOpenChange={setFormOpen} unitId={unit?.id} editing={editing} onSaved={fetch} />
+        <NogForm open={formOpen} onOpenChange={setFormOpen} unitId={unit?.id} editing={editing} onSaved={refresh} />
 
         <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
           <DialogContent className="sm:max-w-[420px]">
