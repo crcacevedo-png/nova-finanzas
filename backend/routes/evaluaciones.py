@@ -687,6 +687,55 @@ async def get_import_template_evaluaciones(
             "Las recetas de anteojos/lentes de contacto van como ARRAYS en 'anteojos_lista' y 'lentes_contacto_lista'.",
             "Recomendado importar en lotes de 500 registros."
         ],
+        "diccionario_campos": {
+            "_enlace_al_paciente": {
+                "expediente": "Clave de enlace. DEBE ser igual al record_number del paciente. Alias: record_number, paciente_expediente.",
+                "dpi": "Enlace alternativo si no hay expediente (13 dígitos).",
+                "id_origen": "PK de la evaluación en Access. Se usa para deduplicar reimportaciones. Alias: source_id."
+            },
+            "_encabezado": {
+                "fecha": "Fecha de la evaluación. Formatos: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY.",
+                "medico_nombre": "Nombre del médico que atendió.",
+                "motivo_consulta": "Motivo de la consulta (texto).",
+                "padecimiento_actual": "Historia de la enfermedad actual (texto)."
+            },
+            "antecedentes": {
+                "personales_patologicos": "Texto.",
+                "diabetes": "true/false", "hipertension": "true/false", "cardiopatia": "true/false",
+                "enfermedad_tiroidea": "true/false", "otros_patologicos": "true/false",
+                "oftalmologicos": "Texto.", "quirurgicos": "Texto.", "alergias": "Texto.",
+                "familiares": "Texto.", "habitos": "Texto."
+            },
+            "medicamentos_actuales": "Array de objetos: {nombre, dosis, frecuencia, via, desde}.",
+            "medicamentos_previos": "Array de objetos: {nombre, dosis, motivo, periodo}.",
+            "examen": {
+                "avsc_od / avsc_os": "Agudeza visual SIN corrección OD/OS (ej. '20/40').",
+                "avcc_od / avcc_os": "Agudeza visual CON corrección OD/OS.",
+                "refraccion_od / refraccion_os": "Objeto {esfera, cilindro, eje, adicion}.",
+                "queratometria_od / queratometria_os": "Texto.",
+                "pio_od / pio_os": "Presión intraocular OD/OS. pio_metodo: método de medición.",
+                "segmento_anterior": "Hallazgos del segmento anterior (texto).",
+                "segmento_posterior": "Hallazgos del segmento posterior / fondo de ojo (texto).",
+                "motilidad_ocular": "Texto.", "pupilas_reflejos": "Texto."
+            },
+            "diagnosticos": "Array de objetos: {descripcion, codigo_cie10, ojo} (ojo: OD/OS/OU).",
+            "plan": "Plan de tratamiento (texto).",
+            "recomendaciones": {
+                "estudios_a_realizar": "Array de objetos: {estudio, ojo, indicaciones}.",
+                "recomendaciones_generales": "Texto."
+            },
+            "procedimientos": "Array de objetos: {categoria (Clínico/Quirúrgico), tipo_nombre, ojo, fecha, descripcion, resultado_notas}.",
+            "recetas": {
+                "medicamentos": "Objeto {items: [{medicamento, presentacion, dosis, frecuencia, duracion, via, indicaciones}]}.",
+                "anteojos_lista": "ARRAY de recetas de anteojos: [{od:{esfera,cilindro,eje,adicion}, os:{...}, tipo_lente, material, tratamientos, uso, distancia_pupilar, observaciones}].",
+                "lentes_contacto_lista": "ARRAY de recetas de lentes de contacto: [{od:{poder,curva_base,diametro}, os:{...}, marca, tipo, regimen_reemplazo, adicion, observaciones}]."
+            },
+            "_notas": [
+                "NO envíes 'paciente_id', 'id' ni 'paciente_nombre': el sistema los rellena al enlazar por expediente/dpi.",
+                "Cualquier campo adicional que envíes se guarda tal cual (esquema flexible).",
+                "Campos que no tengas: simplemente omítelos (todos tienen valor por defecto)."
+            ]
+        },
         "ejemplo": [
             {
                 "id_origen": "ACCESS-EVAL-000123",
