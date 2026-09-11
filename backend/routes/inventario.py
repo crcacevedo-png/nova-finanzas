@@ -555,6 +555,17 @@ async def obtener_existencia_total(db, producto_id: str) -> int:
     result = await db.existencias_inventario.aggregate(pipeline).to_list(1)
     return result[0]["total"] if result else 0
 
+async def obtener_existencias_totales(db, producto_ids: list) -> dict:
+    """PERF: existencia total de VARIOS productos en una sola consulta (evita N+1)."""
+    if not producto_ids:
+        return {}
+    pipeline = [
+        {"$match": {"producto_id": {"$in": producto_ids}, "origen": "clinica"}},
+        {"$group": {"_id": "$producto_id", "total": {"$sum": "$cantidad"}}}
+    ]
+    result = await db.existencias_inventario.aggregate(pipeline).to_list(len(producto_ids) + 1)
+    return {r["_id"]: r["total"] for r in result}
+
 async def actualizar_existencia(db, producto_id: str, bodega_id: str, cantidad_cambio: int):
     """Actualiza la existencia de un producto en una bodega"""
     await db.existencias_inventario.update_one(
@@ -1070,10 +1081,13 @@ async def listar_productos(
     # Obtener categorías para nombres
     categorias = {c["id"]: c["nombre"] for c in await db.categorias_inventario.find({"origen": "clinica"}).to_list(100)}
     
+    # PERF: existencias de todos los productos de la página en UNA sola consulta (evita N+1)
+    existencias_map = await obtener_existencias_totales(db, [p["id"] for p in productos])
+    
     data = []
     for p in productos:
-        # Calcular existencia total
-        existencia = await obtener_existencia_total(db, p["id"])
+        # Existencia total (precalculada por lote)
+        existencia = existencias_map.get(p["id"], 0)
         
         # Filtrar por bajo mínimo si se solicita
         if bajo_minimo is not None:

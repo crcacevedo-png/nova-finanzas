@@ -1,6 +1,8 @@
 # /app/backend/config/permissions.py
 # Sistema de permisos por rol
 
+import time
+
 from config.database import db
 
 PERMISSIONS = {
@@ -159,20 +161,46 @@ def get_permissions(role: str) -> dict:
     return PERMISSIONS.get(role, PERMISSIONS["usuario"])
 
 
+# Caché corta en memoria de permisos por rol.
+# Evita leer db.roles en CADA request autenticado (alta concurrencia).
+_PERM_CACHE_TTL = 10  # segundos
+_perm_cache = {}  # role -> (timestamp_monotonic, permissions_dict)
+
+
+def invalidate_permissions_cache(role=None):
+    """Invalida la caché de permisos (todo o solo un rol específico).
+    Llamar tras crear/editar/eliminar un rol para propagar el cambio al instante."""
+    if role is None:
+        _perm_cache.clear()
+    else:
+        _perm_cache.pop(role, None)
+
+
 async def resolve_permissions(role: str) -> dict:
     """SEC-003/RBAC: Resuelve los permisos efectivos de un rol.
     - superadmin siempre tiene todos los permisos.
     - roles personalizados y personalizaciones de roles de sistema se leen de db.roles.
     - roles de sistema sin personalización usan la matriz por defecto.
-    - rol desconocido => sin permisos (deny by default)."""
+    - rol desconocido => sin permisos (deny by default).
+    Usa una caché corta (10s) por rol para reducir lecturas a db.roles."""
     if role == "superadmin":
         return PERMISSIONS["superadmin"]
+
+    now = time.monotonic()
+    cached = _perm_cache.get(role)
+    if cached and (now - cached[0]) < _PERM_CACHE_TTL:
+        return cached[1]
+
     try:
         custom = await db.roles.find_one({"name": role})
     except Exception:
         custom = None
     if custom and isinstance(custom.get("permissions"), dict) and custom["permissions"]:
-        return custom["permissions"]
-    if role in PERMISSIONS:
-        return PERMISSIONS[role]
-    return {}
+        perms = custom["permissions"]
+    elif role in PERMISSIONS:
+        perms = PERMISSIONS[role]
+    else:
+        perms = {}
+
+    _perm_cache[role] = (now, perms)
+    return perms

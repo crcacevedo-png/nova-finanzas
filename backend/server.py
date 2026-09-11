@@ -829,7 +829,7 @@ async def blacklist_token(token: str, user_id: str):
             "token": token,
             "user_id": user_id,
             "blacklisted_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": exp_date.isoformat()
+            "expires_at": exp_date  # BSON date: habilita el índice TTL para purga automática
         })
     except Exception as e:
         logging.error(f"Error al agregar token a blacklist: {e}")
@@ -838,7 +838,7 @@ async def cleanup_expired_tokens():
     """Limpiar tokens expirados de la blacklist (ejecutar periódicamente)"""
     try:
         result = await db.token_blacklist.delete_many({
-            "expires_at": {"$lt": datetime.now(timezone.utc).isoformat()}
+            "expires_at": {"$lt": datetime.now(timezone.utc)}
         })
         if result.deleted_count > 0:
             logging.info(f"Limpiados {result.deleted_count} tokens expirados de blacklist")
@@ -3940,9 +3940,34 @@ async def startup_event():
     await seed_optica_data()
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
-    # Índice para blacklist de tokens con TTL
+    # Índice único por token de la blacklist
     await db.token_blacklist.create_index([("token", 1)], unique=True)
-    await db.token_blacklist.create_index([("expires_at", 1)])
+    # Backfill: convertir expires_at de string ISO a datetime (BSON date) para que
+    # el índice TTL pueda purgar automáticamente los tokens ya expirados
+    async for _bl in db.token_blacklist.find({"expires_at": {"$type": "string"}}, {"expires_at": 1}):
+        try:
+            await db.token_blacklist.update_one(
+                {"_id": _bl["_id"]},
+                {"$set": {"expires_at": datetime.fromisoformat(_bl["expires_at"])}}
+            )
+        except Exception:
+            pass
+    # Entradas de logout legadas sin expires_at: se marcan como expiradas de inmediato
+    await db.token_blacklist.update_many(
+        {"expires_at": {"$exists": False}},
+        {"$set": {"expires_at": datetime.now(timezone.utc)}}
+    )
+    # Índice TTL: MongoDB elimina automáticamente cada token una vez expirado
+    try:
+        await db.token_blacklist.drop_index("expires_at_1")
+    except Exception:
+        pass
+    try:
+        await db.token_blacklist.create_index(
+            [("expires_at", 1)], expireAfterSeconds=0, name="blacklist_ttl"
+        )
+    except Exception as _e:
+        logging.warning(f"No se pudo crear índice TTL de token_blacklist: {_e}")
     
     # Índice para audit logs
     await db.audit_logs.create_index([("timestamp", -1)])
@@ -4147,6 +4172,38 @@ async def startup_event():
         await db.users.create_index([("username", 1)], unique=True)
     except Exception:
         pass  # Index may already exist
+
+    # PERF: Índices sobre el campo 'id' (uuid) — evita COLLSCAN en búsquedas/updates por id.
+    # A escala (17k pacientes, 68k evaluaciones) un find_one({"id": ...}) sin índice escanea
+    # toda la colección; con este índice es una búsqueda directa.
+    _id_index_cols = [
+        "patients", "evaluaciones_oftalmologicas", "ventas", "users", "citas",
+        "productos_inventario", "payments", "expenses", "payment_authorizations",
+        "optica_sales", "optica_sale_payments", "optica_frames", "optica_contact_lenses",
+        "optica_lens_types", "surgeries", "surgery_candidates", "surgery_crm",
+        "cuentas_por_cobrar", "caja_sesiones", "caja_movimientos", "caja_cierres",
+        "movimientos_inventario", "existencias_inventario", "kardex_inventario",
+        "doctors", "medicos_agenda", "proveedores", "suppliers", "sociedades",
+        "bodegas_inventario", "categorias_inventario", "ordenes_compra",
+        "recepciones_inventario", "cierres_financieros", "responsables_cxc",
+        "transferencias_inventario", "lotes_inventario", "tomas_fisicas",
+        "bank_accounts", "fixed_expenses"
+    ]
+    for _col in _id_index_cols:
+        try:
+            await db[_col].create_index([("id", 1)], name="id_lookup")
+        except Exception:
+            pass
+    # roles.name: usado por resolve_permissions en cada request no-superadmin
+    try:
+        await db.roles.create_index([("name", 1)], name="roles_name")
+    except Exception:
+        pass
+    # import_source_id: usado por deduplicación del importador de evaluaciones
+    try:
+        await db.evaluaciones_oftalmologicas.create_index([("import_source_id", 1)], sparse=True, name="eval_import_source")
+    except Exception:
+        pass
     
     # Iniciar scheduler
     start_scheduler()

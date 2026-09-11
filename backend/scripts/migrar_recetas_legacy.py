@@ -37,7 +37,7 @@ async def migrar_recetas():
     
     # Buscar evaluaciones que tienen recetas en formato legacy
     # (tienen recetas.anteojos o recetas.lentes_contacto pero no las listas)
-    evaluaciones = await db.evaluaciones.find({
+    evaluaciones = await db.evaluaciones_oftalmologicas.find({
         "$or": [
             # Tiene receta de anteojos legacy pero no lista
             {
@@ -151,7 +151,7 @@ async def migrar_recetas():
             
             # Aplicar actualizaciones
             if updates and not dry_run:
-                await db.evaluaciones.update_one(
+                await db.evaluaciones_oftalmologicas.update_one(
                     {"_id": ev["_id"]},
                     {"$set": updates}
                 )
@@ -162,13 +162,13 @@ async def migrar_recetas():
     
     # También asegurar que evaluaciones sin recetas legacy tengan las listas vacías
     if not dry_run:
-        result = await db.evaluaciones.update_many(
+        result = await db.evaluaciones_oftalmologicas.update_many(
             {"recetas.anteojos_lista": {"$exists": False}},
             {"$set": {"recetas.anteojos_lista": []}}
         )
         print(f"\nEvaluaciones inicializadas con anteojos_lista vacía: {result.modified_count}")
         
-        result = await db.evaluaciones.update_many(
+        result = await db.evaluaciones_oftalmologicas.update_many(
             {"recetas.lentes_contacto_lista": {"$exists": False}},
             {"$set": {"recetas.lentes_contacto_lista": []}}
         )

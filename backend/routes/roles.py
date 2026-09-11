@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 
 from config.database import db
-from config.permissions import PERMISSIONS
+from config.permissions import PERMISSIONS, invalidate_permissions_cache
 from .auth import get_current_user, require_permission
 
 router = APIRouter(prefix="/roles", tags=["Roles"])
@@ -300,6 +300,7 @@ async def create_role(
     }
     
     result = await db.roles.insert_one(new_role)
+    invalidate_permissions_cache(role_name)
     
     return {
         "message": f"Rol '{role_data.display_name}' creado exitosamente",
@@ -340,6 +341,7 @@ async def update_role(
             {"$set": update_fields},
             upsert=True
         )
+        invalidate_permissions_cache(role_name)
         return {"message": f"Rol '{role_name}' actualizado exitosamente"}
     
     # Para roles personalizados
@@ -351,6 +353,7 @@ async def update_role(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Rol no encontrado")
     
+    invalidate_permissions_cache(role_name)
     return {"message": f"Rol '{role_name}' actualizado exitosamente"}
 
 
@@ -380,6 +383,7 @@ async def delete_role(
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Rol no encontrado")
     
+    invalidate_permissions_cache(role_name)
     # También eliminar configuración de menús para este rol
     await db.menu_configurations.delete_one({"role": role_name})
     
@@ -412,6 +416,7 @@ async def reset_role_permissions(
     
     # Eliminar personalización de la DB
     await db.roles.delete_one({"name": role_name})
+    invalidate_permissions_cache(role_name)
     
     return {
         "message": f"Permisos del rol '{role_name}' restaurados a valores por defecto",

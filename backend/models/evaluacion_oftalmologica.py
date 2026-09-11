@@ -210,6 +210,11 @@ class Recetas(BaseModel):
     medicamentos: RecetaMedicamentos = Field(default_factory=RecetaMedicamentos)
     anteojos: RecetaAnteojos = Field(default_factory=RecetaAnteojos)
     lentes_contacto: RecetaLentesContacto = Field(default_factory=RecetaLentesContacto)
+    # Nuevo formato multi-receta (arrays). Se guardan como dicts para no perder
+    # campos extra (id, fecha_creacion, migrado_de_legacy, etc.). Sin esto el
+    # response_model descartaría las recetas migradas/importadas.
+    anteojos_lista: List[dict] = Field(default_factory=list)
+    lentes_contacto_lista: List[dict] = Field(default_factory=list)
 
 
 # ==================== PRÓXIMA CITA ====================
