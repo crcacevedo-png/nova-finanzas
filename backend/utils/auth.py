@@ -12,8 +12,8 @@ from typing import Optional
 from config.database import db
 from config.permissions import get_user_permissions, has_permission
 
-# JWT Configuration
-SECRET_KEY = os.environ.get("SECRET_KEY", "novavision-secret-key-2024-finanzas-seguro")
+# JWT Configuration (SEC-001: sin secreto embebido; unificado con JWT_SECRET del entorno)
+SECRET_KEY = os.environ.get("SECRET_KEY") or os.environ["JWT_SECRET"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 horas
 

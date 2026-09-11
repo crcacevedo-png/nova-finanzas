@@ -1,0 +1,41 @@
+{
+  "summary": "AppSec audit E2E validation (iter48). Pytest: 25/25 PASS en test_appsec_audit_iter48.py. Cubre: (1) Shape del login — permissions incluye manage_sales, manage_caja, view_inventory, manage_inventory=true para superadmin/admin y false/ausente para optica. (2) SEC-002 Laboratorio Pruebas: GET /estado, GET /credenciales-prueba y DELETE /purgar devuelven 401/403 SIN token; 403 con token 'optica'; 200 con 'superadmin'. (3) SEC-003 Autorización por módulo: 'optica' recibe 403 en GET /api/inventario/productos, /api/ventas/productos, /api/caja/estado y POST /api/ventas; 'superadmin' y 'admin' reciben 200 en los tres GET. (4) SEC-004 Logout con blacklist unificada: tras POST /api/auth/logout, el MISMO token da 401 tanto en /api/auth/me (server) como en /api/caja/estado (router modular) — blacklist persistente y compartida OK. (5) SEC-004 Revocación de sesiones: tras POST /api/security/revoke-my-sessions el token previo da 401 en /api/auth/me y login nuevo funciona (200). (6) RBAC roles personalizados: creado rol 'test_qa_role_iter48_v2' con view_inventory=true, manage_caja=false; usuario TEST_qa_user_iter48_v2 asignado a ese rol vía PUT (workaround por schema restrictivo, ver action_items); ese usuario recibe 200 en GET /api/inventario/productos y 403 en GET /api/caja/estado. Cleanup completo: rol y usuario eliminados. Frontend regresión: SuperAdmin login OK, dashboard carga, navegación limpia a /inventario, /inventario/productos, /caja, /usuarios sin errores de consola ni pantalla en blanco; menú incluye Inventario, Óptica, Finanzas, Gestión de usuarios, Lab. Pruebas, Auditoría. Optica login OK, menú restringido correctamente (solo Pacientes, Óptica, Médicos, sin módulos clínicos), /optica/inventario carga (Armazones, Lentes de Contacto, Lentes Oftálmicos, Punto de Venta, Cuentas por Cobrar, Compras).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/users", "issue": "UserBase.role tiene pattern regex '^(superadmin|admin|usuario|optica)$' que IMPIDE asignar un rol personalizado en la creación. Workaround: crear usuario con rol 'usuario' y luego PUT /api/users/{id} con role=custom (UserUpdate NO tiene el pattern). Esto rompe parcialmente la promesa RBAC de custom roles."},
+      {"endpoint": "GET /api/patients", "issue": "500 Internal Server Error para TODOS los roles (superadmin/admin/optica). Causa: pydantic ResponseValidationError — múltiples pacientes en la BD carecen de campos requeridos (gender, birth_date, phone, referral_institution, created_by). NO es regresión de esta iteración (issue de calidad de datos preexistente), pero rompe la vista de Pacientes en el frontend con banner 'Error al cargar los pacientes'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Pacientes (todos los roles con acceso)", "issue": "Muestra banner 'Error al cargar los pacientes' porque /api/patients devuelve 500. Al ser el landing de rol 'optica', da mala primera impresión aunque no bloquea el módulo Óptica.", "selector": "text=Error al cargar los pacientes", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_appsec_audit_iter48.py",
+    "/app/test_reports/pytest/appsec_iter48.xml"
+  ],
+  "action_items": [
+    "Quitar el pattern regex del campo 'role' en UserBase (server.py línea 506) o refactorizar para validar dinámicamente contra roles existentes en db.roles + built-ins. Sin esto, la creación de usuarios con rol personalizado directamente vía POST /api/users es imposible (422) y se requiere el workaround POST + PUT.",
+    "(Pre-existente, no AppSec) Reparar seed/migración de pacientes: agregar valores por defecto (gender/birth_date/phone/referral_institution/created_by) o hacer opcionales esos campos en el modelo de respuesta para evitar el 500 en GET /api/patients."
+  ],
+  "critical_code_review_comments": [
+    "server.py:506 UserBase.role con pattern hardcoded contradice el feature RBAC de roles personalizados. UserUpdate.role SÍ es libre — inconsistencia entre create y update.",
+    "SEC-002/003/004 correctamente aplicados y verificados end-to-end. La blacklist compartida (db.token_blacklist) funciona simultáneamente en endpoints del server principal y routers modulares — arquitectura correcta.",
+    "resolve_permissions() con deny-by-default para roles desconocidos verificado indirectamente vía RBAC custom test (manage_caja explícito=false produce 403 correctamente).",
+    "El endpoint POST /api/security/revoke-my-sessions incrementa token_version y todos los tokens previos son rechazados con 401 vía get_current_user — bien implementado."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_appsec_audit_iter48.py (nuevo, 25 tests)"
+  ],
+  "success_rate": {"backend": "100% (25/25 pytest AppSec)", "frontend": "100% flujos legítimos (navegación limpia SA y optica)"},
+  "test_credentials": "superadmin/nova2024, admin/Admin2024Nuevo!, optica/optica2024 — todas válidas y con rate limit 5/min respetado en los tests (60s de espera entre logins críticos)",
+  "seed_data_creation": "Rol 'test_qa_role_iter48_v2' y usuario 'TEST_qa_user_iter48_v2' creados y ELIMINADOS al final del run vía DELETE /api/roles/{name} y DELETE /api/users/{id}. Estado del sistema al finalizar: LIMPIO. No se alteraron roles de sistema (superadmin/admin/usuario/optica). Token version de 'admin' fue incrementado por el test de revoke — sesiones activas de admin previas están invalidadas (comportamiento esperado del test).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Todos los hallazgos AppSec (SEC-002, SEC-003, SEC-004, RBAC custom roles) están verificados y pasan. El único hueco en el feature RBAC es que POST /api/users tiene un pattern regex en 'role' que impide asignar roles personalizados en la creación directa; se requiere workaround POST(role='usuario')+PUT(role=custom). El bug de /api/patients 500 es preexistente por datos incompletos en la BD, no relacionado con AppSec. El test test_appsec_audit_iter48.py tarda ~5 min por los 3 sleeps de 60s (rate limit login). Login: campo 'username', devuelve 'access_token'. Nota: el test de revoke-my-sessions invalida los tokens 'admin' cacheados; refresca el token si corres tests adicionales seguidos.",
+  "rca of the issue": "N/A — no hay bug crítico nuevo. El único issue funcional detectado en RBAC (pattern regex en UserCreate.role) requiere corrección para experiencia completa del feature 'custom roles'."
+}

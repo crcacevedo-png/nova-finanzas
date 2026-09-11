@@ -57,10 +57,14 @@ if not JWT_SECRET:
     # En desarrollo, generar un secret seguro temporal
     JWT_SECRET = secrets.token_urlsafe(64)
     logging.warning("⚠️ SEGURIDAD: JWT_SECRET no configurado. Usando valor temporal. Configure en .env para producción.")
+elif JWT_SECRET in ['novavision_secret_key_2024', 'novavision_secure_secret_key_2024_gtq_production_v2', 'novavision-secret-key-2024-finanzas-seguro']:
+    if os.environ.get('ENVIRONMENT') == 'production':
+        raise RuntimeError("❌ CRÍTICO: JWT_SECRET es un valor conocido/publicado. Genere uno nuevo con: python -c \"import secrets; print(secrets.token_urlsafe(64))\" antes de desplegar a producción.")
+    logging.warning("⚠️ SEGURIDAD: JWT_SECRET es un valor conocido. ROTE el secreto antes de producción con: python -c \"import secrets; print(secrets.token_urlsafe(64))\"")
 elif len(JWT_SECRET) < 32:
+    if os.environ.get('ENVIRONMENT') == 'production':
+        raise RuntimeError("❌ CRÍTICO: JWT_SECRET demasiado corto para producción. Use 64+ caracteres.")
     logging.warning("⚠️ SEGURIDAD: JWT_SECRET demasiado corto. Recomendado: 64+ caracteres")
-elif JWT_SECRET in ['novavision_secret_key_2024', 'novavision_secure_secret_key_2024_gtq_production_v2']:
-    logging.warning("⚠️ SEGURIDAD: JWT_SECRET es un valor conocido. Genere uno nuevo con: python -c \"import secrets; print(secrets.token_urlsafe(64))\"")
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '8'))  # Por defecto 8 horas
@@ -460,8 +464,45 @@ PERMISSIONS = {
     }
 }
 
+# SEC-003: Permisos de módulos clínicos (inventario, POS/ventas, caja)
+_MODULE_PERMS = {
+    "superadmin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
+    "admin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
+    "usuario": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": False},
+    "optica": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": False},
+}
+for _rol, _perms_mod in _MODULE_PERMS.items():
+    PERMISSIONS.setdefault(_rol, {}).update(_perms_mod)
+
+
 def get_permissions(role: str) -> dict:
     return PERMISSIONS.get(role, PERMISSIONS["usuario"])
+
+
+async def resolve_permissions(role: str) -> dict:
+    """SEC-003/RBAC: Resuelve los permisos efectivos de un rol.
+    - superadmin siempre tiene todos los permisos.
+    - roles personalizados y personalizaciones de roles de sistema se leen de db.roles.
+    - roles de sistema sin personalización usan la matriz por defecto.
+    - rol desconocido => sin permisos (deny by default)."""
+    if role == "superadmin":
+        return PERMISSIONS["superadmin"]
+    try:
+        custom = await db.roles.find_one({"name": role})
+    except Exception:
+        custom = None
+    if custom and isinstance(custom.get("permissions"), dict) and custom["permissions"]:
+        return custom["permissions"]
+    if role in PERMISSIONS:
+        return PERMISSIONS[role]
+    return {}
+
+
+async def validar_rol_existe(role: str) -> bool:
+    """RBAC: valida que un rol sea de sistema o exista como rol personalizado en db.roles."""
+    if role in ["superadmin", "admin", "usuario", "optica"]:
+        return True
+    return await db.roles.find_one({"name": role}) is not None
 
 # ==================== MODELS ====================
 
@@ -469,7 +510,8 @@ def get_permissions(role: str) -> dict:
 class UserBase(BaseModel):
     username: str
     name: str
-    role: str = Field(default="usuario", pattern="^(superadmin|admin|usuario|optica)$")
+    # RBAC: se permite cualquier rol de sistema o personalizado (se valida en el endpoint contra db.roles)
+    role: str = Field(default="usuario")
 
 class UserCreate(UserBase):
     password: str
@@ -757,12 +799,13 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
         return False, "La contraseña debe contener al menos un número"
     return True, "OK"
 
-def create_token(user_id: str, username: str, role: str) -> str:
+def create_token(user_id: str, username: str, role: str, token_version: int = 1) -> str:
     """Crear token JWT con claims seguros"""
     payload = {
         "sub": user_id,
         "username": username,
         "role": role,
+        "token_version": token_version,  # SEC-004: revocación masiva de sesiones
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
         "iat": datetime.now(timezone.utc),
         "jti": str(uuid.uuid4())  # JWT ID único para prevenir replay attacks
@@ -819,7 +862,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
         
-        user["permissions"] = get_permissions(user["role"])
+        # SEC-004: Verificar versión de token (revocación masiva de sesiones)
+        token_tv = payload.get("token_version")
+        if token_tv is not None and token_tv != user.get("token_version", 1):
+            raise HTTPException(status_code=401, detail="Sesión revocada. Inicie sesión nuevamente.")
+        
+        user["permissions"] = await resolve_permissions(user["role"])
         user["_token"] = token  # Store token for logout
         
         return user
@@ -830,7 +878,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 def require_permission(permission: str):
     async def permission_checker(current_user: dict = Depends(get_current_user)):
-        user_permissions = get_permissions(current_user["role"])
+        user_permissions = current_user.get("permissions") or get_permissions(current_user["role"])
         if not user_permissions.get(permission, False):
             raise HTTPException(status_code=403, detail="No tienes permiso para realizar esta acción")
         return current_user
@@ -1187,7 +1235,14 @@ async def seed_optica_data():
             "role": "optica",
             "is_active": True,
             "created_at": now,
-            "last_login": None
+            "last_login": None,
+            # SEC-005: forzar cambio de contraseña por defecto + campos de seguridad
+            "must_change_password": True,
+            "password_changed_at": None,
+            "failed_login_attempts": 0,
+            "locked_until": None,
+            "known_devices": [],
+            "token_version": 1
         }
         await db.users.insert_one(optica_user)
         print("Created optica user (username: optica, password: optica2024)")
@@ -2348,8 +2403,8 @@ async def login(request: Request, credentials: UserLogin):
     # SEC-001: Verificar si debe cambiar contraseña
     must_change = user.get("must_change_password", False)
     
-    # Crear token
-    token = create_token(user["id"], user["username"], user["role"])
+    # Crear token (SEC-004: incluye token_version para revocación de sesiones)
+    token = create_token(user["id"], user["username"], user["role"], user.get("token_version", 1))
     
     # Log login exitoso
     await audit.log(
@@ -2379,7 +2434,7 @@ async def login(request: Request, credentials: UserLogin):
             last_login=datetime.now(timezone.utc).isoformat(),
             created_at=user["created_at"],
             updated_at=user.get("updated_at"),
-            permissions=get_permissions(user["role"])
+            permissions=await resolve_permissions(user["role"])
         )
     }
 
@@ -2823,6 +2878,10 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
     if existing:
         raise HTTPException(status_code=400, detail="El nombre de usuario ya está registrado")
     
+    # RBAC: validar que el rol exista (sistema o personalizado)
+    if not await validar_rol_existe(user_data.role):
+        raise HTTPException(status_code=400, detail=f"El rol '{user_data.role}' no existe")
+    
     user_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     user_doc = {
@@ -2834,7 +2893,8 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
         "is_active": True,
         "last_login": None,
         "created_at": now,
-        "updated_at": now
+        "updated_at": now,
+        "token_version": 1
     }
     
     await db.users.insert_one(user_doc)
@@ -2848,7 +2908,7 @@ async def create_user(user_data: UserCreate, current_user: dict = Depends(requir
         last_login=None,
         created_at=now,
         updated_at=now,
-        permissions=get_permissions(user_data.role)
+        permissions=await resolve_permissions(user_data.role)
     )
 
 @api_router.put("/users/{user_id}", response_model=UserResponse)
@@ -2871,6 +2931,8 @@ async def update_user(
         changes.append(f"nombre: {user.get('name')} → {user_data.name}")
     
     if user_data.role is not None and user_data.role != user.get("role"):
+        if not await validar_rol_existe(user_data.role):
+            raise HTTPException(status_code=400, detail=f"El rol '{user_data.role}' no existe")
         update_data["role"] = user_data.role
         changes.append(f"rol: {user.get('role')} → {user_data.role}")
     
@@ -2905,7 +2967,7 @@ async def update_user(
         )
     
     updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
-    return UserResponse(**updated, permissions=get_permissions(updated["role"]))
+    return UserResponse(**updated, permissions=await resolve_permissions(updated["role"]))
 
 @api_router.put("/users/{user_id}/toggle-active")
 async def toggle_user_active(user_id: str, current_user: dict = Depends(require_permission("manage_users"))):
@@ -3866,6 +3928,12 @@ app.include_router(api_router)
 @app.on_event("startup")
 async def startup_event():
     """Run seed on startup and create indexes"""
+    # SEC-004: Backfill de token_version para usuarios legados (evita que la
+    # revocación de sesiones falle en cuentas creadas sin este campo)
+    await db.users.update_many(
+        {"token_version": {"$exists": False}},
+        {"$set": {"token_version": 1}}
+    )
     await seed_default_users()
     await seed_sample_expenses()
     await seed_sample_patients()

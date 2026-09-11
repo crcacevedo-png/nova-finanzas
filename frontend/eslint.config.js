@@ -11,12 +11,13 @@ module.exports = [
       'node_modules/**',
       'coverage/**',
       'playwright-report/**',
-      '**/*.config.js',
+      'test-results/**',
     ],
   },
   js.configs.recommended,
   {
-    files: ['src/**/*.{js,jsx}'],
+    // Aplica a todos los archivos JS/JSX del proyecto (src, scripts, config, plugins, tests)
+    files: ['**/*.{js,jsx,cjs,mjs}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -30,6 +31,7 @@ module.exports = [
         vi: 'readonly',
         describe: 'readonly',
         it: 'readonly',
+        test: 'readonly',
         expect: 'readonly',
         beforeEach: 'readonly',
         afterEach: 'readonly',
@@ -47,14 +49,15 @@ module.exports = [
     rules: {
       // Reglas relajadas acordes a un proyecto CRA existente
       'no-unused-vars': 'off',
+      'no-undef': 'off',
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
       'react/no-unescaped-entities': 'off',
       'react/display-name': 'off',
       'no-empty': 'off',
-      'no-undef': 'off',
       'no-useless-escape': 'off',
       'no-constant-condition': 'off',
+      'no-control-regex': 'off',
     },
   },
 ];

@@ -84,6 +84,18 @@ AVAILABLE_PERMISSIONS = {
             {"id": "view_profitability", "label": "Ver Rentabilidad", "description": "Acceso a reportes de rentabilidad"},
         ]
     },
+    "ventas": {
+        "label": "Punto de Venta",
+        "permissions": [
+            {"id": "manage_sales", "label": "Operar Punto de Venta", "description": "Registrar y anular ventas en el POS de clínica"},
+        ]
+    },
+    "caja": {
+        "label": "Caja",
+        "permissions": [
+            {"id": "manage_caja", "label": "Gestionar Caja", "description": "Aperturas, movimientos, cierres y cuentas por cobrar de clínica"},
+        ]
+    },
     "proveedores": {
         "label": "Proveedores",
         "permissions": [

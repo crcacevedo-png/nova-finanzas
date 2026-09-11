@@ -448,9 +448,16 @@ def get_db():
     return _db
 
 def get_current_user_dependency():
-    """Obtener la dependencia de usuario actual"""
+    """Dependencia: usuario autenticado con acceso al módulo de inventario (SEC-003)."""
     from server import get_current_user
-    return get_current_user
+
+    async def _dep(current_user: dict = Depends(get_current_user)):
+        perms = current_user.get("permissions") or {}
+        if not (perms.get("view_inventory") or perms.get("manage_inventory")):
+            raise HTTPException(status_code=403, detail="No tienes permiso para acceder al inventario")
+        return current_user
+
+    return _dep
 
 async def generar_codigo_producto(db) -> str:
     """Genera código único para producto"""

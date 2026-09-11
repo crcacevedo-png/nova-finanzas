@@ -6,14 +6,18 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 6)
 
-### Últimos Cambios (2026-06 Sesión 6)
-- ✅ **Verificación E2E de Modificación de Permisos de Roles** (solicitado por usuario)
-  - Bug de `display_name: None` (rol admin) al abrir modal de edición: CONFIRMADO RESUELTO
-  - Agente de pruebas: Backend 13/13 pytest PASS (`test_roles_crud.py`), Frontend 100% de flujos
-  - Modal de edición abre sin error para admin, usuario, optica; superadmin muestra mensaje de bloqueo
-  - Toggle de permisos + Guardar → persiste; Reset a valores por defecto → OK; Crear/Eliminar rol personalizado → OK
-  - Reporte: `/app/test_reports/iteration_47.json`
-  - Pendientes cosméticos (opcionales): ocultar botón editar en superadmin; agregar data-testid a botones lápiz/reset/delete de tarjetas; POST /api/roles/ podría devolver 201
+### Últimos Cambios (2026-06 Sesión 6) — Auditoría de Seguridad AppSec
+- ✅ **Auditoría AppSec completa + remediación** (blindaje de accesos/permisos). Informe: `/app/docs/SECURITY_AUDIT_2026-06.md`
+  - SEC-001 (JWT): eliminados fallbacks de secreto embebidos; guarda de arranque ABORTA en producción si el secreto es conocido/corto. **El usuario decidió NO rotar el secreto aún → rotar antes de producción.**
+  - SEC-002: Laboratorio de Pruebas ahora exige SuperAdmin autenticado + no-producción (dependencia `verificar_acceso_laboratorio`).
+  - SEC-003: Autorización por módulo (inventario `view_inventory`/`manage_inventory`, POS `manage_sales`, caja `manage_caja`). superadmin/admin con acceso; usuario/optica sin acceso a módulos clínicos.
+  - SEC-004: Blacklist persistente unificada (`db.token_blacklist`) + `token_version` verificado en `get_current_user` + backfill legado.
+  - SEC-005: Seed de usuario `optica` con `must_change_password` y campos de seguridad (solo nuevos despliegues).
+  - RBAC gap: `resolve_permissions()` async lee `db.roles` (deny-by-default); `POST/PUT /api/users` permite roles personalizados con validación.
+  - Validado: 25/25 pytest AppSec (`/app/test_reports/iteration_48.json`) + curl + navegación E2E (SuperAdmin y Óptica).
+- ⚠️ **Bug preexistente detectado (fuera de alcance):** `GET /api/patients` devuelve 500 por pacientes con campos incompletos en la BD (no es regresión de esta sesión).
+- ✅ **Verificación E2E de permisos de roles** (inicio de sesión): `/app/test_reports/iteration_47.json`
+- ✅ **Fix motor ESLint**: creado `/app/frontend/eslint.config.js` (config plana ESLint 9).
 
 ### Últimos Cambios (2026-08-26 Sesión 5)
 - ✅ **Módulo Completo de Sociedades Médicas** (`/sociedades`)

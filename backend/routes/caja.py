@@ -95,7 +95,7 @@ async def calcular_totales_caja_dia(fecha_dia: str) -> dict:
 @router.get("/estado", response_model=CajaEstadoResponse)
 async def get_caja_estado(
     fecha: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener estado de la caja del día"""
     fecha_hoy = fecha or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -125,7 +125,7 @@ async def get_caja_estado(
 @router.post("/apertura", response_model=CajaCierreResponse)
 async def abrir_caja(
     apertura: CajaCierreApertura,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Abrir caja del día"""
     fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -190,7 +190,7 @@ async def get_movimientos(
     tipo: Optional[str] = None,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Listar movimientos del día"""
     fecha_hoy = fecha or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -215,7 +215,7 @@ async def get_movimientos(
 @router.post("/movimientos", response_model=CajaMovimientoResponse)
 async def crear_movimiento(
     movimiento: CajaMovimientoCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Crear nuevo movimiento de caja"""
     fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -269,7 +269,7 @@ async def crear_movimiento(
 async def actualizar_movimiento(
     movimiento_id: str,
     movimiento: CajaMovimientoUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Actualizar movimiento existente"""
     existing = await db.caja_movimientos.find_one({"id": movimiento_id, "origen": "clinica"}, {"_id": 0})
@@ -308,7 +308,7 @@ async def eliminar_movimiento(
 @router.post("/cierre", response_model=CajaCierreResponse)
 async def cerrar_caja(
     cierre_req: CajaCierreRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Cerrar caja del día"""
     fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -376,7 +376,7 @@ async def cerrar_caja(
 async def get_historial_cierres(
     limit: int = Query(30, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener historial de cierres"""
     total = await db.caja_cierres.count_documents({"origen": "clinica"})
@@ -390,7 +390,7 @@ async def get_historial_cierres(
 @router.get("/cierres/{cierre_id}", response_model=CajaCierreResponse)
 async def get_cierre(
     cierre_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener detalle de un cierre"""
     cierre = await db.caja_cierres.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
@@ -446,7 +446,7 @@ async def reabrir_caja(
 
 @catalogos_router.get("/pagadores")
 async def get_pagadores(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Listar tipos de pagador"""
     pagadores = await db.catalogo_pagadores.find(
@@ -458,7 +458,7 @@ async def get_pagadores(
 @catalogos_router.post("/pagadores", response_model=PagadorResponse)
 async def crear_pagador(
     pagador: PagadorCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Crear nuevo tipo de pagador"""
     now = datetime.now(timezone.utc)
@@ -482,7 +482,7 @@ async def crear_pagador(
 async def actualizar_pagador(
     pagador_id: str,
     pagador: PagadorUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Actualizar tipo de pagador"""
     existing = await db.catalogo_pagadores.find_one({"id": pagador_id, "origen": "clinica"}, {"_id": 0})
@@ -518,7 +518,7 @@ async def get_cuentas_cobrar(
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Listar cuentas por cobrar"""
     query = {"origen": "clinica"}
@@ -542,7 +542,7 @@ async def get_cuentas_cobrar(
 
 @cxc_router.get("/resumen", response_model=ResumenCxCResponse)
 async def get_resumen_cxc(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener resumen de cuentas por cobrar"""
     cuentas = await db.cuentas_por_cobrar.find(
@@ -577,7 +577,7 @@ async def get_resumen_cxc(
 @cxc_router.post("", response_model=CuentaCobrarResponse)
 async def crear_cuenta_cobrar(
     cuenta: CuentaCobrarCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Crear nueva cuenta por cobrar"""
     now = datetime.now(timezone.utc)
@@ -622,7 +622,7 @@ async def crear_cuenta_cobrar(
 @cxc_router.get("/{cuenta_id}", response_model=CuentaCobrarResponse)
 async def get_cuenta_cobrar(
     cuenta_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener detalle de cuenta por cobrar"""
     cuenta = await db.cuentas_por_cobrar.find_one({"id": cuenta_id, "origen": "clinica"}, {"_id": 0})
@@ -635,7 +635,7 @@ async def get_cuenta_cobrar(
 async def actualizar_cuenta_cobrar(
     cuenta_id: str,
     cuenta: CuentaCobrarUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Actualizar cuenta por cobrar"""
     existing = await db.cuentas_por_cobrar.find_one({"id": cuenta_id, "origen": "clinica"}, {"_id": 0})
@@ -663,7 +663,7 @@ async def actualizar_cuenta_cobrar(
 async def registrar_abono(
     cuenta_id: str,
     abono: AbonoCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Registrar abono a cuenta por cobrar"""
     cuenta = await db.cuentas_por_cobrar.find_one({"id": cuenta_id, "origen": "clinica"}, {"_id": 0})
@@ -818,7 +818,7 @@ async def get_cierres_financieros(
     anio: Optional[int] = None,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Listar cierres financieros"""
     query = {"origen": "clinica"}
@@ -838,7 +838,7 @@ async def get_cierres_financieros(
 @cierres_financieros_router.post("", response_model=CierreFinancieroResponse)
 async def crear_cierre_financiero(
     cierre: CierreFinancieroCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Generar cierre financiero"""
     now = datetime.now(timezone.utc)
@@ -902,7 +902,7 @@ async def crear_cierre_financiero(
 @cierres_financieros_router.get("/{cierre_id}", response_model=CierreFinancieroResponse)
 async def get_cierre_financiero(
     cierre_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener detalle de cierre financiero"""
     cierre = await db.cierres_financieros.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
@@ -915,7 +915,7 @@ async def get_cierre_financiero(
 async def actualizar_cierre_financiero(
     cierre_id: str,
     cierre: CierreFinancieroUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Actualizar cierre financiero"""
     existing = await db.cierres_financieros.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
@@ -934,7 +934,7 @@ async def actualizar_cierre_financiero(
 @cierres_financieros_router.post("/{cierre_id}/recalcular", response_model=CierreFinancieroResponse)
 async def recalcular_cierre_financiero(
     cierre_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Recalcular totales de cierre financiero"""
     cierre = await db.cierres_financieros.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})

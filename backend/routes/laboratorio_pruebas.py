@@ -12,6 +12,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 import asyncio
 
+from routes.auth import get_current_user
+
 # Verificación de ambiente ANTES de todo
 ENVIRONMENT = os.environ.get('ENVIRONMENT', os.environ.get('NODE_ENV', 'development'))
 IS_PRODUCTION = ENVIRONMENT.lower() == 'production'
@@ -85,11 +87,27 @@ async def verificar_superadmin(current_user: dict):
     return True
 
 
+async def verificar_acceso_laboratorio(current_user: dict = Depends(get_current_user)):
+    """SEC-002: Bloquea en producción Y exige rol SuperAdmin autenticado."""
+    if IS_PRODUCTION:
+        raise HTTPException(
+            status_code=403,
+            detail="❌ BLOQUEADO: El Laboratorio de Pruebas NO está disponible en producción. "
+                   "Esta restricción no es negociable ni configurable."
+        )
+    if current_user.get("role") != "superadmin":
+        raise HTTPException(
+            status_code=403,
+            detail="Solo SuperAdmin puede acceder al Laboratorio de Pruebas"
+        )
+    return True
+
+
 # ==================== ENDPOINTS ====================
 
 @router.get("/estado", response_model=EstadoDatosPrueba)
 async def obtener_estado_datos_prueba(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Obtiene el estado actual de los datos de prueba en la base de datos.
@@ -139,7 +157,7 @@ async def obtener_estado_datos_prueba(
 
 @router.post("/seed/datos-maestros", response_model=SeedResponse)
 async def seed_datos_maestros_endpoint(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 1: Genera datos maestros de prueba.
@@ -209,7 +227,7 @@ async def seed_datos_maestros_endpoint(
 
 @router.post("/seed/pacientes", response_model=SeedResponse)
 async def seed_pacientes_endpoint(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 2: Genera los 14 pacientes sintéticos de prueba.
@@ -259,7 +277,7 @@ async def seed_pacientes_endpoint(
 
 @router.post("/seed/completo", response_model=SeedResponse)
 async def seed_completo_endpoint(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Ejecuta el seed completo: Fase 1 (datos maestros) + Fase 2 (pacientes).
@@ -320,7 +338,7 @@ async def seed_completo_endpoint(
 @router.delete("/purgar", response_model=PurgeResponse)
 async def purgar_datos_prueba(
     confirmacion: str,
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 7: Elimina TODOS los datos de prueba.
@@ -397,7 +415,7 @@ async def purgar_datos_prueba(
 
 @router.get("/credenciales-prueba")
 async def obtener_credenciales_prueba(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Retorna las credenciales de los usuarios de prueba.
@@ -419,7 +437,7 @@ async def obtener_credenciales_prueba(
 
 @router.post("/verificaciones/ejecutar-todas")
 async def ejecutar_todas_verificaciones(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 3-4: Ejecuta la batería completa de verificaciones E2E.
@@ -437,7 +455,7 @@ async def ejecutar_todas_verificaciones(
 @router.post("/verificaciones/ejecutar-categoria/{categoria}")
 async def ejecutar_categoria_verificaciones(
     categoria: str,
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Ejecuta solo una categoría de verificaciones.
@@ -465,7 +483,7 @@ async def ejecutar_categoria_verificaciones(
 
 @router.get("/verificaciones/categorias")
 async def listar_categorias_verificaciones(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Lista las categorías de verificaciones disponibles.
@@ -530,7 +548,7 @@ async def listar_categorias_verificaciones(
 @router.post("/volumen/generar")
 async def generar_datos_volumen(
     cantidad: int = 100,
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 5: Genera datos de volumen para pruebas de estrés.
@@ -554,7 +572,7 @@ async def generar_datos_volumen(
 
 @router.get("/volumen/medir-rendimiento")
 async def medir_rendimiento(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 5: Mide el rendimiento de consultas comunes.
@@ -572,7 +590,7 @@ async def medir_rendimiento(
 
 @router.get("/informe/generar")
 async def generar_informe_e2e(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 6: Genera el informe completo de pruebas E2E en formato estructurado.
@@ -608,7 +626,7 @@ async def generar_informe_e2e(
 
 @router.get("/informe/markdown")
 async def generar_informe_markdown(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     FASE 6: Genera el informe en formato Markdown para anexar a INFORME_PRUEBAS_E2E.md
@@ -669,7 +687,7 @@ async def generar_informe_markdown(
 
 @router.post("/transacciones/ejecutar-todas")
 async def ejecutar_pruebas_transaccion(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Ejecuta pruebas de transacción completas:
@@ -690,7 +708,7 @@ async def ejecutar_pruebas_transaccion(
 
 @router.delete("/transacciones/limpiar")
 async def limpiar_transacciones_prueba(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Limpia todas las transacciones de prueba (ventas, movimientos, kardex).
@@ -710,7 +728,7 @@ async def limpiar_transacciones_prueba(
 
 @router.get("/transacciones/estado")
 async def estado_transacciones_prueba(
-    _: bool = Depends(verificar_no_produccion)
+    _: bool = Depends(verificar_acceso_laboratorio)
 ):
     """
     Obtiene el estado actual de transacciones de prueba.

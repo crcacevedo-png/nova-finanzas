@@ -10,7 +10,7 @@ import jwt
 import bcrypt
 
 from config.database import db, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS, blacklisted_tokens
-from config.permissions import PERMISSIONS, get_permissions
+from config.permissions import PERMISSIONS, get_permissions, resolve_permissions
 
 # Pydantic imports
 from pydantic import BaseModel, ConfigDict, Field
@@ -64,11 +64,12 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def create_token(user_id: str, username: str, role: str) -> str:
+def create_token(user_id: str, username: str, role: str, token_version: int = 1) -> str:
     payload = {
         "sub": user_id,
         "username": username,
         "role": role,
+        "token_version": token_version,  # SEC-004: revocación masiva de sesiones
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
         "iat": datetime.now(timezone.utc)
     }
@@ -78,8 +79,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     try:
         token = credentials.credentials
         
-        # Check if token is blacklisted
-        if token in blacklisted_tokens:
+        # SEC-004: Verificar blacklist persistente en MongoDB
+        if await db.token_blacklist.find_one({"token": token}):
             raise HTTPException(status_code=401, detail="Token ha sido invalidado")
         
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -91,7 +92,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
         
-        user["permissions"] = get_permissions(user["role"])
+        # SEC-004: Verificar versión de token (revocación masiva de sesiones)
+        token_tv = payload.get("token_version")
+        if token_tv is not None and token_tv != user.get("token_version", 1):
+            raise HTTPException(status_code=401, detail="Sesión revocada. Inicie sesión nuevamente.")
+        
+        user["permissions"] = await resolve_permissions(user["role"])
         user["_token"] = token  # Store token for logout
         
         return user
@@ -102,7 +108,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 def require_permission(permission: str):
     async def permission_checker(current_user: dict = Depends(get_current_user)):
-        user_permissions = get_permissions(current_user["role"])
+        user_permissions = current_user.get("permissions") or get_permissions(current_user["role"])
         if not user_permissions.get(permission, False):
             raise HTTPException(status_code=403, detail="No tienes permiso para realizar esta acción")
         return current_user
@@ -155,10 +161,14 @@ async def login(request: Request, credentials: UserLogin):
 
 @router.post("/logout")
 async def logout(current_user: dict = Depends(get_current_user)):
-    """Invalidate the current token"""
+    """Invalidate the current token (SEC-004: blacklist persistente en MongoDB)"""
     token = current_user.get("_token")
     if token:
-        blacklisted_tokens.add(token)
+        await db.token_blacklist.insert_one({
+            "token": token,
+            "user_id": current_user.get("id"),
+            "blacklisted_at": datetime.now(timezone.utc).isoformat()
+        })
     return {"message": "Sesión cerrada correctamente"}
 
 @router.get("/me", response_model=UserResponse)

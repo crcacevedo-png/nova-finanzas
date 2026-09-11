@@ -1,6 +1,8 @@
 # /app/backend/config/permissions.py
 # Sistema de permisos por rol
 
+from config.database import db
+
 PERMISSIONS = {
     "superadmin": {
         "view_dashboard": True,
@@ -141,6 +143,36 @@ PERMISSIONS = {
     }
 }
 
+# SEC-003: Permisos de módulos clínicos (inventario, POS/ventas, caja)
+_MODULE_PERMS = {
+    "superadmin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
+    "admin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
+    "usuario": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": False},
+    "optica": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": False},
+}
+for _rol, _perms_mod in _MODULE_PERMS.items():
+    PERMISSIONS.setdefault(_rol, {}).update(_perms_mod)
+
+
 def get_permissions(role: str) -> dict:
     """Obtener permisos para un rol específico"""
     return PERMISSIONS.get(role, PERMISSIONS["usuario"])
+
+
+async def resolve_permissions(role: str) -> dict:
+    """SEC-003/RBAC: Resuelve los permisos efectivos de un rol.
+    - superadmin siempre tiene todos los permisos.
+    - roles personalizados y personalizaciones de roles de sistema se leen de db.roles.
+    - roles de sistema sin personalización usan la matriz por defecto.
+    - rol desconocido => sin permisos (deny by default)."""
+    if role == "superadmin":
+        return PERMISSIONS["superadmin"]
+    try:
+        custom = await db.roles.find_one({"name": role})
+    except Exception:
+        custom = None
+    if custom and isinstance(custom.get("permissions"), dict) and custom["permissions"]:
+        return custom["permissions"]
+    if role in PERMISSIONS:
+        return PERMISSIONS[role]
+    return {}
