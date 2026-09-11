@@ -15,6 +15,7 @@ import {
   Eye,
   UserCheck,
   UserX,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   X
@@ -49,6 +50,7 @@ import {
 } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
+import { EvaluacionesPacienteDialog } from '../components/EvaluacionesPacienteDialog';
 import { toast, Toaster } from 'sonner';
 import { 
   patientApi, 
@@ -67,6 +69,8 @@ const Pacientes = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [evaluacionesDialogOpen, setEvaluacionesDialogOpen] = useState(false);
+  const [evaluacionesPatient, setEvaluacionesPatient] = useState(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState(null);
@@ -711,6 +715,19 @@ const Pacientes = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEvaluacionesPatient(patient);
+                                setEvaluacionesDialogOpen(true);
+                              }}
+                              className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                              title="Ver evaluaciones previas"
+                              data-testid={`evaluaciones-patient-${patient.id}`}
+                            >
+                              <ClipboardList className="w-4 h-4" />
+                            </Button>
                             {canEdit && patient.is_active && (
                               <Button
                                 variant="ghost"
@@ -1300,6 +1317,13 @@ const Pacientes = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Diálogo de evaluaciones previas del paciente */}
+        <EvaluacionesPacienteDialog
+          patient={evaluacionesPatient}
+          open={evaluacionesDialogOpen}
+          onOpenChange={setEvaluacionesDialogOpen}
+        />
 
         {/* Delete Confirmation Dialog */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
