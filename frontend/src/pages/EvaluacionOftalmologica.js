@@ -191,6 +191,8 @@ const EvaluacionOftalmologica = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [evaluaciones, setEvaluaciones] = useState([]);
+  // Ref con el id del paciente actual (para acotar el Historial a ese paciente)
+  const pacienteIdRef = useRef(null);
   const [evaluacionActual, setEvaluacionActual] = useState(null);
   const [pacientes, setPacientes] = useState([]);
   const [medicos, setMedicos] = useState([]);
@@ -341,14 +343,27 @@ const EvaluacionOftalmologica = () => {
 
   const [formData, setFormData] = useState(evaluacionVacia);
 
-  // Fetch inicial
-  const fetchEvaluaciones = useCallback(async () => {
+  // Fetch del historial: SOLO evaluaciones del paciente actual, ordenadas por fecha clínica
+  const fetchEvaluaciones = useCallback(async (pacienteIdArg = null) => {
+    const pid = pacienteIdArg || pacienteIdRef.current;
+    if (!pid) {
+      setEvaluaciones([]);
+      return;
+    }
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/evaluaciones?limit=50`, {
+      const response = await axios.get(`${API_URL}/evaluaciones?paciente_id=${pid}&limit=100`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setEvaluaciones(response.data.data || []);
+      const list = response.data.data || [];
+      // Ordenar por fecha clínica (desc) y, a igualdad, por fecha de creación (desc)
+      list.sort((a, b) => {
+        const fa = a.fecha || '';
+        const fb = b.fecha || '';
+        if (fa !== fb) return fb.localeCompare(fa);
+        return (b.fecha_creacion || '').localeCompare(a.fecha_creacion || '');
+      });
+      setEvaluaciones(list);
     } catch (error) {
       console.error('Error fetching evaluaciones:', error);
     }
@@ -365,6 +380,11 @@ const EvaluacionOftalmologica = () => {
       console.error('Error fetching médicos:', error);
     }
   }, []);
+
+  // Mantener sincronizado el ref del paciente actual (para acotar el Historial)
+  useEffect(() => {
+    pacienteIdRef.current = formData.paciente_id || null;
+  }, [formData.paciente_id]);
 
   const buscarPacientes = useCallback(async (search) => {
     if (!search || search.length < 2) {
@@ -819,6 +839,9 @@ const EvaluacionOftalmologica = () => {
     setSearchPaciente('');
     setAutoguardadoStatus('');
     setTiempoRestante(null);
+    // Limpiar el historial (no hay paciente seleccionado)
+    pacienteIdRef.current = null;
+    setEvaluaciones([]);
     // Resetear estado CRM
     setCrmEnviado(false);
     setCrmForm({
@@ -953,6 +976,9 @@ const EvaluacionOftalmologica = () => {
     }));
     setSearchPaciente(paciente.nombre_completo);
     setShowPacienteList(false);
+    // Acotar el Historial a las evaluaciones de ESTE paciente
+    pacienteIdRef.current = paciente.id;
+    fetchEvaluaciones(paciente.id);
     
     // Cargar historial médico del paciente (antecedentes y medicamentos)
     try {
@@ -1401,7 +1427,7 @@ const EvaluacionOftalmologica = () => {
                 <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
                   {evaluaciones.length === 0 ? (
                     <div className="px-3 py-4 text-center text-gray-500 text-sm">
-                      No hay evaluaciones registradas
+                      {formData.paciente_id ? 'Este paciente no tiene evaluaciones registradas' : 'Selecciona un paciente para ver su historial'}
                     </div>
                   ) : (
                     evaluaciones.map((ev) => (
