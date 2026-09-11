@@ -434,7 +434,7 @@ function AppRoutes() {
       <Route 
         path="/importar-pacientes" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="import_patients">
             <ImportarPacientes />
           </ProtectedRoute>
         } 
@@ -444,7 +444,7 @@ function AppRoutes() {
       <Route 
         path="/importar-evaluaciones" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="import_patients">
             <ImportarEvaluaciones />
           </ProtectedRoute>
         } 
