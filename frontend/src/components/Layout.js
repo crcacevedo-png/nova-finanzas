@@ -137,6 +137,11 @@ const Layout = ({ children }) => {
     navItems.push({ path: '/importar-pacientes', icon: Upload, label: 'Importar Pacientes', testId: 'nav-importar-pacientes' });
   }
   
+  // Importación Masiva de Evaluaciones - Solo Admin y SuperAdmin
+  if (isAdminOrSuperAdmin && isMenuEnabled('importar_pacientes')) {
+    navItems.push({ path: '/importar-evaluaciones', icon: Upload, label: 'Importar Evaluaciones', testId: 'nav-importar-evaluaciones' });
+  }
+  
   // Evaluación Oftalmológica - Visible si está habilitado
   if (isMenuEnabled('evaluacion_oftalmologica')) {
     navItems.push({ path: '/evaluacion-oftalmologica', icon: Eye, label: 'Evaluación Oftalmológica', testId: 'nav-evaluacion' });

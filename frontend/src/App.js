@@ -29,6 +29,7 @@ import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
 import ImportarPacientes from './pages/ImportarPacientes';
+import ImportarEvaluaciones from './pages/ImportarEvaluaciones';
 import LaboratorioPruebas from './pages/LaboratorioPruebas';
 import CuentasCobrarOptica from './pages/CuentasCobrarOptica';
 import CuentasCobrarFinanzas from './pages/CuentasCobrarFinanzas';
@@ -435,6 +436,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ImportarPacientes />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Importación Masiva de Evaluaciones */}
+      <Route 
+        path="/importar-evaluaciones" 
+        element={
+          <ProtectedRoute>
+            <ImportarEvaluaciones />
           </ProtectedRoute>
         } 
       />

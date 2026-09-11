@@ -3,9 +3,9 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timezone
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import uuid
 import re
 import io
@@ -133,6 +133,83 @@ class AuditLogger:
             pass
 
 audit = AuditLogger()
+
+
+# ==================== IMPORTACIÓN MASIVA DE EVALUACIONES ====================
+# Enlaza cada evaluación (extraída de Access) con su paciente por el
+# número de expediente (record_number) o, en su defecto, por DPI.
+
+class ImportEvaluacionItem(BaseModel):
+    """Esquema flexible para importar evaluaciones.
+    Los campos clínicos adicionales se conservan tal cual (extra='allow')."""
+    model_config = ConfigDict(extra="allow")
+    # Clave de enlace al paciente (al menos una es obligatoria)
+    expediente: Optional[str] = None
+    record_number: Optional[str] = None
+    paciente_expediente: Optional[str] = None
+    dpi: Optional[str] = None
+    # Identificador de origen (PK de Access) para deduplicar reimportaciones
+    id_origen: Optional[str] = None
+    source_id: Optional[str] = None
+    # Campos clínicos comunes (el resto fluye por extra='allow')
+    fecha: Optional[str] = None
+    medico_nombre: Optional[str] = None
+
+
+class ImportEvalBatchRequest(BaseModel):
+    items: List[ImportEvaluacionItem]
+    batch_number: int = 1
+    skip_duplicates: bool = True
+
+
+# Claves meta que NO forman parte del documento clínico de la evaluación
+_EVAL_LINK_KEYS = {"expediente", "record_number", "dpi", "id_origen", "source_id", "_id"}
+
+
+def _norm_fecha_eval(value) -> str:
+    """Normaliza una fecha a YYYY-MM-DD; si no reconoce el formato la deja igual."""
+    if not value:
+        return ""
+    v = str(value).strip()
+    if re.match(r'^\d{4}-\d{2}-\d{2}', v):
+        return v[:10]
+    m = re.match(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$', v)
+    if m:
+        d, mo, y = m.groups()
+        return f"{y}-{mo.zfill(2)}-{d.zfill(2)}"
+    m = re.match(r'^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$', v)
+    if m:
+        y, mo, d = m.groups()
+        return f"{y}-{mo.zfill(2)}-{d.zfill(2)}"
+    return v
+
+
+def _get_expediente(data: dict) -> str:
+    """Obtiene la clave de expediente desde cualquiera de los alias aceptados."""
+    return (
+        data.get("record_number")
+        or data.get("expediente")
+        or data.get("paciente_expediente")
+        or ""
+    ).strip()
+
+
+async def _mapear_pacientes(expedientes: set, dpis: set):
+    """Construye mapas expediente->paciente y dpi->paciente para enlazar en lote."""
+    proj = {"_id": 0, "id": 1, "record_number": 1, "first_name": 1,
+            "last_name": 1, "gender": 1, "birth_date": 1, "dpi": 1}
+    mapa_exp, mapa_dpi = {}, {}
+    if expedientes:
+        cursor = db.patients.find({"record_number": {"$in": list(expedientes)}}, proj)
+        async for p in cursor:
+            if p.get("record_number"):
+                mapa_exp[p["record_number"]] = p
+    if dpis:
+        cursor = db.patients.find({"dpi": {"$in": list(dpis)}}, proj)
+        async for p in cursor:
+            if p.get("dpi"):
+                mapa_dpi[p["dpi"]] = p
+    return mapa_exp, mapa_dpi
 
 
 # ==================== CATÁLOGOS ENDPOINTS ====================
@@ -590,6 +667,238 @@ async def create_evaluacion(
     if "_id" in evaluacion_dict:
         del evaluacion_dict["_id"]
     return evaluacion_dict
+
+
+# ==================== IMPORTACIÓN MASIVA - ENDPOINTS ====================
+
+@router.get("/import/template")
+async def get_import_template_evaluaciones(
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Devuelve la plantilla/esquema JSON esperado para importar evaluaciones."""
+    return {
+        "descripcion": "Plantilla para importación masiva de evaluaciones oftalmológicas NovaVision",
+        "instrucciones": [
+            "El archivo debe ser un array JSON de objetos (una evaluación por objeto).",
+            "Cada evaluación DEBE incluir la clave de enlace al paciente: 'expediente' (igual al record_number del paciente) o 'dpi'.",
+            "Importa los PACIENTES primero, preservando su expediente, para que el enlace funcione.",
+            "Incluye 'id_origen' (PK de la evaluación en Access) para poder deduplicar reimportaciones.",
+            "La fecha acepta YYYY-MM-DD, DD/MM/YYYY o DD-MM-YYYY.",
+            "Las recetas de anteojos/lentes de contacto van como ARRAYS en 'anteojos_lista' y 'lentes_contacto_lista'.",
+            "Recomendado importar en lotes de 500 registros."
+        ],
+        "ejemplo": [
+            {
+                "id_origen": "ACCESS-EVAL-000123",
+                "expediente": "EXP-202401-0001",
+                "fecha": "2024-03-15",
+                "medico_nombre": "Dr. Juan Pérez",
+                "motivo_consulta": "Control anual",
+                "padecimiento_actual": "",
+                "antecedentes": {"diabetes": False, "hipertension": False, "alergias": ""},
+                "examen": {
+                    "avsc_od": "20/40", "avsc_os": "20/30",
+                    "avcc_od": "20/20", "avcc_os": "20/20",
+                    "refraccion_od": {"esfera": "-1.00", "cilindro": "-0.50", "eje": "180", "adicion": ""},
+                    "refraccion_os": {"esfera": "-0.75", "cilindro": "", "eje": "", "adicion": ""},
+                    "pio_od": "14", "pio_os": "15",
+                    "segmento_anterior": "Sin alteraciones",
+                    "segmento_posterior": "Papila y mácula normales"
+                },
+                "diagnosticos": [{"descripcion": "Miopía simple", "codigo_cie10": "H52.1", "ojo": "OU"}],
+                "plan": "Uso de anteojos permanente",
+                "recetas": {
+                    "anteojos_lista": [{
+                        "od": {"esfera": "-1.00", "cilindro": "-0.50", "eje": "180", "adicion": ""},
+                        "os": {"esfera": "-0.75", "cilindro": "", "eje": "", "adicion": ""},
+                        "tipo_lente": "Monofocal", "material": "", "tratamientos": "Antirreflejo",
+                        "uso": "Permanente", "distancia_pupilar": "62", "observaciones": ""
+                    }],
+                    "lentes_contacto_lista": []
+                }
+            }
+        ]
+    }
+
+
+@router.post("/import/validate")
+async def validate_import_evaluaciones(
+    items: List[ImportEvaluacionItem] = Body(...),
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Valida (dry-run) cuántas evaluaciones enlazan con un paciente existente."""
+    dumped = [it.model_dump() for it in items]
+    exps, dpis = set(), set()
+    for d in dumped:
+        e = _get_expediente(d)
+        if e:
+            exps.add(e)
+        elif d.get("dpi"):
+            dpis.add(str(d["dpi"]).strip())
+    mapa_exp, mapa_dpi = await _mapear_pacientes(exps, dpis)
+
+    linkable = 0
+    sin_clave = 0
+    huerfanas = []
+    sample = []
+    for idx, d in enumerate(dumped):
+        e = _get_expediente(d)
+        dpi = str(d.get("dpi") or "").strip()
+        if not e and not dpi:
+            sin_clave += 1
+            continue
+        pac = mapa_exp.get(e) if e else None
+        if not pac and dpi:
+            pac = mapa_dpi.get(dpi)
+        if not pac:
+            if len(huerfanas) < 50:
+                huerfanas.append({"row": idx + 1, "clave": e or dpi})
+            continue
+        linkable += 1
+        if len(sample) < 5:
+            sample.append({
+                "row": idx + 1,
+                "clave": e or dpi,
+                "paciente": f"{pac.get('first_name', '')} {pac.get('last_name', '')}".strip(),
+                "fecha": _norm_fecha_eval(d.get("fecha"))
+            })
+    total = len(dumped)
+    return {
+        "valid": linkable > 0 and sin_clave == 0,
+        "total_records": total,
+        "linkable_records": linkable,
+        "sin_clave_enlace": sin_clave,
+        "huerfanas_count": total - linkable - sin_clave,
+        "huerfanas": huerfanas,
+        "sample": sample
+    }
+
+
+@router.post("/import/batch")
+async def import_evaluaciones_batch(
+    request: ImportEvalBatchRequest,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Importa un lote de evaluaciones enlazándolas al paciente por expediente/DPI."""
+    now = datetime.now(timezone.utc).isoformat()
+    inserted = 0
+    huerfanas = 0
+    sin_clave = 0
+    duplicados = 0
+    error_details = []
+    huerfana_details = []
+
+    dumped = [it.model_dump() for it in request.items]
+    exps, dpis, source_ids = set(), set(), set()
+    for d in dumped:
+        e = _get_expediente(d)
+        if e:
+            exps.add(e)
+        elif d.get("dpi"):
+            dpis.add(str(d["dpi"]).strip())
+        sid = d.get("id_origen") or d.get("source_id")
+        if sid:
+            source_ids.add(str(sid))
+
+    mapa_exp, mapa_dpi = await _mapear_pacientes(exps, dpis)
+
+    existentes_sid = set()
+    if request.skip_duplicates and source_ids:
+        cursor = db.evaluaciones_oftalmologicas.find(
+            {"import_source_id": {"$in": list(source_ids)}},
+            {"_id": 0, "import_source_id": 1}
+        )
+        async for ev in cursor:
+            if ev.get("import_source_id"):
+                existentes_sid.add(ev["import_source_id"])
+
+    docs = []
+    for idx, d in enumerate(dumped):
+        e = _get_expediente(d)
+        dpi = str(d.get("dpi") or "").strip()
+        if not e and not dpi:
+            sin_clave += 1
+            error_details.append({"row": idx + 1, "error": "Sin clave de enlace (expediente/dpi)"})
+            continue
+        pac = mapa_exp.get(e) if e else None
+        if not pac and dpi:
+            pac = mapa_dpi.get(dpi)
+        if not pac:
+            huerfanas += 1
+            if len(huerfana_details) < 20:
+                huerfana_details.append({"row": idx + 1, "clave": e or dpi})
+            continue
+
+        sid = str(d.get("id_origen") or d.get("source_id") or "")
+        if request.skip_duplicates and sid and sid in existentes_sid:
+            duplicados += 1
+            continue
+
+        # Documento clínico: quitar claves meta de enlace, conservar el resto
+        clinico = {k: v for k, v in d.items() if k not in _EVAL_LINK_KEYS and v is not None}
+
+        # Enriquecer con datos del paciente
+        clinico["id"] = str(uuid.uuid4())
+        clinico["paciente_id"] = pac["id"]
+        clinico["paciente_nombre"] = f"{pac.get('first_name', '')} {pac.get('last_name', '')}".strip()
+        clinico["paciente_expediente"] = pac.get("record_number", "")
+        clinico["paciente_sexo"] = pac.get("gender", "")
+        if pac.get("birth_date"):
+            clinico["paciente_edad"] = calcular_edad(pac["birth_date"])
+        else:
+            clinico.setdefault("paciente_edad", 0)
+
+        clinico["fecha"] = _norm_fecha_eval(clinico.get("fecha")) or now[:10]
+
+        # Asegurar estructura de recetas con arrays (formato actual)
+        recetas = clinico.get("recetas")
+        if not isinstance(recetas, dict):
+            recetas = {}
+        recetas.setdefault("anteojos_lista", [])
+        recetas.setdefault("lentes_contacto_lista", [])
+        clinico["recetas"] = recetas
+        clinico.setdefault("diagnosticos", [])
+
+        # Metadatos
+        clinico["creado_por"] = current_user["id"]
+        clinico["creado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
+        clinico["fecha_creacion"] = clinico.get("fecha_creacion") or now
+        clinico["actualizado_por"] = current_user["id"]
+        clinico["actualizado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
+        clinico["fecha_actualizacion"] = now
+        clinico["sellado"] = False
+        clinico["fecha_sellado"] = None
+        clinico["ultimo_autoguardado"] = now
+        clinico["imported"] = True
+        clinico["import_batch"] = request.batch_number
+        if sid:
+            clinico["import_source_id"] = sid
+            existentes_sid.add(sid)
+
+        docs.append(clinico)
+
+    if docs:
+        try:
+            res = await db.evaluaciones_oftalmologicas.insert_many(docs, ordered=False)
+            inserted = len(res.inserted_ids)
+        except Exception as ex:
+            error_str = str(ex)
+            if "duplicate key" in error_str.lower():
+                inserted = len(docs) - 1
+            else:
+                raise HTTPException(status_code=500, detail=f"Error de base de datos: {error_str}")
+
+    return {
+        "success": True,
+        "batch_number": request.batch_number,
+        "total_processed": len(request.items),
+        "inserted": inserted,
+        "orphaned": huerfanas,
+        "sin_clave": sin_clave,
+        "duplicates": duplicados,
+        "error_details": error_details[:20],
+        "orphaned_details": huerfana_details
+    }
 
 
 @router.put("/{evaluacion_id}", response_model=EvaluacionOftalmologicaResponse)
