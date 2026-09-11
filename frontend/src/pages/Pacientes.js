@@ -51,6 +51,7 @@ import {
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import { EvaluacionesPacienteDialog } from '../components/EvaluacionesPacienteDialog';
+import { NogSelector } from '../components/NogSelector';
 import { toast, Toaster } from 'sonner';
 import { 
   patientApi, 
@@ -1100,12 +1101,10 @@ const Pacientes = () => {
                         </div>
                         <div className="space-y-2">
                           <Label className="text-xs">NOG</Label>
-                          <Input
+                          <NogSelector
+                            unitId={formData.igss_unit_id}
                             value={formData.igss_nog}
-                            onChange={(e) => setFormData(prev => ({ ...prev, igss_nog: e.target.value }))}
-                            className="input-teal"
-                            placeholder="No. Orden Gestión"
-                            data-testid="patient-igss-nog"
+                            onChange={(val) => setFormData(prev => ({ ...prev, igss_nog: val }))}
                           />
                         </div>
                         <div className="space-y-2">

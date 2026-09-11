@@ -653,6 +653,13 @@ async def create_evaluacion(
     
     await db.evaluaciones_oftalmologicas.insert_one(evaluacion_dict)
     
+    # Acreditar servicio al NOG del paciente (IGSS) si corresponde. Nunca bloquea la evaluación.
+    try:
+        from routes.igss_nogs import _acreditar_evaluacion
+        await _acreditar_evaluacion(paciente, evaluacion_dict, current_user)
+    except Exception:
+        pass
+    
     # Procesar catálogos
     await procesar_catalogos_evaluacion(evaluacion_dict)
     

@@ -177,6 +177,23 @@ export const igssUnitApi = {
   delete: (id) => axios.delete(`${API_URL}/igss-units/${id}`),
 };
 
+// NOG por Unidad IGSS API (contratos de servicios y acreditaciones)
+export const igssNogApi = {
+  getByUnit: (unitId) => axios.get(`${API_URL}/igss-units/${unitId}/nogs`),
+  getActivos: (unitId) => axios.get(`${API_URL}/igss-units/${unitId}/nogs-activos`),
+  create: (unitId, data) => axios.post(`${API_URL}/igss-units/${unitId}/nogs`, data),
+  update: (nogId, data) => axios.put(`${API_URL}/igss-units/nogs/${nogId}`, data),
+  delete: (nogId) => axios.delete(`${API_URL}/igss-units/nogs/${nogId}`),
+  recalcular: (nogId) => axios.post(`${API_URL}/igss-units/nogs/${nogId}/recalcular`),
+  getPacientes: (nogId) => axios.get(`${API_URL}/igss-units/nogs/${nogId}/pacientes`),
+  anularAcreditacion: (nogId, acredId, motivo) =>
+    axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/${acredId}/anular`, { motivo }),
+  exportExcel: (nogId) =>
+    axios.get(`${API_URL}/igss-units/nogs/${nogId}/export/excel`, { responseType: 'blob' }),
+  exportUnidadExcel: (unitId) =>
+    axios.get(`${API_URL}/igss-units/${unitId}/nogs/export/excel`, { responseType: 'blob' }),
+};
+
 // Menu Configuration API
 export const menuConfigApi = {
   getAvailableMenus: () => axios.get(`${API_URL}/menu-config/available-menus`),

@@ -1,0 +1,25 @@
+{
+  "summary": "Feature 'NOG por Unidad IGSS' probada end-to-end. 12/12 tests backend PASS (creación NOG, duplicado 400, acreditación automática al crear evaluación con bloqueo exacto al 100%, listado de pacientes/acreditaciones, anular libera cupo, recalcular idempotente que respeta anulaciones, conteo retroactivo al crear NOG, endpoint ligero /nogs-activos, exportación Excel por NOG y por unidad, permisos: igss.admin OK / optica 403). Frontend verificado con Playwright: botón NOG por unidad abre diálogo con métricas y tabla, creación de NOG desde el formulario funciona y aparece en la tabla, expand de fila muestra pacientes acreditados. En la ficha del paciente, al elegir Institución IGSS + Hospital General Demo aparece el SELECTOR NOG (data-testid patient-igss-nog-select) con 3 NOGs del catálogo + opción 'Otro (escribir NOG)' (patient-nog-option-libre); al elegir 'Otro' se revela correctamente el input de texto libre (patient-igss-nog).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_igss_nogs.py",
+    "/app/test_reports/pytest/igss_nogs_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Guarda atómica de _crear_acreditacion (update_one con acreditados $lt cantidad) previene sobregiro incluso ante concurrencia: correcto y bien pensado.",
+    "El hook _acreditar_evaluacion está envuelto en try/except en create_evaluacion (evaluaciones.py:657), garantizando que la clínica nunca se bloquea si la acreditación falla. Correcto.",
+    "Dedup por (nog_id, evaluacion_id) asegura idempotencia en recalcular. Correcto.",
+    "listar_pacientes_nog filtra pacientes inactivos correctamente (solo activos), cumpliendo el requisito del usuario.",
+    "Sugerencia menor (no crítica): considerar índice único MongoDB en (unidad_id, numero) para igss_nogs y en (nog_id, evaluacion_id) para igss_nog_acreditaciones si aún no existen, para reforzar unicidad a nivel DB (server.py ~línea 4127 aparentemente ya los crea, verificar índice único)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin/nova2024, igss.admin/IgssAdmin2024, optica/optica2024",
+  "seed_data_creation": "Unidad TEST_UNIDAD_NOG_* creada y ELIMINADA al finalizar. Se creó 1 NOG-UI-* de prueba desde la UI en Hospital General Demo (queda para inspección visual, no interfiere).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Feature NOG por Unidad IGSS 100% funcional. Suite de tests en /app/backend/tests/test_igss_nogs.py cubre catálogo, acreditación/bloqueo, anular, recalcular, retroactivo, exportaciones, permisos. Frontend selector NOG en ficha paciente y diálogo de gestión NOG funcionan como se especificó.",
+  "rca of the issue": "N/A - no se encontraron issues."
+}

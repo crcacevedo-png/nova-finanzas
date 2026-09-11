@@ -11,7 +11,8 @@ import {
   Users,
   FileBarChart,
   ClipboardList,
-  Download
+  Download,
+  FileStack
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,6 +40,7 @@ import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { igssUnitApi } from '../services/api';
+import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
 
 // Exporta el reporte por unidad a CSV
 const exportarReporteCSV = (data) => {
@@ -167,6 +169,8 @@ const UnidadesIGSS = () => {
   const [activeView, setActiveView] = useState('catalogo');
   const [reporte, setReporte] = useState(null);
   const [loadingReporte, setLoadingReporte] = useState(false);
+  const [nogUnit, setNogUnit] = useState(null);
+  const [nogDialogOpen, setNogDialogOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -442,6 +446,15 @@ const UnidadesIGSS = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => { setNogUnit(unit); setNogDialogOpen(true); }}
+                              className="h-8 px-2 text-[#0F6E56] hover:bg-[#E1F5EE]"
+                              data-testid={`nogs-unit-${unit.id}`}
+                            >
+                              <FileStack className="w-4 h-4 mr-1" />NOG
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => handleOpenDialog(unit)}
                               className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
                               data-testid={`edit-unit-${unit.id}`}
@@ -595,6 +608,11 @@ const UnidadesIGSS = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* NOG por Unidad IGSS */}
+        {nogUnit && (
+          <NogsUnidadDialog unit={nogUnit} open={nogDialogOpen} onOpenChange={setNogDialogOpen} />
+        )}
       </div>
     </Layout>
   );
