@@ -1,0 +1,46 @@
+{
+  "summary": "Verified UI fix for Historial dropdown in /evaluacion-oftalmologica. The dropdown is now correctly scoped to the loaded patient and each row shows date (DD/MM/YYYY) and primary diagnosis via data-testids historial-fecha-* and historial-dx-*. Empty-state and patient-switch behavior work as expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verifications": {
+    "maria_garcia_lopez_EXP-202604-0001": {
+      "historial_count": 4,
+      "expected_by_task": 3,
+      "note": "Data drift: an extra 11/09/2026 'Sin diagnóstico registrado' entry exists (likely auto-saved by prior test agent). The 3 seed evaluations are present: 28/07/2026 Sin dx (TEST_autoguardado), 28/07/2026 'Dx: Catarata senil nuclear +3 más', 25/07/2026 'Dx: Glaucoma primario de ángulo abierto'. Order is descending by date. No Juan Pérez appears.",
+      "dates_format_DD_MM_YYYY": true,
+      "diagnosticos_con_+N_mas": true,
+      "sin_diagnostico_registrado_shown": true,
+      "no_cross_patient_contamination": true
+    },
+    "empty_state_after_Nueva": {
+      "message_shown": "Selecciona un paciente para ver su historial",
+      "items_count": 0,
+      "passed": true
+    },
+    "juan_perez": {
+      "expected_by_task": "Juan Pérez Rodríguez (1 eval, 'Dx: Glaucoma primario de ángulo abierto +2 más')",
+      "actual_in_db": "'Juan Pérez Rodríguez' does not exist. Closest match 'Juan Pérez Morales' (EXP-202604-0002) has 1 evaluation (11/09/2026 - Sin diagnóstico registrado).",
+      "historial_scoped_to_juan_only": true,
+      "no_maria_in_juan_historial": true
+    }
+  },
+  "action_items": [
+    "OPTIONAL: Consider seeding/preserving the exact expected data set (Juan Pérez Rodríguez with 1 diagnosed eval, María with exactly 3 evals). Current preview DB has drifted due to prior test agents auto-saving evaluations with fecha=today (11/09/2026, 'Sin diagnóstico registrado'). This is NOT a bug in the fix itself; the Historial dropdown behavior is correct.",
+    "OPTIONAL: Add data-testid to the 'Historial' toggle button (e.g., historial-toggle-btn) for more robust automation; currently found only via text."
+  ],
+  "critical_code_review_comments": [
+    "fetchEvaluaciones(pacienteIdArg) correctly filters by paciente_id and ordena por fecha desc; historial rows render date via formatFechaHistorial and primary dx from array with '+N más' fallback. Empty state text renders correctly when no paciente is selected.",
+    "Auto-save on the form is creating empty evaluations (e.g., 11/09/2026 'Sin diagnóstico registrado' entries appear for multiple patients as soon as the form is opened/edited). This may be an intended behavior but pollutes historial. Worth reviewing whether auto-guardado should skip when no meaningful data is entered."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (all task acceptance criteria met on scoping, enrichment, empty-state, and patient switch)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "El fix del dropdown 'Historial' funciona: se acota al paciente y muestra fecha DD/MM/YYYY + diagnóstico principal (con 'Sin diagnóstico registrado' cuando falta). El botón 'Historial' NO tiene data-testid; localizar por texto. Datos reales en preview: 'María García López' con EXP-202604-0001 tiene 4 evals (3 originales + 1 auto-guardado); 'Juan Pérez Rodríguez' no existe (usar 'Juan Pérez Morales' EXP-202604-0002). El auto-guardado está creando evaluaciones vacías con la fecha de hoy en múltiples pacientes."
+}

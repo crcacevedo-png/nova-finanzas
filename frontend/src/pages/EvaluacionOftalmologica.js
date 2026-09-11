@@ -43,6 +43,14 @@ import { agendaApi } from '../services/agendaApi';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Formatea una fecha (YYYY-MM-DD o ISO) a DD/MM/YYYY para el historial
+const formatFechaHistorial = (f) => {
+  if (!f) return 'Sin fecha';
+  const s = String(f).slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+};
+
 // Componente de Autocomplete reutilizable
 const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, className }) => {
   const [suggestions, setSuggestions] = useState([]);
@@ -1418,7 +1426,7 @@ const EvaluacionOftalmologica = () => {
               {/* Dropdown de Historial */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="btn-outline">
+                  <Button variant="outline" size="sm" className="btn-outline" data-testid="historial-toggle-btn">
                     <FileText className="w-4 h-4 mr-1" />
                     Historial
                     <ChevronDown className="w-3 h-3 ml-1" />
@@ -1430,39 +1438,45 @@ const EvaluacionOftalmologica = () => {
                       {formData.paciente_id ? 'Este paciente no tiene evaluaciones registradas' : 'Selecciona un paciente para ver su historial'}
                     </div>
                   ) : (
-                    evaluaciones.map((ev) => (
-                      <DropdownMenuItem 
-                        key={ev.id}
-                        onClick={() => cargarEvaluacion(ev)}
-                        className={`flex flex-col items-start py-2 cursor-pointer ${
-                          evaluacionActual?.id === ev.id ? 'bg-blue-50' : ''
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-medium text-sm truncate max-w-[200px]">
-                            {ev.paciente_nombre}
-                          </span>
-                          {ev.sellado && (
-                            <Lock className="w-3 h-3 text-red-500 ml-2" />
+                    evaluaciones.map((ev) => {
+                      // Diagnóstico principal: primer elemento del array 'diagnosticos' (o el legacy 'diagnostico')
+                      const dxList = Array.isArray(ev.diagnosticos) ? ev.diagnosticos : [];
+                      const dxPrincipal = dxList.length > 0
+                        ? (dxList[0].descripcion || dxList[0].nombre || '')
+                        : (ev.diagnostico || '');
+                      const dxExtra = dxList.length > 1 ? ` +${dxList.length - 1} más` : '';
+                      return (
+                        <DropdownMenuItem 
+                          key={ev.id}
+                          onClick={() => cargarEvaluacion(ev)}
+                          data-testid={`historial-item-${ev.id}`}
+                          className={`flex flex-col items-start py-2 cursor-pointer ${
+                            evaluacionActual?.id === ev.id ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-semibold text-sm text-slate-800" data-testid={`historial-fecha-${ev.id}`}>
+                              {formatFechaHistorial(ev.fecha)}
+                            </span>
+                            {ev.sellado && (
+                              <Lock className="w-3 h-3 text-red-500 ml-2 flex-shrink-0" />
+                            )}
+                          </div>
+                          {dxPrincipal ? (
+                            <span className="text-xs text-teal-700 mt-0.5 truncate max-w-[270px]" data-testid={`historial-dx-${ev.id}`}>
+                              <strong>Dx:</strong> {dxPrincipal.length > 55 ? dxPrincipal.substring(0, 55) + '…' : dxPrincipal}{dxExtra}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400 mt-0.5">Sin diagnóstico registrado</span>
                           )}
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {ev.fecha} | {ev.paciente_expediente}
-                        </span>
-                        {/* Diagnóstico - resumen */}
-                        {ev.diagnostico && (
-                          <span className="text-xs text-teal-600 mt-1 truncate max-w-[250px]">
-                            <strong>Dx:</strong> {ev.diagnostico.length > 50 ? ev.diagnostico.substring(0, 50) + '...' : ev.diagnostico}
-                          </span>
-                        )}
-                        {/* Lectura de exámenes - resumen */}
-                        {ev.lectura_examenes && (
-                          <span className="text-xs text-blue-600 truncate max-w-[250px]">
-                            <strong>Exámenes:</strong> {ev.lectura_examenes.length > 40 ? ev.lectura_examenes.substring(0, 40) + '...' : ev.lectura_examenes}
-                          </span>
-                        )}
-                      </DropdownMenuItem>
-                    ))
+                          {ev.motivo_consulta && (
+                            <span className="text-xs text-gray-500 truncate max-w-[270px]">
+                              {ev.motivo_consulta.length > 50 ? ev.motivo_consulta.substring(0, 50) + '…' : ev.motivo_consulta}
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
