@@ -170,6 +170,7 @@ export const fixedExpenseApi = {
 // IGSS Units API (Catálogo de Unidades IGSS)
 export const igssUnitApi = {
   getAll: () => axios.get(`${API_URL}/igss-units`),
+  getReporte: () => axios.get(`${API_URL}/igss-units/reporte`),
   getById: (id) => axios.get(`${API_URL}/igss-units/${id}`),
   create: (data) => axios.post(`${API_URL}/igss-units`, data),
   update: (id, data) => axios.put(`${API_URL}/igss-units/${id}`, data),

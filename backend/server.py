@@ -3680,6 +3680,74 @@ async def get_igss_units(current_user: dict = Depends(get_current_user)):
     return IGSSUnitListResponse(data=units, total=len(units))
 
 
+@api_router.get("/igss-units/reporte")
+async def get_igss_units_report(current_user: dict = Depends(require_permission("manage_igss_units"))):
+    """Reporte por Unidad IGSS: cantidad de pacientes y evaluaciones por cada unidad.
+    Las evaluaciones se asocian a la unidad del paciente (evaluaciones -> paciente_id -> patient.igss_unit_id).
+    Incluye un renglón 'sin unidad' para pacientes/evaluaciones sin unidad IGSS asignada."""
+    # Unidades (activas e inactivas para un reporte completo)
+    units = await db.igss_units.find({}, {"_id": 0, "id": 1, "name": 1, "code": 1, "is_active": 1}).to_list(1000)
+    unit_map = {u["id"]: u for u in units}
+
+    # Mapa paciente -> unidad + conteo de pacientes por unidad (una sola lectura, campos mínimos)
+    pacientes = await db.patients.find({}, {"_id": 0, "id": 1, "igss_unit_id": 1}).to_list(None)
+    pac_unit = {}
+    pacientes_por_unidad = {}
+    sin_unidad_pacientes = 0
+    for p in pacientes:
+        uid = p.get("igss_unit_id") or None
+        pac_unit[p["id"]] = uid
+        if uid and uid in unit_map:
+            pacientes_por_unidad[uid] = pacientes_por_unidad.get(uid, 0) + 1
+        else:
+            sin_unidad_pacientes += 1
+
+    # Evaluaciones agrupadas por paciente (una sola agregación) -> se acumulan por unidad
+    eval_por_paciente = await db.evaluaciones_oftalmologicas.aggregate([
+        {"$group": {"_id": "$paciente_id", "count": {"$sum": 1}}}
+    ]).to_list(None)
+    evals_por_unidad = {}
+    sin_unidad_evals = 0
+    total_evals = 0
+    for row in eval_por_paciente:
+        cnt = row.get("count", 0)
+        total_evals += cnt
+        uid = pac_unit.get(row["_id"])
+        if uid and uid in unit_map:
+            evals_por_unidad[uid] = evals_por_unidad.get(uid, 0) + cnt
+        else:
+            sin_unidad_evals += cnt
+
+    filas = []
+    for u in sorted(units, key=lambda x: (x.get("name") or "").lower()):
+        uid = u["id"]
+        pac = pacientes_por_unidad.get(uid, 0)
+        evs = evals_por_unidad.get(uid, 0)
+        # Mostrar unidades activas o cualquiera con datos (oculta unidades inactivas vacías)
+        if not u.get("is_active", True) and pac == 0 and evs == 0:
+            continue
+        filas.append({
+            "unidad_id": uid,
+            "nombre": u.get("name", ""),
+            "codigo": u.get("code", ""),
+            "activa": u.get("is_active", True),
+            "pacientes": pac,
+            "evaluaciones": evs,
+        })
+
+    return {
+        "unidades": filas,
+        "sin_unidad": {"pacientes": sin_unidad_pacientes, "evaluaciones": sin_unidad_evals},
+        "totales": {
+            "unidades": len(filas),
+            "pacientes_con_unidad": sum(f["pacientes"] for f in filas),
+            "evaluaciones_con_unidad": sum(f["evaluaciones"] for f in filas),
+            "pacientes_total": len(pacientes),
+            "evaluaciones_total": total_evals,
+        },
+    }
+
+
 @api_router.get("/igss-units/{unit_id}", response_model=IGSSUnitResponse)
 async def get_igss_unit(unit_id: str, current_user: dict = Depends(get_current_user)):
     """Obtener una unidad IGSS específica"""

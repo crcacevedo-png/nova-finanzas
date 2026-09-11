@@ -7,7 +7,11 @@ import {
   Trash2, 
   RefreshCw,
   Building,
-  AlertCircle
+  AlertCircle,
+  Users,
+  FileBarChart,
+  ClipboardList,
+  Download
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -30,9 +34,125 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { igssUnitApi } from '../services/api';
+
+// Exporta el reporte por unidad a CSV
+const exportarReporteCSV = (data) => {
+  const rows = [['Unidad', 'Código', 'Estado', 'Pacientes', 'Evaluaciones']];
+  (data.unidades || []).forEach((u) => {
+    rows.push([u.nombre, u.codigo || '', u.activa ? 'Activa' : 'Inactiva', u.pacientes, u.evaluaciones]);
+  });
+  if (data.sin_unidad) {
+    rows.push(['Sin unidad asignada', '', '', data.sin_unidad.pacientes, data.sin_unidad.evaluaciones]);
+  }
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reporte_unidades_igss_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const MetricCard = ({ icon: Icon, label, value, color }) => (
+  <Card className="card-metrics border-0 shadow-none">
+    <CardContent className="p-4 flex items-center gap-4">
+      <div className={`p-3 rounded-xl ${color}`}><Icon className="w-5 h-5" /></div>
+      <div>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+        <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+// Reporte: pacientes y evaluaciones por unidad IGSS
+const ReporteIGSS = ({ data, loading, onRefresh }) => {
+  if (loading || !data) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  const t = data.totales || {};
+  const unidades = data.unidades || [];
+  const sin = data.sin_unidad || { pacientes: 0, evaluaciones: 0 };
+  return (
+    <div className="space-y-6" data-testid="reporte-igss">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <MetricCard icon={Building} label="Unidades IGSS" value={t.unidades ?? 0} color="bg-green-100 text-green-600" />
+        <MetricCard icon={Users} label="Pacientes con unidad" value={t.pacientes_con_unidad ?? 0} color="bg-blue-100 text-blue-600" />
+        <MetricCard icon={ClipboardList} label="Evaluaciones con unidad" value={t.evaluaciones_con_unidad ?? 0} color="bg-teal-100 text-teal-600" />
+      </div>
+
+      <Card className="card-teal">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Pacientes y evaluaciones por unidad
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="btn-outline" onClick={onRefresh} data-testid="reporte-refresh">
+              <RefreshCw className="w-4 h-4 mr-2" />Actualizar
+            </Button>
+            <Button variant="outline" size="sm" className="btn-outline" onClick={() => exportarReporteCSV(data)} data-testid="reporte-export-csv">
+              <Download className="w-4 h-4 mr-2" />Exportar CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow style={{ backgroundColor: 'var(--bg-metrics)' }}>
+                  <TableHead className="table-header">Unidad</TableHead>
+                  <TableHead className="table-header">Código</TableHead>
+                  <TableHead className="table-header">Estado</TableHead>
+                  <TableHead className="table-header text-right">Pacientes</TableHead>
+                  <TableHead className="table-header text-right">Evaluaciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unidades.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">No hay unidades IGSS registradas</TableCell></TableRow>
+                ) : unidades.map((u) => (
+                  <TableRow key={u.unidad_id} data-testid={`reporte-row-${u.unidad_id}`}>
+                    <TableCell className="font-medium" style={{ color: 'var(--text-primary)' }}>{u.nombre}</TableCell>
+                    <TableCell style={{ color: 'var(--text-secondary)' }}>{u.codigo || '—'}</TableCell>
+                    <TableCell>
+                      <Badge className={u.activa ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}>
+                        {u.activa ? 'Activa' : 'Inactiva'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">{u.pacientes}</TableCell>
+                    <TableCell className="text-right font-semibold">{u.evaluaciones}</TableCell>
+                  </TableRow>
+                ))}
+                {(sin.pacientes > 0 || sin.evaluaciones > 0) && (
+                  <TableRow className="bg-amber-50" data-testid="reporte-row-sin-unidad">
+                    <TableCell className="italic text-amber-700" colSpan={3}>Sin unidad IGSS asignada</TableCell>
+                    <TableCell className="text-right font-semibold text-amber-700">{sin.pacientes}</TableCell>
+                    <TableCell className="text-right font-semibold text-amber-700">{sin.evaluaciones}</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const UnidadesIGSS = () => {
   const { user, hasPermission } = useAuth();
@@ -44,6 +164,9 @@ const UnidadesIGSS = () => {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeView, setActiveView] = useState('catalogo');
+  const [reporte, setReporte] = useState(null);
+  const [loadingReporte, setLoadingReporte] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -64,6 +187,19 @@ const UnidadesIGSS = () => {
       toast.error('Error al cargar las unidades IGSS');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchReporte = useCallback(async () => {
+    try {
+      setLoadingReporte(true);
+      const response = await igssUnitApi.getReporte();
+      setReporte(response.data);
+    } catch (error) {
+      console.error('Error fetching IGSS report:', error);
+      toast.error('Error al cargar el reporte por unidad IGSS');
+    } finally {
+      setLoadingReporte(false);
     }
   }, []);
 
@@ -166,26 +302,40 @@ const UnidadesIGSS = () => {
               Catálogo de unidades del Instituto Guatemalteco de Seguridad Social
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline"
-              onClick={fetchUnits}
-              className="btn-outline"
-              data-testid="refresh-button"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Actualizar
-            </Button>
-            <Button 
-              onClick={() => handleOpenDialog()}
-              className="btn-primary"
-              data-testid="add-unit-button"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Unidad
-            </Button>
-          </div>
+          {activeView === 'catalogo' && (
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={fetchUnits}
+                className="btn-outline"
+                data-testid="refresh-button"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Actualizar
+              </Button>
+              <Button 
+                onClick={() => handleOpenDialog()}
+                className="btn-primary"
+                data-testid="add-unit-button"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nueva Unidad
+              </Button>
+            </div>
+          )}
         </div>
+
+        <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
+          <TabsList data-testid="unidades-igss-tabs">
+            <TabsTrigger value="catalogo" data-testid="tab-catalogo">
+              <Building className="w-4 h-4 mr-2" />Catálogo
+            </TabsTrigger>
+            <TabsTrigger value="reporte" data-testid="tab-reporte" onClick={fetchReporte}>
+              <FileBarChart className="w-4 h-4 mr-2" />Reporte
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="catalogo" className="space-y-6 mt-4">
 
         {/* Summary Card */}
         <Card className="card-metrics border-0 shadow-none">
@@ -331,6 +481,12 @@ const UnidadesIGSS = () => {
             </p>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="reporte" className="mt-4">
+            <ReporteIGSS data={reporte} loading={loadingReporte} onRefresh={fetchReporte} />
+          </TabsContent>
+        </Tabs>
 
         {/* Create/Edit Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
