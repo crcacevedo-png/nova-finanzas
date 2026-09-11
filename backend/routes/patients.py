@@ -74,21 +74,21 @@ class PatientUpdate(BaseModel):
 class PatientResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
-    record_number: str
-    first_name: str
-    last_name: str
+    record_number: Optional[str] = ""
+    first_name: Optional[str] = ""
+    last_name: Optional[str] = ""
     full_name: Optional[str] = ""
-    gender: str
-    birth_date: str
-    age: int
+    gender: Optional[str] = ""
+    birth_date: Optional[str] = ""
+    age: Optional[int] = 0
     profession: Optional[str] = ""
-    phone: str
+    phone: Optional[str] = ""
     email: Optional[str] = ""
     dpi: Optional[str] = ""
     emergency_phone: Optional[str] = ""
     emergency_contact_name: Optional[str] = ""
     emergency_contact_relationship: Optional[str] = ""
-    referral_institution: str
+    referral_institution: Optional[str] = ""
     referral_institution_label: Optional[str] = ""
     insurance_name: Optional[str] = ""
     other_institution_name: Optional[str] = ""
@@ -101,9 +101,9 @@ class PatientResponse(BaseModel):
     igss_nog: Optional[str] = ""
     comments: Optional[str] = ""
     is_active: bool = True
-    created_by: str
+    created_by: Optional[str] = ""
     created_by_name: Optional[str] = ""
-    created_at: str
+    created_at: Optional[str] = ""
     updated_by: Optional[str] = ""
     updated_by_name: Optional[str] = ""
     updated_at: Optional[str] = None

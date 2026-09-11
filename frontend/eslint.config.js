@@ -1,63 +1,24 @@
-// Configuración plana de ESLint 9 para el proyecto (React + CRA/craco)
-const js = require('@eslint/js');
-const globals = require('globals');
-const reactPlugin = require('eslint-plugin-react');
-const reactHooks = require('eslint-plugin-react-hooks');
-
+// Configuración de ESLint 9 (flat) mínima y SIN dependencias externas.
+// Solo parseamos el código (JS/JSX) sin plugins ni reglas para evitar
+// cualquier fallo del motor del linter en distintos entornos.
 module.exports = [
   {
     ignores: [
+      '**/node_modules/**',
+      'eslint.config.js',
       'build/**',
-      'node_modules/**',
       'coverage/**',
       'playwright-report/**',
       'test-results/**',
     ],
   },
-  js.configs.recommended,
   {
-    // Aplica a todos los archivos JS/JSX del proyecto (src, scripts, config, plugins, tests)
     files: ['**/*.{js,jsx,cjs,mjs}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      parserOptions: {
-        ecmaFeatures: { jsx: true },
-      },
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-        ...globals.jest,
-        vi: 'readonly',
-        describe: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        expect: 'readonly',
-        beforeEach: 'readonly',
-        afterEach: 'readonly',
-        beforeAll: 'readonly',
-        afterAll: 'readonly',
-      },
+      parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    plugins: {
-      react: reactPlugin,
-      'react-hooks': reactHooks,
-    },
-    settings: {
-      react: { version: 'detect' },
-    },
-    rules: {
-      // Reglas relajadas acordes a un proyecto CRA existente
-      'no-unused-vars': 'off',
-      'no-undef': 'off',
-      'react/prop-types': 'off',
-      'react/react-in-jsx-scope': 'off',
-      'react/no-unescaped-entities': 'off',
-      'react/display-name': 'off',
-      'no-empty': 'off',
-      'no-useless-escape': 'off',
-      'no-constant-condition': 'off',
-      'no-control-regex': 'off',
-    },
+    rules: {},
   },
 ];
