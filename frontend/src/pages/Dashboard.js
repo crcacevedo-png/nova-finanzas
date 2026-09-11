@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { NogAlertasBanner } from '../components/NogAlertasBanner';
 import { dashboardApi, formatCurrency, formatDate, typeLabels, statusLabels } from '../services/api';
 import { 
   Wallet, 
@@ -138,6 +140,7 @@ const AlertCard = ({ title, alerts, type, icon: Icon }) => {
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [alerts30, setAlerts30] = useState([]);
@@ -195,6 +198,11 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Dashboard</h1>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Resumen financiero de la clínica</p>
         </div>
+
+        {/* Alertas de contratos NOG (IGSS) */}
+        <NogAlertasBanner
+          onVer={(a) => navigate(`/configuracion/unidades-igss?nogUnidad=${a.unidad_id}&nog=${a.nog_id}&nombre=${encodeURIComponent(a.unidad_nombre || '')}`)}
+        />
 
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

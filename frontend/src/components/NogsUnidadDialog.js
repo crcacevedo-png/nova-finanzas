@@ -375,7 +375,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto" data-testid="nogs-unidad-dialog">
         <DialogHeader>
-          <DialogTitle>NOG — {unit?.name}</DialogTitle>
+          <DialogTitle>NOG — {unit?.name || data?.unidad?.name || ''}</DialogTitle>
           <DialogDescription>
             Contratos de servicios del IGSS. El sistema acredita 1 servicio por atención (evaluación) y bloquea el NOG al completarse.
           </DialogDescription>

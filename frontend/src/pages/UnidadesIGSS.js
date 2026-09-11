@@ -12,10 +12,7 @@ import {
   FileBarChart,
   ClipboardList,
   Download,
-  FileStack,
-  AlertTriangle,
-  XCircle,
-  Eye
+  FileStack
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -42,8 +39,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
-import { igssUnitApi, igssNogApi } from '../services/api';
+import { igssUnitApi } from '../services/api';
 import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
+import { NogAlertasBanner } from '../components/NogAlertasBanner';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // Exporta el reporte por unidad a CSV
 const exportarReporteCSV = (data) => {
@@ -175,7 +174,9 @@ const UnidadesIGSS = () => {
   const [nogUnit, setNogUnit] = useState(null);
   const [nogDialogOpen, setNogDialogOpen] = useState(false);
   const [nogInicial, setNogInicial] = useState(null);
-  const [alertas, setAlertas] = useState(null);
+  const [alertReload, setAlertReload] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -196,16 +197,6 @@ const UnidadesIGSS = () => {
       toast.error('Error al cargar las unidades IGSS');
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const fetchAlertas = useCallback(async () => {
-    try {
-      const response = await igssNogApi.getAlertas();
-      setAlertas(response.data);
-    } catch (error) {
-      // Silencioso: la alerta es informativa
-      setAlertas(null);
     }
   }, []);
 
@@ -230,8 +221,20 @@ const UnidadesIGSS = () => {
 
   useEffect(() => {
     fetchUnits();
-    fetchAlertas();
-  }, [fetchUnits, fetchAlertas]);
+  }, [fetchUnits]);
+
+  // Auto-abrir el diálogo de NOG si se llega con ?nogUnidad=&nog= (desde el Dashboard)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const uId = params.get('nogUnidad');
+    const nId = params.get('nog');
+    if (uId) {
+      const u = units.find((x) => x.id === uId)
+        || { id: uId, name: params.get('nombre') || '', code: '' };
+      abrirNogsUnidad(u, nId || null);
+      navigate('/configuracion/unidades-igss', { replace: true });
+    }
+  }, [location.search, units]);
 
   const handleOpenDialog = (unit = null) => {
     if (unit) {
@@ -352,67 +355,11 @@ const UnidadesIGSS = () => {
         </div>
 
         {/* Alertas de límite de NOG (90%+ y completados) */}
-        {alertas && alertas.total > 0 && (
-          <Card className="border-l-4 border-l-amber-500 bg-amber-50/50" data-testid="nog-alertas-banner">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2 text-amber-800">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-                Alertas de contratos NOG
-                <Badge className="bg-amber-200 text-amber-900" data-testid="nog-alertas-count">{alertas.total}</Badge>
-              </CardTitle>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {alertas.completados > 0 && (
-                  <span className="text-red-700 font-medium">{alertas.completados} completado(s)</span>
-                )}
-                {alertas.completados > 0 && alertas.por_completarse > 0 && ' · '}
-                {alertas.por_completarse > 0 && (
-                  <span className="text-amber-700 font-medium">{alertas.por_completarse} por completarse (≥{alertas.umbral_aviso}%)</span>
-                )}
-                {' '}— renueva el contrato a tiempo.
-              </p>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-2">
-              {alertas.alertas.map((a) => {
-                const completado = a.estado === 'completado';
-                return (
-                  <div
-                    key={a.nog_id}
-                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg border ${completado ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-white'}`}
-                    data-testid={`nog-alerta-${a.nog_id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {completado
-                        ? <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-                        : <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />}
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {a.numero}
-                          {a.nombre_servicio ? <span className="font-normal text-gray-500"> — {a.nombre_servicio}</span> : null}
-                        </p>
-                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {a.unidad_nombre} · {a.acreditados}/{a.cantidad} servicios ({a.porcentaje}%) · {a.disponibles} disponibles
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 sm:justify-end">
-                      <Badge className={completado ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}>
-                        {completado ? 'Completado' : 'Por completarse'}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="btn-outline"
-                        onClick={() => abrirNogsUnidad({ id: a.unidad_id, name: a.unidad_nombre, code: a.unidad_codigo }, a.nog_id)}
-                        data-testid={`nog-alerta-ver-${a.nog_id}`}
-                      >
-                        <Eye className="w-4 h-4 mr-1" />Ver
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+        {canManageIgss && (
+          <NogAlertasBanner
+            reloadSignal={alertReload}
+            onVer={(a) => abrirNogsUnidad({ id: a.unidad_id, name: a.unidad_nombre, code: a.unidad_codigo }, a.nog_id)}
+          />
         )}
 
         <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
@@ -702,7 +649,7 @@ const UnidadesIGSS = () => {
             open={nogDialogOpen}
             onOpenChange={setNogDialogOpen}
             initialNogId={nogInicial}
-            onChanged={fetchAlertas}
+            onChanged={() => setAlertReload((x) => x + 1)}
           />
         )}
       </div>
