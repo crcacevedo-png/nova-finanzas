@@ -182,6 +182,7 @@ export const igssNogApi = {
   getByUnit: (unitId) => axios.get(`${API_URL}/igss-units/${unitId}/nogs`),
   getActivos: (unitId) => axios.get(`${API_URL}/igss-units/${unitId}/nogs-activos`),
   getAlertas: () => axios.get(`${API_URL}/igss-units/nogs/alertas`),
+  getResumen: () => axios.get(`${API_URL}/igss-units/nogs/resumen`),
   create: (unitId, data) => axios.post(`${API_URL}/igss-units/${unitId}/nogs`, data),
   update: (nogId, data) => axios.put(`${API_URL}/igss-units/nogs/${nogId}`, data),
   delete: (nogId) => axios.delete(`${API_URL}/igss-units/nogs/${nogId}`),

@@ -384,6 +384,42 @@ async def recalcular_nog(
 
 # ==================== ENDPOINTS - ACREDITACIONES / PACIENTES ====================
 
+@router.get("/nogs/resumen")
+async def resumen_nogs(
+    current_user: dict = Depends(require_permission("manage_igss_units"))
+):
+    """Resumen global de NOG para tarjetas del catálogo: cuántos NOG están
+    disponibles (activos y no completados) y el total de servicios disponibles."""
+    nogs = await db.igss_nogs.find({}, {"_id": 0}).to_list(None)
+    total_nogs = len(nogs)
+    nogs_disponibles = 0
+    nogs_completados = 0
+    servicios_contratados = 0
+    servicios_acreditados = 0
+    servicios_disponibles = 0
+    valor_total = 0.0
+    for n in nogs:
+        d = _nog_con_derivados(n)
+        servicios_contratados += d["cantidad"]
+        servicios_acreditados += d["acreditados"]
+        valor_total += d["valor_total"]
+        if d["is_active"]:
+            servicios_disponibles += d["disponibles"]
+            if d["estado"] == "completado":
+                nogs_completados += 1
+            else:
+                nogs_disponibles += 1
+    return {
+        "total_nogs": total_nogs,
+        "nogs_disponibles": nogs_disponibles,
+        "nogs_completados": nogs_completados,
+        "servicios_contratados": servicios_contratados,
+        "servicios_acreditados": servicios_acreditados,
+        "servicios_disponibles": servicios_disponibles,
+        "valor_total": round(valor_total, 2),
+    }
+
+
 @router.get("/nogs/alertas")
 async def alertas_nogs(
     current_user: dict = Depends(require_permission("manage_igss_units"))

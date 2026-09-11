@@ -39,7 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
-import { igssUnitApi } from '../services/api';
+import { igssUnitApi, igssNogApi } from '../services/api';
 import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
 import { NogAlertasBanner } from '../components/NogAlertasBanner';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -65,13 +65,14 @@ const exportarReporteCSV = (data) => {
   URL.revokeObjectURL(url);
 };
 
-const MetricCard = ({ icon: Icon, label, value, color }) => (
+const MetricCard = ({ icon: Icon, label, value, color, subtitle }) => (
   <Card className="card-metrics border-0 shadow-none">
     <CardContent className="p-4 flex items-center gap-4">
       <div className={`p-3 rounded-xl ${color}`}><Icon className="w-5 h-5" /></div>
       <div>
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</p>
         <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+        {subtitle && <p className="text-xs" style={{ color: 'var(--text-hint)' }}>{subtitle}</p>}
       </div>
     </CardContent>
   </Card>
@@ -175,6 +176,7 @@ const UnidadesIGSS = () => {
   const [nogDialogOpen, setNogDialogOpen] = useState(false);
   const [nogInicial, setNogInicial] = useState(null);
   const [alertReload, setAlertReload] = useState(0);
+  const [resumen, setResumen] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -206,6 +208,15 @@ const UnidadesIGSS = () => {
     setNogDialogOpen(true);
   };
 
+  const fetchResumen = useCallback(async () => {
+    try {
+      const response = await igssNogApi.getResumen();
+      setResumen(response.data);
+    } catch (error) {
+      setResumen(null); // silencioso
+    }
+  }, []);
+
   const fetchReporte = useCallback(async () => {
     try {
       setLoadingReporte(true);
@@ -222,6 +233,10 @@ const UnidadesIGSS = () => {
   useEffect(() => {
     fetchUnits();
   }, [fetchUnits]);
+
+  useEffect(() => {
+    if (canManageIgss) fetchResumen();
+  }, [fetchResumen, alertReload, canManageIgss]);
 
   // Auto-abrir el diálogo de NOG si se llega con ?nogUnidad=&nog= (desde el Dashboard)
   useEffect(() => {
@@ -374,20 +389,29 @@ const UnidadesIGSS = () => {
 
           <TabsContent value="catalogo" className="space-y-6 mt-4">
 
-        {/* Summary Card */}
-        <Card className="card-metrics border-0 shadow-none">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-green-100">
-              <Building className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total Unidades IGSS</p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                {units.length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <MetricCard
+            icon={Building}
+            label="Total Unidades IGSS"
+            value={units.length}
+            color="bg-green-100 text-green-600"
+          />
+          <MetricCard
+            icon={FileStack}
+            label="NOG disponibles"
+            value={resumen?.nogs_disponibles ?? 0}
+            color="bg-blue-100 text-blue-600"
+            subtitle={`${resumen?.servicios_disponibles ?? 0} servicios disponibles`}
+          />
+          <MetricCard
+            icon={ClipboardList}
+            label="Servicios acreditados"
+            value={resumen?.servicios_acreditados ?? 0}
+            color="bg-teal-100 text-teal-600"
+            subtitle={`de ${resumen?.servicios_contratados ?? 0} contratados`}
+          />
+        </div>
 
         {/* Search */}
         <Card className="card-teal">
