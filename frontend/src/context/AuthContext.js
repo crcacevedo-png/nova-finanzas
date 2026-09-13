@@ -97,6 +97,14 @@ export const AuthProvider = ({ children }) => {
     };
   };
 
+  const changePassword = async (currentPassword, newPassword) => {
+    const response = await axios.post(`${API_URL}/security/change-password`, {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return response.data;
+  };
+
   const hasRole = (roles) => {
     if (!user) return false;
     if (typeof roles === 'string') return user.role === roles;
@@ -134,6 +142,7 @@ export const AuthProvider = ({ children }) => {
       permissions,
       login,
       logout,
+      changePassword,
       hasRole,
       hasPermission,
       canCreateExpenses,
