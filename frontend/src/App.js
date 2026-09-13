@@ -338,7 +338,7 @@ function AppRoutes() {
       <Route 
         path="/caja" 
         element={
-          <ProtectedRoute requiredPermission="view_payment_authorizations">
+          <ProtectedRoute requiredPermission="manage_caja">
             <Caja />
           </ProtectedRoute>
         } 

@@ -149,7 +149,7 @@ PERMISSIONS = {
 _MODULE_PERMS = {
     "superadmin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
     "admin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
-    "usuario": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": False},
+    "usuario": {"view_inventory": True, "manage_inventory": False, "manage_sales": True, "manage_caja": True},
     "optica": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": False},
 }
 for _rol, _perms_mod in _MODULE_PERMS.items():

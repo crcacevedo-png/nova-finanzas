@@ -84,6 +84,7 @@ const PuntoVenta = () => {
   // Estado de la bodega POS
   const [bodegaPOS, setBodegaPOS] = useState(null);
   const [loadingBodega, setLoadingBodega] = useState(true);
+  const [accesoDenegado, setAccesoDenegado] = useState(false);
   
   // Estado del carrito
   const [carrito, setCarrito] = useState([]);
@@ -184,9 +185,14 @@ const PuntoVenta = () => {
     try {
       const response = await ventasApi.getBodegaPOS();
       setBodegaPOS(response.data);
+      setAccesoDenegado(false);
     } catch (error) {
       console.error('Error fetching bodega POS:', error);
-      toast.error('Error al obtener bodega de punto de venta');
+      if (error.response?.status === 403) {
+        setAccesoDenegado(true);
+      } else {
+        toast.error('Error al obtener bodega de punto de venta');
+      }
     } finally {
       setLoadingBodega(false);
     }
@@ -889,6 +895,21 @@ const PuntoVenta = () => {
           <div className="text-center">
             <RefreshCw className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-slate-500">Cargando punto de venta...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (accesoDenegado) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-[80vh]">
+          <div className="text-center max-w-md" data-testid="pos-acceso-denegado">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Sin permiso para el Punto de Venta</h2>
+            <p className="text-slate-500 mb-4">Tu rol no tiene habilitado operar el Punto de Venta.</p>
+            <p className="text-sm text-slate-400">Solicita a un administrador que active el permiso "Operar Punto de Venta" para tu rol.</p>
           </div>
         </div>
       </Layout>

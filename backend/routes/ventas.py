@@ -352,23 +352,24 @@ async def obtener_bodega_pos(
     
     if bodega_id:
         bodega = await db.bodegas_inventario.find_one({"id": bodega_id, "origen": "clinica"})
-        if bodega and bodega.get("activo"):
+        # Tratar 'activo' ausente como activo (bodegas creadas por seed/import pueden no tener el campo)
+        if bodega and bodega.get("activo", True) is not False:
             return {"bodega_id": bodega["id"], "bodega_nombre": bodega["nombre"]}
     
     # Buscar primera bodega marcada como punto de venta
     bodega = await db.bodegas_inventario.find_one({
         "origen": "clinica",
-        "activo": True,
+        "activo": {"$ne": False},
         "es_punto_venta": True
     })
     
     if bodega:
         return {"bodega_id": bodega["id"], "bodega_nombre": bodega["nombre"]}
     
-    # Si no hay ninguna, devolver la primera activa
+    # Si no hay ninguna, devolver la primera activa (o sin el campo 'activo')
     bodega = await db.bodegas_inventario.find_one({
         "origen": "clinica",
-        "activo": True
+        "activo": {"$ne": False}
     })
     
     if bodega:
