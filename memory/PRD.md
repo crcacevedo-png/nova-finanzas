@@ -6,7 +6,12 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 8)
 
-### Fix (2026-06 Sesión 8) — Acceso de rol "usuario" a Caja y Punto de Venta
+### Fix (2026-06 Sesión 8) — Búsqueda de pacientes por nombre (multi-palabra)
+- **Problema**: buscar "Juan Pérez" no encontraba al paciente porque el texto completo se buscaba dentro de un solo campo (nombre o apellido).
+- **Solución** (`routes/patients.py`, helper `build_patient_search_conditions`): el texto se separa en palabras; cada palabra debe aparecer en el nombre O el apellido (en cualquier orden), sin distinguir mayúsculas/acentos (reutiliza `generate_accent_regex`). Se combinan con AND (todas las palabras). Se mantiene la coincidencia por expediente, DPI y teléfono con el texto completo (`re.escape`). Aplicado en AMBOS buscadores: listado `GET /api/patients?search=` y autocompletado `GET /api/pacientes/buscar?q=`. El autocompletado subió su tope por defecto de 10 → 50.
+- **Verificado (curl)**: 'juan perez' y 'perez juan' devuelven lo mismo (orden independiente); cruza campos ('garcia carlos' → "Juan Carlos López García"); 'PEREZ' insensible a acento/mayúsculas; búsqueda por teléfono y expediente OK. Datos de prueba purgados.
+
+
 - **Bug 1 (Caja → Pacientes)**: la ruta `/caja` en `App.js` exigía el permiso equivocado `view_payment_authorizations` (que es de "Autorizaciones de Pago"); al no tenerlo, `ProtectedRoute` redirigía a `/pacientes`. Corregido a `requiredPermission="manage_caja"` (consistente con el backend de Caja).
 - **Bug 2 ("configure bodegas" con 3 bodegas)**: `obtener_bodega_pos` en `routes/ventas.py` filtraba `activo: True` de forma estricta e ignoraba bodegas creadas sin el campo `activo` (por seed/import). Ahora usa `activo: {$ne: False}` y trata el campo ausente como activo. Además el POS respondía 403 (sin `manage_sales`) que el frontend mostraba como "Sin Bodega Configurada".
 - **Decisión del usuario (opción a)**: se concedió al rol `usuario` los permisos `manage_sales`, `manage_caja` y `view_inventory` (para leer categorías del POS). IMPORTANTE: existen DOS matrices de permisos que deben mantenerse sincronizadas: `server.py` `_MODULE_PERMS` y `config/permissions.py` `_MODULE_PERMS` (el router de Caja usa `routes/auth.py`→`config.permissions`; ventas/`/auth/me` usan `server.py`). Se actualizaron ambas.

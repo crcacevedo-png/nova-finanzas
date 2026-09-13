@@ -242,13 +242,37 @@ def generate_accent_regex(text: str) -> str:
     return regex_pattern
 
 
+def build_patient_search_conditions(search: str) -> list:
+    """Construye condiciones de búsqueda de pacientes.
+    - Cada palabra del texto debe aparecer en el nombre O en el apellido (en cualquier orden),
+      sin distinguir mayúsculas/minúsculas ni acentos.
+    - Además permite coincidencia por número de expediente, DPI o teléfono con el texto completo.
+    Devuelve una lista para usar en query["$or"] (coincide si cumple cualquiera de las alternativas)."""
+    import re
+    conditions = []
+    tokens = [t for t in search.split() if t.strip()]
+    if tokens:
+        token_and = []
+        for tok in tokens:
+            rgx = {"$regex": generate_accent_regex(tok), "$options": "i"}
+            token_and.append({"$or": [{"first_name": rgx}, {"last_name": rgx}]})
+        conditions.append({"$and": token_and} if len(token_and) > 1 else token_and[0])
+    full = search.strip()
+    if full:
+        ident = {"$regex": re.escape(full), "$options": "i"}
+        conditions.append({"record_number": ident})
+        conditions.append({"dpi": ident})
+        conditions.append({"phone": ident})
+    return conditions
+
+
 # ==================== BÚSQUEDA RÁPIDA (para autocomplete) ====================
 
 @pacientes_router.get("/buscar")
 async def buscar_pacientes_rapido(
     search: str = Query("", min_length=0),
     q: str = Query("", min_length=0),
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(50, ge=1, le=50),
     current_user: dict = Depends(get_current_user)
 ):
     """Búsqueda rápida de pacientes para autocomplete"""
@@ -256,14 +280,9 @@ async def buscar_pacientes_rapido(
     search = search or q
     query = {"is_active": True}
     if search:
-        search_pattern = generate_accent_regex(search)
-        search_regex = {"$regex": search_pattern, "$options": "i"}
-        query["$or"] = [
-            {"first_name": search_regex},
-            {"last_name": search_regex},
-            {"record_number": {"$regex": search, "$options": "i"}},
-            {"dpi": {"$regex": search, "$options": "i"}}
-        ]
+        conditions = build_patient_search_conditions(search)
+        if conditions:
+            query["$or"] = conditions
     
     pacientes = await db.patients.find(
         query, 
@@ -304,15 +323,9 @@ async def get_patients(
     query = {"is_active": is_active}
     
     if search:
-        search_pattern = generate_accent_regex(search)
-        search_regex = {"$regex": search_pattern, "$options": "i"}
-        query["$or"] = [
-            {"first_name": search_regex},
-            {"last_name": search_regex},
-            {"dpi": {"$regex": search, "$options": "i"}},
-            {"phone": {"$regex": search, "$options": "i"}},
-            {"record_number": {"$regex": search, "$options": "i"}}
-        ]
+        conditions = build_patient_search_conditions(search)
+        if conditions:
+            query["$or"] = conditions
     
     if referral_institution:
         query["referral_institution"] = referral_institution
