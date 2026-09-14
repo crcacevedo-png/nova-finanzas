@@ -62,6 +62,14 @@ const TIPOS_CITA = [
 
 // Helper para formatear fecha
 const formatDate = (date) => {
+  // Las fechas tipo YYYY-MM-DD (sin hora) deben interpretarse como fecha local,
+  // NO como medianoche UTC (evita el desfase de -1 día al aplicar zona Guatemala).
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('es-GT', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
   return new Date(date).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala', 
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
