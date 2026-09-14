@@ -184,7 +184,7 @@ async def push_cita(cita: dict):
         gc = (doctor or {}).get("google_calendar") or {}
         if not gc.get("connected"):
             return
-        cal_id = await _ensure_calendar(doctor)
+        cal_id = gc.get("calendar_id") or "primary"
         service = await _get_service(doctor)
         body = _event_body(cita)
         ev_id = cita.get("google_event_id")
@@ -313,7 +313,7 @@ async def _apply_event(doctor, service, cal_id, ev, res):
 
 async def _sync_doctor(doctor):
     gc = doctor.get("google_calendar") or {}
-    cal_id = gc.get("calendar_id") or await _ensure_calendar(doctor)
+    cal_id = gc.get("calendar_id") or "primary"
     service = await _get_service(doctor)
     sync_token = gc.get("sync_token")
     res = {"import": 0, "update": 0, "cancel": 0}
@@ -323,7 +323,9 @@ async def _sync_doctor(doctor):
         if stoken:
             params["syncToken"] = stoken
         else:
-            params["timeMin"] = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+            # Desde hoy en adelante (inicio del día en hora de Guatemala)
+            hoy = datetime.now(TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+            params["timeMin"] = hoy.isoformat()
         if page_token:
             params["pageToken"] = page_token
         return service.events().list(**params).execute()
@@ -413,16 +415,11 @@ async def callback(code: str = "", state: str = "", error: str = ""):
         "connected": True,
         "email": userinfo.get("email", ""),
         "tokens": token,
-        "calendar_id": None,
+        "calendar_id": "primary",
+        "calendar_name": "Principal",
         "sync_token": None,
         "connected_at": datetime.now(timezone.utc).isoformat(),
     }}})
-
-    try:
-        doctor = await db.doctors.find_one({"id": doctor_id})
-        await _ensure_calendar(doctor)
-    except Exception as e:
-        print("ensure_calendar on connect error:", e)
 
     return RedirectResponse(f"{frontend}?gcal=connected")
 
@@ -440,9 +437,67 @@ async def status(current_user: dict = Depends(require_role(["superadmin"]))):
             "specialty": d.get("specialty", ""),
             "connected": bool(gc.get("connected")),
             "email": gc.get("email", ""),
+            "calendar_id": gc.get("calendar_id"),
+            "calendar_name": gc.get("calendar_name", ""),
             "last_sync": gc.get("last_sync"),
         })
     return {"data": out, "configured": bool(CLIENT_ID and CLIENT_SECRET)}
+
+
+@router.get("/google-calendar/calendars")
+async def list_calendars(doctor_id: str, current_user: dict = Depends(require_role(["superadmin"]))):
+    """Lista TODOS los calendarios accesibles por la cuenta del médico (propios y compartidos)."""
+    doctor = await db.doctors.find_one({"id": doctor_id})
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Médico no encontrado")
+    gc = doctor.get("google_calendar") or {}
+    if not gc.get("connected"):
+        raise HTTPException(status_code=400, detail="El médico no tiene una cuenta de Google conectada")
+    try:
+        service = await _get_service(doctor)
+        def _list():
+            items = []
+            page = None
+            while True:
+                resp = service.calendarList().list(pageToken=page, showHidden=False).execute()
+                items.extend(resp.get("items", []))
+                page = resp.get("nextPageToken")
+                if not page:
+                    break
+            return items
+        cals = await asyncio.to_thread(_list)
+    except Exception as e:
+        print("list_calendars error:", e)
+        raise HTTPException(status_code=502, detail="No se pudieron obtener los calendarios de Google")
+    data = [{
+        "id": c.get("id"),
+        "summary": c.get("summaryOverride") or c.get("summary", ""),
+        "primary": bool(c.get("primary")),
+        "access_role": c.get("accessRole", ""),
+    } for c in cals]
+    # Principal primero, luego alfabético
+    data.sort(key=lambda x: (0 if x["primary"] else 1, x["summary"].lower()))
+    return {"data": data, "selected": gc.get("calendar_id")}
+
+
+@router.post("/google-calendar/select-calendar")
+async def select_calendar(payload: dict, current_user: dict = Depends(require_role(["superadmin"]))):
+    """Elige el calendario de origen/destino para un médico. Reinicia la sincronización
+    (sync_token=None) para que la próxima lectura traiga todo desde hoy del nuevo calendario."""
+    doctor_id = payload.get("doctor_id")
+    calendar_id = payload.get("calendar_id")
+    calendar_name = payload.get("calendar_name", "")
+    if not doctor_id or not calendar_id:
+        raise HTTPException(status_code=400, detail="doctor_id y calendar_id requeridos")
+    doctor = await db.doctors.find_one({"id": doctor_id})
+    if not doctor or not (doctor.get("google_calendar") or {}).get("connected"):
+        raise HTTPException(status_code=400, detail="El médico no tiene una cuenta de Google conectada")
+    await db.doctors.update_one({"id": doctor_id}, {"$set": {
+        "google_calendar.calendar_id": calendar_id,
+        "google_calendar.calendar_name": calendar_name,
+        "google_calendar.sync_token": None,
+    }})
+    return {"message": "Calendario actualizado", "calendar_id": calendar_id}
 
 
 @router.post("/google-calendar/disconnect")

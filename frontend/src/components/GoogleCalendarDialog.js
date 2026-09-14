@@ -21,20 +21,53 @@ export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
   const [loading, setLoading] = useState(true);
   const [medicos, setMedicos] = useState([]);
   const [busy, setBusy] = useState(null);
+  const [cals, setCals] = useState({});
+  const [selBusy, setSelBusy] = useState(null);
+
+  const loadCalendars = useCallback(async (list) => {
+    const connected = (list || []).filter((m) => m.connected);
+    const entries = await Promise.all(
+      connected.map(async (m) => {
+        try {
+          const r = await googleCalendarApi.getCalendars(m.id);
+          return [m.id, r.data.data || []];
+        } catch {
+          return [m.id, []];
+        }
+      })
+    );
+    setCals(Object.fromEntries(entries));
+  }, []);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
       const res = await googleCalendarApi.getStatus();
-      setMedicos(res.data.data || []);
+      const data = res.data.data || [];
+      setMedicos(data);
+      loadCalendars(data);
     } catch (e) {
       toast.error('No se pudo cargar el estado de Google Calendar');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCalendars]);
 
   useEffect(() => { if (open) fetchStatus(); }, [open, fetchStatus]);
+
+  const elegirCalendario = async (medico, calId) => {
+    const cal = (cals[medico.id] || []).find((c) => c.id === calId);
+    setSelBusy(medico.id);
+    try {
+      await googleCalendarApi.selectCalendar(medico.id, calId, cal ? cal.summary : '');
+      toast.success(`Calendario actualizado para ${medico.name}. La próxima sincronización traerá todo desde hoy.`);
+      setMedicos((prev) => prev.map((x) => (x.id === medico.id ? { ...x, calendar_id: calId, calendar_name: cal ? cal.summary : '' } : x)));
+    } catch (e) {
+      toast.error('No se pudo actualizar el calendario');
+    } finally {
+      setSelBusy(null);
+    }
+  };
 
   const conectar = async (medico) => {
     setBusy(medico.id);
@@ -73,8 +106,8 @@ export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
             Google Calendar por médico
           </DialogTitle>
           <DialogDescription>
-            Conecta la cuenta de Google de cada médico. Las citas se sincronizan en ambos
-            sentidos con un calendario dedicado ("NovaVision - Citas").
+            Conecta la cuenta de Google de cada médico y elige el calendario a sincronizar
+            (propio o compartido, incluido el principal). Las citas se sincronizan en ambos sentidos.
           </DialogDescription>
         </DialogHeader>
 
@@ -87,48 +120,76 @@ export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
             medicos.map((m) => (
               <div
                 key={m.id}
-                className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white"
+                className="p-3 rounded-lg border border-slate-200 bg-white"
                 data-testid={`gcal-medico-${m.id}`}
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{m.name}</p>
-                  <p className="text-xs text-slate-500 truncate">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{m.name}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {m.connected ? (
+                        <>
+                          <Check className="w-3 h-3 inline mr-1 text-green-600" />
+                          {m.email || 'Conectado'} · última sync: {fmtFecha(m.last_sync)}
+                        </>
+                      ) : (
+                        'Sin conectar'
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     {m.connected ? (
                       <>
-                        <Check className="w-3 h-3 inline mr-1 text-green-600" />
-                        {m.email || 'Conectado'} · última sync: {fmtFecha(m.last_sync)}
+                        <Badge className="bg-green-100 text-green-700">Conectado</Badge>
+                        <Button
+                          variant="outline" size="sm"
+                          disabled={busy === m.id}
+                          onClick={() => desconectar(m)}
+                          data-testid={`gcal-disconnect-${m.id}`}
+                        >
+                          <Unlink className="w-4 h-4 mr-1" />Desconectar
+                        </Button>
                       </>
                     ) : (
-                      'Sin conectar'
-                    )}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {m.connected ? (
-                    <>
-                      <Badge className="bg-green-100 text-green-700">Conectado</Badge>
                       <Button
-                        variant="outline" size="sm"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
                         disabled={busy === m.id}
-                        onClick={() => desconectar(m)}
-                        data-testid={`gcal-disconnect-${m.id}`}
+                        onClick={() => conectar(m)}
+                        data-testid={`gcal-connect-${m.id}`}
                       >
-                        <Unlink className="w-4 h-4 mr-1" />Desconectar
+                        {busy === m.id ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
+                        Conectar
                       </Button>
-                    </>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700"
-                      disabled={busy === m.id}
-                      onClick={() => conectar(m)}
-                      data-testid={`gcal-connect-${m.id}`}
-                    >
-                      {busy === m.id ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
-                      Conectar
-                    </Button>
-                  )}
+                    )}
+                  </div>
                 </div>
+
+                {m.connected && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="text-xs text-slate-500 shrink-0">Calendario:</label>
+                    <select
+                      className="flex-1 text-sm border border-slate-300 rounded-md px-2 py-1.5 bg-white disabled:opacity-60"
+                      value={m.calendar_id || 'primary'}
+                      disabled={selBusy === m.id}
+                      onChange={(e) => elegirCalendario(m, e.target.value)}
+                      data-testid={`gcal-calendar-select-${m.id}`}
+                    >
+                      {(cals[m.id] && cals[m.id].length > 0) ? (
+                        cals[m.id].map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.summary}{c.primary ? ' (Principal)' : ''}
+                          </option>
+                        ))
+                      ) : (
+                        <option value={m.calendar_id || 'primary'}>
+                          {m.calendar_name || 'Principal'}
+                        </option>
+                      )}
+                    </select>
+                    {selBusy === m.id && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
+                  </div>
+                )}
               </div>
             ))
           )}

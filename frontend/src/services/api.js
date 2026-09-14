@@ -199,6 +199,9 @@ export const igssNogApi = {
 // Google Calendar API (sincronización de Agenda por médico)
 export const googleCalendarApi = {
   getStatus: () => axios.get(`${API_URL}/google-calendar/status`),
+  getCalendars: (doctorId) => axios.get(`${API_URL}/google-calendar/calendars`, { params: { doctor_id: doctorId } }),
+  selectCalendar: (doctorId, calendarId, calendarName) =>
+    axios.post(`${API_URL}/google-calendar/select-calendar`, { doctor_id: doctorId, calendar_id: calendarId, calendar_name: calendarName }),
   getConnectUrl: (doctorId) => axios.get(`${API_URL}/oauth/calendar/connect`, { params: { doctor_id: doctorId } }),
   disconnect: (doctorId) => axios.post(`${API_URL}/google-calendar/disconnect`, { doctor_id: doctorId }),
   sync: () => axios.post(`${API_URL}/google-calendar/sync`),
