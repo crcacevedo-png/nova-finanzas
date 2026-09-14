@@ -40,6 +40,9 @@ export const agendaApi = {
   cambiarEstado: (id, estado) => 
     axios.patch(`${API_URL}/api/agenda/citas/${id}/estado`, { estado }, getAuthHeaders()),
   
+  revertirLlegada: (id) => 
+    axios.patch(`${API_URL}/api/agenda/citas/${id}/revertir-llegada`, {}, getAuthHeaders()),
+  
   asignarCita: (id, medicoId, medicoNombre) => 
     axios.patch(`${API_URL}/api/agenda/citas/${id}/asignar`, {
       asignado_a_medico_id: medicoId,
@@ -61,7 +64,7 @@ export const agendaApi = {
   },
   
   // Mi día (médico)
-  getMiDia: () => axios.get(`${API_URL}/api/agenda/mi-dia`, getAuthHeaders()),
+  getMiDia: (fecha) => axios.get(`${API_URL}/api/agenda/mi-dia${fecha ? `?fecha=${fecha}` : ''}`, getAuthHeaders()),
   
   // Walk-in
   createWalkIn: (data) => axios.post(`${API_URL}/api/agenda/walk-in`, data, getAuthHeaders()),

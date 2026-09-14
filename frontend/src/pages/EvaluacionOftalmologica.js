@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -234,6 +235,8 @@ const EvaluacionOftalmologica = () => {
   const [evaluaciones, setEvaluaciones] = useState([]);
   // Ref con el id del paciente actual (para acotar el Historial a ese paciente)
   const pacienteIdRef = useRef(null);
+  const preseleccionDoneRef = useRef(false);
+  const [searchParams] = useSearchParams();
   const [evaluacionActual, setEvaluacionActual] = useState(null);
   const [pacientes, setPacientes] = useState([]);
   const [medicos, setMedicos] = useState([]);
@@ -1088,6 +1091,41 @@ const EvaluacionOftalmologica = () => {
       // No mostrar error, simplemente continuar sin historial
     }
   };
+
+  // Preseleccionar paciente cuando se llega desde el listado de Pacientes (?paciente_id=)
+  useEffect(() => {
+    const pid = searchParams.get('paciente_id');
+    if (!pid || preseleccionDoneRef.current || loading) return;
+    preseleccionDoneRef.current = true;
+    (async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const { data: p } = await axios.get(`${API_URL}/patients/${pid}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // Calcular edad a partir de la fecha de nacimiento
+        let edad = 0;
+        if (p.birth_date) {
+          const nac = new Date(p.birth_date);
+          const hoy = new Date();
+          edad = hoy.getFullYear() - nac.getFullYear();
+          const m = hoy.getMonth() - nac.getMonth();
+          if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+        }
+        await seleccionarPaciente({
+          id: p.id,
+          nombre_completo: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+          edad: edad > 0 ? edad : 0,
+          gender: p.gender || '',
+          record_number: p.record_number || ''
+        });
+        toast.success('Paciente cargado para nueva evaluación');
+      } catch (error) {
+        console.error('Error preseleccionando paciente:', error);
+        toast.error('No se pudo cargar el paciente seleccionado');
+      }
+    })();
+  }, [searchParams, loading]);
 
   // Actualizar campo anidado
   const updateNestedField = (path, value) => {

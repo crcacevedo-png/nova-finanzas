@@ -8,7 +8,7 @@ import { useAgendaWebSocket } from '../hooks/useWebSocket';
 import { 
   Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
-  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays, Wifi, WifiOff
+  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -151,7 +151,7 @@ const CitaCard = ({ cita, onEstadoChange, onAsignar, onEdit, onVerPaciente, comp
 };
 
 // Componente de paciente presente
-const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvaluacion, medicos }) => {
+const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvaluacion, onCancelarLlegada, medicos }) => {
   const tiempoEspera = paciente.tiempo_espera_minutos;
   const colorEspera = tiempoEspera > 60 ? 'text-red-600' : tiempoEspera > 30 ? 'text-amber-600' : 'text-green-600';
   
@@ -199,6 +199,9 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
                   <Eye className="w-4 h-4 mr-2" /> Ver evaluación
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onCancelarLlegada(paciente.cita_id)} data-testid={`cancelar-llegada-${paciente.cita_id}`}>
+                  <RotateCcw className="w-4 h-4 mr-2" /> Cancelar llegada
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onEstadoChange(paciente.cita_id, 'No asistió')}>
                   <XCircle className="w-4 h-4 mr-2" /> No asistió
                 </DropdownMenuItem>
@@ -357,12 +360,12 @@ const Agenda = () => {
   
   const fetchMiAgenda = useCallback(async () => {
     try {
-      const response = await agendaApi.getMiDia();
+      const response = await agendaApi.getMiDia(fechaSeleccionada);
       setMiAgenda(response.data);
     } catch (error) {
       console.error('Error fetching mi agenda:', error);
     }
-  }, []);
+  }, [fechaSeleccionada]);
   
   const fetchConfig = useCallback(async () => {
     try {
@@ -497,6 +500,19 @@ const Agenda = () => {
       if (activeTab === 'mi-agenda') fetchMiAgenda();
     } catch (error) {
       toast.error('Error al cambiar estado');
+    }
+  };
+  
+  const handleCancelarLlegada = async (citaId) => {
+    try {
+      await agendaApi.revertirLlegada(citaId);
+      toast.success('Llegada cancelada, la cita volvió a su estado original');
+      fetchCitas();
+      fetchContadores();
+      fetchPresentes();
+      if (activeTab === 'mi-agenda') fetchMiAgenda();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al cancelar la llegada');
     }
   };
   
@@ -1253,6 +1269,7 @@ const Agenda = () => {
                             paciente={{...paciente, medico_color: grupo.medico_color}}
                             onEstadoChange={handleCambiarEstado}
                             onVerEvaluacion={handleVerEvaluacion}
+                            onCancelarLlegada={handleCancelarLlegada}
                             medicos={medicos}
                           />
                         ))}
@@ -1314,6 +1331,7 @@ const Agenda = () => {
                             paciente={paciente}
                             onEstadoChange={handleCambiarEstado}
                             onVerEvaluacion={handleVerEvaluacion}
+                            onCancelarLlegada={handleCancelarLlegada}
                             medicos={medicos}
                           />
                         ))

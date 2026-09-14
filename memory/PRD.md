@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 9)
+**Última actualización**: 2026-06 (Sesión 10)
+
+### Mejoras (2026-06 Sesión 10) — Cancelar llegada, fecha de Mi Agenda, crear evaluación desde Pacientes
+- ✅ **1. Cancelar llegada (revertir "Presente" por error)**: en el panel "Pacientes Presentes en Clínica" (Tablero del Día y Mi Agenda) el menú de la tarjeta ahora tiene **"Cancelar llegada"** (`cancelar-llegada-{cita_id}`). Backend: al marcar `Presente` se guarda `estado_previo` (Agendada/Confirmada); nuevo endpoint `PATCH /api/agenda/citas/{id}/revertir-llegada` devuelve la cita a su estado original y limpia `hora_llegada`/`hora_inicio_consulta`/`asistio` (solo si está Presente/En consulta, si no 400). `agendaApi.revertirLlegada` + `handleCancelarLlegada` en Agenda.js. Verificado por curl (Presente→revertir→Agendada, 2º intento 400) y screenshot.
+- ✅ **2. Fecha de "Mi Agenda" correlacionada**: `GET /api/agenda/mi-dia` ahora acepta `?fecha=YYYY-MM-DD` y por defecto usa **hoy en hora Guatemala (UTC-6)** (antes usaba UTC y siempre "hoy", ignorando la fecha de trabajo). `agendaApi.getMiDia(fecha)` y `fetchMiAgenda` pasan `fechaSeleccionada`. Verificado por curl (`?fecha=2026-09-14`→total 1, `?fecha=2025-01-01`→0).
+- ✅ **3. Crear evaluación desde el listado de Pacientes**: nuevo botón **"Crear evaluación"** (ícono estetoscopio, `crear-evaluacion-patient-{id}`) entre "Ver detalle" y "Ver evaluaciones previas"; navega a `/evaluacion-oftalmologica?paciente_id={id}`. `EvaluacionOftalmologica.js` lee el query param con `useSearchParams`, hace `GET /api/patients/{id}`, calcula la edad y preselecciona al paciente (toast "Paciente cargado para nueva evaluación"). Verificado por screenshot (20 botones, navegación + paciente precargado).
+- **NOTA**: cambios de preview; requieren REDESPLIEGUE para aplicar en producción. ESLint limpio.
+
 
 ### Mejoras (2026-06 Sesión 9) — Vincular citas de Google a pacientes + fix búsqueda multi-palabra
 - ✅ **Cerrado el ítem en curso: vincular cita importada de Google (sin ficha) a un paciente**. En el diálogo "Editar Cita" de `Agenda.js`, si la cita no tiene `paciente_id` y proviene de Google, se muestra el banner `cita-google-ref` ("Cita de Google sin ficha. Texto original: ...") y el buscador de pacientes; al seleccionar un paciente se guarda `paciente_id` vía `PUT /agenda/citas/{id}` (preserva `google_event_id`). NOTA UX: en vista Día la cita se edita desde el menú "⋮" → "Editar cita" (el cuerpo de la tarjeta tiene `stopPropagation`).

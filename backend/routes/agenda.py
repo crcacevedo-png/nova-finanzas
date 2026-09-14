@@ -293,6 +293,9 @@ async def cambiar_estado_cita(
     # Acciones específicas según el nuevo estado
     if estado_data.estado == EstadoCita.PRESENTE:
         update_data["hora_llegada"] = now.isoformat()
+        # Guardar el estado anterior para poder revertir la llegada si fue por error
+        if cita.get("estado") in [EstadoCita.AGENDADA, EstadoCita.CONFIRMADA]:
+            update_data["estado_previo"] = cita["estado"]
     elif estado_data.estado == EstadoCita.EN_CONSULTA:
         update_data["hora_inicio_consulta"] = now.isoformat()
     elif estado_data.estado == EstadoCita.ATENDIDA:
@@ -319,6 +322,53 @@ async def cambiar_estado_cita(
     await notify_agenda_update("cita_estado_cambiado", {
         "cita": cita_actualizada,
         "nuevo_estado": estado_data.estado,
+        "fecha": cita_actualizada.get("fecha"),
+        "medico_id": cita_actualizada.get("medico_id")
+    })
+    
+    return CitaResponse(**cita_actualizada)
+
+
+@router.patch("/citas/{cita_id}/revertir-llegada", response_model=CitaResponse)
+async def revertir_llegada_cita(
+    cita_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cancelar la marca de llegada (paciente marcado Presente/En consulta por error).
+    Devuelve la cita a su estado original (Agendada/Confirmada) y limpia los tiempos de llegada."""
+    cita = await db.citas.find_one({"id": cita_id, "tipo_agenda": "pacientes"})
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    if cita["estado"] not in [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA]:
+        raise HTTPException(status_code=400, detail="Solo se puede cancelar la llegada de pacientes presentes o en consulta")
+    
+    estado_original = cita.get("estado_previo") or EstadoCita.AGENDADA
+    update_data = {
+        "estado": estado_original,
+        "hora_llegada": None,
+        "hora_inicio_consulta": None,
+        "asistio": None,
+        "estado_previo": None,
+        "actualizado_por": current_user["id"],
+        "fecha_actualizacion": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.citas.update_one({"id": cita_id}, {"$set": update_data})
+    
+    cita_actualizada = await db.citas.find_one({"id": cita_id}, {"_id": 0})
+    
+    # Reflejar en Google Calendar
+    try:
+        from routes.google_calendar import push_cita
+        await push_cita(cita_actualizada)
+    except Exception:
+        pass
+    
+    # Notificar a clientes WebSocket
+    await notify_agenda_update("cita_estado_cambiado", {
+        "cita": cita_actualizada,
+        "nuevo_estado": estado_original,
         "fecha": cita_actualizada.get("fecha"),
         "medico_id": cita_actualizada.get("medico_id")
     })
@@ -498,16 +548,20 @@ async def obtener_contadores(
 
 @router.get("/mi-dia", response_model=MiAgendaResponse)
 async def mi_agenda_del_dia(
+    fecha: Optional[str] = Query(None, description="Fecha YYYY-MM-DD; por defecto hoy (hora Guatemala)"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Agenda del día para el médico autenticado"""
+    """Agenda del día para el médico autenticado.
+    Respeta la fecha que se está trabajando (param `fecha`); si no se envía usa hoy en hora Guatemala (UTC-6)."""
     # Buscar si el usuario está vinculado a un médico
     medico = await get_medico_vinculado(current_user["id"])
     
     if not medico and current_user["role"] not in ["superadmin", "admin"]:
         raise HTTPException(status_code=403, detail="Usuario no vinculado a un médico")
     
-    fecha = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Fecha de trabajo: la enviada por el frontend o el día actual en hora Guatemala
+    if not fecha:
+        fecha = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime("%Y-%m-%d")
     medico_id = medico["id"] if medico else None
     medico_nombre = medico["name"] if medico else current_user["name"]
     

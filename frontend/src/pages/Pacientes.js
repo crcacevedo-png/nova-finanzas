@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -16,6 +17,7 @@ import {
   UserCheck,
   UserX,
   ClipboardList,
+  Stethoscope,
   ChevronLeft,
   ChevronRight,
   X
@@ -64,6 +66,7 @@ import {
 
 const Pacientes = () => {
   const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [igssUnits, setIgssUnits] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -715,6 +718,16 @@ const Pacientes = () => {
                               data-testid={`view-patient-${patient.id}`}
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/evaluacion-oftalmologica?paciente_id=${patient.id}`)}
+                              className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                              title="Crear evaluación"
+                              data-testid={`crear-evaluacion-patient-${patient.id}`}
+                            >
+                              <Stethoscope className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
