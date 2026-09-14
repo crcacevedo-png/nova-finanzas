@@ -220,6 +220,7 @@ const Agenda = () => {
   const [syncing, setSyncing] = useState(false);
   const [vistaCalendario, setVistaCalendario] = useState('dia');
   const [dragCita, setDragCita] = useState(null);
+  const [dragOverSlot, setDragOverSlot] = useState(null);
   const [citasRango, setCitasRango] = useState([]);
   const isSuperAdmin = user?.role === 'superadmin';
 
@@ -941,10 +942,12 @@ const Agenda = () => {
                           return (
                             <div
                               key={slot}
-                              className="group border-b border-dashed border-gray-200 min-h-[40px] py-1 rounded hover:bg-blue-50/60 transition-colors cursor-pointer"
+                              className={`group border-b border-dashed border-gray-200 min-h-[40px] py-1 rounded transition-colors cursor-pointer ${dragOverSlot === `${medicoId}-${slot}` ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-blue-50/60'}`}
                               onClick={() => citasSlot.length === 0 && handleSlotClick(medicoId, slot)}
                               onDragOver={(e) => { e.preventDefault(); }}
-                              onDrop={(e) => { e.preventDefault(); handleMoverCita(medicoId, slot, fechaSeleccionada); }}
+                              onDragEnter={() => dragCita && setDragOverSlot(`${medicoId}-${slot}`)}
+                              onDragLeave={() => setDragOverSlot((p) => (p === `${medicoId}-${slot}` ? null : p))}
+                              onDrop={(e) => { e.preventDefault(); setDragOverSlot(null); handleMoverCita(medicoId, slot, fechaSeleccionada); }}
                               data-testid={`slot-${medicoId}-${slot}`}
                             >
                               <div className="flex items-center justify-between">
@@ -979,6 +982,70 @@ const Agenda = () => {
                 </div>
               </div>
             ) : vistaCalendario === 'semana' ? (
+              medicoFiltro !== 'todos' ? (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[900px]">
+                    <div className="grid sticky top-0 z-10 bg-white" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+                      <div className="text-[10px] text-slate-400 py-2 text-center border-b">
+                        {medicos.find(m => m.id === medicoFiltro)?.name?.split(' ')[0] || ''}
+                      </div>
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        const dia = addDays(startOfWeek(fechaSeleccionada), i);
+                        const diaISO = toISODate(dia);
+                        const esHoy = diaISO === toISODate(new Date());
+                        return (
+                          <button
+                            key={diaISO}
+                            onClick={() => { setFechaSeleccionada(diaISO); setVistaCalendario('dia'); }}
+                            className={`py-1.5 text-center border-b border-l ${esHoy ? 'bg-blue-50' : 'bg-slate-50'} hover:bg-blue-100`}
+                            data-testid={`semanamed-dia-${diaISO}`}
+                          >
+                            <div className="text-[11px] font-semibold text-slate-600">{DIAS_SEMANA[i]}</div>
+                            <div className="text-sm font-bold text-slate-800">{dia.getDate()}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {generarSlots().map(slot => (
+                      <div key={slot} className="grid" style={{ gridTemplateColumns: '64px repeat(7, 1fr)' }}>
+                        <div className="text-[10px] text-slate-400 py-1 pr-1 text-right border-b border-dashed border-gray-100">{formatTime(slot)}</div>
+                        {Array.from({ length: 7 }).map((_, i) => {
+                          const diaISO = toISODate(addDays(startOfWeek(fechaSeleccionada), i));
+                          const key = `${diaISO}-${slot}`;
+                          const cs = citasRango.filter(c => c.medico_id === medicoFiltro && c.fecha === diaISO && c.hora_inicio === slot);
+                          return (
+                            <div
+                              key={key}
+                              className={`min-h-[34px] border-b border-l border-dashed border-gray-100 p-0.5 cursor-pointer transition-colors ${dragOverSlot === key ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-blue-50/60'}`}
+                              onClick={() => cs.length === 0 && handleOpenCitaDialog(null, { medicoId: medicoFiltro, hora: slot, fecha: diaISO })}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDragEnter={() => dragCita && setDragOverSlot(key)}
+                              onDragLeave={() => setDragOverSlot((p) => (p === key ? null : p))}
+                              onDrop={(e) => { e.preventDefault(); setDragOverSlot(null); handleMoverCita(medicoFiltro, slot, diaISO); }}
+                              data-testid={`semanamed-slot-${key}`}
+                            >
+                              {cs.map(cita => (
+                                <div
+                                  key={cita.id}
+                                  draggable
+                                  onDragStart={() => setDragCita(cita)}
+                                  onDragEnd={() => setDragCita(null)}
+                                  onClick={(e) => { e.stopPropagation(); handleOpenCitaDialog(cita); }}
+                                  className="text-[10px] rounded px-1 py-0.5 mb-0.5 text-white truncate"
+                                  style={{ backgroundColor: medicos.find(m => m.id === cita.medico_id)?.color || '#3b82f6' }}
+                                  title={`${cita.paciente_nombre} - ${cita.estado}`}
+                                >
+                                  {cita.paciente_nombre}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <div className="overflow-x-auto">
                 <div className="grid grid-cols-7 gap-2 min-w-[900px]">
                   {Array.from({ length: 7 }).map((_, i) => {
@@ -1018,6 +1085,7 @@ const Agenda = () => {
                   })}
                 </div>
               </div>
+              )
             ) : (
               (() => {
                 const d = parseISO(fechaSeleccionada);

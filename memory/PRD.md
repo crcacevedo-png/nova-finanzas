@@ -6,7 +6,13 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 8)
 
-### Feature (2026-06 Sesión 8) — Agenda: click-para-agendar, drag&drop y vistas Día/Semana/Mes
+### Mejoras (2026-06 Sesión 8) — Agenda: resaltado al arrastrar, Semana por médico, sync automática GCal
+- **Resaltado de slot destino** al arrastrar: estado `dragOverSlot`; los slots (Día y Semana-por-médico) se resaltan (`bg-blue-100 ring-2 ring-blue-400`) con `onDragEnter/onDragLeave`.
+- **Vista Semana por médico**: en la vista "Semana", si el filtro de médico ≠ "todos", se muestra una **grilla por hora** (columna de horas × 7 días) del médico seleccionado, con click-para-agendar y drag&drop entre días/horas (`data-testid semanamed-slot-{diaISO}-{HH:MM}`). Con "todos" se mantiene el resumen semanal.
+- **Sincronización automática Google Calendar**: job APScheduler `google_calendar_sync` cada 10 min en `server.py` (usa `run_sync_all()` refactorizado en `google_calendar.py`). Log al iniciar: "Google Calendar: cada 10min".
+- **Verificado**: screenshot de la grilla Semana-por-médico; log del scheduler; ESLint limpio.
+
+
 - **Click en slot**: en la vista Día, hacer clic en un horario vacío abre "Nueva Cita" prellenando médico + fecha + hora (`handleOpenCitaDialog(null, {medicoId, hora, fecha})`, `handleSlotClick`). Slots con `data-testid="slot-{medicoId}-{HH:MM}"` y pista "+ Agregar" al pasar el mouse.
 - **Drag & drop**: cada cita es `draggable`; al soltarla en otro slot/columna se llama `PUT /agenda/citas/{id}` con nuevo `medico_id`/`hora_inicio`/`fecha` (`handleMoverCita`, recalcula `hora_fin` en backend). DnD nativo HTML5 (sin librerías).
 - **Vistas Día/Semana/Mes**: selector (`data-testid vista-dia|semana|mes`). Día = columnas por médico con slots (existente). Semana = 7 columnas (Lun-Dom) con citas del día, clic en día → vista Día. Mes = grilla mensual con citas por celda (máx 3 + "+N más"), clic en día → vista Día. Semana/Mes usan `agendaApi.getCitasRango(desde,hasta)` (respuesta `{data,total}`).

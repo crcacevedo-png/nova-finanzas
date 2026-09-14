@@ -509,9 +509,9 @@ async def disconnect(payload: dict, current_user: dict = Depends(require_role(["
     return {"message": "Cuenta de Google desconectada"}
 
 
-@router.post("/google-calendar/sync")
-async def sync(current_user: dict = Depends(get_current_user)):
-    """Sincroniza (pull) los calendarios de todos los médicos conectados."""
+async def run_sync_all() -> dict:
+    """Sincroniza (pull) los calendarios de todos los médicos conectados. Reutilizable
+    por el endpoint y por el job en segundo plano."""
     if not (CLIENT_ID and CLIENT_SECRET):
         return {"configured": False, "medicos_sincronizados": 0, "importadas": 0, "actualizadas": 0, "canceladas": 0}
     doctors = await db.doctors.find({"google_calendar.connected": True}).to_list(200)
@@ -530,3 +530,9 @@ async def sync(current_user: dict = Depends(get_current_user)):
         "actualizadas": totals["update"],
         "canceladas": totals["cancel"],
     }
+
+
+@router.post("/google-calendar/sync")
+async def sync(current_user: dict = Depends(get_current_user)):
+    """Sincroniza (pull) los calendarios de todos los médicos conectados."""
+    return await run_sync_all()
