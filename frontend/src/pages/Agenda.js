@@ -1379,7 +1379,7 @@ const Agenda = () => {
             {/* Búsqueda de paciente */}
             <div className="space-y-2">
               <Label>Paciente *</Label>
-              {citaForm.paciente_nombre && !citaForm.es_paciente_nuevo ? (
+              {citaForm.paciente_id && !citaForm.es_paciente_nuevo ? (
                 <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200">
                   <User className="w-4 h-4 text-blue-600" />
                   <span className="flex-1">{citaForm.paciente_nombre}</span>
@@ -1479,6 +1479,11 @@ const Agenda = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {editingCita && !citaForm.paciente_id && editingCita.paciente_nombre && (
+                    <div className="p-2 rounded border border-amber-200 bg-amber-50 text-xs text-amber-800" data-testid="cita-google-ref">
+                      <span className="font-semibold">Cita de Google sin ficha.</span> Texto original: "{editingCita.paciente_nombre}". Busca el paciente por su nombre para vincularlo, o créalo si no existe.
+                    </div>
+                  )}
                   <div className="relative">
                     <Input
                       placeholder="Buscar paciente por nombre o expediente..."

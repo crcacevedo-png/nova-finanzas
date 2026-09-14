@@ -372,20 +372,12 @@ async def search_patients(
     limit: int = Query(10, ge=1, le=50),
     current_user: dict = Depends(require_permission("view_patients"))
 ):
-    """Búsqueda de pacientes para autocompletado en otros módulos"""
-    search_pattern = generate_accent_regex(q)
-    search_regex = {"$regex": search_pattern, "$options": "i"}
-    
-    query = {
-        "is_active": True,
-        "$or": [
-            {"first_name": search_regex},
-            {"last_name": search_regex},
-            {"dpi": {"$regex": q, "$options": "i"}},
-            {"phone": {"$regex": q, "$options": "i"}},
-            {"record_number": {"$regex": q, "$options": "i"}}
-        ]
-    }
+    """Búsqueda de pacientes para autocompletado en otros módulos.
+    Usa búsqueda multi-palabra en cualquier orden (nombre/apellido) + expediente/DPI/teléfono."""
+    conditions = build_patient_search_conditions(q)
+    query = {"is_active": True}
+    if conditions:
+        query["$or"] = conditions
     
     patients = await db.patients.find(query, {"_id": 0}).limit(limit).to_list(limit)
     

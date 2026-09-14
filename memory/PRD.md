@@ -4,7 +4,13 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 8)
+**Última actualización**: 2026-06 (Sesión 9)
+
+### Mejoras (2026-06 Sesión 9) — Vincular citas de Google a pacientes + fix búsqueda multi-palabra
+- ✅ **Cerrado el ítem en curso: vincular cita importada de Google (sin ficha) a un paciente**. En el diálogo "Editar Cita" de `Agenda.js`, si la cita no tiene `paciente_id` y proviene de Google, se muestra el banner `cita-google-ref` ("Cita de Google sin ficha. Texto original: ...") y el buscador de pacientes; al seleccionar un paciente se guarda `paciente_id` vía `PUT /agenda/citas/{id}` (preserva `google_event_id`). NOTA UX: en vista Día la cita se edita desde el menú "⋮" → "Editar cita" (el cuerpo de la tarjeta tiene `stopPropagation`).
+- 🐛 **CAUSA RAÍZ corregida (bug que bloqueaba el vínculo)**: el buscador del diálogo usa `GET /api/patients/search?q=` (`patientApi.search`), un TERCER endpoint que NO tenía la búsqueda multi-palabra (solo se había aplicado a `/api/patients?search=` y `/api/pacientes/buscar?q=`). Resultado: `maria` devolvía 5 pero `maria garcia` devolvía 0, imposibilitando encontrar al paciente por su nombre completo. Se aplicó `build_patient_search_conditions` en `search_patients` (`routes/patients.py`). Verificado por curl: `maria garcia`/`garcia maria`/`lopez maria garcia` devuelven resultados en cualquier orden.
+- **Verificado E2E**: curl (search multi-palabra + PUT vincular preserva google_event_id) y screenshots (diálogo con banner, búsqueda→3 opciones, selección, "Guardar cambios"→toast "Cita actualizada", tarjeta muestra el nombre del paciente). Dato de prueba purgado.
+
 
 ### Mejoras (2026-06 Sesión 8) — Agenda: resaltado al arrastrar, Semana por médico, sync automática GCal
 - **Resaltado de slot destino** al arrastrar: estado `dragOverSlot`; los slots (Día y Semana-por-médico) se resaltan (`bg-blue-100 ring-2 ring-blue-400`) con `onDragEnter/onDragLeave`.
