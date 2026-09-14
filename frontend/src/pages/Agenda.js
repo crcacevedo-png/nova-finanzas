@@ -218,7 +218,18 @@ const Agenda = () => {
   const [loading, setLoading] = useState(true);
   const [gcalOpen, setGcalOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [vistaCalendario, setVistaCalendario] = useState('dia');
+  const [dragCita, setDragCita] = useState(null);
+  const [citasRango, setCitasRango] = useState([]);
   const isSuperAdmin = user?.role === 'superadmin';
+
+  // Helpers de fechas (semana/mes)
+  const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const toISODate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const startOfWeek = (s) => { const d = parseISO(s); const off = (d.getDay() + 6) % 7; return addDays(d, -off); };
+  const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
   
   // WebSocket para actualizaciones en tiempo real
@@ -376,7 +387,31 @@ const Agenda = () => {
     setLoading(false);
   }, [fetchMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, activeTab]);
   
-  // Botón "Actualizar": sincroniza con Google Calendar y luego recarga la agenda
+  // Cargar citas del rango visible en vista semana/mes
+  useEffect(() => {
+    if (activeTab !== 'calendario' || vistaCalendario === 'dia') return;
+    const fetchRango = async () => {
+      let desde, hasta;
+      if (vistaCalendario === 'semana') {
+        const sw = startOfWeek(fechaSeleccionada);
+        desde = toISODate(sw); hasta = toISODate(addDays(sw, 6));
+      } else {
+        const d = parseISO(fechaSeleccionada);
+        desde = toISODate(new Date(d.getFullYear(), d.getMonth(), 1));
+        hasta = toISODate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+      }
+      try {
+        const r = await agendaApi.getCitasRango(desde, hasta);
+        const arr = Array.isArray(r.data) ? r.data : (r.data?.data || []);
+        setCitasRango(arr);
+      } catch (e) {
+        setCitasRango([]);
+      }
+    };
+    fetchRango();
+  }, [vistaCalendario, fechaSeleccionada, activeTab, citas]);
+
+  
   const handleActualizar = useCallback(async () => {
     setSyncing(true);
     try {
@@ -474,7 +509,7 @@ const Agenda = () => {
     }
   };
   
-  const handleOpenCitaDialog = (cita = null) => {
+  const handleOpenCitaDialog = (cita = null, prefill = null) => {
     if (cita) {
       setEditingCita(cita);
       setCitaForm({
@@ -492,14 +527,15 @@ const Agenda = () => {
         nuevo_paciente_edad: ''
       });
     } else {
+      const med = prefill?.medicoId ? medicos.find(m => m.id === prefill.medicoId) : medicos[0];
       setEditingCita(null);
       setCitaForm({
         paciente_id: '',
         paciente_nombre: '',
-        medico_id: medicos[0]?.id || '',
-        medico_nombre: medicos[0]?.name || '',
-        fecha: fechaSeleccionada,
-        hora_inicio: '08:00',
+        medico_id: med?.id || '',
+        medico_nombre: med?.name || '',
+        fecha: prefill?.fecha || fechaSeleccionada,
+        hora_inicio: prefill?.hora || '08:00',
         tipo_cita: 'Subsecuente',
         duracion_minutos: 15,
         notas: '',
@@ -511,6 +547,33 @@ const Agenda = () => {
     setPacienteSearch('');
     setPacienteResults([]);
     setCitaDialogOpen(true);
+  };
+
+  // Click en un slot vacío -> abrir "Nueva Cita" con médico/fecha/hora prellenados
+  const handleSlotClick = (medicoId, slot) => {
+    handleOpenCitaDialog(null, { medicoId, hora: slot, fecha: fechaSeleccionada });
+  };
+
+  // Drag & drop: mover una cita a otro horario/médico
+  const handleMoverCita = async (medicoId, slot, fecha) => {
+    const c = dragCita;
+    setDragCita(null);
+    if (!c) return;
+    const nuevaFecha = fecha || c.fecha;
+    if (c.medico_id === medicoId && c.hora_inicio === slot && c.fecha === nuevaFecha) return;
+    try {
+      const med = medicos.find(m => m.id === medicoId);
+      await agendaApi.updateCita(c.id, {
+        medico_id: medicoId,
+        medico_nombre: med?.name || c.medico_nombre,
+        hora_inicio: slot,
+        fecha: nuevaFecha,
+      });
+      toast.success('Cita movida correctamente');
+      fetchAll();
+    } catch (e) {
+      toast.error('No se pudo mover la cita');
+    }
   };
   
   const handleSaveCita = async () => {
@@ -796,6 +859,20 @@ const Agenda = () => {
                     {formatDate(fechaSeleccionada)}
                   </div>
                   
+                  {/* Selector de vista */}
+                  <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden ml-2">
+                    {[['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes']].map(([v, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => setVistaCalendario(v)}
+                        className={`px-3 py-1.5 text-sm transition-colors ${vistaCalendario === v ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                        data-testid={`vista-${v}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  
                   {/* Filtros */}
                   <div className="flex gap-2 ml-auto">
                     <Select value={medicoFiltro} onValueChange={setMedicoFiltro}>
@@ -841,7 +918,7 @@ const Agenda = () => {
                   </Card>
                 ))}
               </div>
-            ) : (
+            ) : vistaCalendario === 'dia' ? (
               <div className="overflow-x-auto">
                 <div className="flex gap-4 min-w-max pb-4">
                   {Object.entries(citasPorMedicoYSlot()).map(([medicoId, data]) => (
@@ -862,17 +939,36 @@ const Agenda = () => {
                         {generarSlots().map(slot => {
                           const citasSlot = data.slots[slot] || [];
                           return (
-                            <div key={slot} className="border-b border-dashed border-gray-200 min-h-[40px] py-1">
-                              <div className="text-xs text-gray-400 mb-1">{formatTime(slot)}</div>
+                            <div
+                              key={slot}
+                              className="group border-b border-dashed border-gray-200 min-h-[40px] py-1 rounded hover:bg-blue-50/60 transition-colors cursor-pointer"
+                              onClick={() => citasSlot.length === 0 && handleSlotClick(medicoId, slot)}
+                              onDragOver={(e) => { e.preventDefault(); }}
+                              onDrop={(e) => { e.preventDefault(); handleMoverCita(medicoId, slot, fechaSeleccionada); }}
+                              data-testid={`slot-${medicoId}-${slot}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-400 mb-1">{formatTime(slot)}</span>
+                                {citasSlot.length === 0 && (
+                                  <span className="text-[10px] text-blue-500 opacity-0 group-hover:opacity-100">+ Agregar</span>
+                                )}
+                              </div>
                               {citasSlot.map(cita => (
-                                <CitaCard
+                                <div
                                   key={cita.id}
-                                  cita={cita}
-                                  compact
-                                  onEstadoChange={handleCambiarEstado}
-                                  onEdit={handleOpenCitaDialog}
-                                  onVerPaciente={handleVerPaciente}
-                                />
+                                  draggable
+                                  onDragStart={() => setDragCita(cita)}
+                                  onDragEnd={() => setDragCita(null)}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <CitaCard
+                                    cita={cita}
+                                    compact
+                                    onEstadoChange={handleCambiarEstado}
+                                    onEdit={handleOpenCitaDialog}
+                                    onVerPaciente={handleVerPaciente}
+                                  />
+                                </div>
                               ))}
                             </div>
                           );
@@ -882,6 +978,95 @@ const Agenda = () => {
                   ))}
                 </div>
               </div>
+            ) : vistaCalendario === 'semana' ? (
+              <div className="overflow-x-auto">
+                <div className="grid grid-cols-7 gap-2 min-w-[900px]">
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    const dia = addDays(startOfWeek(fechaSeleccionada), i);
+                    const diaISO = toISODate(dia);
+                    const esHoy = diaISO === toISODate(new Date());
+                    const citasDia = citasRango
+                      .filter(c => c.fecha === diaISO)
+                      .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+                    return (
+                      <div key={diaISO} className={`rounded-lg border ${esHoy ? 'border-blue-400' : 'border-slate-200'} bg-white flex flex-col`}>
+                        <button
+                          onClick={() => { setFechaSeleccionada(diaISO); setVistaCalendario('dia'); }}
+                          className={`px-2 py-2 text-center border-b ${esHoy ? 'bg-blue-50' : 'bg-slate-50'} hover:bg-blue-100 transition-colors`}
+                          data-testid={`semana-dia-${diaISO}`}
+                        >
+                          <div className="text-xs font-semibold text-slate-600">{DIAS_SEMANA[i]}</div>
+                          <div className="text-lg font-bold text-slate-800">{dia.getDate()}</div>
+                          <div className="text-[10px] text-slate-400">{citasDia.length} cita(s)</div>
+                        </button>
+                        <div className="p-1.5 space-y-1 max-h-[520px] overflow-y-auto min-h-[120px]">
+                          {citasDia.map(cita => (
+                            <button
+                              key={cita.id}
+                              onClick={() => handleOpenCitaDialog(cita)}
+                              className="w-full text-left text-xs p-1.5 rounded border-l-2 hover:bg-slate-50"
+                              style={{ borderColor: medicos.find(m => m.id === cita.medico_id)?.color || '#3b82f6' }}
+                              data-testid={`semana-cita-${cita.id}`}
+                            >
+                              <div className="font-medium text-slate-700">{formatTime(cita.hora_inicio)}</div>
+                              <div className="text-slate-500 truncate">{cita.paciente_nombre}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              (() => {
+                const d = parseISO(fechaSeleccionada);
+                const primerDia = new Date(d.getFullYear(), d.getMonth(), 1);
+                const gridInicio = startOfWeek(toISODate(primerDia));
+                const celdas = Array.from({ length: 42 }).map((_, i) => addDays(gridInicio, i));
+                const hoyISO = toISODate(new Date());
+                return (
+                  <div>
+                    <div className="text-center text-sm font-semibold text-slate-700 mb-2 capitalize">
+                      {MESES[d.getMonth()]} {d.getFullYear()}
+                    </div>
+                    <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-lg overflow-hidden border border-slate-200">
+                      {DIAS_SEMANA.map(dn => (
+                        <div key={dn} className="bg-slate-50 text-center text-xs font-semibold text-slate-500 py-2">{dn}</div>
+                      ))}
+                      {celdas.map((cel) => {
+                        const celISO = toISODate(cel);
+                        const esOtroMes = cel.getMonth() !== d.getMonth();
+                        const esHoy = celISO === hoyISO;
+                        const citasCel = citasRango.filter(c => c.fecha === celISO);
+                        return (
+                          <button
+                            key={celISO}
+                            onClick={() => { setFechaSeleccionada(celISO); setVistaCalendario('dia'); }}
+                            className={`bg-white min-h-[90px] p-1.5 text-left align-top hover:bg-blue-50 transition-colors ${esOtroMes ? 'opacity-40' : ''} ${esHoy ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                            data-testid={`mes-dia-${celISO}`}
+                          >
+                            <div className="text-xs font-semibold text-slate-600">{cel.getDate()}</div>
+                            {citasCel.length > 0 && (
+                              <div className="mt-1 space-y-0.5">
+                                {citasCel.slice(0, 3).map(c => (
+                                  <div key={c.id} className="text-[10px] truncate rounded px-1 py-0.5 text-white"
+                                    style={{ backgroundColor: medicos.find(m => m.id === c.medico_id)?.color || '#3b82f6' }}>
+                                    {formatTime(c.hora_inicio)} {c.paciente_nombre}
+                                  </div>
+                                ))}
+                                {citasCel.length > 3 && (
+                                  <div className="text-[10px] text-slate-500">+{citasCel.length - 3} más</div>
+                                )}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()
             )}
           </TabsContent>
           

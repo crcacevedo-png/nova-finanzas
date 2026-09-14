@@ -6,7 +6,13 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 8)
 
-### Mejora (2026-06 Sesión 8) — Elegir calendario de Google por médico
+### Feature (2026-06 Sesión 8) — Agenda: click-para-agendar, drag&drop y vistas Día/Semana/Mes
+- **Click en slot**: en la vista Día, hacer clic en un horario vacío abre "Nueva Cita" prellenando médico + fecha + hora (`handleOpenCitaDialog(null, {medicoId, hora, fecha})`, `handleSlotClick`). Slots con `data-testid="slot-{medicoId}-{HH:MM}"` y pista "+ Agregar" al pasar el mouse.
+- **Drag & drop**: cada cita es `draggable`; al soltarla en otro slot/columna se llama `PUT /agenda/citas/{id}` con nuevo `medico_id`/`hora_inicio`/`fecha` (`handleMoverCita`, recalcula `hora_fin` en backend). DnD nativo HTML5 (sin librerías).
+- **Vistas Día/Semana/Mes**: selector (`data-testid vista-dia|semana|mes`). Día = columnas por médico con slots (existente). Semana = 7 columnas (Lun-Dom) con citas del día, clic en día → vista Día. Mes = grilla mensual con citas por celda (máx 3 + "+N más"), clic en día → vista Día. Semana/Mes usan `agendaApi.getCitasRango(desde,hasta)` (respuesta `{data,total}`).
+- **Verificado**: screenshots de las 3 vistas y del diálogo prellenado al hacer clic en el slot 08:00; ESLint limpio. Drag&drop verificado a nivel de wiring + endpoint `updateCita` (el gesto real de arrastre no se automatizó).
+
+
 - **Problema**: se forzaba un calendario nuevo y vacío "NovaVision - Citas", por lo que "Actualizar" no importaba nada (las citas reales estaban en el calendario principal/compartido del médico).
 - **Cambios** (`routes/google_calendar.py`): al conectar, `calendar_id` por defecto = `"primary"` (ya no se crea/forzar "NovaVision - Citas"). Nuevos endpoints: `GET /api/google-calendar/calendars?doctor_id=` (lista TODOS los calendarios accesibles: propios y compartidos, principal primero) y `POST /api/google-calendar/select-calendar` (fija el calendario elegido y **reinicia `sync_token=None`** para releer todo desde hoy). Push y pull usan `gc.calendar_id` (o "primary"). El pull lee **desde el inicio de hoy** (hora Guatemala).
 - **Frontend** (`GoogleCalendarDialog.js`): cada médico conectado muestra un **selector** con sus calendarios; al cambiarlo se llama `selectCalendar` (toast). `googleCalendarApi.getCalendars/selectCalendar` en `api.js`.
