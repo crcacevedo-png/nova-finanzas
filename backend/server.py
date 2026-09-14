@@ -2803,6 +2803,10 @@ api_router.include_router(pacientes_router, tags=["Pacientes - Búsqueda rápida
 from routes.igss_nogs import router as igss_nogs_router
 api_router.include_router(igss_nogs_router, tags=["Unidades IGSS - NOG"])
 
+# ==================== INTEGRACIÓN GOOGLE CALENDAR ====================
+from routes.google_calendar import router as google_calendar_router
+api_router.include_router(google_calendar_router, tags=["Google Calendar"])
+
 # ==================== MÓDULO DE EVALUACIONES (Refactorizado) ====================
 from routes.evaluaciones import router as evaluaciones_router, catalogos_router
 

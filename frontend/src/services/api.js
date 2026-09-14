@@ -196,6 +196,14 @@ export const igssNogApi = {
     axios.get(`${API_URL}/igss-units/${unitId}/nogs/export/excel`, { responseType: 'blob' }),
 };
 
+// Google Calendar API (sincronización de Agenda por médico)
+export const googleCalendarApi = {
+  getStatus: () => axios.get(`${API_URL}/google-calendar/status`),
+  getConnectUrl: (doctorId) => axios.get(`${API_URL}/oauth/calendar/connect`, { params: { doctor_id: doctorId } }),
+  disconnect: (doctorId) => axios.post(`${API_URL}/google-calendar/disconnect`, { doctor_id: doctorId }),
+  sync: () => axios.post(`${API_URL}/google-calendar/sync`),
+};
+
 // Menu Configuration API
 export const menuConfigApi = {
   getAvailableMenus: () => axios.get(`${API_URL}/menu-config/available-menus`),

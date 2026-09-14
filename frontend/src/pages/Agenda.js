@@ -42,7 +42,8 @@ import { Textarea } from '../components/ui/textarea';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { agendaApi } from '../services/agendaApi';
-import { patientApi } from '../services/api';
+import { patientApi, googleCalendarApi } from '../services/api';
+import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
 
 // Estados de cita con colores
 const ESTADOS_CITA = {
@@ -215,6 +216,9 @@ const Agenda = () => {
   const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState('calendario');
   const [loading, setLoading] = useState(true);
+  const [gcalOpen, setGcalOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const isSuperAdmin = user?.role === 'superadmin';
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
   
   // WebSocket para actualizaciones en tiempo real
@@ -371,6 +375,45 @@ const Agenda = () => {
     }
     setLoading(false);
   }, [fetchMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, activeTab]);
+  
+  // Botón "Actualizar": sincroniza con Google Calendar y luego recarga la agenda
+  const handleActualizar = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await googleCalendarApi.sync();
+      const d = res.data || {};
+      if (d.configured && d.medicos_sincronizados > 0) {
+        const partes = [];
+        if (d.importadas) partes.push(`${d.importadas} importada(s)`);
+        if (d.actualizadas) partes.push(`${d.actualizadas} actualizada(s)`);
+        if (d.canceladas) partes.push(`${d.canceladas} cancelada(s)`);
+        toast.success(
+          partes.length
+            ? `Google Calendar sincronizado: ${partes.join(', ')}.`
+            : 'Google Calendar sincronizado (sin cambios).'
+        );
+      }
+    } catch (e) {
+      // La sincronización con Google es opcional; no bloquear la recarga local
+      console.error('Error sincronizando Google Calendar:', e);
+    } finally {
+      setSyncing(false);
+    }
+    await fetchAll();
+  }, [fetchAll]);
+
+  // Aviso al volver de la conexión OAuth de Google (?gcal=connected|error)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gcal = params.get('gcal');
+    if (gcal === 'connected') {
+      toast.success('Cuenta de Google conectada correctamente.');
+      window.history.replaceState({}, '', '/agenda');
+    } else if (gcal === 'error') {
+      toast.error('No se pudo conectar la cuenta de Google. Intenta de nuevo.');
+      window.history.replaceState({}, '', '/agenda');
+    }
+  }, []);
   
   useEffect(() => {
     fetchAll();
@@ -684,16 +727,24 @@ const Agenda = () => {
           </div>
           
           <div className="flex gap-2">
-            <Button onClick={fetchAll} variant="outline" size="sm">
-              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            <Button onClick={handleActualizar} variant="outline" size="sm" disabled={syncing} data-testid="agenda-actualizar-btn">
+              <RefreshCw className={`w-4 h-4 mr-1 ${(loading || syncing) ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
+            {isSuperAdmin && (
+              <Button onClick={() => setGcalOpen(true)} variant="outline" size="sm" data-testid="agenda-gcal-btn">
+                <CalendarDays className="w-4 h-4 mr-1" />
+                Google Calendar
+              </Button>
+            )}
             <Button onClick={() => handleOpenCitaDialog()} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-1" />
               Nueva Cita
             </Button>
           </div>
         </div>
+        
+        <GoogleCalendarDialog open={gcalOpen} onOpenChange={setGcalOpen} />
         
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

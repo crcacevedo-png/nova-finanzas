@@ -204,6 +204,13 @@ async def crear_cita(
     if "_id" in cita_doc:
         del cita_doc["_id"]
     
+    # Sincronizar con Google Calendar del médico (no bloquea si falla)
+    try:
+        from routes.google_calendar import push_cita
+        await push_cita(cita_doc)
+    except Exception:
+        pass
+    
     # Notificar a clientes WebSocket
     await notify_agenda_update("cita_creada", {
         "cita": cita_doc,
@@ -248,6 +255,13 @@ async def actualizar_cita(
     
     cita_actualizada = await db.citas.find_one({"id": cita_id}, {"_id": 0})
     
+    # Reflejar cambios en Google Calendar (reprogramación)
+    try:
+        from routes.google_calendar import push_cita
+        await push_cita(cita_actualizada)
+    except Exception:
+        pass
+    
     # Notificar a clientes WebSocket
     await notify_agenda_update("cita_actualizada", {
         "cita": cita_actualizada,
@@ -290,6 +304,16 @@ async def cambiar_estado_cita(
     await db.citas.update_one({"id": cita_id}, {"$set": update_data})
     
     cita_actualizada = await db.citas.find_one({"id": cita_id}, {"_id": 0})
+    
+    # Sincronizar con Google Calendar: al cancelar se elimina el evento; otros estados lo actualizan
+    try:
+        from routes.google_calendar import push_cita, delete_cita_event
+        if estado_data.estado == EstadoCita.CANCELADA:
+            await delete_cita_event(cita_actualizada)
+        else:
+            await push_cita(cita_actualizada)
+    except Exception:
+        pass
     
     # Notificar a clientes WebSocket (cambio de estado es importante)
     await notify_agenda_update("cita_estado_cambiado", {
@@ -346,6 +370,14 @@ async def eliminar_cita(
             raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar citas finalizadas")
     
     await db.citas.delete_one({"id": cita_id})
+    
+    # Eliminar el evento asociado en Google Calendar
+    try:
+        from routes.google_calendar import delete_cita_event
+        await delete_cita_event(cita)
+    except Exception:
+        pass
+    
     return {"message": "Cita eliminada"}
 
 

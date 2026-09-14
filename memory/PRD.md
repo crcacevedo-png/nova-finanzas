@@ -6,7 +6,17 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 8)
 
-### Fix (2026-06 Sesión 8) — Búsqueda de pacientes por nombre (multi-palabra)
+### Feature (2026-06 Sesión 8) — Integración Google Calendar (Agenda, bidireccional por médico)
+- **Backend NUEVO** `routes/google_calendar.py` (registrado en `server.py`): OAuth 2.0 por médico conectado por SuperAdmin.
+  - `GET /api/oauth/calendar/connect?doctor_id=` (superadmin) → URL de consentimiento (access_type=offline, prompt=consent, scope calendar). `GET /api/oauth/calendar/callback` → intercambia código, guarda tokens en `db.doctors.google_calendar`, crea calendario dedicado "NovaVision - Citas".
+  - `GET /api/google-calendar/status` (superadmin), `POST /api/google-calendar/disconnect`, `POST /api/google-calendar/sync`.
+  - **PUSH**: `crear/actualizar/cambiar_estado(Cancelada)/eliminar` cita en `agenda.py` llama a `push_cita`/`delete_cita_event` (try/except, nunca bloquea). Guarda `google_event_id` en la cita.
+  - **PULL (bidireccional)**: `_sync_doctor` usa `events.list` con `syncToken` (resync completo ante 410). Eventos con `nova_cita_id` → refleja reprogramaciones y cancelaciones en la cita; eventos externos nuevos → crea cita ("origen_google", sin paciente, nombre = título) y etiqueta el evento con `nova_cita_id`.
+- **Frontend**: `components/GoogleCalendarDialog.js` (superadmin: lista médicos, Conectar/Desconectar, última sync). En `Agenda.js` el botón **"Actualizar"** ahora ejecuta `googleCalendarApi.sync()` y luego recarga (toast con importadas/actualizadas/canceladas); botón "Google Calendar" (superadmin); aviso al volver de OAuth (`?gcal=connected|error`). `googleCalendarApi` en `api.js`.
+- **Credenciales**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `APP_PUBLIC_URL` en `backend/.env` (preview). Redirect URI: `.../api/oauth/calendar/callback`.
+- **Verificado**: endpoints (status/connect/sync) responden OK; UI (botón + diálogo con médicos y "Conectar") verificada por screenshot; ESLint limpio. PENDIENTE por el usuario: completar el consentimiento OAuth de cada médico (su Gmail debe estar como "usuario de prueba" en la pantalla de consentimiento) para activar el push/pull real. Para PRODUCCIÓN: registrar la redirect URI del dominio productivo y definir estas env vars allí.
+
+
 - **Problema**: buscar "Juan Pérez" no encontraba al paciente porque el texto completo se buscaba dentro de un solo campo (nombre o apellido).
 - **Solución** (`routes/patients.py`, helper `build_patient_search_conditions`): el texto se separa en palabras; cada palabra debe aparecer en el nombre O el apellido (en cualquier orden), sin distinguir mayúsculas/acentos (reutiliza `generate_accent_regex`). Se combinan con AND (todas las palabras). Se mantiene la coincidencia por expediente, DPI y teléfono con el texto completo (`re.escape`). Aplicado en AMBOS buscadores: listado `GET /api/patients?search=` y autocompletado `GET /api/pacientes/buscar?q=`. El autocompletado subió su tope por defecto de 10 → 50.
 - **Verificado (curl)**: 'juan perez' y 'perez juan' devuelven lo mismo (orden independiente); cruza campos ('garcia carlos' → "Juan Carlos López García"); 'PEREZ' insensible a acento/mayúsculas; búsqueda por teléfono y expediente OK. Datos de prueba purgados.

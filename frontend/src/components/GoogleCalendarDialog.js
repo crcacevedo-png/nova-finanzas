@@ -1,0 +1,141 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { CalendarCheck, Link2, Unlink, RefreshCw, Check } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { toast } from 'sonner';
+import { googleCalendarApi } from '../services/api';
+
+const fmtFecha = (iso) => {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return '—';
+  }
+};
+
+export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
+  const [loading, setLoading] = useState(true);
+  const [medicos, setMedicos] = useState([]);
+  const [busy, setBusy] = useState(null);
+
+  const fetchStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await googleCalendarApi.getStatus();
+      setMedicos(res.data.data || []);
+    } catch (e) {
+      toast.error('No se pudo cargar el estado de Google Calendar');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (open) fetchStatus(); }, [open, fetchStatus]);
+
+  const conectar = async (medico) => {
+    setBusy(medico.id);
+    try {
+      const res = await googleCalendarApi.getConnectUrl(medico.id);
+      const url = res.data.authorization_url;
+      if (url) {
+        // Redirige a la pantalla de consentimiento de Google (vuelve a /agenda?gcal=connected)
+        window.location.href = url;
+      }
+    } catch (e) {
+      toast.error('No se pudo iniciar la conexión con Google');
+      setBusy(null);
+    }
+  };
+
+  const desconectar = async (medico) => {
+    setBusy(medico.id);
+    try {
+      await googleCalendarApi.disconnect(medico.id);
+      toast.success(`Cuenta de Google desconectada de ${medico.name}`);
+      fetchStatus();
+    } catch (e) {
+      toast.error('No se pudo desconectar');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl" data-testid="gcal-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarCheck className="w-5 h-5 text-blue-600" />
+            Google Calendar por médico
+          </DialogTitle>
+          <DialogDescription>
+            Conecta la cuenta de Google de cada médico. Las citas se sincronizan en ambos
+            sentidos con un calendario dedicado ("NovaVision - Citas").
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+          {loading ? (
+            <div className="py-8 text-center text-slate-500">Cargando...</div>
+          ) : medicos.length === 0 ? (
+            <div className="py-8 text-center text-slate-500">No hay médicos activos.</div>
+          ) : (
+            medicos.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white"
+                data-testid={`gcal-medico-${m.id}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{m.name}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {m.connected ? (
+                      <>
+                        <Check className="w-3 h-3 inline mr-1 text-green-600" />
+                        {m.email || 'Conectado'} · última sync: {fmtFecha(m.last_sync)}
+                      </>
+                    ) : (
+                      'Sin conectar'
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {m.connected ? (
+                    <>
+                      <Badge className="bg-green-100 text-green-700">Conectado</Badge>
+                      <Button
+                        variant="outline" size="sm"
+                        disabled={busy === m.id}
+                        onClick={() => desconectar(m)}
+                        data-testid={`gcal-disconnect-${m.id}`}
+                      >
+                        <Unlink className="w-4 h-4 mr-1" />Desconectar
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                      disabled={busy === m.id}
+                      onClick={() => conectar(m)}
+                      data-testid={`gcal-connect-${m.id}`}
+                    >
+                      {busy === m.id ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Link2 className="w-4 h-4 mr-1" />}
+                      Conectar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default GoogleCalendarDialog;
