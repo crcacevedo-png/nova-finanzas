@@ -4204,6 +4204,7 @@ async def startup_event():
         await db.citas.create_index([("estado", 1)])
         await db.citas.create_index([("fecha", 1), ("medico_id", 1), ("estado", 1)], name="citas_agenda_diaria")
         await db.citas.create_index([("paciente_id", 1), ("fecha", -1)], name="citas_paciente_fecha")
+        await db.citas.create_index([("google_event_id", 1)], name="citas_google_event", sparse=True)
     except Exception:
         pass
     

@@ -268,6 +268,31 @@ async def _apply_event(doctor, service, cal_id, ev, res):
                 res["update"] += 1
         return
 
+    # Dedup por google_event_id: si ya existe una cita para este evento (p.ej. el patch de
+    # nova_cita_id falló en un calendario compartido sin permiso de edición), NO crear otra.
+    existente = await db.citas.find_one({"google_event_id": ev.get("id"), "tipo_agenda": "pacientes"})
+    if existente:
+        if existente.get("estado") not in ["Atendida", "No asistió"]:
+            changed = {}
+            if existente.get("fecha") != fecha:
+                changed["fecha"] = fecha
+            if existente.get("hora_inicio") != hora:
+                changed["hora_inicio"] = hora
+                changed["hora_fin"] = hora_f
+            if changed:
+                changed["fecha_actualizacion"] = now
+                await db.citas.update_one({"id": existente["id"]}, {"$set": changed})
+                res["update"] += 1
+        # Reintentar etiquetar el evento con nova_cita_id (mejor esfuerzo)
+        def _retag():
+            try:
+                service.events().patch(calendarId=cal_id, eventId=ev["id"],
+                                       body={"extendedProperties": {"private": {"nova_cita_id": existente["id"]}}}).execute()
+            except Exception:
+                pass
+        await asyncio.to_thread(_retag)
+        return
+
     # Evento nuevo creado directamente en Google -> crear cita externa
     new_id = str(uuid.uuid4())
     cita_doc = {

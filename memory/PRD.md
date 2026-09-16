@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 11)
+**Última actualización**: 2026-06 (Sesión 12)
+
+### Fix (2026-06 Sesión 12) — Google Calendar: no duplicar eventos al sincronizar
+- 🐛 **Bug**: al "Actualizar" Google Calendar se duplicaban las citas. Causa: la deduplicación al importar dependía SOLO de la propiedad extendida `nova_cita_id`. En calendarios **compartidos** (sin permiso de edición) el `patch` que escribe esa etiqueta falla, así que cada sync volvía a ver el evento "sin etiqueta" y creaba otra cita.
+- ✅ **Fix** (`routes/google_calendar.py` `_apply_event`): antes de crear una cita nueva, se busca una existente por **`google_event_id`**; si existe, se actualiza (fecha/hora) en vez de duplicar y se reintenta etiquetar el evento (mejor esfuerzo). Import ahora **idempotente** aunque el patch falle. Índice `citas_google_event` (sparse) agregado en `server.py`.
+- **Verificado**: 3 syncs del mismo evento con `patch` fallando (calendario compartido simulado) → **1 sola cita** (import=1, luego 0/0). Backend OK. Requiere redespliegue para producción.
+
+
 
 ### Fix (2026-06 Sesión 11) — Desfase de -1 día en el texto de fecha (Agenda y Mi Agenda)
 - 🐛 **Bug**: el input mostraba p.ej. 16/09/2026 pero el texto decía "martes 15 de septiembre". Causa: `formatDate` hacía `new Date("2026-09-16")` (medianoche UTC) y luego aplicaba `timeZone: 'America/Guatemala'` (UTC-6), retrocediendo al día anterior.
