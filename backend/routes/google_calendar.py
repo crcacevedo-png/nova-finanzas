@@ -561,3 +561,39 @@ async def run_sync_all() -> dict:
 async def sync(current_user: dict = Depends(get_current_user)):
     """Sincroniza (pull) los calendarios de todos los médicos conectados."""
     return await run_sync_all()
+
+
+@router.post("/google-calendar/limpiar-duplicados")
+async def limpiar_duplicados(current_user: dict = Depends(require_role(["superadmin"]))):
+    """Elimina citas duplicadas de Google (mismo google_event_id), conservando una por evento.
+    Prioriza conservar: la Atendida > la que ya tiene paciente vinculado > la más antigua."""
+    pipeline = [
+        {"$match": {"tipo_agenda": "pacientes", "google_event_id": {"$nin": [None, ""]}}},
+        {"$group": {"_id": "$google_event_id", "ids": {"$push": "$id"}, "n": {"$sum": 1}}},
+        {"$match": {"n": {"$gt": 1}}},
+    ]
+    grupos = await db.citas.aggregate(pipeline).to_list(5000)
+
+    eliminadas = 0
+    for g in grupos:
+        citas = await db.citas.find({"id": {"$in": g["ids"]}}, {"_id": 0}).to_list(1000)
+
+        def _prioridad(c):
+            # Menor tupla = mayor prioridad para CONSERVAR
+            atendida = 0 if c.get("estado") in ["Atendida", "No asistió"] else 1
+            con_paciente = 0 if (c.get("paciente_id") or "") else 1
+            creacion = c.get("fecha_creacion") or ""
+            return (atendida, con_paciente, creacion)
+
+        citas_ordenadas = sorted(citas, key=_prioridad)
+        conservar = citas_ordenadas[0]
+        a_eliminar = [c["id"] for c in citas_ordenadas[1:]]
+        if a_eliminar:
+            res = await db.citas.delete_many({"id": {"$in": a_eliminar}})
+            eliminadas += res.deleted_count
+
+    return {
+        "grupos_con_duplicados": len(grupos),
+        "citas_eliminadas": eliminadas,
+    }
+

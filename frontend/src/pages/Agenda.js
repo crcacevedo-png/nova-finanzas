@@ -8,7 +8,7 @@ import { useAgendaWebSocket } from '../hooks/useWebSocket';
 import { 
   Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
-  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw
+  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -449,6 +449,27 @@ const Agenda = () => {
     await fetchAll();
   }, [fetchAll]);
 
+  const handleLimpiarDuplicados = useCallback(async () => {
+    if (!window.confirm('¿Eliminar las citas duplicadas de Google Calendar? Se conservará una por evento (se prioriza la atendida o la que ya tiene paciente vinculado). Esta acción no se puede deshacer.')) {
+      return;
+    }
+    setSyncing(true);
+    try {
+      const res = await googleCalendarApi.limpiarDuplicados();
+      const d = res.data || {};
+      if (d.citas_eliminadas > 0) {
+        toast.success(`Se eliminaron ${d.citas_eliminadas} cita(s) duplicada(s) de ${d.grupos_con_duplicados} evento(s).`);
+      } else {
+        toast.info('No se encontraron citas duplicadas de Google.');
+      }
+      await fetchAll();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Error al limpiar duplicados');
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchAll]);
+
   // Aviso al volver de la conexión OAuth de Google (?gcal=connected|error)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -823,6 +844,12 @@ const Agenda = () => {
               <Button onClick={() => setGcalOpen(true)} variant="outline" size="sm" data-testid="agenda-gcal-btn">
                 <CalendarDays className="w-4 h-4 mr-1" />
                 Google Calendar
+              </Button>
+            )}
+            {isSuperAdmin && (
+              <Button onClick={handleLimpiarDuplicados} variant="outline" size="sm" disabled={syncing} data-testid="agenda-limpiar-duplicados-btn">
+                <Trash2 className="w-4 h-4 mr-1" />
+                Limpiar duplicados
               </Button>
             )}
             <Button onClick={() => handleOpenCitaDialog()} className="bg-blue-600 hover:bg-blue-700">

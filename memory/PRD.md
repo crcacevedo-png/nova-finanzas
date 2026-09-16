@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 12)
+**Última actualización**: 2026-06 (Sesión 13)
+
+### Feature (2026-06 Sesión 13) — Botón "Limpiar duplicados" de Google Calendar
+- ✅ Nuevo botón **"Limpiar duplicados"** en el encabezado de la Agenda (solo SuperAdmin, junto a "Google Calendar", `agenda-limpiar-duplicados-btn`). Pide confirmación y elimina citas duplicadas que comparten el mismo `google_event_id`, **conservando una por evento**.
+- Backend: `POST /api/google-calendar/limpiar-duplicados` (require_role superadmin). Agrupa por `google_event_id` (no vacío) y, en grupos con >1, conserva por prioridad: **Atendida/No asistió > con paciente vinculado > más antigua**; elimina el resto. Devuelve `{grupos_con_duplicados, citas_eliminadas}`. `googleCalendarApi.limpiarDuplicados` + `handleLimpiarDuplicados` en Agenda.js (toast con resumen, recarga).
+- **Verificado (curl)**: 3 duplicados del mismo evento (uno vinculado a paciente) → elimina 2 y **conserva la vinculada**. UI: botón visible por screenshot. ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Fix (2026-06 Sesión 12) — Google Calendar: no duplicar eventos al sincronizar
 - 🐛 **Bug**: al "Actualizar" Google Calendar se duplicaban las citas. Causa: la deduplicación al importar dependía SOLO de la propiedad extendida `nova_cita_id`. En calendarios **compartidos** (sin permiso de edición) el `patch` que escribe esa etiqueta falla, así que cada sync volvía a ver el evento "sin etiqueta" y creaba otra cita.
