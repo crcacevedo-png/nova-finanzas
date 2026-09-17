@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="4" failures="0" skipped="0" tests="4" time="1.825" timestamp="2026-09-17T01:16:20.506618+00:00" hostname="agent-env-d1d73794-876b-4f26-b868-6eff195fc400"><testcase classname="tests.test_evaluaciones_permisos.TestUsuarioNoPuedeEscribir" name="test_usuario_POST_evaluacion_403" time="1.764"><error message="failed on setup with &quot;AssertionError: GET /api/pacientes failed: 404 {&quot;detail&quot;:&quot;Not Found&quot;}&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code&quot;">backend/tests/test_evaluaciones_permisos.py:33: in paciente_id
+    assert r.status_code == 200, f"GET /api/pacientes failed: {r.status_code} {r.text}"
+E   AssertionError: GET /api/pacientes failed: 404 {"detail":"Not Found"}
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</error></testcase><testcase classname="tests.test_evaluaciones_permisos.TestUsuarioNoPuedeEscribir" name="test_usuario_PUT_evaluacion_403" time="0.000"><error message="failed on setup with &quot;AssertionError: GET /api/pacientes failed: 404 {&quot;detail&quot;:&quot;Not Found&quot;}&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code&quot;">backend/tests/test_evaluaciones_permisos.py:33: in paciente_id
+    assert r.status_code == 200, f"GET /api/pacientes failed: {r.status_code} {r.text}"
+E   AssertionError: GET /api/pacientes failed: 404 {"detail":"Not Found"}
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</error></testcase><testcase classname="tests.test_evaluaciones_permisos.TestAdminYSuperadminSiPueden" name="test_admin_POST_evaluacion_ok" time="0.000"><error message="failed on setup with &quot;AssertionError: GET /api/pacientes failed: 404 {&quot;detail&quot;:&quot;Not Found&quot;}&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code&quot;">backend/tests/test_evaluaciones_permisos.py:33: in paciente_id
+    assert r.status_code == 200, f"GET /api/pacientes failed: {r.status_code} {r.text}"
+E   AssertionError: GET /api/pacientes failed: 404 {"detail":"Not Found"}
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</error></testcase><testcase classname="tests.test_evaluaciones_permisos.TestAdminYSuperadminSiPueden" name="test_superadmin_POST_evaluacion_ok" time="0.000"><error message="failed on setup with &quot;AssertionError: GET /api/pacientes failed: 404 {&quot;detail&quot;:&quot;Not Found&quot;}&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code&quot;">backend/tests/test_evaluaciones_permisos.py:33: in paciente_id
+    assert r.status_code == 200, f"GET /api/pacientes failed: {r.status_code} {r.text}"
+E   AssertionError: GET /api/pacientes failed: 404 {"detail":"Not Found"}
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</error></testcase></testsuite></testsuites>

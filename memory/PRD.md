@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 13)
+**Última actualización**: 2026-06 (Sesión 14)
+
+### Verificación + fix UX (2026-06 Sesión 14) — El rol "usuario" NO puede escribir evaluaciones
+- ❓ **Pregunta del usuario**: ¿el rol `usuario` puede escribir en las Evaluaciones Oftalmológicas? **Respuesta: NO.** Verificado con el testing agent (`/app/test_reports/iteration_53.json`, backend 4/4 pytest).
+  - Backend (`routes/evaluaciones.py`): `POST /api/evaluaciones` y `PUT /api/evaluaciones/{id}` exigen rol `superadmin`/`admin`; el `usuario` recibe **403** ("No tiene permisos para crear/editar evaluaciones"). admin/superadmin → 200.
+  - Frontend (`EvaluacionOftalmologica.js`): `canEdit = role superadmin|admin`; para `usuario` todos los campos quedan en **solo lectura** y NO se muestra el botón Guardar.
+- ✅ **Fix UX** (`Pacientes.js`): el botón "Crear evaluación" (agregado en Sesión 10) aparecía para el rol `usuario` y lo llevaba a una pantalla donde no podía guardar. Ahora se muestra **solo a superadmin/admin** (`canCreateEvaluacion = role superadmin|admin`). Verificado por screenshot (usuario → 0 botones; sin regresión para admin).
+
+
 
 ### Feature (2026-06 Sesión 13) — Botón "Limpiar duplicados" de Google Calendar
 - ✅ Nuevo botón **"Limpiar duplicados"** en el encabezado de la Agenda (solo SuperAdmin, junto a "Google Calendar", `agenda-limpiar-duplicados-btn`). Pide confirmación y elimina citas duplicadas que comparten el mismo `google_event_id`, **conservando una por evento**.

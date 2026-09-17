@@ -121,6 +121,8 @@ const Pacientes = () => {
   const canEdit = hasPermission('edit_patients');
   const canDelete = hasPermission('delete_patients');
   const canExport = hasPermission('export_patients');
+  // Solo superadmin/admin pueden crear/editar evaluaciones (coherente con el backend y EvaluacionOftalmologica)
+  const canCreateEvaluacion = user?.role === 'superadmin' || user?.role === 'admin';
 
   const fetchIgssUnits = useCallback(async () => {
     try {
@@ -719,6 +721,7 @@ const Pacientes = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
+                            {canCreateEvaluacion && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -729,6 +732,7 @@ const Pacientes = () => {
                             >
                               <Stethoscope className="w-4 h-4" />
                             </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"

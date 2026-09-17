@@ -1,0 +1,49 @@
+{
+  "summary": "Verificación del permiso de escritura de Evaluaciones Oftalmológicas para el rol 'usuario'. Backend y frontend testeados end-to-end. Respuesta a la pregunta del usuario: NO. El rol 'usuario' NO puede escribir (crear/editar/guardar) evaluaciones oftalmológicas. El backend devuelve 403 y la UI directamente no muestra el botón Guardar y deja todos los campos deshabilitados (read-only).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "evidence": {
+    "backend_api_pytest": {
+      "usuario_POST_/api/evaluaciones": "403 - {\"detail\":\"No tiene permisos para crear evaluaciones\"}",
+      "usuario_PUT_/api/evaluaciones/{id}": "403 - {\"detail\":\"No tiene permisos para editar evaluaciones\"}",
+      "admin_POST_/api/evaluaciones": "200 (evaluación creada)",
+      "superadmin_POST_/api/evaluaciones": "200 (evaluación creada)"
+    },
+    "frontend_ui_como_usuario": {
+      "acceso_a_/evaluacion-oftalmologica": "SÍ carga (ruta sólo protegida por ProtectedRoute, sin permiso específico)",
+      "campos_del_formulario": "TODOS deshabilitados (readOnly=true). Playwright falló al hacer fill del textarea 'motivo_consulta' porque 'element is not enabled'.",
+      "boton_Guardar": "NO SE RENDERIZA. En src/pages/EvaluacionOftalmologica.js línea 1622 está envuelto en {canEdit && !isReadOnly && (...)} y canEdit = user?.role === 'superadmin' || user?.role === 'admin'.",
+      "boton_Nueva": "Se renderiza pero está disabled (línea 1602: disabled={!canEdit}).",
+      "boton_crear_evaluacion_en_/pacientes": "Presente (20 filas con data-testid='crear-evaluacion-patient-{id}'). Al hacer click sí navega a /evaluacion-oftalmologica?paciente_id={id} y muestra toast 'Paciente cargado para nueva evaluación', pero los campos siguen deshabilitados y NO hay botón Guardar. El usuario NO puede completar la operación.",
+      "codigo_gating_frontend": "EvaluacionOftalmologica.js:275-276  const canEdit = user?.role === 'superadmin' || user?.role === 'admin';  const isReadOnly = !canEdit || evaluacionActual?.sellado;"
+    },
+    "screenshots": [
+      "/app/test_reports/playwright/usuario_eval.png",
+      "/app/test_reports/playwright/usuario_pacientes.png",
+      "/app/test_reports/playwright/usuario_eval_from_patient.png"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_evaluaciones_permisos.py",
+    "/app/test_reports/pytest/evaluaciones_permisos.xml"
+  ],
+  "action_items": [
+    "NINGUNA acción de código requerida. El comportamiento es correcto y consistente: backend bloquea con 403 y frontend oculta/deshabilita las acciones de escritura para el rol 'usuario'.",
+    "OPCIONAL/UX: dado que el botón 'Crear evaluación' del listado de Pacientes SÍ aparece para el rol 'usuario' y lleva a una pantalla donde no puede guardar, se recomienda: (a) ocultar/deshabilitar ese botón para 'usuario', o (b) mostrar un banner informativo en /evaluacion-oftalmologica del tipo 'Modo solo lectura: no tiene permisos para editar evaluaciones'. Actualmente el usuario final llega a la pantalla y no obtiene feedback explícito del motivo por el que no puede escribir."
+  ],
+  "critical_code_review_comments": [
+    "Consistencia OK: mismo criterio de rol (superadmin/admin) aplicado en backend (routes/evaluaciones.py líneas ~617 y ~1046) y frontend (EvaluacionOftalmologica.js línea 275).",
+    "UX gap menor: la ruta /evaluacion-oftalmologica está sólo bajo <ProtectedRoute> sin PermissionGuard; funciona porque la UI internamente aplica canEdit, pero convendría envolverla en un guard de permiso 'evaluaciones:read' o similar para robustez.",
+    "Botón 'crear-evaluacion-patient-{id}' en Pacientes.js no verifica rol; navega a un flujo que el 'usuario' no puede completar."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_evaluaciones_permisos.py (nuevo)"
+  ],
+  "success_rate": {"backend": "100% (4/4 pytest)", "frontend": "100% (comportamiento esperado verificado)"},
+  "test_credentials": "usuario/user2024, admin/Admin2024Nuevo!, superadmin/nova2024",
+  "seed_data_creation": "Se crearon evaluaciones temporales con motivo 'TEST_permisos evaluacion' como admin/superadmin; se eliminaron dentro de los tests (fixtures). Purga final: 1 evaluación residual limpiada.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Endpoint listar pacientes es /api/patients (no /api/pacientes). Evaluaciones require rol superadmin/admin para POST/PUT/DELETE (403 con mensajes en español). El campo de motivo_consulta en la UI está deshabilitado para 'usuario' y no hay botón Guardar en la vista de evaluación para ese rol.",
+  "rca of the issue": "N/A - no es un bug. La pregunta del usuario fue una verificación de permisos. Respuesta definitiva: rol 'usuario' NO puede escribir en Evaluaciones Oftalmológicas ni por API ni por UI."
+}
