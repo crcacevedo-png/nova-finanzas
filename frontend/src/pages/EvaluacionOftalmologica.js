@@ -272,7 +272,7 @@ const EvaluacionOftalmologica = () => {
   
   const OFFLINE_STORAGE_KEY = 'novavision_evaluaciones_offline';
   
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin';
+  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'usuario';
   const isReadOnly = !canEdit || evaluacionActual?.sellado;
 
   // Estado inicial de evaluación

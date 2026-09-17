@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 14)
+**Última actualización**: 2026-06 (Sesión 15)
+
+### Cambio de permisos (2026-06 Sesión 15) — El rol "usuario" AHORA puede modificar evaluaciones
+- ✅ A pedido del usuario, se habilitó la **escritura de Evaluaciones Oftalmológicas para el rol `usuario`**.
+- Backend (`routes/evaluaciones.py`): se añadió `"usuario"` a los 6 chequeos de escritura inline: crear (`POST ''`), editar (`PUT /{id}`), autoguardar (`PATCH /{id}/autoguardar`), actualizar historial médico, `agregar-medicamento-desde-receta` y `agregar-crm-cirugia`. **Eliminar** (`DELETE /{id}`) sigue restringido a **superadmin**; catálogos e import siguen en admin/superadmin.
+- Frontend: `canEdit` en `EvaluacionOftalmologica.js` y `canCreateEvaluacion` en `Pacientes.js` ahora incluyen `usuario` (formulario editable, botón Guardar visible, botón "Crear evaluación" restaurado).
+- **Verificado E2E**: curl como `usuario` → crear 200, PUT 200, PATCH autoguardar 200 (delete solo superadmin). UI como `usuario`: 37 campos editables + botón "Guardar" + 20 botones "Crear evaluación". ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Verificación + fix UX (2026-06 Sesión 14) — El rol "usuario" NO puede escribir evaluaciones
 - ❓ **Pregunta del usuario**: ¿el rol `usuario` puede escribir en las Evaluaciones Oftalmológicas? **Respuesta: NO.** Verificado con el testing agent (`/app/test_reports/iteration_53.json`, backend 4/4 pytest).
