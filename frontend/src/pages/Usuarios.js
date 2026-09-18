@@ -333,6 +333,27 @@ const Usuarios = () => {
     setRoleDialogOpen(true);
   };
 
+  const handleCopyPermissionsFrom = (roleName) => {
+    if (!roleName || roleName === '__none__') {
+      setRoleFormData(prev => ({ ...prev, permissions: {} }));
+      setExpandedCategories({});
+      return;
+    }
+    const base = roles.find(r => r.name === roleName);
+    if (!base) return;
+    const perms = { ...(base.permissions || {}) };
+    setRoleFormData(prev => ({ ...prev, permissions: perms }));
+    if (availablePermissions?.categories) {
+      const expanded = {};
+      Object.keys(availablePermissions.categories).forEach(catId => {
+        const catPerms = availablePermissions.categories[catId].permissions;
+        if (catPerms.some(p => perms?.[p.id])) expanded[catId] = true;
+      });
+      setExpandedCategories(expanded);
+    }
+    toast.success(`Permisos copiados de "${base.display_name || base.name}"`);
+  };
+
   const handleDeleteRoleClick = (role) => {
     setRoleToDelete(role);
     setDeleteRoleDialogOpen(true);
@@ -1144,6 +1165,30 @@ const Usuarios = () => {
                   ))}
                 </div>
               </div>
+
+              {/* Copiar permisos de un rol base (solo al crear) */}
+              {!editingRole && (
+                <div className="space-y-2">
+                  <Label htmlFor="copy-permissions">Copiar permisos de</Label>
+                  <Select defaultValue="__none__" onValueChange={handleCopyPermissionsFrom}>
+                    <SelectTrigger id="copy-permissions" data-testid="select-copy-permissions">
+                      <SelectValue placeholder="Ninguno (partir de cero)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Ninguno (partir de cero)</SelectItem>
+                      {roles
+                        .filter((r) => r.name !== 'superadmin' || currentUser?.role === 'superadmin')
+                        .map((r) => (
+                          <SelectItem key={r.name} value={r.name}>
+                            {r.display_name || roleLabels[r.name] || r.name}
+                            {r.is_system === false ? ' (personalizado)' : ''}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">Precarga los permisos del rol elegido; puedes ajustarlos abajo antes de guardar</p>
+                </div>
+              )}
 
               {/* Permisos */}
               <div className="space-y-2">

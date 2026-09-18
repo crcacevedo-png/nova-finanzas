@@ -580,6 +580,9 @@ const UnidadesIGSS = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   className="input-teal"
                   placeholder="Ej: Hospital General de Enfermedades"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   data-testid="unit-name-input"
                 />
               </div>

@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 16)
+**Última actualización**: 2026-06 (Sesión 17)
+
+### Features/Fix (2026-06 Sesión 17) — Copiar permisos de rol base + nombre de Unidad IGSS con texto y números
+- ✅ **1. Copiar permisos de un rol base al crear un rol personalizado**: en el diálogo "Nuevo Rol" (`Usuarios.js`) se agregó el selector **"Copiar permisos de"** (`select-copy-permissions`, solo al crear, oculto al editar). Lista roles de sistema + personalizados (filtra superadmin salvo para superadmin) más "Ninguno (partir de cero)". Al elegir uno se precargan sus `permissions` (editables antes de guardar) y se expanden las categorías con permisos activos. Verificado (copió 64 permisos, toast de confirmación).
+- ✅ **2. Nombre de Unidad IGSS con texto y números, tal cual se escribe**: el código actual ya preservaba el nombre (probado por curl y UI: "Clínica Zona 5 Prueba 123" se guarda exacto). Como refuerzo: (a) input `unit-name-input` con `autoCapitalize="none"`, `autoCorrect="off"`, `spellCheck={false}` (evita auto-mayúsculas en móvil); (b) backend (`server.py` create/update) ahora escapa el regex del chequeo de duplicados con `re.escape(...)` y guarda `name.strip()` (solo recorta espacios extremos, NO cambia mayúsculas ni quita números). **El síntoma en producción se debía a un build anterior; requiere redespliegue.**
+- ESLint limpio. Datos de prueba purgados.
+
+
 
 ### Bug fix (2026-06 Sesión 16) — Roles personalizados no aparecían al crear/editar usuarios
 - 🐛 **Bug (producción)**: al crear un rol personalizado en Gestión de Usuarios → Roles, no aparecía como opción en el formulario de crear/editar usuario. Causa: en `Usuarios.js` el `Select` de rol tenía las opciones **hardcodeadas** (usuario, admin, optica, administrador_igss, superadmin) y además `roles` solo se cargaba en la pestaña "Roles". El backend YA aceptaba roles personalizados (`create_user`/`update_user` validan con `validar_rol_existe` contra `db.roles`).

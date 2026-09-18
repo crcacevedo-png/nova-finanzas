@@ -3770,7 +3770,7 @@ async def create_igss_unit(unit_data: IGSSUnitCreate, current_user: dict = Depen
     """Crear nueva unidad IGSS (solo SuperAdmin)"""
     # Verificar duplicado por nombre
     existing = await db.igss_units.find_one({
-        "name": {"$regex": f"^{unit_data.name}$", "$options": "i"},
+        "name": {"$regex": f"^{re.escape(unit_data.name.strip())}$", "$options": "i"},
         "is_active": True
     })
     if existing:
@@ -3779,7 +3779,7 @@ async def create_igss_unit(unit_data: IGSSUnitCreate, current_user: dict = Depen
     now = datetime.now(timezone.utc).isoformat()
     unit_doc = {
         "id": str(uuid.uuid4()),
-        "name": unit_data.name,
+        "name": unit_data.name.strip(),
         "code": unit_data.code or "",
         "description": unit_data.description or "",
         "is_active": True,
@@ -3808,7 +3808,7 @@ async def update_igss_unit(unit_id: str, unit_data: IGSSUnitUpdate, current_user
     # Verificar duplicado de nombre
     if "name" in update_data and update_data["name"].lower() != unit["name"].lower():
         existing = await db.igss_units.find_one({
-            "name": {"$regex": f"^{update_data['name']}$", "$options": "i"},
+            "name": {"$regex": f"^{re.escape(update_data['name'].strip())}$", "$options": "i"},
             "is_active": True,
             "id": {"$ne": unit_id}
         })
