@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
 import io
+import re
 
 from config.database import db
 from routes.auth import get_current_user, require_role, require_permission
