@@ -204,7 +204,8 @@ const Usuarios = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+    fetchRoles();
+  }, [fetchRoles]);
 
   useEffect(() => {
     if (activeTab === 'menus') {
@@ -599,9 +600,9 @@ const Usuarios = () => {
                           <TableCell className="font-medium">{user.username}</TableCell>
                           <TableCell>{user.name}</TableCell>
                           <TableCell>
-                            <Badge className={`${roleColors[user.role]} flex items-center gap-1 w-fit`}>
+                            <Badge className={`${roleColors[user.role] || 'bg-slate-100 text-slate-700'} flex items-center gap-1 w-fit`}>
                               {getRoleIcon(user.role)}
-                              {roleLabels[user.role]}
+                              {roles.find((r) => r.name === user.role)?.display_name || roleLabels[user.role] || user.role}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -1003,38 +1004,19 @@ const Usuarios = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="usuario">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        Usuario
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="admin">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4" />
-                        Administrador
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="optica">
-                      <div className="flex items-center gap-2">
-                        <Glasses className="w-4 h-4" />
-                        Óptica
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="administrador_igss">
-                      <div className="flex items-center gap-2">
-                        <Building className="w-4 h-4" />
-                        Administrador IGSS
-                      </div>
-                    </SelectItem>
-                    {currentUser?.role === 'superadmin' && (
-                      <SelectItem value="superadmin">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-4 h-4" />
-                          Super Admin
-                        </div>
-                      </SelectItem>
-                    )}
+                    {roles
+                      .filter((r) => r.name !== 'superadmin' || currentUser?.role === 'superadmin')
+                      .map((r) => (
+                        <SelectItem key={r.name} value={r.name}>
+                          <div className="flex items-center gap-2">
+                            {getRoleIcon(r.name)}
+                            {r.display_name || roleLabels[r.name] || r.name}
+                            {r.is_system === false && (
+                              <span className="text-xs text-muted-foreground">(personalizado)</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

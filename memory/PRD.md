@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 15)
+**Última actualización**: 2026-06 (Sesión 16)
+
+### Bug fix (2026-06 Sesión 16) — Roles personalizados no aparecían al crear/editar usuarios
+- 🐛 **Bug (producción)**: al crear un rol personalizado en Gestión de Usuarios → Roles, no aparecía como opción en el formulario de crear/editar usuario. Causa: en `Usuarios.js` el `Select` de rol tenía las opciones **hardcodeadas** (usuario, admin, optica, administrador_igss, superadmin) y además `roles` solo se cargaba en la pestaña "Roles". El backend YA aceptaba roles personalizados (`create_user`/`update_user` validan con `validar_rol_existe` contra `db.roles`).
+- ✅ **Fix (solo frontend, `Usuarios.js`)**: (1) el dropdown de rol ahora se construye dinámicamente desde `rolesApi.getAll()` (sistema + personalizados), con etiqueta "(personalizado)" y filtrando `superadmin` salvo para superadmin; (2) `fetchRoles()` se ejecuta al montar (no solo en la pestaña Roles); (3) el badge del listado usa `display_name` del rol (fallback a nombre) y color por defecto, para que los roles personalizados no salgan en blanco. Mismo diálogo cubre crear y editar.
+- **Verificado**: screenshot del diálogo "Nuevo Usuario" muestra las opciones: Super Administrador, Administrador, Usuario, Óptica, Administrador IGSS (personalizado), Enfermería (personalizado), QA Iter48 (personalizado). ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Cambio de permisos (2026-06 Sesión 15) — El rol "usuario" AHORA puede modificar evaluaciones
 - ✅ A pedido del usuario, se habilitó la **escritura de Evaluaciones Oftalmológicas para el rol `usuario`**.
