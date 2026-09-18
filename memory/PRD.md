@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 17)
+**Última actualización**: 2026-06 (Sesión 18)
+
+### Feature (2026-06 Sesión 18) — Filtros de Pacientes: quitar edad + filtros IGSS por Unidad y NOG
+- ✅ Se **eliminó el filtro por edad** ("Edad desde"/"Edad hasta") del panel de filtros de Pacientes (estado, `clearFilters`, UI y param en `patientApi.getAll`).
+- ✅ Al seleccionar **Institución = IGSS** aparecen dos filtros condicionales: **Unidad IGSS** (selector, `filter-igss-unit`) y **NOG** (texto, `filter-igss-nog`). Al cambiar a otra institución se ocultan y se limpian.
+- Backend (`routes/patients.py get_patients`): nuevo query param `igss_nog` (regex substring case-insensitive con `re.escape`). `igss_unit_id` ya existía.
+- **Verificado**: backend por curl (unidad A=2, unidad B=2, NOG-2001=1, NOG-10 parcial=2) y **testing agent frontend 7/7 (100%, iteration_54.json)**: filtros de edad ausentes, aparición/ocultamiento condicional, filtrado por unidad y NOG (exacto y parcial), combinación unidad+NOG, limpiar filtros y exclusión de IGSS al elegir Particular. Datos de prueba (5 pacientes QA + unidad "Zona 5 QA") purgados. ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Features/Fix (2026-06 Sesión 17) — Copiar permisos de rol base + nombre de Unidad IGSS con texto y números
 - ✅ **1. Copiar permisos de un rol base al crear un rol personalizado**: en el diálogo "Nuevo Rol" (`Usuarios.js`) se agregó el selector **"Copiar permisos de"** (`select-copy-permissions`, solo al crear, oculto al editar). Lista roles de sistema + personalizados (filtra superadmin salvo para superadmin) más "Ninguno (partir de cero)". Al elegir uno se precargan sus `permissions` (editables antes de guardar) y se expanden las categorías con permisos activos. Verificado (copió 64 permisos, toast de confirmación).

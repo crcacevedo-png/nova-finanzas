@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend UI testing of Pacientes filters: age filter removal + new IGSS conditional filters (Unidad IGSS + NOG). All 7 test scenarios passed successfully.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "TEST 1 - Age filters removed": "PASS (Edad desde/hasta ausentes)",
+    "TEST 2a - IGSS filters hidden by default": "PASS",
+    "TEST 2b - IGSS filters appear on IGSS select": "PASS (filter-igss-unit + filter-igss-nog visible)",
+    "TEST 3a - Zona 11 filter": "PASS (2 rows: QA Ana Filtro Uno, QA Beto Filtro Dos)",
+    "TEST 3b - Zona 5 QA filter": "PASS (2 rows: QA Carla Filtro Tres, QA Diego Filtro Cuatro)",
+    "TEST 4a - NOG-2001 exact": "PASS (1 row: QA Carla Filtro Tres)",
+    "TEST 4b - NOG-10 partial substring": "PASS (2 rows: QA Ana + QA Beto)",
+    "TEST 5 - Combination Zona 5 QA + NOG-2002": "PASS (1 row: QA Diego Filtro Cuatro)",
+    "TEST 6 - Limpiar filtros": "PASS (IGSS filters disappear, patients reset to 20 active)",
+    "TEST 7 - Particular no muestra IGSS QA": "PASS (has_qa_igss=False, QA Elena Particular Cinco present)"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Conditional cleanup on institution change (lines 541-542) correctly resets igss_unit_id and igss_nog when switching away from IGSS - good defensive coding."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (7/7)"},
+  "seed_data_creation": "None - used pre-existing QA test data (QA Ana/Beto/Carla/Diego Filtro + QA Elena Particular Cinco)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pacientes filter panel now excludes age filters and conditionally renders Unidad IGSS + NOG filters only when Institución Referente = IGSS. All backend/frontend integration verified working."
+}
