@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
 import io
-import re
 
 from config.database import db
 from routes.auth import get_current_user, require_role, require_permission
@@ -312,6 +311,7 @@ async def get_patients(
     search: Optional[str] = None,
     referral_institution: Optional[str] = None,
     igss_unit_id: Optional[str] = None,
+    igss_nog: Optional[str] = None,
     gender: Optional[str] = None,
     age_from: Optional[int] = None,
     age_to: Optional[int] = None,
@@ -332,6 +332,9 @@ async def get_patients(
         query["referral_institution"] = referral_institution
     if igss_unit_id:
         query["igss_unit_id"] = igss_unit_id
+    if igss_nog:
+        import re as _re
+        query["igss_nog"] = {"$regex": _re.escape(igss_nog.strip()), "$options": "i"}
     if gender:
         query["gender"] = gender
     if date_from or date_to:

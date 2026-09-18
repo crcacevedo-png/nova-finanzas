@@ -239,9 +239,8 @@ export const patientApi = {
     if (filters.search) params.append('search', filters.search);
     if (filters.referral_institution) params.append('referral_institution', filters.referral_institution);
     if (filters.igss_unit_id) params.append('igss_unit_id', filters.igss_unit_id);
+    if (filters.igss_nog) params.append('igss_nog', filters.igss_nog);
     if (filters.gender) params.append('gender', filters.gender);
-    if (filters.age_from) params.append('age_from', filters.age_from.toString());
-    if (filters.age_to) params.append('age_to', filters.age_to.toString());
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
     if (filters.is_active !== undefined) params.append('is_active', filters.is_active.toString());

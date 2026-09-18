@@ -90,9 +90,8 @@ const Pacientes = () => {
   const [filters, setFilters] = useState({
     referral_institution: '',
     igss_unit_id: '',
+    igss_nog: '',
     gender: '',
-    age_from: '',
-    age_to: '',
     dateFrom: '',
     dateTo: '',
     is_active: true
@@ -390,9 +389,8 @@ const Pacientes = () => {
     setFilters({
       referral_institution: '',
       igss_unit_id: '',
+      igss_nog: '',
       gender: '',
-      age_from: '',
-      age_to: '',
       dateFrom: '',
       dateTo: '',
       is_active: true
@@ -537,7 +535,12 @@ const Pacientes = () => {
                   <Label className="text-xs">Institución Referente</Label>
                   <Select
                     value={filters.referral_institution}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, referral_institution: value === 'all' ? '' : value }))}
+                    onValueChange={(value) => setFilters(prev => ({
+                      ...prev,
+                      referral_institution: value === 'all' ? '' : value,
+                      igss_unit_id: value === 'igss' ? prev.igss_unit_id : '',
+                      igss_nog: value === 'igss' ? prev.igss_nog : ''
+                    }))}
                   >
                     <SelectTrigger className="input-teal">
                       <SelectValue placeholder="Todas" />
@@ -567,28 +570,38 @@ const Pacientes = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs">Edad desde</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={filters.age_from}
-                    onChange={(e) => setFilters(prev => ({ ...prev, age_from: e.target.value }))}
-                    className="input-teal"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Edad hasta</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={filters.age_to}
-                    onChange={(e) => setFilters(prev => ({ ...prev, age_to: e.target.value }))}
-                    className="input-teal"
-                    placeholder="100"
-                  />
-                </div>
+                {filters.referral_institution === 'igss' && (
+                  <>
+                    <div>
+                      <Label className="text-xs">Unidad IGSS</Label>
+                      <Select
+                        value={filters.igss_unit_id || 'all'}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, igss_unit_id: value === 'all' ? '' : value }))}
+                      >
+                        <SelectTrigger className="input-teal" data-testid="filter-igss-unit">
+                          <SelectValue placeholder="Todas las unidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas las unidades</SelectItem>
+                          {igssUnits.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">NOG</Label>
+                      <Input
+                        type="text"
+                        value={filters.igss_nog}
+                        onChange={(e) => setFilters(prev => ({ ...prev, igss_nog: e.target.value }))}
+                        className="input-teal"
+                        placeholder="Buscar por NOG..."
+                        data-testid="filter-igss-nog"
+                      />
+                    </div>
+                  </>
+                )}
                 <div>
                   <Label className="text-xs">Fecha registro desde</Label>
                   <Input
