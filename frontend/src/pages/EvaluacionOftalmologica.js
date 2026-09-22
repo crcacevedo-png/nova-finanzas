@@ -2531,7 +2531,7 @@ const EvaluacionOftalmologica = () => {
                         </Button>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-1">
+                    <div className="flex items-center rounded-lg border border-teal-200 overflow-hidden bg-white">
                       <Input
                         value={item.dosis}
                         onChange={(e) => {
@@ -2541,8 +2541,9 @@ const EvaluacionOftalmologica = () => {
                         }}
                         placeholder="Dosis"
                         disabled={isReadOnly}
-                        className="input-teal text-xs h-7"
+                        className="flex-1 text-xs h-7 border-0 rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
+                      <div className="w-px h-5 bg-teal-200" />
                       <Input
                         value={item.frecuencia}
                         onChange={(e) => {
@@ -2552,8 +2553,9 @@ const EvaluacionOftalmologica = () => {
                         }}
                         placeholder="Frecuencia"
                         disabled={isReadOnly}
-                        className="input-teal text-xs h-7"
+                        className="flex-1 text-xs h-7 border-0 rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
+                      <div className="w-px h-5 bg-teal-200" />
                       <Input
                         value={item.duracion}
                         onChange={(e) => {
@@ -2563,7 +2565,7 @@ const EvaluacionOftalmologica = () => {
                         }}
                         placeholder="Duración"
                         disabled={isReadOnly}
-                        className="input-teal text-xs h-7"
+                        className="flex-1 text-xs h-7 border-0 rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                   </div>
@@ -2985,7 +2987,7 @@ const EvaluacionOftalmologica = () => {
                 <img 
                   src="https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/qvzbrum6_logo%20nova%20transparente.png" 
                   alt="Logo" 
-                  className="h-8"
+                  className="h-12"
                 />
                 <div>
                   <h1 className="print-title text-sm font-bold" style={{ color: '#0F6E56' }}>NovaVision</h1>

@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 18)
+**Última actualización**: 2026-06 (Sesión 19)
+
+### Ajustes UI (2026-06 Sesión 19) — Receta de Medicamentos
+- ✅ **1. Unir Dosis/Frecuencia/Duración**: en la sección "Receta de Medicamentos" de `EvaluacionOftalmologica.js` los tres campos (antes un `grid grid-cols-3` de inputs separados tipo píldora) ahora forman **un solo grupo conectado**: un contenedor con borde redondeado que envuelve los tres inputs sin borde propio, separados por divisores verticales. Verificado por screenshot (grupo unido visible con la receta desplegada).
+- ✅ **2. Logo de la receta 1.5x**: el logo del encabezado de impresión de la receta pasó de `h-8` (2rem) a `h-12` (3rem). Verificado por código.
+- ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Feature (2026-06 Sesión 18) — Filtros de Pacientes: quitar edad + filtros IGSS por Unidad y NOG
 - ✅ Se **eliminó el filtro por edad** ("Edad desde"/"Edad hasta") del panel de filtros de Pacientes (estado, `clearFilters`, UI y param en `patientApi.getAll`).
