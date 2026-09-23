@@ -257,6 +257,8 @@ export const patientApi = {
     const params = new URLSearchParams();
     if (filters.search) params.append('search', filters.search);
     if (filters.referral_institution) params.append('referral_institution', filters.referral_institution);
+    if (filters.igss_unit_id) params.append('igss_unit_id', filters.igss_unit_id);
+    if (filters.igss_nog) params.append('igss_nog', filters.igss_nog);
     if (filters.gender) params.append('gender', filters.gender);
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
@@ -266,7 +268,11 @@ export const patientApi = {
     const params = new URLSearchParams();
     if (filters.search) params.append('search', filters.search);
     if (filters.referral_institution) params.append('referral_institution', filters.referral_institution);
+    if (filters.igss_unit_id) params.append('igss_unit_id', filters.igss_unit_id);
+    if (filters.igss_nog) params.append('igss_nog', filters.igss_nog);
     if (filters.gender) params.append('gender', filters.gender);
+    if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.append('dateTo', filters.dateTo);
     return `${API_URL}/patients/export/pdf?${params.toString()}`;
   },
   downloadTemplate: () => `${API_URL}/patients/export/template`,

@@ -285,6 +285,7 @@ async def listar_nogs_activos(
             "nombre_servicio": n.get("nombre_servicio", ""),
             "disponibles": max(int(n.get("cantidad") or 0) - int(n.get("acreditados") or 0), 0),
             "cantidad": int(n.get("cantidad") or 0),
+            "acreditados": int(n.get("acreditados") or 0),
             "pacientes_asignados": conteo_por_nog.get(n.get("numero", ""), 0),
             "estado": _estado_nog(int(n.get("acreditados") or 0), int(n.get("cantidad") or 0), True),
         }

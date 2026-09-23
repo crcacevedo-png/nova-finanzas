@@ -701,6 +701,7 @@ async def export_patients_excel(
     search: Optional[str] = None,
     referral_institution: Optional[str] = None,
     igss_unit_id: Optional[str] = None,
+    igss_nog: Optional[str] = None,
     gender: Optional[str] = None,
     date_from: Optional[str] = Query(None, alias="dateFrom"),
     date_to: Optional[str] = Query(None, alias="dateTo"),
@@ -710,6 +711,7 @@ async def export_patients_excel(
     try:
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        import re as _re
         
         query = {"is_active": True}
         if search:
@@ -719,6 +721,8 @@ async def export_patients_excel(
             query["referral_institution"] = referral_institution
         if igss_unit_id:
             query["igss_unit_id"] = igss_unit_id
+        if igss_nog:
+            query["igss_nog"] = {"$regex": _re.escape(igss_nog.strip()), "$options": "i"}
         if gender:
             query["gender"] = gender
         if date_from or date_to:
@@ -739,7 +743,7 @@ async def export_patients_excel(
         headers = [
             "No. Expediente", "Nombre", "Apellido", "Género", "Fecha Nacimiento",
             "Edad", "Profesión", "Teléfono", "Email", "DPI", "Institución",
-            "Unidad IGSS", "Fecha Registro"
+            "Unidad IGSS", "NOG", "Fecha Registro"
         ]
         
         header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
@@ -763,7 +767,7 @@ async def export_patients_excel(
                 enriched["gender"].capitalize(), enriched["birth_date"], enriched["age"],
                 enriched.get("profession", ""), enriched["phone"], enriched.get("email", ""),
                 enriched.get("dpi", ""), enriched["referral_institution_label"],
-                enriched.get("igss_unit_name", ""), enriched["created_at"][:10]
+                enriched.get("igss_unit_name", ""), enriched.get("igss_nog", ""), enriched["created_at"][:10]
             ]
             for col, value in enumerate(data, 1):
                 cell = ws.cell(row=row, column=col, value=value)
@@ -789,7 +793,11 @@ async def export_patients_excel(
 async def export_patients_pdf(
     search: Optional[str] = None,
     referral_institution: Optional[str] = None,
+    igss_unit_id: Optional[str] = None,
+    igss_nog: Optional[str] = None,
     gender: Optional[str] = None,
+    date_from: Optional[str] = Query(None, alias="dateFrom"),
+    date_to: Optional[str] = Query(None, alias="dateTo"),
     current_user: dict = Depends(require_permission("export_patients"))
 ):
     """Exportar pacientes a PDF"""
@@ -800,6 +808,7 @@ async def export_patients_pdf(
         from reportlab.lib.units import inch
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.enums import TA_CENTER
+        import re as _re
         
         query = {"is_active": True}
         if search:
@@ -807,8 +816,20 @@ async def export_patients_pdf(
             query["$or"] = [{"first_name": search_regex}, {"last_name": search_regex}, {"dpi": search_regex}]
         if referral_institution:
             query["referral_institution"] = referral_institution
+        if igss_unit_id:
+            query["igss_unit_id"] = igss_unit_id
+        if igss_nog:
+            query["igss_nog"] = {"$regex": _re.escape(igss_nog.strip()), "$options": "i"}
         if gender:
             query["gender"] = gender
+        if date_from or date_to:
+            date_query = {}
+            if date_from:
+                date_query["$gte"] = date_from
+            if date_to:
+                date_query["$lte"] = date_to
+            if date_query:
+                query["created_at"] = date_query
         
         patients = await db.patients.find(query, {"_id": 0}).sort("record_number", 1).to_list(10000)
         
@@ -825,14 +846,15 @@ async def export_patients_pdf(
         elements.append(Paragraph(f"Generado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
         elements.append(Spacer(1, 0.3*inch))
         
-        table_data = [["Expediente", "Nombre Completo", "Género", "Edad", "Teléfono", "DPI", "Institución"]]
+        table_data = [["Expediente", "Nombre Completo", "Género", "Edad", "Teléfono", "DPI", "Institución", "Unidad IGSS", "NOG"]]
         
         for patient in patients:
             enriched = await enrich_patient(patient)
             table_data.append([
                 enriched["record_number"], enriched["full_name"], enriched["gender"].capitalize(),
                 str(enriched["age"]), enriched["phone"], enriched.get("dpi", "-"),
-                enriched["referral_institution_label"]
+                enriched["referral_institution_label"],
+                enriched.get("igss_unit_name", "") or "-", enriched.get("igss_nog", "") or "-"
             ])
         
         table = Table(table_data, repeatRows=1)

@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 21)
+**Última actualización**: 2026-06 (Sesión 22)
+
+### Mejoras (2026-06 Sesión 22) — Cupos por NOG en el filtro + Exportar con Unidad y NOG
+- ✅ **1. Cupos por NOG en el desplegable**: además del conteo de pacientes, cada NOG muestra ahora **usados/total según contrato**, ej. "EXP-100 — Consulta (2 pac. · 7/50)". Backend: `nogs-activos` agrega `acreditados`; frontend agrega `· {acreditados}/{cantidad}` al label.
+- ✅ **2. Exportación de Pacientes con Unidad y NOG**: los export a **Excel y PDF** ahora respetan los filtros `igss_unit_id` e `igss_nog` (antes el Excel ignoraba NOG y el PDF ignoraba unidad, NOG y fechas) e incluyen columnas **"Unidad IGSS"** y **"NOG"**. Frontend `patientApi.exportExcel/exportPdf` pasan unidad, NOG y fechas.
+- **Verificado**: curl (nogs-activos → 2 pac · 7/50; Excel con columnas Unidad/NOG y 2 filas filtradas; PDF válido) y screenshot del desplegable con cupos. Datos de prueba purgados. ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Mejora (2026-06 Sesión 21) — Contador de pacientes por NOG en el filtro
 - ✅ El desplegable de NOG (filtro de Pacientes, cascada desde Unidad IGSS) ahora muestra junto a cada NOG **cuántos pacientes tiene asignados**: ej. "CNT-100 — Consulta (3 pac.)".

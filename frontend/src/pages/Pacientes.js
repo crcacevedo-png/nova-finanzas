@@ -619,7 +619,7 @@ const Pacientes = () => {
                             <SelectItem value="all">Todos los NOG</SelectItem>
                             {filterNogs.map((n) => (
                               <SelectItem key={n.id} value={n.numero}>
-                                {n.numero}{n.nombre_servicio ? ` — ${n.nombre_servicio}` : ''} ({n.pacientes_asignados || 0} pac.)
+                                {n.numero}{n.nombre_servicio ? ` — ${n.nombre_servicio}` : ''} ({n.pacientes_asignados || 0} pac. · {n.acreditados || 0}/{n.cantidad || 0})
                               </SelectItem>
                             ))}
                           </SelectContent>
