@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 19)
+**Última actualización**: 2026-06 (Sesión 20)
+
+### Mejora (2026-06 Sesión 20) — Filtro NOG en cascada desde la Unidad IGSS
+- ✅ En los filtros de Pacientes, al **seleccionar una Unidad IGSS** el filtro de **NOG** ahora se convierte en un **desplegable** con los NOG activos de esa unidad (cascada Unidad → NOG) usando `igssNogApi.getActivos(unitId)`. Sin unidad seleccionada, el NOG sigue siendo un campo de texto libre (búsqueda parcial). Al cambiar de unidad se **resetea** el NOG.
+- Implementación en `Pacientes.js`: nuevo estado `filterNogs` + efecto que carga los NOG al cambiar `filters.igss_unit_id`; render condicional `filter-igss-nog-select` (Select) vs `filter-igss-nog` (Input).
+- **Verificado por testing agent (frontend 5/5, 100%, iteration_55.json)**: aparición del desplegable con los NOG correctos, filtrado de la tabla por NOG, reseteo al cambiar unidad y "Limpiar filtros". Datos de prueba (unidad "QA Unidad NOG", 2 NOG, 3 pacientes QN) purgados. ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Ajustes UI (2026-06 Sesión 19) — Receta de Medicamentos
 - ✅ **1. Unir Dosis/Frecuencia/Duración**: en la sección "Receta de Medicamentos" de `EvaluacionOftalmologica.js` los tres campos (antes un `grid grid-cols-3` de inputs separados tipo píldora) ahora forman **un solo grupo conectado**: un contenedor con borde redondeado que envuelve los tres inputs sin borde propio, separados por divisores verticales. Verificado por screenshot (grupo unido visible con la receta desplegada).

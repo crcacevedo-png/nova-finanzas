@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only E2E testing of IGSS Unit -> NOG cascade filter in /pacientes. All 5 scenarios from the review request PASSED. The NOG filter correctly toggles between a free-text Input (no unit selected) and a Select dropdown (unit with NOGs selected), lists the correct NOGs, filters the patient table correctly, resets NOG when the unit changes, and Limpiar filtros collapses the IGSS panel and restores Institución to 'Todas'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "detailed_results": [
+    "IGSS selected -> filter-igss-unit present, filter-igss-nog (Input) present, filter-igss-nog-select absent. PASS",
+    "Unit 'QA Unidad NOG' selected -> filter-igss-nog-select appears with 3 options: 'Todos los NOG', 'NOG-QA-100 — Consulta', 'NOG-QA-200 — Cirugía'. Table shows 3 patients (QN Ana NogUno, QN Beto NogUno, QN Carla NogDos). PASS",
+    "NOG-QA-100 -> 2 rows (Ana + Beto). NOG-QA-200 -> 1 row (Carla). Todos los NOG -> 3 rows. PASS",
+    "Change unit to 'Todas las unidades' -> NOG resets: filter-igss-nog input reappears with value '', table no longer filtered by NOG (5 rows IGSS). PASS",
+    "After applying unit + NOG-QA-100, click 'Limpiar filtros' -> filter-igss-unit disappears (IGSS panel gone), Institución combobox reads 'Todas', table shows unfiltered list (20 rows visible). PASS"
+  ],
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None. Test data (Unidad 'QA Unidad NOG', NOG-QA-100/200 and QN patients) already existed and was preserved as instructed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cascade filter Unidad IGSS -> NOG in /pacientes is fully working. data-testids used: filter-igss-unit, filter-igss-nog (Input), filter-igss-nog-select. QN test patients are still present in DB (main agent to clean up)."
+}
