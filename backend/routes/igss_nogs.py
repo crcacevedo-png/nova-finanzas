@@ -272,6 +272,12 @@ async def listar_nogs_activos(
     nogs_docs = await db.igss_nogs.find(
         {"unidad_id": unit_id, "is_active": True}, {"_id": 0}
     ).sort("numero", 1).to_list(1000)
+    # Conteo de pacientes activos asignados a cada NOG de esta unidad (una sola agregación)
+    conteo_docs = await db.patients.aggregate([
+        {"$match": {"igss_unit_id": unit_id, "is_active": True, "igss_nog": {"$nin": [None, ""]}}},
+        {"$group": {"_id": "$igss_nog", "total": {"$sum": 1}}},
+    ]).to_list(2000)
+    conteo_por_nog = {c["_id"]: c["total"] for c in conteo_docs}
     return [
         {
             "id": n["id"],
@@ -279,6 +285,7 @@ async def listar_nogs_activos(
             "nombre_servicio": n.get("nombre_servicio", ""),
             "disponibles": max(int(n.get("cantidad") or 0) - int(n.get("acreditados") or 0), 0),
             "cantidad": int(n.get("cantidad") or 0),
+            "pacientes_asignados": conteo_por_nog.get(n.get("numero", ""), 0),
             "estado": _estado_nog(int(n.get("acreditados") or 0), int(n.get("cantidad") or 0), True),
         }
         for n in nogs_docs

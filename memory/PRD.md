@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 20)
+**Última actualización**: 2026-06 (Sesión 21)
+
+### Mejora (2026-06 Sesión 21) — Contador de pacientes por NOG en el filtro
+- ✅ El desplegable de NOG (filtro de Pacientes, cascada desde Unidad IGSS) ahora muestra junto a cada NOG **cuántos pacientes tiene asignados**: ej. "CNT-100 — Consulta (3 pac.)".
+- Backend: el endpoint `GET /igss-units/{unit_id}/nogs-activos` incluye ahora `pacientes_asignados`, calculado con una sola agregación sobre `patients` (activos, agrupados por `igss_nog`) para esa unidad.
+- Frontend (`Pacientes.js`): el label de cada `SelectItem` del NOG añade `(${n.pacientes_asignados} pac.)`.
+- **Verificado**: curl (CNT-100→3, CNT-200→1) y screenshot del desplegable con el conteo. Datos de prueba purgados. ESLint limpio. Requiere redespliegue para producción.
+
+
 
 ### Mejora (2026-06 Sesión 20) — Filtro NOG en cascada desde la Unidad IGSS
 - ✅ En los filtros de Pacientes, al **seleccionar una Unidad IGSS** el filtro de **NOG** ahora se convierte en un **desplegable** con los NOG activos de esa unidad (cascada Unidad → NOG) usando `igssNogApi.getActivos(unitId)`. Sin unidad seleccionada, el NOG sigue siendo un campo de texto libre (búsqueda parcial). Al cambiar de unidad se **resetea** el NOG.
