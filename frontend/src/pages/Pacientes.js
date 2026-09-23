@@ -58,6 +58,7 @@ import { toast, Toaster } from 'sonner';
 import { 
   patientApi, 
   igssUnitApi,
+  igssNogApi,
   formatDate, 
   referralInstitutionLabels, 
   genderLabels,
@@ -69,6 +70,7 @@ const Pacientes = () => {
   const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
   const [igssUnits, setIgssUnits] = useState([]);
+  const [filterNogs, setFilterNogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -155,6 +157,20 @@ const Pacientes = () => {
   useEffect(() => {
     fetchIgssUnits();
   }, [fetchIgssUnits]);
+
+  // Cargar los NOG de la unidad elegida en el filtro (cascada unidad -> NOG)
+  useEffect(() => {
+    const unitId = filters.igss_unit_id;
+    if (!unitId) {
+      setFilterNogs([]);
+      return;
+    }
+    let cancelled = false;
+    igssNogApi.getActivos(unitId)
+      .then((res) => { if (!cancelled) setFilterNogs(res.data || []); })
+      .catch(() => { if (!cancelled) setFilterNogs([]); });
+    return () => { cancelled = true; };
+  }, [filters.igss_unit_id]);
 
   useEffect(() => {
     fetchPatients();
@@ -576,7 +592,7 @@ const Pacientes = () => {
                       <Label className="text-xs">Unidad IGSS</Label>
                       <Select
                         value={filters.igss_unit_id || 'all'}
-                        onValueChange={(value) => setFilters(prev => ({ ...prev, igss_unit_id: value === 'all' ? '' : value }))}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, igss_unit_id: value === 'all' ? '' : value, igss_nog: '' }))}
                       >
                         <SelectTrigger className="input-teal" data-testid="filter-igss-unit">
                           <SelectValue placeholder="Todas las unidades" />
@@ -591,14 +607,33 @@ const Pacientes = () => {
                     </div>
                     <div>
                       <Label className="text-xs">NOG</Label>
-                      <Input
-                        type="text"
-                        value={filters.igss_nog}
-                        onChange={(e) => setFilters(prev => ({ ...prev, igss_nog: e.target.value }))}
-                        className="input-teal"
-                        placeholder="Buscar por NOG..."
-                        data-testid="filter-igss-nog"
-                      />
+                      {filters.igss_unit_id && filterNogs.length > 0 ? (
+                        <Select
+                          value={filters.igss_nog || 'all'}
+                          onValueChange={(value) => setFilters(prev => ({ ...prev, igss_nog: value === 'all' ? '' : value }))}
+                        >
+                          <SelectTrigger className="input-teal" data-testid="filter-igss-nog-select">
+                            <SelectValue placeholder="Todos los NOG" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos los NOG</SelectItem>
+                            {filterNogs.map((n) => (
+                              <SelectItem key={n.id} value={n.numero}>
+                                {n.numero}{n.nombre_servicio ? ` — ${n.nombre_servicio}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          type="text"
+                          value={filters.igss_nog}
+                          onChange={(e) => setFilters(prev => ({ ...prev, igss_nog: e.target.value }))}
+                          className="input-teal"
+                          placeholder="Buscar por NOG..."
+                          data-testid="filter-igss-nog"
+                        />
+                      )}
                     </div>
                   </>
                 )}
