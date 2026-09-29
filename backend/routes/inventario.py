@@ -919,15 +919,29 @@ async def eliminar_bodega(
     if current_user.get("role") != "superadmin":
         raise HTTPException(status_code=403, detail="Solo SuperAdmin puede eliminar bodegas")
     
-    # Verificar existencias
-    existencias = await db.existencias_inventario.find_one({
+    # Verificar existencias con stock en esta bodega
+    existencias = await db.existencias_inventario.find({
         "bodega_id": bodega_id,
         "cantidad": {"$gt": 0},
         "origen": "clinica"
-    })
-    if existencias:
+    }).to_list(2000)
+
+    # Ignorar existencias huérfanas (de productos que ya fueron eliminados):
+    # solo bloquean el borrado las existencias de productos que aún existen.
+    producto_ids = list({e.get("producto_id") for e in existencias if e.get("producto_id")})
+    productos_existentes = set()
+    if producto_ids:
+        docs = await db.productos_inventario.find(
+            {"id": {"$in": producto_ids}, "origen": "clinica"}, {"_id": 0, "id": 1}
+        ).to_list(2000)
+        productos_existentes = {d["id"] for d in docs}
+
+    existencias_reales = [e for e in existencias if e.get("producto_id") in productos_existentes]
+    if existencias_reales:
         raise HTTPException(status_code=400, detail="No se puede eliminar una bodega con existencias")
-    
+
+    # Limpiar existencias huérfanas de esta bodega antes de eliminarla
+    await db.existencias_inventario.delete_many({"bodega_id": bodega_id, "origen": "clinica"})
     await db.bodegas_inventario.delete_one({"id": bodega_id})
     return {"message": "Bodega eliminada"}
 
@@ -1323,8 +1337,8 @@ async def eliminar_producto(
     if tiene_movimientos and force:
         # Eliminar movimientos
         await db.movimientos_inventario.delete_many({"producto_id": producto_id, "origen": "clinica"})
-        # Eliminar existencias por bodega
-        await db.existencias_bodega.delete_many({"producto_id": producto_id})
+        # Eliminar existencias por bodega (colección real de stock)
+        await db.existencias_inventario.delete_many({"producto_id": producto_id})
         # Eliminar lotes
         await db.lotes_inventario.delete_many({"producto_id": producto_id, "origen": "clinica"})
     
