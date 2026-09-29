@@ -262,16 +262,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         elif any(ext in path for ext in ['.xlsx', '.pdf', '.csv']):
             response.headers["Cache-Control"] = "public, max-age=3600"
         
-        # API endpoints: no cachear por defecto (datos dinámicos)
+        # API endpoints: NUNCA cachear datos dinámicos.
+        # Con 10 usuarios en simultáneo, cachear listas (médicos, unidades IGSS,
+        # catálogos) hacía que los cambios de un usuario no aparecieran a los
+        # demás hasta que expiraba el caché (~5 min con directiva 'public').
         elif '/api/' in path:
-            # Endpoints que pueden cachearse brevemente
-            cacheable_endpoints = ['/api/catalogos/', '/api/igss-units', '/api/doctors']
-            if any(ep in path for ep in cacheable_endpoints):
-                response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutos
-            else:
-                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-                response.headers["Pragma"] = "no-cache"
-                response.headers["Expires"] = "0"
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         
         return response
 

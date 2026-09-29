@@ -4,7 +4,24 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 23)
+**Última actualización**: 2026-06 (Sesión 25)
+
+### Bug fix (2026-06 Sesión 25) — Datos no se actualizaban entre usuarios simultáneos (médico nuevo tardaba ~10 min)
+- 🐛 **Bug (en pruebas, 10 usuarios simultáneos)**: al agregar un médico, no aparecía para otro usuario hasta ~10 min después.
+- 🔎 **Causa raíz**: el middleware de seguridad (`server.py`) marcaba `/api/doctors`, `/api/igss-units` y `/api/catalogos/` con `Cache-Control: public, max-age=300`. Al ser `public` + 5 min, el navegador/CDN servía la lista **cacheada** a los demás usuarios → los cambios no se veían hasta expirar el caché.
+- ✅ **Fix backend** (`server.py`): TODOS los endpoints `/api/` ahora responden `no-cache, no-store, must-revalidate` (se eliminó la lista `cacheable_endpoints`). Verificado por curl: `GET /api/doctors` → `cache-control: no-store, no-cache, must-revalidate`.
+- ✅ **Fix frontend** (`Medicos.js`): auto-actualización en tiempo real — polling silencioso cada 15s (solo si la pestaña está visible) para que los médicos nuevos aparezcan sin recargar. La página ya tenía botón "Actualizar" manual.
+- ⚠️ **Nota**: la verificación por UI (screenshot) no pudo autenticarse en el preview por rate-limit de IP de la automatización de login; el fix está verificado a nivel de API. Requiere redespliegue para producción.
+
+
+### Bug fix (2026-06 Sesión 24) — El rol "usuario" no podía agregar productos en Inventario
+- 🐛 **Bug**: como `usuario`, al dar clic en "Nuevo Producto" no se podía crear (y los catálogos de apoyo daban 403).
+- 🔎 **Causa**: el backend restringía a admin/superadmin: `crear_producto` (403 al guardar), `GET /suppliers` y `GET /inventario/sociedades/catalogo` (403 al cargar el formulario).
+- ✅ **Fix**: se agregó el rol `usuario` a esos tres chequeos: `crear_producto` (`routes/inventario.py`), `listar_sociedades` (catálogo) y `get_suppliers` (`server.py`). Se mantienen restringidos a superadmin: eliminar producto y editar `precio_venta`.
+- **Verificado por testing agent (backend 6/6 + frontend 100%, iteration_57.json)**: `usuario` abre el modal y crea productos por UI (PROD-00023) y por API (POST→200); `GET /suppliers`, `/sociedades/catalogo`, `/bodegas`→200; DELETE producto sigue 403. Test: `/app/backend/tests/test_inventario_usuario_role.py`. Productos QA purgados. Requiere redespliegue para producción.
+- (Nota menor no bloqueante: el modal "Nuevo Producto" carece de `DialogDescription` — advertencia de accesibilidad, pendiente opcional.)
+
+
 
 ### Bug fix (2026-06 Sesión 23) — No se podía eliminar una bodega "con productos" aunque el inventario estaba vacío
 - 🐛 **Bug (producción)**: inventario vacío pero al eliminar una bodega decía que tenía productos/existencias.

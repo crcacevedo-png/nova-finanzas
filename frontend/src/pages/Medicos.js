@@ -58,21 +58,31 @@ const Medicos = () => {
 
   const canManage = hasPermission('manage_doctors');
 
-  const fetchDoctors = useCallback(async () => {
+  const fetchDoctors = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await doctorApi.getAll(searchTerm);
       setDoctors(response.data.data || []);
     } catch (error) {
       console.error('Error fetching doctors:', error);
-      toast.error('Error al cargar médicos');
+      if (!silent) toast.error('Error al cargar médicos');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [searchTerm]);
 
   useEffect(() => {
     fetchDoctors();
+  }, [fetchDoctors]);
+
+  // Auto-actualización en tiempo real: refresca la lista cada 15s en segundo
+  // plano para que, con varios usuarios simultáneos, los médicos nuevos
+  // aparezcan sin necesidad de recargar la página.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchDoctors(true);
+    }, 15000);
+    return () => clearInterval(interval);
   }, [fetchDoctors]);
 
   const handleOpenDialog = (doctor = null) => {
