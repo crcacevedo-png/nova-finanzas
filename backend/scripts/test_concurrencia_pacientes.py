@@ -11,7 +11,7 @@ import threading
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-API = os.environ.get("API_URL", "https://novavision-finanzas.preview.emergentagent.com") + "/api"
+API = os.environ["API_URL"] + "/api"
 
 USERS = [
     ("superadmin", "nova2024"),

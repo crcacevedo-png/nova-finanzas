@@ -1,0 +1,34 @@
+{
+  "summary": "Verificación independiente de la corrección de condición de carrera en get_next_record_number y smoke UI de Médicos/Pacientes/Agenda. Se ejecutaron 4 tests pytest (30 POST /api/patients concurrentes con 3 tokens; 10 POST /api/patients con mismo DPI concurrentes; matriz de permisos; sanity GET). Resultado: 4/4 PASS. Cero record_number duplicados en 20 pacientes creados concurrentemente por superadmin+admin. Frontend: /pacientes, /optica/medicos y /agenda cargan sin errores de consola y con tabla/calendario + botón 'Actualizar'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_concurrencia_pacientes.py",
+    "/app/test_reports/pytest/concurrencia_pacientes.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "patients.py get_next_record_number ahora es atómico usando db.counters con find_one_and_update $inc + ReturnDocument.AFTER y verificación de drift; inicialización idempotente con $setOnInsert (correcto).",
+    "El script legacy /app/backend/scripts/test_concurrencia_pacientes.py usa API_URL con URL hard-coded como fallback; se recomienda quitar el default para 'fail fast' si falta la variable (patrón ya aplicado en el nuevo test)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_concurrencia_pacientes.py (nuevo test pytest)"
+  ],
+  "success_rate": {
+    "backend": "100% (4/4 tests)",
+    "frontend": "100% (3/3 páginas smoke)"
+  },
+  "test_credentials": "superadmin/nova2024, admin/Admin2024Nuevo!, usuario/user2024 (los tres válidos; usuario correctamente recibe 403 al POST /api/patients).",
+  "seed_data_creation": "20 pacientes de prueba con prefijo 'LoadTest<hex>' + 1 paciente con DPI duplicado; TODOS eliminados via hard-delete en Mongo (patients.delete_many first_name ~ ^LoadTest) en el teardown de la fixture.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test de concurrencia estable: 30 POST /api/patients paralelos, esperando 20x200 con record_number único formato EXP-YYYYMM-#### y 10x403 para rol 'usuario'. También valida que con el mismo DPI enviado 10 veces en paralelo solo 1 request resulte 200 y el resto 400. IMPORTANTE: hay rate-limit 5/min/IP en /api/auth/login: SIEMPRE reutilizar tokens (scope='session' en fixture). La ruta frontend de Médicos es /optica/medicos (no /medicos: /medicos redirige a /dashboard). El nombre del test file para regresión es /app/backend/tests/test_concurrencia_pacientes.py.",
+  "rca of the issue": "N/A - el bug original de expedientes duplicados por race en get_next_record_number ya está corregido (atomic $inc en 'counters'). Verificado bajo 20 creaciones concurrentes: 0 duplicados. La corrección adicional del header Cache-Control:no-store en /api también está en server.py."
+}

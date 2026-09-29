@@ -4,7 +4,18 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 25)
+**Última actualización**: 2026-06 (Sesión 26)
+
+### Features + Bug fix (2026-06 Sesión 26) — Concurrencia (10 usuarios) y auto-actualización en tiempo real
+- 🐛 **Bug crítico de concurrencia (data integrity)**: `get_next_record_number` (`routes/patients.py`) leía el último expediente y sumaba 1 (read-then-write). Con 3 usuarios creando pacientes en simultáneo generaba **números de expediente DUPLICADOS**.
+  - ✅ **Fix**: contador atómico por mes en la colección `counters` (`find_one_and_update` con `$inc` + `ReturnDocument.AFTER`), inicialización idempotente con `$setOnInsert` (toma el máximo existente del mes una sola vez) y bucle de reintento anti-drift (si el candidato ya existe, avanza). Import `from pymongo import ReturnDocument`.
+  - **Verificado (testing agent, iteration_58.json, 4/4 backend)**: 20 POST /api/patients concurrentes → 0 expedientes duplicados; 10 POST con el MISMO DPI en paralelo → solo 1 crea (resto 400). Script: `/app/backend/scripts/test_concurrencia_pacientes.py` y `/app/backend/tests/test_concurrencia_pacientes.py`.
+- ✅ **Refresco automático en Agenda** (`Agenda.js`): el polling (cada 15s) ahora TAMBIÉN refresca las citas (`pollCitas`), no solo contadores/presentes, para **evitar duplicar citas** entre usuarios. Guardas: no refresca con el diálogo de cita abierto, walk-in abierto ni durante arrastre (drag&drop). Skip si la pestaña está oculta (`document.hidden`).
+- ✅ **Auto-actualización en Pacientes** (`Pacientes.js`): polling silencioso cada 15s (`pollPatients`) respetando página/búsqueda/filtros actuales; no corre con el formulario abierto.
+- ✅ **Aviso discreto de cambios**: cuando el refresco automático detecta registros nuevos creados por OTROS usuarios, se muestra un `toast.info` breve (3s): "Agenda actualizada: N cita(s) nueva(s)", "Lista actualizada: N paciente(s) nuevo(s)", "Se agregó N médico(s) nuevo(s)". Detección por `useRef` de IDs conocidos (no avisa por las acciones propias).
+- ℹ️ **Ruta de Médicos**: la página vive en `/optica/medicos` (no `/medicos`).
+- ℹ️ El rol `usuario` NO tiene permiso `create_patients` (recibe 403 al crear pacientes) — comportamiento esperado.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Bug fix (2026-06 Sesión 25) — Datos no se actualizaban entre usuarios simultáneos (médico nuevo tardaba ~10 min)
 - 🐛 **Bug (en pruebas, 10 usuarios simultáneos)**: al agregar un médico, no aparecía para otro usuario hasta ~10 min después.
