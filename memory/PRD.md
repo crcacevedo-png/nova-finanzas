@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 26)
+**Última actualización**: 2026-06 (Sesión 27)
+
+### Feature + Bug fix crítico (2026-06 Sesión 27) — Tiempo real en POS + anti-sobreventa bajo concurrencia
+- 🐛 **Bug crítico de sobreventa (data/dinero)**: `descontar_inventario` (`routes/inventario.py`) validaba el stock y LUEGO descontaba (check-then-act) y los lotes se decrementaban con `$inc` incondicional. Con varios cajeros vendiendo el mismo producto/lote a la vez → **sobreventa** (existencia/lote negativos), justo lo que el usuario temía ("vender el mismo lote agotado").
+  - ✅ **Fix (descuento ATÓMICO + rollback)**: sin lotes → `find_one_and_update` con guard `{'cantidad': {'$gte': cantidad}}`; con lotes (FEFO) → `update_one` por lote con guard `{'cantidad_disponible': {'$gte': usar}}` + reintento FEFO cuando otro usuario toma el lote en paralelo; si no se puede completar, **rollback** de todo lo descontado en esa venta y error 400. `crear_movimiento_kardex` ahora acepta `existencia_anterior` explícita para snapshots correctos.
+  - ✅ **Fix número de venta atómico**: `generar_numero_venta` (`routes/ventas.py`) usaba read-then-write (VTA duplicado). Ahora contador atómico en `counters` (`find_one_and_update $inc`) por día + reintento anti-drift.
+  - **Verificado (testing agent, iteration_59.json, backend+frontend 100%)**: 6 ventas concurrentes con stock 3 → exactamente 3 OK / 3 x 400, existencia final 0 (nunca negativa); 5 concurrentes con lote 2 → 2 OK / 3 x 400, lote 0, existencia 0; 10 concurrentes → 10 números de venta únicos. Scripts: `/app/backend/scripts/test_concurrencia_pos.py`, `test_concurrencia_pos_lotes.py`; pytest `/app/backend/tests/test_pos_concurrencia_iter59.py`.
+- ✅ **Refresco automático de stock en POS** (`PuntoVenta.js`): `refrescarStockSilencioso` cada 12s (silencioso, respeta búsqueda/categoría y se pausa si la pestaña está oculta) para que la existencia se sincronice entre cajeros. Smoke UI OK sin errores de consola.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Features + Bug fix (2026-06 Sesión 26) — Concurrencia (10 usuarios) y auto-actualización en tiempo real
 - 🐛 **Bug crítico de concurrencia (data integrity)**: `get_next_record_number` (`routes/patients.py`) leía el último expediente y sumaba 1 (read-then-write). Con 3 usuarios creando pacientes en simultáneo generaba **números de expediente DUPLICADOS**.

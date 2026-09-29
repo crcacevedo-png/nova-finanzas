@@ -1,0 +1,32 @@
+{
+  "summary": "Verificación independiente de las correcciones anti-sobreventa del POS bajo concurrencia + smoke UI. (1) Ejecutados los 2 scripts de referencia (/app/backend/scripts/test_concurrencia_pos.py y test_concurrencia_pos_lotes.py): ambos PASARON. (2) Creado test pytest independiente /app/backend/tests/test_pos_concurrencia_iter59.py con 3 casos (sin lotes, con lotes/FEFO, y numero_venta único bajo 10 ventas concurrentes): los 3 PASARON. (3) Smoke UI POS (/punto-venta) con superadmin: la página carga, muestra productos con existencia/stock y el carrito; tras 15s (permite disparar al menos un ciclo del setInterval de 12s) NO hay errores de consola ni pageerror ni 4xx/5xx en /api. Advertencia UI: la caja del día 2026-09-29 aparece cerrada, con banner 'La caja está cerrada' visible (no es un bug, es estado real de datos).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pos_concurrencia_iter59.py",
+    "/app/test_reports/pytest/iter59_pos_concurrencia.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "El script test_concurrencia_pos.py requiere env var API_URL (no está en backend/.env). Aunque no bloquea al agente principal (lo corre con export), el nuevo pytest usa REACT_APP_BACKEND_URL desde frontend/.env, más portable.",
+    "generar_numero_venta usa db.counters $inc con reset diario: OK bajo concurrencia (10/10 numeros únicos y con formato VTA-YYYYMMDD-####).",
+    "descontar_inventario aplica update_one con guard {cantidad: {$gte: qty}} tanto en lote como en existencia agregada; comprobado que existencia final nunca es negativa (0 en ambos escenarios)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pos_concurrencia_iter59.py (nuevo)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024 y admin / Admin2024Nuevo! (ambos funcionan)",
+  "seed_data_creation": "Producto/lote/existencia/venta/movimientos y caja temporal (si no existía caja abierta hoy) fueron sembrados y ELIMINADOS al final de cada test (fixture con teardown y bloque finally).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Los 3 tests concurrentes del POS iter59 pueden reutilizarse como regresión: pytest /app/backend/tests/test_pos_concurrencia_iter59.py. Requieren MongoDB local up y REACT_APP_BACKEND_URL en frontend/.env. La colección db.counters se incrementa (no se limpia); no afecta funcionalidad. Si la caja clínica del día ya está abierta cuando corre el test, no se crea/borra caja temporal.",
+  "rca of the issue": "N/A - no se encontraron regresiones. Las guardas atómicas ($gte en cantidad y cantidad_disponible) impiden sobreventa en concurrencia real (6 threads simultáneos con stock 3 => exactamente 3 OK y 3 400; 5 threads con lote 2 => exactamente 2 OK y 3 400; 10 threads con stock 10 => 10 números de venta únicos)."
+}
