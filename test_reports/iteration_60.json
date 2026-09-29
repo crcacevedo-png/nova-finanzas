@@ -1,0 +1,22 @@
+{
+  "summary": "Verified fix for 'usuario' role: Entrada Rápida now works (POST /api/inventario/entrada -> 200) and min/max existence fields are editable (PUT /api/inventario/productos/{id} -> 200). Price update by usuario correctly rejected (400). No admin regression. All backend tests (5/5) pass and E2E flow confirmed via Playwright with network capture showing 200 responses.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_inventario_usuario_permisos.py",
+    "/app/test_reports/pytest/inv_usuario.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routes/inventario.py: whitelist approach for 'usuario' PUT is correct; ensure any future writable field for usuario is added explicitly.",
+    "Frontend 'puedeEditarExistencias' flag on Productos.js line ~29 correctly enables min/max inputs for usuario role."
+  ],
+  "updated_files": ["/app/backend/tests/test_inventario_usuario_permisos.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin/nova2024, usuario/user2024",
+  "seed_data_creation": "None. Only registered small stock entries (+2, +1) using existing product Estuche para Lentes de Contacto (PROD-00014).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests at /app/backend/tests/test_inventario_usuario_permisos.py cover: usuario can update min/max, usuario cannot change precio_venta (400), usuario/admin can register entrada. Note: entrada endpoint requires costo_unitario, and product with controla_lotes=true requires lote+fecha_vencimiento; tests pick a non-lote product automatically. Frontend routes at /inventario/productos, testids: btn-entrada-{id}, btn-edit-{id}, btn-confirmar-entrada, producto-existencia-minima/maxima.",
+  "rca of the issue": "Original bug: POST /api/inventario/entrada and PUT /api/inventario/productos permissions blocked role 'usuario' (403), causing button clicks to silently fail. Fix added 'usuario' to permission list with whitelist restricting mutable fields (existencia_minima, existencia_maxima) while keeping precio_venta restricted. Frontend enabled min/max inputs for usuario. All verified working E2E."
+}
