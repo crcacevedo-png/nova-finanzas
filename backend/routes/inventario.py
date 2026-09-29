@@ -1326,19 +1326,30 @@ async def actualizar_producto(
     """Actualiza un producto"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    role = current_user.get("role")
+    if role not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Sin permisos para editar productos")
-    
-    # Verificar permisos para editar precio
-    if producto.precio_venta is not None and current_user.get("role") != "superadmin":
-        raise HTTPException(status_code=403, detail="Solo SuperAdmin puede editar precios de venta")
     
     existente = await db.productos_inventario.find_one({"id": producto_id, "origen": "clinica"})
     if not existente:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    # Preparar actualización (solo campos no nulos)
-    update_data = {k: v for k, v in producto.model_dump().items() if v is not None}
+    if role == "usuario":
+        # El rol 'usuario' sólo puede modificar existencias mínima y máxima.
+        campos_permitidos = {"existencia_minima", "existencia_maxima"}
+        update_data = {
+            k: v for k, v in producto.model_dump().items()
+            if v is not None and k in campos_permitidos
+        }
+        if not update_data:
+            raise HTTPException(status_code=400, detail="Sin campos válidos para actualizar")
+    else:
+        # Verificar permisos para editar precio (solo superadmin)
+        if producto.precio_venta is not None and role != "superadmin":
+            raise HTTPException(status_code=403, detail="Solo SuperAdmin puede editar precios de venta")
+        # Preparar actualización (solo campos no nulos)
+        update_data = {k: v for k, v in producto.model_dump().items() if v is not None}
+    
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     await db.productos_inventario.update_one(
@@ -2099,7 +2110,7 @@ async def registrar_entrada_rapida(
     """Registra una entrada rápida de inventario"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Sin permisos para registrar entradas")
     
     producto = await db.productos_inventario.find_one({"id": entrada.producto_id, "origen": "clinica"})

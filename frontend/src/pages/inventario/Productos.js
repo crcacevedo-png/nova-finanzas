@@ -26,6 +26,8 @@ const Productos = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+  // El rol 'usuario' también puede definir existencias mínima/máxima.
+  const puedeEditarExistencias = isAdminOrSuperAdmin || user?.role === 'usuario';
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState([]);
@@ -1020,11 +1022,12 @@ const Productos = () => {
                       type="number"
                       value={formData.existencia_minima}
                       onChange={(e) => setFormData({ ...formData, existencia_minima: parseInt(e.target.value) || 0 })}
-                      disabled={!isAdminOrSuperAdmin}
-                      className={!isAdminOrSuperAdmin ? 'bg-gray-100 cursor-not-allowed' : ''}
+                      disabled={!puedeEditarExistencias}
+                      className={!puedeEditarExistencias ? 'bg-gray-100 cursor-not-allowed' : ''}
+                      data-testid="producto-existencia-minima"
                     />
-                    {!isAdminOrSuperAdmin && (
-                      <p className="text-xs text-gray-500">Solo administradores pueden modificar</p>
+                    {!puedeEditarExistencias && (
+                      <p className="text-xs text-gray-500">Sin permiso para modificar</p>
                     )}
                   </div>
                   
@@ -1034,11 +1037,12 @@ const Productos = () => {
                       type="number"
                       value={formData.existencia_maxima}
                       onChange={(e) => setFormData({ ...formData, existencia_maxima: parseInt(e.target.value) || 0 })}
-                      disabled={!isAdminOrSuperAdmin}
-                      className={!isAdminOrSuperAdmin ? 'bg-gray-100 cursor-not-allowed' : ''}
+                      disabled={!puedeEditarExistencias}
+                      className={!puedeEditarExistencias ? 'bg-gray-100 cursor-not-allowed' : ''}
+                      data-testid="producto-existencia-maxima"
                     />
-                    {!isAdminOrSuperAdmin && (
-                      <p className="text-xs text-gray-500">Solo administradores pueden modificar</p>
+                    {!puedeEditarExistencias && (
+                      <p className="text-xs text-gray-500">Sin permiso para modificar</p>
                     )}
                   </div>
                 </>
