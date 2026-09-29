@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
+from pymongo import ReturnDocument
 import uuid
 import logging
 import csv
@@ -620,10 +621,17 @@ async def crear_movimiento_kardex(
     lote_id: Optional[str] = None,
     referencia_tipo: Optional[str] = None,
     referencia_id: Optional[str] = None,
-    motivo: Optional[str] = None
+    motivo: Optional[str] = None,
+    existencia_anterior: Optional[int] = None
 ):
-    """Crea un movimiento inmutable en el kardex"""
-    existencia_anterior = await obtener_existencia(db, producto_id, bodega_id)
+    """Crea un movimiento inmutable en el kardex.
+
+    `existencia_anterior` puede pasarse explícitamente cuando el descuento de
+    stock ya se ejecutó de forma atómica (para que el snapshot del kardex sea
+    correcto y no vuelva a leer la existencia ya modificada).
+    """
+    if existencia_anterior is None:
+        existencia_anterior = await obtener_existencia(db, producto_id, bodega_id)
     
     # Calcular nueva existencia según tipo
     tipos_entrada = ["entrada", "devolucion", "ajuste_positivo", "transferencia_entrada"]
@@ -722,78 +730,140 @@ async def descontar_inventario(
     Esta función es usada por el módulo de Punto de Venta.
     """
     detalle_lotes = []
-    
+    # Registros para rollback ante fallo parcial o concurrencia (no dejar stock
+    # descontado si la venta completa no se puede satisfacer).
+    lotes_decrementados = []      # [(lote_id, cantidad)]
+    existencias_decrementadas = []  # [(producto_id, cantidad)]
+
+    config = await db.config_inventario.find_one({"origen": "clinica"})
+    permitir_negativo = config.get("permitir_existencia_negativa", False) if config else False
+
+    async def _rollback():
+        for lote_id, qty in lotes_decrementados:
+            await db.lotes_inventario.update_one(
+                {"id": lote_id}, {"$inc": {"cantidad_disponible": qty}}
+            )
+        for pid, qty in existencias_decrementadas:
+            await db.existencias_inventario.update_one(
+                {"producto_id": pid, "bodega_id": bodega_id, "origen": "clinica"},
+                {"$inc": {"cantidad": qty}}
+            )
+
     try:
         for item in items:
             producto_id = item["producto_id"]
             cantidad = item["cantidad"]
-            
+
             # Verificar producto
             producto = await db.productos_inventario.find_one({
                 "id": producto_id,
                 "origen": "clinica"
             })
-            
+
             if not producto:
                 raise ValueError(f"Producto {producto_id} no encontrado")
-            
+
             if not producto.get("controla_inventario", True):
                 # Servicios no descuentan inventario
                 continue
-            
-            # Verificar existencia
-            existencia = await obtener_existencia(db, producto_id, bodega_id)
-            
-            # Obtener config para permitir negativo
-            config = await db.config_inventario.find_one({"origen": "clinica"})
-            permitir_negativo = config.get("permitir_existencia_negativa", False) if config else False
-            
-            if existencia < cantidad and not permitir_negativo:
-                raise ValueError(f"Stock insuficiente para {producto['nombre']}. Disponible: {existencia}, Requerido: {cantidad}")
-            
-            # Si controla lotes, usar FEFO
+
+            # Si controla lotes, usar FEFO con descuento ATÓMICO por lote.
             if producto.get("controla_lotes", False):
-                lotes_a_usar = await obtener_lotes_fefo(db, producto_id, bodega_id, cantidad)
-                
-                if lotes_a_usar is None:
-                    raise ValueError(f"No hay lotes disponibles suficientes para {producto['nombre']}")
-                
-                for lote_info in lotes_a_usar:
-                    # Actualizar lote
-                    await db.lotes_inventario.update_one(
-                        {"id": lote_info["lote_id"]},
-                        {"$inc": {"cantidad_disponible": -lote_info["cantidad"]}}
+                restante = cantidad
+                consumidos_item = []
+                intentos = 0
+                # Reintentar mientras haya progreso (otros usuarios pueden tomar
+                # el mismo lote en paralelo). El guard $gte evita sobreventa.
+                while restante > 0 and intentos < 50:
+                    intentos += 1
+                    candidatos = await obtener_lotes_fefo(db, producto_id, bodega_id, restante)
+                    if candidatos is None:
+                        break  # ya no hay lotes disponibles suficientes
+                    progreso = False
+                    for c in candidatos:
+                        if restante <= 0:
+                            break
+                        usar = min(c["cantidad"], restante)
+                        res = await db.lotes_inventario.update_one(
+                            {"id": c["lote_id"], "cantidad_disponible": {"$gte": usar}},
+                            {"$inc": {"cantidad_disponible": -usar}}
+                        )
+                        if res.modified_count == 1:
+                            lotes_decrementados.append((c["lote_id"], usar))
+                            consumidos_item.append({
+                                "lote_id": c["lote_id"],
+                                "numero_lote": c["numero_lote"],
+                                "cantidad": usar,
+                                "costo_unitario": c["costo_unitario"]
+                            })
+                            restante -= usar
+                            progreso = True
+                    if not progreso:
+                        # Todos los candidatos fueron tomados por otra venta; reintentar FEFO.
+                        continue
+
+                if restante > 0 and not permitir_negativo:
+                    raise ValueError(
+                        f"Stock insuficiente para {producto['nombre']}. "
+                        f"Otro usuario pudo haber vendido el mismo lote."
                     )
-                    
-                    # Crear movimiento de kardex
+
+                # Kardex + detalle por cada lote realmente consumido
+                for c in consumidos_item:
                     await crear_movimiento_kardex(
                         db=db,
                         producto_id=producto_id,
                         bodega_id=bodega_id,
                         tipo="venta",
-                        cantidad=lote_info["cantidad"],
-                        costo_unitario=lote_info["costo_unitario"],
+                        cantidad=c["cantidad"],
+                        costo_unitario=c["costo_unitario"],
                         usuario_id=usuario_id,
-                        lote_id=lote_info["lote_id"],
+                        lote_id=c["lote_id"],
                         referencia_tipo=referencia_tipo,
                         referencia_id=referencia_id
                     )
-                    
                     detalle_lotes.append({
                         "producto_id": producto_id,
-                        "lote_id": lote_info["lote_id"],
-                        "numero_lote": lote_info["numero_lote"],
-                        "cantidad": lote_info["cantidad"],
-                        "costo_unitario": lote_info["costo_unitario"]
+                        "lote_id": c["lote_id"],
+                        "numero_lote": c["numero_lote"],
+                        "cantidad": c["cantidad"],
+                        "costo_unitario": c["costo_unitario"]
                     })
-                
-                # Actualizar existencia total
+
+                # Actualizar existencia total (los lotes ya garantizaron disponibilidad)
                 await actualizar_existencia(db, producto_id, bodega_id, -cantidad)
+                existencias_decrementadas.append((producto_id, cantidad))
             else:
-                # Sin control de lotes
+                # Sin control de lotes: descuento ATÓMICO con guard de stock.
                 costo = producto.get("costo_promedio", 0)
-                
-                # Crear movimiento de kardex
+
+                if permitir_negativo:
+                    doc = await db.existencias_inventario.find_one_and_update(
+                        {"producto_id": producto_id, "bodega_id": bodega_id, "origen": "clinica"},
+                        {"$inc": {"cantidad": -cantidad},
+                         "$set": {"ultima_actualizacion": datetime.now(timezone.utc).isoformat()}},
+                        upsert=True,
+                        return_document=ReturnDocument.AFTER
+                    )
+                else:
+                    doc = await db.existencias_inventario.find_one_and_update(
+                        {"producto_id": producto_id, "bodega_id": bodega_id, "origen": "clinica",
+                         "cantidad": {"$gte": cantidad}},
+                        {"$inc": {"cantidad": -cantidad},
+                         "$set": {"ultima_actualizacion": datetime.now(timezone.utc).isoformat()}},
+                        return_document=ReturnDocument.AFTER
+                    )
+                    if not doc:
+                        raise ValueError(
+                            f"Stock insuficiente para {producto['nombre']}. "
+                            f"Otro usuario pudo haber vendido las últimas unidades."
+                        )
+
+                existencias_decrementadas.append((producto_id, cantidad))
+                nueva = doc.get("cantidad", 0)
+                anterior = nueva + cantidad
+
+                # Crear movimiento de kardex con el snapshot correcto (ya descontado)
                 await crear_movimiento_kardex(
                     db=db,
                     producto_id=producto_id,
@@ -803,22 +873,24 @@ async def descontar_inventario(
                     costo_unitario=costo,
                     usuario_id=usuario_id,
                     referencia_tipo=referencia_tipo,
-                    referencia_id=referencia_id
+                    referencia_id=referencia_id,
+                    existencia_anterior=anterior
                 )
-                
-                # Actualizar existencia
-                await actualizar_existencia(db, producto_id, bodega_id, -cantidad)
-                
+
                 detalle_lotes.append({
                     "producto_id": producto_id,
                     "cantidad": cantidad,
                     "costo_unitario": costo
                 })
-        
+
         return {"success": True, "detalle": detalle_lotes, "error": None}
-    
+
     except Exception as e:
         logger.error(f"Error en descontar_inventario: {str(e)}")
+        try:
+            await _rollback()
+        except Exception as re:
+            logger.error(f"Error en rollback de inventario: {str(re)}")
         return {"success": False, "detalle": [], "error": str(e)}
 
 

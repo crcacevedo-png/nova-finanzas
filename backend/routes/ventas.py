@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
+from pymongo import ReturnDocument
 import uuid
 import logging
 
@@ -141,25 +142,46 @@ def get_current_user_dependency():
     return _dep
 
 async def generar_numero_venta(db) -> str:
-    """Genera número único para venta con formato VTA-YYYYMMDD-XXXX"""
+    """Genera número único para venta con formato VTA-YYYYMMDD-XXXX.
+
+    Usa un contador atómico por día en la colección `counters` para evitar
+    números DUPLICADOS cuando varios cajeros venden en simultáneo.
+    """
     hoy = datetime.now(timezone.utc).strftime("%Y%m%d")
     prefijo = f"VTA-{hoy}-"
-    
-    # Buscar la última venta del día
-    ultima = await db.ventas.find_one(
-        {"numero_venta": {"$regex": f"^{prefijo}"}},
-        sort=[("numero_venta", -1)]
-    )
-    
-    if ultima:
-        try:
-            ultimo_num = int(ultima["numero_venta"].split("-")[-1]) + 1
-        except Exception:
-            ultimo_num = 1
-    else:
-        ultimo_num = 1
-    
-    return f"{prefijo}{ultimo_num:04d}"
+    counter_key = f"venta_num_{hoy}"
+
+    # Inicialización idempotente del contador del día.
+    if await db.counters.find_one({"_id": counter_key}) is None:
+        ultima = await db.ventas.find_one(
+            {"numero_venta": {"$regex": f"^{prefijo}"}},
+            sort=[("numero_venta", -1)]
+        )
+        start = 0
+        if ultima:
+            try:
+                start = int(ultima["numero_venta"].split("-")[-1])
+            except Exception:
+                start = 0
+        await db.counters.update_one(
+            {"_id": counter_key},
+            {"$setOnInsert": {"seq": start}},
+            upsert=True
+        )
+
+    candidato = f"{prefijo}0001"
+    for _ in range(5):
+        doc = await db.counters.find_one_and_update(
+            {"_id": counter_key},
+            {"$inc": {"seq": 1}},
+            return_document=ReturnDocument.AFTER,
+            upsert=True
+        )
+        num = doc.get("seq", 1)
+        candidato = f"{prefijo}{num:04d}"
+        if not await db.ventas.find_one({"numero_venta": candidato}):
+            return candidato
+    return candidato
 
 async def obtener_existencia_bodega(db, producto_id: str, bodega_id: str) -> int:
     """Obtiene la existencia de un producto en una bodega específica"""

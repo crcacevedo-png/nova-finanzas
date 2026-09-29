@@ -304,6 +304,31 @@ const PuntoVenta = () => {
     }
   };
 
+  // Refresco automático del stock del POS (cada 12s) para sincronizar la
+  // existencia entre cajeros y evitar vender un lote ya agotado por otro usuario.
+  // Es silencioso: no muestra spinners y respeta la búsqueda/categoría actuales.
+  const refrescarStockSilencioso = useCallback(async () => {
+    if (!bodegaPOS || document.hidden) return;
+    try {
+      const params = { bodega_id: bodegaPOS.bodega_id, limit: 50 };
+      if (searchQuery) params.search = searchQuery;
+      if (categoriaSeleccionada) params.categoria_id = categoriaSeleccionada;
+      const [pRes, rRes] = await Promise.all([
+        ventasApi.buscarProductos(params),
+        ventasApi.getProductosRapidos({ bodega_id: bodegaPOS.bodega_id, limit: 8 })
+      ]);
+      setProductos(pRes.data || []);
+      setProductosRapidos(rRes.data || []);
+    } catch (e) {
+      // silencioso: el refresco de stock no debe interrumpir la venta
+    }
+  }, [bodegaPOS, searchQuery, categoriaSeleccionada]);
+
+  useEffect(() => {
+    const interval = setInterval(refrescarStockSilencioso, 12000);
+    return () => clearInterval(interval);
+  }, [refrescarStockSilencioso]);
+
   // ==================== FUNCIONES DEL CARRITO ====================
 
   const agregarAlCarrito = (producto) => {
