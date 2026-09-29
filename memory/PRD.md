@@ -6,6 +6,11 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 27)
 
+### Aclaración/Fix menor (2026-06 Sesión 27b) — Overlay "Uncaught runtime errors: Script error." en el preview
+- ❓ Reporte: aparecía el overlay rojo "Uncaught runtime errors: Script error." sobre la pantalla de login.
+- 🔎 **Causa**: NO es un error de la app. Es un error **cross-origin** de scripts externos cargados en `public/index.html` (PostHog analytics / `assets.emergent.sh/scripts/emergent-main.js`). El navegador enmascara su detalle como el genérico "Script error." y el overlay de **modo desarrollo** de React (el preview corre `craco start`) lo muestra. En producción (build) ese overlay no existe.
+- ✅ **Fix** (`public/index.html`): supresor específico (junto al ya existente de `DataCloneError`) que descarta sólo el "Script error." cross-origin genérico (`!e.filename && !e.error`); los errores reales de la app (con mensaje/filename) NO se suprimen. Verificado: login carga sin overlay.
+
 ### Feature + Bug fix crítico (2026-06 Sesión 27) — Tiempo real en POS + anti-sobreventa bajo concurrencia
 - 🐛 **Bug crítico de sobreventa (data/dinero)**: `descontar_inventario` (`routes/inventario.py`) validaba el stock y LUEGO descontaba (check-then-act) y los lotes se decrementaban con `$inc` incondicional. Con varios cajeros vendiendo el mismo producto/lote a la vez → **sobreventa** (existencia/lote negativos), justo lo que el usuario temía ("vender el mismo lote agotado").
   - ✅ **Fix (descuento ATÓMICO + rollback)**: sin lotes → `find_one_and_update` con guard `{'cantidad': {'$gte': cantidad}}`; con lotes (FEFO) → `update_one` por lote con guard `{'cantidad_disponible': {'$gte': usar}}` + reintento FEFO cuando otro usuario toma el lote en paralelo; si no se puede completar, **rollback** de todo lo descontado en esa venta y error 400. `crear_movimiento_kardex` ahora acepta `existencia_anterior` explícita para snapshots correctos.
