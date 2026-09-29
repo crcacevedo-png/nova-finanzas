@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
@@ -175,6 +175,44 @@ const Pacientes = () => {
   useEffect(() => {
     fetchPatients();
   }, [fetchPatients]);
+
+  // Detección de pacientes nuevos creados por otros usuarios (aviso discreto)
+  const knownPatientIdsRef = useRef(new Set());
+  useEffect(() => {
+    knownPatientIdsRef.current = new Set((patients || []).map((p) => p.id));
+  }, [patients]);
+
+  // Refresco silencioso: refleja registros nuevos entre usuarios simultáneos
+  // sin recargar la página. No se ejecuta con el formulario abierto.
+  const pollPatients = useCallback(async () => {
+    if (dialogOpen) return;
+    try {
+      const response = await patientApi.getAll({
+        page,
+        limit: 20,
+        search: searchTerm,
+        ...filters
+      });
+      const nuevos = response.data.data || [];
+      const previos = knownPatientIdsRef.current;
+      const nuevosDeOtros = previos.size > 0 ? nuevos.filter((p) => !previos.has(p.id)) : [];
+      setPatients(nuevos);
+      setTotalPages(response.data.total_pages || 1);
+      setTotal(response.data.total || 0);
+      if (nuevosDeOtros.length > 0) {
+        toast.info(`Lista actualizada: ${nuevosDeOtros.length} paciente(s) nuevo(s)`, { duration: 3000 });
+      }
+    } catch (e) {
+      // silencioso
+    }
+  }, [page, searchTerm, filters, dialogOpen]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) pollPatients();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [pollPatients]);
 
   const handleSearch = (e) => {
     e.preventDefault();

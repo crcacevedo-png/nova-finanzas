@@ -1,7 +1,7 @@
 // /app/frontend/src/pages/Agenda.js
 // Módulo de Agenda de Pacientes - Vista principal con submenú
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAgendaWebSocket } from '../hooks/useWebSocket';
@@ -348,6 +348,32 @@ const Agenda = () => {
     }
   }, [fechaSeleccionada, medicoFiltro, estadoFiltro]);
   
+  // Detección de citas nuevas creadas por otros usuarios (para aviso discreto)
+  const knownCitaIdsRef = useRef(new Set());
+  useEffect(() => {
+    knownCitaIdsRef.current = new Set((citas || []).map((c) => c.id));
+  }, [citas]);
+
+  // Refresco silencioso de citas: no interrumpe edición ni arrastre; avisa si
+  // aparecen citas nuevas de otros usuarios (evita duplicar horarios).
+  const pollCitas = useCallback(async () => {
+    if (citaDialogOpen || walkInDialogOpen || dragCita) return;
+    try {
+      const medicoId = medicoFiltro !== 'todos' ? medicoFiltro : undefined;
+      const estado = estadoFiltro !== 'todos' ? estadoFiltro : undefined;
+      const response = await agendaApi.getCitas(fechaSeleccionada, medicoId, estado);
+      const nuevas = response.data.data || [];
+      const previas = knownCitaIdsRef.current;
+      const nuevasDeOtros = previas.size > 0 ? nuevas.filter((c) => !previas.has(c.id)) : [];
+      setCitas(nuevas);
+      if (nuevasDeOtros.length > 0) {
+        toast.info(`Agenda actualizada: ${nuevasDeOtros.length} cita(s) nueva(s)`, { duration: 3000 });
+      }
+    } catch (e) {
+      // silencioso: el polling no debe molestar al usuario
+    }
+  }, [citaDialogOpen, walkInDialogOpen, dragCita, fechaSeleccionada, medicoFiltro, estadoFiltro]);
+  
   const fetchContadores = useCallback(async () => {
     try {
       const response = await agendaApi.getContadores(fechaSeleccionada);
@@ -485,14 +511,17 @@ const Agenda = () => {
   
   useEffect(() => {
     fetchAll();
-    // Polling cada 30 segundos para actualizar presentes y contadores
+    // Polling cada 15s para reflejar cambios de otros usuarios en tiempo real
+    // (citas, presentes y contadores). Refrescar citas evita duplicar horarios.
     const interval = setInterval(() => {
+      if (document.hidden) return;
+      pollCitas();
       fetchContadores();
       fetchPresentes();
       if (activeTab === 'mi-agenda') fetchMiAgenda();
-    }, 30000);
+    }, 15000);
     return () => clearInterval(interval);
-  }, [fetchAll, fetchContadores, fetchPresentes, fetchMiAgenda, activeTab]);
+  }, [fetchAll, pollCitas, fetchContadores, fetchPresentes, fetchMiAgenda, activeTab]);
   
   // ==================== BÚSQUEDA DE PACIENTES ====================
   const searchPacientes = useCallback(async (query) => {

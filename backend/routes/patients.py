@@ -11,6 +11,7 @@ import io
 
 from config.database import db
 from routes.auth import get_current_user, require_role, require_permission
+from pymongo import ReturnDocument
 
 router = APIRouter(prefix="/patients", tags=["Pacientes"])
 pacientes_router = APIRouter(prefix="/pacientes", tags=["Pacientes - Búsqueda rápida"])
@@ -175,25 +176,53 @@ def calcular_edad(birth_date: str) -> int:
 
 
 async def get_next_record_number() -> str:
-    """Generar siguiente número de expediente correlativo"""
+    """Generar siguiente número de expediente correlativo de forma ATÓMICA.
+
+    Con varios usuarios creando pacientes en simultáneo, el enfoque anterior
+    (leer el último y sumar 1) generaba expedientes DUPLICADOS por condición de
+    carrera. Ahora usamos un contador atómico por mes en la colección `counters`
+    (`find_one_and_update` con `$inc`), inicializado una sola vez con el máximo
+    existente del mes. Se reintenta si el número candidato ya existiera (drift
+    por importaciones).
+    """
     now = datetime.now(timezone.utc)
-    prefix = f"EXP-{now.strftime('%Y%m')}-"
-    
-    last = await db.patients.find_one(
-        {"record_number": {"$regex": f"^{prefix}"}},
-        sort=[("record_number", -1)]
-    )
-    
-    if last:
-        try:
-            last_num = int(last["record_number"].split("-")[-1])
-            next_num = last_num + 1
-        except (ValueError, IndexError):
-            next_num = 1
-    else:
-        next_num = 1
-    
-    return f"{prefix}{next_num:04d}"
+    ym = now.strftime('%Y%m')
+    prefix = f"EXP-{ym}-"
+    counter_key = f"patient_record_{ym}"
+
+    # Inicialización idempotente del contador del mes (una sola vez).
+    if await db.counters.find_one({"_id": counter_key}) is None:
+        last = await db.patients.find_one(
+            {"record_number": {"$regex": f"^{prefix}"}},
+            sort=[("record_number", -1)]
+        )
+        start = 0
+        if last:
+            try:
+                start = int(last["record_number"].split("-")[-1])
+            except (ValueError, IndexError):
+                start = 0
+        # $setOnInsert evita pisar el contador si otro request lo creó primero.
+        await db.counters.update_one(
+            {"_id": counter_key},
+            {"$setOnInsert": {"seq": start}},
+            upsert=True
+        )
+
+    candidate = f"{prefix}0001"
+    for _ in range(5):
+        doc = await db.counters.find_one_and_update(
+            {"_id": counter_key},
+            {"$inc": {"seq": 1}},
+            return_document=ReturnDocument.AFTER,
+            upsert=True
+        )
+        next_num = doc.get("seq", 1)
+        candidate = f"{prefix}{next_num:04d}"
+        # Defensa ante drift: si el número ya existe, avanzar de nuevo.
+        if not await db.patients.find_one({"record_number": candidate}):
+            return candidate
+    return candidate
 
 
 async def enrich_patient(patient: dict) -> dict:

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -62,7 +62,15 @@ const Medicos = () => {
     try {
       if (!silent) setLoading(true);
       const response = await doctorApi.getAll(searchTerm);
-      setDoctors(response.data.data || []);
+      const nuevos = response.data.data || [];
+      if (silent) {
+        const previos = knownDoctorIdsRef.current;
+        const nuevosDeOtros = previos.size > 0 ? nuevos.filter((d) => !previos.has(d.id)) : [];
+        if (nuevosDeOtros.length > 0) {
+          toast.info(`Se agregó ${nuevosDeOtros.length} médico(s) nuevo(s)`, { duration: 3000 });
+        }
+      }
+      setDoctors(nuevos);
     } catch (error) {
       console.error('Error fetching doctors:', error);
       if (!silent) toast.error('Error al cargar médicos');
@@ -70,6 +78,12 @@ const Medicos = () => {
       if (!silent) setLoading(false);
     }
   }, [searchTerm]);
+
+  // Detección de médicos nuevos agregados por otros usuarios (aviso discreto)
+  const knownDoctorIdsRef = useRef(new Set());
+  useEffect(() => {
+    knownDoctorIdsRef.current = new Set((doctors || []).map((d) => d.id));
+  }, [doctors]);
 
   useEffect(() => {
     fetchDoctors();
