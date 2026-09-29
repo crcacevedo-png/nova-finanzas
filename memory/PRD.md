@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 22)
+**Última actualización**: 2026-06 (Sesión 23)
+
+### Bug fix (2026-06 Sesión 23) — No se podía eliminar una bodega "con productos" aunque el inventario estaba vacío
+- 🐛 **Bug (producción)**: inventario vacío pero al eliminar una bodega decía que tenía productos/existencias.
+- 🔎 **Causa raíz**: el stock real vive en la colección `existencias_inventario`, pero el force-delete de productos (`eliminar_producto`) borraba de `existencias_bodega` (colección incorrecta). Al eliminar productos quedaban existencias **huérfanas** con cantidad>0 (de productos ya inexistentes) que la UI no muestra pero que el chequeo de `eliminar_bodega` sí contaba → bloqueaba el borrado.
+- ✅ **Fix** (`routes/inventario.py`): (1) `eliminar_producto` con `force=true` ahora borra de `existencias_inventario` (colección correcta); (2) `eliminar_bodega` ahora ignora existencias de productos inexistentes (huérfanas), solo bloquea si hay stock de productos que aún existen, y limpia las huérfanas de la bodega antes de eliminarla.
+- **Verificado por testing agent (backend 4/4, 100%, iteration_56.json)**: bodega huérfana→200 eliminada; bodega con stock real→400 bloqueada; no-superadmin→403; force-delete de producto limpia `existencias_inventario` y permite borrar la bodega. Test: `/app/backend/tests/test_bodega_orphan_fix.py`. **NOTA producción**: las bodegas afectadas ya podrán eliminarse tras redesplegar (el propio borrado limpia las huérfanas). Requiere redespliegue.
+
+
 
 ### Mejoras (2026-06 Sesión 22) — Cupos por NOG en el filtro + Exportar con Unidad y NOG
 - ✅ **1. Cupos por NOG en el desplegable**: además del conteo de pacientes, cada NOG muestra ahora **usados/total según contrato**, ej. "EXP-100 — Consulta (2 pac. · 7/50)". Backend: `nogs-activos` agrega `acreditados`; frontend agrega `· {acreditados}/{cantidad}` al label.

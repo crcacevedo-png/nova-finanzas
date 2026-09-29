@@ -1,0 +1,16 @@
+{
+  "summary": "Backend-only test of bodega deletion orphan fix and force-delete product collection fix. All 4 scenarios PASSED (100%). Confirmed: (1) non-superadmin gets 403; (2) QA-BOD-REAL blocked with 400 and exact message 'No se puede eliminar una bodega con existencias'; (3) QA-BOD-ORPHAN with only orphan existencia now deletes with 200 'Bodega eliminada' and is removed from listing; (4) force-delete of QA-PROD-REAL cleans existencia in correct collection ('existencias_inventario'), allowing subsequent deletion of QA-BOD-REAL with 200.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_bodega_orphan_fix.py", "/app/test_reports/pytest/bodega_orphan.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": ["/app/backend/tests/test_bodega_orphan_fix.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A (skipped as requested)"},
+  "test_credentials": "superadmin/nova2024, usuario/user2024",
+  "seed_data_creation": "None created; used pre-seeded QA-BOD-ORPHAN, QA-BOD-REAL, QA-PROD-REAL. All were consumed by tests (deleted).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Seed data QA-BOD-ORPHAN, QA-BOD-REAL, QA-PROD-REAL was consumed (deleted) during this run. If re-testing this fix, main agent must re-seed the QA data first. Exact HTTP responses captured: 403 'Solo SuperAdmin puede eliminar bodegas', 400 'No se puede eliminar una bodega con existencias', 200 'Bodega eliminada', force-delete producto returns 'Producto eliminado' with movimientos_eliminados counter.",
+  "rca of the issue": "Fix verified: eliminar_bodega now ignores orphan existencias (those referencing deleted products) and cleans them up before delete; eliminar_producto force-mode now targets the correct 'existencias_inventario' collection (previously wrote to 'existencias_bodega'), preventing new orphans."
+}
