@@ -3328,8 +3328,8 @@ async def delete_bank_account(account_id: str, current_user: dict = Depends(requ
 
 @api_router.get("/suppliers", response_model=SupplierListResponse)
 async def get_suppliers(current_user: dict = Depends(get_current_user)):
-    """Obtener todos los proveedores (Admin, SuperAdmin y Optica)"""
-    if current_user["role"] not in ["admin", "superadmin", "optica"]:
+    """Obtener todos los proveedores (Admin, SuperAdmin, Optica y Usuario)"""
+    if current_user["role"] not in ["admin", "superadmin", "optica", "usuario"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver proveedores")
     
     suppliers = await db.suppliers.find({"is_active": True}, {"_id": 0}).sort("name", 1).to_list(1000)

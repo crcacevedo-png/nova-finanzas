@@ -1207,7 +1207,7 @@ async def crear_producto(
     """Crea un nuevo producto"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Sin permisos para crear productos")
     
     # Generar código si no se proporciona
@@ -2566,7 +2566,7 @@ async def listar_sociedades(
     """Lista todas las sociedades médicas"""
     db = get_db()
     
-    if current_user.get("role") not in ["admin", "superadmin"]:
+    if current_user.get("role") not in ["admin", "superadmin", "usuario"]:
         raise HTTPException(status_code=403, detail="Acceso denegado")
     
     filtro = {"origen": "clinica"}
