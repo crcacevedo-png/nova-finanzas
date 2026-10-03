@@ -1,49 +1,80 @@
-# Plan: Elegir el calendario de Google para sincronizar (y corregir "no importa nada")
+# Bloqueo de Agenda (espacios, días, feriados y vacaciones)
 
-## Problema a resolver
-Hoy, al conectar un médico, el sistema crea un calendario nuevo y VACÍO llamado
-"NovaVision - Citas" y el botón "Actualizar" solo lee de ese calendario. Como las citas reales
-del médico están en otro calendario (su principal o uno compartido), no se importa ningún
-paciente. Además no hay forma de elegir el calendario de origen.
+Permite reservar espacios de la agenda para que no se puedan agendar citas: por médico (franjas de horas o días completos) y para toda la clínica (feriados o vacaciones).
+Los bloqueos son consultables y respetados también por un agente externo (n8n/Claude) que agenda citas por API.
 
-## Qué cambia (comportamiento nuevo)
-1. **Selección de calendario por médico.** Después de conectar la cuenta de Google del médico,
-   se muestra la lista de TODOS los calendarios a los que esa cuenta tiene acceso (propios y
-   compartidos, incluido el principal). El SuperAdmin elige cuál usar para ese médico. Ese
-   calendario pasa a ser el origen (lectura) y destino (escritura) de la sincronización.
-2. **Se deja de forzar el calendario "NovaVision - Citas".** Se usa el calendario elegido. (El
-   que se haya creado antes queda sin efecto; se puede ignorar o borrar manualmente en Google.)
-3. **"Actualizar" importa de verdad.** Al sincronizar, se leen los eventos del calendario
-   elegido **desde hoy en adelante** y **todos** se convierten en citas del sistema para ese
-   médico (el título del evento se usa como nombre; sin ficha de paciente asociada, marcadas
-   como "de Google"). Los cambios de fecha/hora y las cancelaciones hechas en Google se
-   reflejan en las citas; las citas creadas en el sistema se envían a ese mismo calendario.
-4. **Al cambiar de calendario** para un médico, la próxima sincronización parte de cero (vuelve
-   a leer todo desde hoy) para el calendario recién elegido.
-5. **Varias cuentas con el mismo Client ID/Secret.** Cada médico conecta su propia cuenta de
-   Google (una distinta por médico) usando las mismas credenciales; para cada uno se elige su
-   calendario. Esto ya es compatible; solo se agrega el paso de elegir calendario.
+## Para quién es
+- Personal de recepción y cualquier usuario del sistema que gestiona la agenda diaria.
+- Médicos que necesitan apartar horarios o ausentarse.
+- Un agente externo automatizado (n8n + Claude) que verifica disponibilidad y agenda citas por API con una clave fija.
 
-## Cómo se verá
-En el diálogo "Google Calendar" de la Agenda, cada médico conectado mostrará un selector con
-sus calendarios disponibles y el calendario actualmente elegido. Cambiarlo actualiza el origen
-de la sincronización. Los médicos sin conectar siguen con el botón "Conectar".
+## Funcionalidades y experiencia
 
-## Decisiones ya confirmadas
-- Elegir entre **cualquier** calendario accesible por la cuenta (propios + compartidos), incl.
-  el principal del médico.
-- Importar **todos** los eventos del calendario elegido.
-- Rango: **desde hoy en adelante**.
-- **Varias cuentas** distintas (una por médico) con el mismo Client ID/Secret.
+### Bloqueos por médico
+- Bloquear una **franja de horas** en una fecha específica (ej. 10:00–12:00 el 15 de julio).
+- Bloquear un **día completo** para un médico.
+- Cada bloqueo es individual por médico y no afecta a los demás.
+- Motivo opcional (ej. Vacaciones, Congreso, Almuerzo, Personal).
 
-## Consideraciones (para tu visto bueno)
-- Como se importan TODOS los eventos, los eventos personales del médico (si el calendario
-  elegido es su calendario personal) también aparecerán como citas en la Agenda. Si más
-  adelante quieres filtrarlos (por palabra clave o etiqueta), se puede agregar; por ahora
-  entran todos, según lo acordado.
-- Estas citas importadas no tienen ficha de paciente (no hay forma de saber el paciente desde
-  un evento de calendario); se muestran con el título del evento como nombre.
+### Bloqueo de clínica completa
+- Bloquear un **día** o un **rango de fechas** para toda la clínica (feriados, vacaciones colectivas).
+- Afecta a todos los médicos durante ese período.
 
-## Fuera de alcance
-- Filtrar o clasificar automáticamente qué evento corresponde a qué paciente.
-- Cambios en las credenciales de Google (siguen siendo las ya configuradas).
+### Reglas de uso
+- **Cualquier usuario** puede crear bloqueos (de médico y de clínica).
+- **Cualquier usuario** puede eliminar cualquier bloqueo (incluidos los de clínica completa).
+- Al intentar agendar una cita en un espacio/día bloqueado, el sistema **impide** la cita y muestra el motivo del bloqueo (bloqueo duro). Esto aplica tanto a la agenda interna como al agente externo.
+- Si al crear un bloqueo ya existen citas en ese horario/día, el bloqueo **se crea igual** y el sistema **lista las citas en conflicto** para que se reprogramen manualmente. Las citas existentes no se cancelan automáticamente; solo se impiden citas nuevas.
+
+### Consulta y agendado por agente externo (API)
+- Acceso mediante una **clave de API fija** (se entrega para configurarla en n8n).
+- El agente externo puede:
+  - **Consultar disponibilidad** de un médico en una fecha/hora, considerando bloqueos y citas existentes.
+  - **Listar los bloqueos** vigentes (por médico y de clínica).
+  - **Agendar una cita**, respetando los bloqueos (si el espacio está bloqueado, la API lo rechaza con el motivo).
+- Los bloqueos creados desde la interfaz se reflejan de inmediato para el agente externo y viceversa.
+
+## Flujo de uso
+1. Un usuario abre la Agenda y elige "Bloquear" sobre un espacio, un día de un médico, o un período de clínica.
+2. Define médico (o "toda la clínica"), fecha/rango, franja de horas o día completo, y un motivo opcional.
+3. Si hay citas en conflicto, el sistema las muestra en una lista para reprogramarlas; el bloqueo queda activo.
+4. En la vista de agenda, los espacios/días bloqueados se muestran marcados y no permiten agendar.
+5. El agente externo (n8n) consulta disponibilidad con su clave de API; si está libre, agenda; si está bloqueado, recibe el rechazo con el motivo.
+6. Cualquier usuario puede eliminar un bloqueo cuando ya no aplica.
+
+## Estilo (UI/UX)
+- Integrado a la agenda actual, sin cambiar su diseño general.
+- Espacios bloqueados con indicación visual clara (sombreado/trama) y el motivo visible al pasar o tocar.
+- Los bloqueos de clínica completa se muestran como una franja/etiqueta destacada en el día (ej. "Feriado", "Vacaciones").
+- Un panel o listado para ver y eliminar bloqueos vigentes.
+- Mensajes claros al impedir una cita por bloqueo, indicando el motivo.
+
+## Fases de implementación
+
+### Fase 1 — MVP (se construye ahora)
+- Bloqueos por médico: franja de horas en una fecha y día completo.
+- Bloqueos de clínica completa: día y rango de fechas.
+- Crear y eliminar bloqueos por cualquier usuario; motivo opcional.
+- Listado de citas en conflicto al crear un bloqueo (para reprogramación manual).
+- Enforcement duro: la agenda interna impide agendar en espacios/días bloqueados.
+- Indicación visual de bloqueos en la agenda y panel para administrarlos.
+- API con clave fija para el agente externo: consultar disponibilidad, listar bloqueos y agendar citas respetando los bloqueos.
+
+### Fase 2 — Mejoras
+- Bloqueos **recurrentes** (ej. almuerzo todos los días, día libre semanal).
+- Herramienta para **reprogramar en lote** las citas en conflicto.
+- Notificación a pacientes afectados cuando un bloqueo genera conflicto.
+
+### Fase 3 — Avanzado
+- Horarios/calendarios laborales individuales por médico y plantillas de disponibilidad.
+- Registro de auditoría de bloqueos (quién creó/eliminó y cuándo).
+- API externa ampliada (cancelar/reprogramar citas, estados).
+
+## Supuestos
+- El agente externo necesita **tanto consultar disponibilidad como agendar** citas por API; la clave fija habilita ambas acciones de forma controlada.
+- Los bloqueos por médico se definen como **franja de horas en una fecha** o **día completo**; los de clínica como **día o rango de fechas**.
+- Cada bloqueo incluye un **motivo opcional**.
+- Los bloqueos **recurrentes** quedan para la Fase 2 (en el MVP se crean por fecha o rango).
+- Al bloquear con citas existentes, estas **no se cancelan automáticamente**; solo se listan para reprogramación y se impiden citas nuevas.
+- La clave de API se **genera y entrega** para configurarla en n8n; puede rotarse si se requiere.
+- El enforcement aplica a la creación/reprogramación de citas; las citas ya finalizadas no se ven afectadas.

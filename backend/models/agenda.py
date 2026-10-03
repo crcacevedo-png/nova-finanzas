@@ -194,3 +194,67 @@ class ProximaCitaCreate(BaseModel):
     tipo_cita: str = TipoCita.SUBSECUENTE
     notas: Optional[str] = None
     evaluacion_id: Optional[str] = None  # Referencia a la evaluación origen
+
+
+# ==================== BLOQUEOS DE AGENDA ====================
+# Permiten reservar espacios/días para que no se puedan agendar citas.
+# tipo="medico": bloqueo por médico (franja de horas en una fecha o día completo)
+# tipo="clinica": bloqueo para toda la clínica (un día o rango de fechas)
+
+class TipoBloqueo(str, Enum):
+    MEDICO = "medico"
+    CLINICA = "clinica"
+
+class BloqueoAgendaCreate(BaseModel):
+    tipo: TipoBloqueo
+    medico_id: Optional[str] = None       # Requerido si tipo="medico"
+    medico_nombre: Optional[str] = None
+    fecha_inicio: str                      # YYYY-MM-DD
+    fecha_fin: Optional[str] = None        # YYYY-MM-DD (para rango de clínica). Si None = fecha_inicio
+    dia_completo: bool = True              # Para médico: True=día completo, False=franja de horas
+    hora_inicio: Optional[str] = None      # HH:MM (solo franja de horas)
+    hora_fin: Optional[str] = None         # HH:MM (solo franja de horas)
+    motivo: Optional[str] = None
+
+class BloqueoAgendaResponse(BaseModel):
+    id: str
+    tipo: str
+    medico_id: Optional[str] = None
+    medico_nombre: Optional[str] = None
+    fecha_inicio: str
+    fecha_fin: str
+    dia_completo: bool
+    hora_inicio: Optional[str] = None
+    hora_fin: Optional[str] = None
+    motivo: Optional[str] = None
+    creado_por: Optional[str] = None
+    creado_por_nombre: Optional[str] = None
+    fecha_creacion: Optional[str] = None
+
+class BloqueoCreateResult(BaseModel):
+    bloqueo: BloqueoAgendaResponse
+    citas_en_conflicto: List[CitaResponse] = []
+
+class BloqueoListResponse(BaseModel):
+    data: List[BloqueoAgendaResponse]
+    total: int
+
+# Modelo para agendado por agente externo (API con clave fija)
+class CitaExternaCreate(BaseModel):
+    paciente_id: str
+    paciente_nombre: str
+    medico_id: str
+    medico_nombre: str
+    fecha: str                 # YYYY-MM-DD
+    hora_inicio: str           # HH:MM
+    hora_fin: Optional[str] = None
+    duracion_minutos: int = 20
+    tipo_cita: str = TipoCita.SUBSECUENTE
+    notas: Optional[str] = None
+
+class DisponibilidadResponse(BaseModel):
+    disponible: bool
+    motivo: Optional[str] = None
+    bloqueo: Optional[BloqueoAgendaResponse] = None
+    citas_existentes: List[CitaResponse] = []
+

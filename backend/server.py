@@ -2762,6 +2762,7 @@ from routes.agenda import (
     router as agenda_router,
     medicos_agenda_router,
     config_router as agenda_config_router,
+    external_router as agenda_external_router,
     init_agenda_routes
 )
 
@@ -2772,6 +2773,7 @@ init_agenda_routes(ws_manager)
 api_router.include_router(agenda_router, tags=["Agenda"])
 api_router.include_router(medicos_agenda_router, tags=["Agenda - Médicos"])
 api_router.include_router(agenda_config_router, tags=["Agenda - Configuración"])
+api_router.include_router(agenda_external_router, tags=["Agenda - Agente Externo"])
 
 # ==================== MÓDULO DE ADMINISTRACIÓN Y DASHBOARD ====================
 from routes.admin import router as admin_router

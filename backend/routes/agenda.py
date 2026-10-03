@@ -13,15 +13,31 @@ from models.agenda import (
     AgendaConfigUpdate, AgendaConfigResponse, TipoCitaConfig,
     PresentesResponse, PresentesPorMedicoResponse, PacientePresenteResponse,
     ContadoresDiaResponse, MiAgendaResponse, WalkInCreate, ProximaCitaCreate,
-    EstadoCita, TipoCita
+    EstadoCita, TipoCita,
+    BloqueoAgendaCreate, BloqueoAgendaResponse, BloqueoCreateResult,
+    BloqueoListResponse, CitaExternaCreate, DisponibilidadResponse
 )
 from config.database import db
 from routes.auth import get_current_user, require_permission, require_role
+import os
+from fastapi import Header
 
 # Routers
 router = APIRouter(prefix="/agenda", tags=["Agenda"])
 medicos_agenda_router = APIRouter(prefix="/medicos-agenda", tags=["Médicos Agenda"])
 config_router = APIRouter(prefix="/agenda/configuracion", tags=["Configuración Agenda"])
+# Router para agente externo (n8n/Claude) autenticado con clave fija (X-API-Key)
+external_router = APIRouter(prefix="/agenda/external", tags=["Agenda - Agente Externo"])
+
+
+async def verificar_clave_api_externa(x_api_key: str = Header(None)):
+    """Valida la clave fija de API para el agente externo."""
+    clave = os.environ.get("AGENDA_API_KEY")
+    if not clave:
+        raise HTTPException(status_code=503, detail="API externa de agenda no configurada")
+    if not x_api_key or x_api_key != clave:
+        raise HTTPException(status_code=401, detail="Clave de API inválida o faltante")
+    return True
 
 # Variable para WebSocket manager (se inyecta desde server.py)
 ws_manager = None
@@ -97,6 +113,135 @@ async def get_agenda_config():
             del config["_id"]
     return config
 
+# ==================== HELPERS DE BLOQUEOS ====================
+
+async def verificar_bloqueo(medico_id: str, fecha: str, hora_inicio: Optional[str] = None, hora_fin: Optional[str] = None):
+    """Devuelve el bloqueo que impide agendar en ese espacio, o None si está libre.
+
+    - Bloqueos de clínica: aplican a todos los médicos en el rango de fechas (día completo).
+    - Bloqueos de médico: día completo o franja de horas con solape.
+    Las fechas (YYYY-MM-DD) y horas (HH:MM) se comparan lexicográficamente.
+    """
+    # 1) Bloqueo de clínica que cubra la fecha
+    clinica = await db.bloqueos_agenda.find_one({
+        "tipo": "clinica",
+        "fecha_inicio": {"$lte": fecha},
+        "fecha_fin": {"$gte": fecha}
+    }, {"_id": 0})
+    if clinica:
+        return clinica
+
+    # 2) Bloqueos del médico que cubran la fecha
+    cursor = db.bloqueos_agenda.find({
+        "tipo": "medico",
+        "medico_id": medico_id,
+        "fecha_inicio": {"$lte": fecha},
+        "fecha_fin": {"$gte": fecha}
+    }, {"_id": 0})
+    async for b in cursor:
+        if b.get("dia_completo"):
+            return b
+        b_ini, b_fin = b.get("hora_inicio"), b.get("hora_fin")
+        if hora_inicio and hora_fin and b_ini and b_fin:
+            # Solape de franjas: inicio < fin_bloqueo y fin > inicio_bloqueo
+            if hora_inicio < b_fin and hora_fin > b_ini:
+                return b
+        else:
+            # Sin información de horas suficiente: se considera bloqueado ese día
+            return b
+    return None
+
+
+async def listar_citas_conflicto(bloqueo: dict):
+    """Lista las citas activas que caen dentro de un bloqueo (para reprogramación manual)."""
+    query = {
+        "tipo_agenda": "pacientes",
+        "estado": {"$nin": [EstadoCita.ATENDIDA.value, EstadoCita.NO_ASISTIO.value, EstadoCita.CANCELADA.value]},
+        "fecha": {"$gte": bloqueo["fecha_inicio"], "$lte": bloqueo["fecha_fin"]}
+    }
+    if bloqueo["tipo"] == "medico":
+        query["medico_id"] = bloqueo.get("medico_id")
+    citas = await db.citas.find(query, {"_id": 0}).to_list(2000)
+    # Para franjas de horas de médico, filtrar por solape horario
+    if bloqueo["tipo"] == "medico" and not bloqueo.get("dia_completo") and bloqueo.get("hora_inicio"):
+        hi, hf = bloqueo["hora_inicio"], bloqueo["hora_fin"]
+        citas = [
+            c for c in citas
+            if c.get("hora_inicio", "") < hf and (c.get("hora_fin") or c.get("hora_inicio", "")) > hi
+        ]
+    return citas
+
+
+async def insertar_cita(cita: CitaCreate, creado_por_id: str, creado_por_nombre: str):
+    """Inserta una cita respetando los bloqueos de agenda (enforcement duro).
+
+    Reutilizado por la agenda interna y el agente externo. Lanza HTTP 409 si el
+    espacio está bloqueado.
+    """
+    now = datetime.now(timezone.utc)
+
+    hora_fin = cita.hora_fin
+    if not hora_fin:
+        hora_inicio_dt = datetime.strptime(cita.hora_inicio, "%H:%M")
+        hora_fin_dt = hora_inicio_dt + timedelta(minutes=cita.duracion_minutos)
+        hora_fin = hora_fin_dt.strftime("%H:%M")
+
+    # Enforcement: verificar bloqueos antes de crear
+    bloqueo = await verificar_bloqueo(cita.medico_id, cita.fecha, cita.hora_inicio, hora_fin)
+    if bloqueo:
+        motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
+        raise HTTPException(
+            status_code=409,
+            detail=f"No se puede agendar: espacio bloqueado ({motivo})"
+        )
+
+    cita_doc = {
+        "id": str(uuid.uuid4()),
+        "paciente_id": cita.paciente_id,
+        "paciente_nombre": cita.paciente_nombre,
+        "medico_id": cita.medico_id,
+        "medico_nombre": cita.medico_nombre,
+        "fecha": cita.fecha,
+        "hora_inicio": cita.hora_inicio,
+        "hora_fin": hora_fin,
+        "duracion_minutos": cita.duracion_minutos,
+        "tipo_cita": cita.tipo_cita,
+        "estado": EstadoCita.AGENDADA,
+        "asistio": None,
+        "hora_llegada": None,
+        "hora_inicio_consulta": None,
+        "hora_fin_consulta": None,
+        "asignado_a_medico_id": cita.medico_id,
+        "asignado_a_medico_nombre": cita.medico_nombre,
+        "notas": cita.notas,
+        "tipo_agenda": "pacientes",
+        "google_event_id": None,
+        "creado_por": creado_por_id,
+        "creado_por_nombre": creado_por_nombre,
+        "fecha_creacion": now.isoformat(),
+        "actualizado_por": None,
+        "fecha_actualizacion": None
+    }
+
+    await db.citas.insert_one(cita_doc)
+    if "_id" in cita_doc:
+        del cita_doc["_id"]
+
+    try:
+        from routes.google_calendar import push_cita
+        await push_cita(cita_doc)
+    except Exception:
+        pass
+
+    await notify_agenda_update("cita_creada", {
+        "cita": cita_doc,
+        "fecha": cita.fecha,
+        "medico_id": cita.medico_id
+    })
+
+    return cita_doc
+
+
 # ==================== CITAS ====================
 
 @router.get("/citas", response_model=CitaListResponse)
@@ -162,62 +307,8 @@ async def crear_cita(
     cita: CitaCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Crear nueva cita"""
-    now = datetime.now(timezone.utc)
-    
-    # Calcular hora_fin si no se proporciona
-    hora_fin = cita.hora_fin
-    if not hora_fin:
-        hora_inicio = datetime.strptime(cita.hora_inicio, "%H:%M")
-        hora_fin_dt = hora_inicio + timedelta(minutes=cita.duracion_minutos)
-        hora_fin = hora_fin_dt.strftime("%H:%M")
-    
-    cita_doc = {
-        "id": str(uuid.uuid4()),
-        "paciente_id": cita.paciente_id,
-        "paciente_nombre": cita.paciente_nombre,
-        "medico_id": cita.medico_id,
-        "medico_nombre": cita.medico_nombre,
-        "fecha": cita.fecha,
-        "hora_inicio": cita.hora_inicio,
-        "hora_fin": hora_fin,
-        "duracion_minutos": cita.duracion_minutos,
-        "tipo_cita": cita.tipo_cita,
-        "estado": EstadoCita.AGENDADA,
-        "asistio": None,
-        "hora_llegada": None,
-        "hora_inicio_consulta": None,
-        "hora_fin_consulta": None,
-        "asignado_a_medico_id": cita.medico_id,
-        "asignado_a_medico_nombre": cita.medico_nombre,
-        "notas": cita.notas,
-        "tipo_agenda": "pacientes",
-        "google_event_id": None,
-        "creado_por": current_user["id"],
-        "creado_por_nombre": current_user["name"],
-        "fecha_creacion": now.isoformat(),
-        "actualizado_por": None,
-        "fecha_actualizacion": None
-    }
-    
-    await db.citas.insert_one(cita_doc)
-    if "_id" in cita_doc:
-        del cita_doc["_id"]
-    
-    # Sincronizar con Google Calendar del médico (no bloquea si falla)
-    try:
-        from routes.google_calendar import push_cita
-        await push_cita(cita_doc)
-    except Exception:
-        pass
-    
-    # Notificar a clientes WebSocket
-    await notify_agenda_update("cita_creada", {
-        "cita": cita_doc,
-        "fecha": cita.fecha,
-        "medico_id": cita.medico_id
-    })
-    
+    """Crear nueva cita (respeta bloqueos de agenda)"""
+    cita_doc = await insertar_cita(cita, current_user["id"], current_user["name"])
     return CitaResponse(**cita_doc)
 
 
@@ -247,6 +338,17 @@ async def actualizar_cita(
         hora_inicio_dt = datetime.strptime(hora_inicio, "%H:%M")
         hora_fin_dt = hora_inicio_dt + timedelta(minutes=duracion)
         update_data["hora_fin"] = hora_fin_dt.strftime("%H:%M")
+    
+    # Enforcement de bloqueos al reprogramar (si cambia fecha/hora/médico)
+    if any(k in update_data for k in ("fecha", "hora_inicio", "duracion_minutos", "medico_id")):
+        nuevo_medico = update_data.get("medico_id", cita["medico_id"])
+        nueva_fecha = update_data.get("fecha", cita["fecha"])
+        nueva_hora_ini = update_data.get("hora_inicio", cita["hora_inicio"])
+        nueva_hora_fin = update_data.get("hora_fin", cita.get("hora_fin"))
+        bloqueo = await verificar_bloqueo(nuevo_medico, nueva_fecha, nueva_hora_ini, nueva_hora_fin)
+        if bloqueo:
+            motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
+            raise HTTPException(status_code=409, detail=f"No se puede reprogramar: espacio bloqueado ({motivo})")
     
     update_data["actualizado_por"] = current_user["id"]
     update_data["fecha_actualizacion"] = datetime.now(timezone.utc).isoformat()
@@ -771,6 +873,12 @@ async def crear_proxima_cita(
     hora_fin_dt = hora_inicio_dt + timedelta(minutes=duracion)
     hora_fin = hora_fin_dt.strftime("%H:%M")
     
+    # Enforcement de bloqueos
+    bloqueo = await verificar_bloqueo(cita_data.medico_id, cita_data.fecha, cita_data.hora_inicio, hora_fin)
+    if bloqueo:
+        motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
+        raise HTTPException(status_code=409, detail=f"No se puede agendar: espacio bloqueado ({motivo})")
+    
     cita_doc = {
         "id": str(uuid.uuid4()),
         "paciente_id": cita_data.paciente_id,
@@ -804,4 +912,213 @@ async def crear_proxima_cita(
     if "_id" in cita_doc:
         del cita_doc["_id"]
     
+    return CitaResponse(**cita_doc)
+
+
+
+# ==================== BLOQUEOS DE AGENDA ====================
+
+def _bloqueo_to_response(b: dict) -> dict:
+    """Normaliza un documento de bloqueo para la respuesta."""
+    return {
+        "id": b["id"],
+        "tipo": b["tipo"],
+        "medico_id": b.get("medico_id"),
+        "medico_nombre": b.get("medico_nombre"),
+        "fecha_inicio": b["fecha_inicio"],
+        "fecha_fin": b["fecha_fin"],
+        "dia_completo": b.get("dia_completo", True),
+        "hora_inicio": b.get("hora_inicio"),
+        "hora_fin": b.get("hora_fin"),
+        "motivo": b.get("motivo"),
+        "creado_por": b.get("creado_por"),
+        "creado_por_nombre": b.get("creado_por_nombre"),
+        "fecha_creacion": b.get("fecha_creacion"),
+    }
+
+
+@router.post("/bloqueos", response_model=BloqueoCreateResult)
+async def crear_bloqueo(
+    bloqueo: BloqueoAgendaCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Crear un bloqueo de agenda (por médico o de clínica).
+
+    Cualquier usuario puede crear bloqueos. Si ya existen citas en el horario/día
+    bloqueado, el bloqueo se crea igual y se devuelven las citas en conflicto para
+    reprogramación manual (no se cancelan automáticamente).
+    """
+    tipo = bloqueo.tipo.value if hasattr(bloqueo.tipo, "value") else bloqueo.tipo
+
+    # Validaciones
+    if tipo == "medico" and not bloqueo.medico_id:
+        raise HTTPException(status_code=400, detail="medico_id es requerido para bloqueos de médico")
+
+    fecha_inicio = bloqueo.fecha_inicio
+    fecha_fin = bloqueo.fecha_fin or bloqueo.fecha_inicio
+    if fecha_fin < fecha_inicio:
+        raise HTTPException(status_code=400, detail="fecha_fin no puede ser anterior a fecha_inicio")
+
+    # Clínica = siempre día(s) completo(s)
+    dia_completo = True if tipo == "clinica" else bloqueo.dia_completo
+    hora_inicio = None
+    hora_fin = None
+    if tipo == "medico" and not dia_completo:
+        if not bloqueo.hora_inicio or not bloqueo.hora_fin:
+            raise HTTPException(status_code=400, detail="hora_inicio y hora_fin son requeridas para un bloqueo por franja de horas")
+        if bloqueo.hora_fin <= bloqueo.hora_inicio:
+            raise HTTPException(status_code=400, detail="hora_fin debe ser posterior a hora_inicio")
+        hora_inicio = bloqueo.hora_inicio
+        hora_fin = bloqueo.hora_fin
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "tipo": tipo,
+        "medico_id": bloqueo.medico_id if tipo == "medico" else None,
+        "medico_nombre": bloqueo.medico_nombre if tipo == "medico" else None,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "dia_completo": dia_completo,
+        "hora_inicio": hora_inicio,
+        "hora_fin": hora_fin,
+        "motivo": bloqueo.motivo,
+        "creado_por": current_user["id"],
+        "creado_por_nombre": current_user["name"],
+        "fecha_creacion": datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.bloqueos_agenda.insert_one(doc)
+    if "_id" in doc:
+        del doc["_id"]
+
+    citas_conflicto = await listar_citas_conflicto(doc)
+
+    await notify_agenda_update("bloqueo_creado", {"bloqueo": _bloqueo_to_response(doc)})
+
+    return BloqueoCreateResult(
+        bloqueo=BloqueoAgendaResponse(**_bloqueo_to_response(doc)),
+        citas_en_conflicto=[CitaResponse(**c) for c in citas_conflicto]
+    )
+
+
+@router.get("/bloqueos", response_model=BloqueoListResponse)
+async def listar_bloqueos(
+    medico_id: Optional[str] = Query(None),
+    fecha: Optional[str] = Query(None, description="Devuelve bloqueos que cubran esta fecha"),
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Listar bloqueos vigentes (por médico y de clínica)."""
+    query = {}
+    if medico_id:
+        # Incluir bloqueos del médico y los de clínica (aplican a todos)
+        query["$or"] = [{"tipo": "clinica"}, {"tipo": "medico", "medico_id": medico_id}]
+    if fecha:
+        query["fecha_inicio"] = {"$lte": fecha}
+        query["fecha_fin"] = {"$gte": fecha}
+    else:
+        if desde:
+            query["fecha_fin"] = {"$gte": desde}
+        if hasta:
+            query["fecha_inicio"] = {"$lte": hasta}
+
+    bloqueos = await db.bloqueos_agenda.find(query, {"_id": 0}).sort("fecha_inicio", 1).to_list(2000)
+    data = [BloqueoAgendaResponse(**_bloqueo_to_response(b)) for b in bloqueos]
+    return BloqueoListResponse(data=data, total=len(data))
+
+
+@router.delete("/bloqueos/{bloqueo_id}")
+async def eliminar_bloqueo(
+    bloqueo_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Eliminar un bloqueo (cualquier usuario puede eliminar cualquier bloqueo)."""
+    result = await db.bloqueos_agenda.delete_one({"id": bloqueo_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Bloqueo no encontrado")
+    await notify_agenda_update("bloqueo_eliminado", {"bloqueo_id": bloqueo_id})
+    return {"message": "Bloqueo eliminado", "id": bloqueo_id}
+
+
+# ==================== API AGENTE EXTERNO (clave fija) ====================
+
+@external_router.get("/disponibilidad", response_model=DisponibilidadResponse)
+async def disponibilidad_externa(
+    medico_id: str = Query(...),
+    fecha: str = Query(..., description="YYYY-MM-DD"),
+    hora_inicio: Optional[str] = Query(None, description="HH:MM"),
+    hora_fin: Optional[str] = Query(None, description="HH:MM"),
+    _: bool = Depends(verificar_clave_api_externa)
+):
+    """Consulta disponibilidad de un médico considerando bloqueos y citas existentes."""
+    bloqueo = await verificar_bloqueo(medico_id, fecha, hora_inicio, hora_fin)
+    if bloqueo:
+        motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
+        return DisponibilidadResponse(
+            disponible=False,
+            motivo=motivo,
+            bloqueo=BloqueoAgendaResponse(**_bloqueo_to_response(bloqueo)),
+            citas_existentes=[]
+        )
+
+    # Citas existentes del médico en esa fecha (y solape de hora si se indica)
+    citas = await db.citas.find({
+        "tipo_agenda": "pacientes",
+        "medico_id": medico_id,
+        "fecha": fecha,
+        "estado": {"$nin": [EstadoCita.CANCELADA.value, EstadoCita.NO_ASISTIO.value]}
+    }, {"_id": 0}).to_list(2000)
+
+    if hora_inicio and hora_fin:
+        citas = [
+            c for c in citas
+            if c.get("hora_inicio", "") < hora_fin and (c.get("hora_fin") or c.get("hora_inicio", "")) > hora_inicio
+        ]
+
+    return DisponibilidadResponse(
+        disponible=True,
+        motivo=None,
+        bloqueo=None,
+        citas_existentes=[CitaResponse(**c) for c in citas]
+    )
+
+
+@external_router.get("/bloqueos", response_model=BloqueoListResponse)
+async def listar_bloqueos_externo(
+    medico_id: Optional[str] = Query(None),
+    fecha: Optional[str] = Query(None),
+    _: bool = Depends(verificar_clave_api_externa)
+):
+    """Lista los bloqueos vigentes para el agente externo."""
+    query = {}
+    if medico_id:
+        query["$or"] = [{"tipo": "clinica"}, {"tipo": "medico", "medico_id": medico_id}]
+    if fecha:
+        query["fecha_inicio"] = {"$lte": fecha}
+        query["fecha_fin"] = {"$gte": fecha}
+    bloqueos = await db.bloqueos_agenda.find(query, {"_id": 0}).sort("fecha_inicio", 1).to_list(2000)
+    data = [BloqueoAgendaResponse(**_bloqueo_to_response(b)) for b in bloqueos]
+    return BloqueoListResponse(data=data, total=len(data))
+
+
+@external_router.post("/citas", response_model=CitaResponse)
+async def crear_cita_externa(
+    cita: CitaExternaCreate,
+    _: bool = Depends(verificar_clave_api_externa)
+):
+    """Agenda una cita desde el agente externo, respetando los bloqueos (rechaza si está bloqueado)."""
+    cita_create = CitaCreate(
+        paciente_id=cita.paciente_id,
+        paciente_nombre=cita.paciente_nombre,
+        medico_id=cita.medico_id,
+        medico_nombre=cita.medico_nombre,
+        fecha=cita.fecha,
+        hora_inicio=cita.hora_inicio,
+        hora_fin=cita.hora_fin,
+        duracion_minutos=cita.duracion_minutos,
+        tipo_cita=cita.tipo_cita,
+        notas=cita.notas
+    )
+    cita_doc = await insertar_cita(cita_create, creado_por_id="agente_externo", creado_por_nombre="Agente Externo (n8n)")
     return CitaResponse(**cita_doc)

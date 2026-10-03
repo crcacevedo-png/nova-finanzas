@@ -78,7 +78,19 @@ export const agendaApi = {
   
   // Médicos para agenda
   getMedicosAgenda: () => axios.get(`${API_URL}/api/medicos-agenda`, getAuthHeaders()),
-  updateMedicoAgenda: (id, data) => axios.patch(`${API_URL}/api/medicos-agenda/${id}`, data, getAuthHeaders())
+  updateMedicoAgenda: (id, data) => axios.patch(`${API_URL}/api/medicos-agenda/${id}`, data, getAuthHeaders()),
+
+  // Bloqueos de agenda
+  getBloqueos: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.medico_id) qs.append('medico_id', params.medico_id);
+    if (params.fecha) qs.append('fecha', params.fecha);
+    if (params.desde) qs.append('desde', params.desde);
+    if (params.hasta) qs.append('hasta', params.hasta);
+    return axios.get(`${API_URL}/api/agenda/bloqueos?${qs}`, getAuthHeaders());
+  },
+  crearBloqueo: (data) => axios.post(`${API_URL}/api/agenda/bloqueos`, data, getAuthHeaders()),
+  eliminarBloqueo: (id) => axios.delete(`${API_URL}/api/agenda/bloqueos/${id}`, getAuthHeaders())
 };
 
 export default agendaApi;

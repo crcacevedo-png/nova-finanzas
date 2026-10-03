@@ -44,6 +44,7 @@ import { toast, Toaster } from 'sonner';
 import { agendaApi } from '../services/agendaApi';
 import { patientApi, googleCalendarApi } from '../services/api';
 import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
+import { BloqueosAgenda } from './AgendaBloqueos';
 
 // Estados de cita con colores
 const ESTADOS_CITA = {
@@ -889,6 +890,13 @@ const Agenda = () => {
         </div>
         
         <GoogleCalendarDialog open={gcalOpen} onOpenChange={setGcalOpen} />
+        
+        {/* Bloqueos de agenda (franjas, días, feriados y vacaciones) */}
+        <BloqueosAgenda
+          medicos={medicos}
+          fecha={fechaSeleccionada}
+          onBloqueosChange={() => { fetchCitas(); fetchContadores(); }}
+        />
         
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
