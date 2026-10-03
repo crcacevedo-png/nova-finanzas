@@ -4,7 +4,28 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 27)
+**Última actualización**: 2026-06 (Sesión 28)
+
+### Feature (2026-06 Sesión 28) — Bloqueo de Agenda (espacios, días, feriados y vacaciones) [Fase 1 MVP]
+- ✅ **Bloqueos por médico**: franja de horas en una fecha o día completo (individual por médico).
+- ✅ **Bloqueos de clínica completa**: un día o rango de fechas (feriados/vacaciones), afecta a todos los médicos.
+- ✅ **Crear/eliminar por cualquier usuario**; motivo opcional.
+- ✅ **Enforcement duro**: crear cita (`POST /api/agenda/citas`), reprogramar (`PUT`) y próxima-cita en un espacio bloqueado devuelven **409** con el motivo. Aplica a agenda interna y API externa.
+- ✅ **Conflictos**: al crear un bloqueo con citas existentes, el bloqueo se crea igual y se devuelven `citas_en_conflicto` (las citas NO se cancelan; se listan para reprogramar).
+- ✅ **API agente externo (n8n/Claude)** con clave fija `X-API-Key` (env `AGENDA_API_KEY`):
+  - `GET /api/agenda/external/disponibilidad?medico_id=&fecha=&hora_inicio=&hora_fin=` → {disponible, motivo, bloqueo, citas_existentes}
+  - `GET /api/agenda/external/bloqueos` → lista bloqueos vigentes
+  - `POST /api/agenda/external/citas` → agenda respetando bloqueos (409 si bloqueado). Sin clave/clave inválida → 401.
+- ✅ **Frontend** (`AgendaBloqueos.js` integrado en `Agenda.js`): botones "Bloquear agenda"/"Ver bloqueos", diálogo de creación (tipo, médico, fecha/rango, día completo/franja, motivo, lista de conflictos), banner de bloqueos del día con eliminación, panel de gestión. Refresco cada 15s.
+- **Backend**: colección `bloqueos_agenda`; helpers `verificar_bloqueo`, `listar_citas_conflicto`, `insertar_cita` en `routes/agenda.py`.
+- **Verificado**: testing agent iteration_61.json → backend 100% (10/10 script + 3/3 pytest), frontend E2E 100%.
+- **Clave API para n8n** (preview): `nova_agenda_1eH6M_ssw5iOnYeYVK_rGwnWUIh3_U1FXULX2AZB8jk` (en `backend/.env` `AGENDA_API_KEY`; puede rotarse).
+- **Pendiente (Fase 2)**: bloqueos recurrentes, reprogramación en lote de conflictos, notificación a pacientes; (nice-to-have) tachar slots bloqueados en la grilla además del banner.
+- ⚠️ Requiere redespliegue para producción.
+
+### Feature (2026-06 Sesión 27c) — Permisos rol 'usuario' en Inventario (entrada rápida y mín/máx)
+- 🐛 El rol `usuario` recibía 403 en `POST /api/inventario/entrada` (Entrada Rápida) y `PUT /api/inventario/productos/{id}` (editar mín/máx); en el frontend los campos mín/máx estaban `disabled`.
+- ✅ **Fix backend**: `registrar_entrada_rapida` y `actualizar_producto` permiten `usuario` (en update, whitelist a `existencia_minima`/`existencia_maxima`; precio sigue protegido a superadmin). **Fix frontend** (`inventario/Productos.js`): flag `puedeEditarExistencias` habilita mín/máx para `usuario`. Verificado (iteration_60.json, 100%).
 
 ### Aclaración/Fix menor (2026-06 Sesión 27b) — Overlay "Uncaught runtime errors: Script error." en el preview
 - ❓ Reporte: aparecía el overlay rojo "Uncaught runtime errors: Script error." sobre la pantalla de login.
