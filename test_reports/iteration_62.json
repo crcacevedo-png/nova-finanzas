@@ -1,0 +1,23 @@
+{
+  "summary": "Independent verification of 'Horario de disponibilidad por médico' (backend enforcement + frontend E2E). Executed reference script test_horario_medico.py (PASSED) plus 4 extended pytest cases (persistence GET, reprogramar PUT fuera horario, external POST fuera horario, compatibilidad sin horario) all PASSED. Frontend E2E on /optica/medicos verified: 7 days visible with correct data-testid, section rendered, time inputs disabled when día inactive and enabled when active, save + reopen confirms horario persists (checked, 09:30, 15:45). Cleanup restored original state.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_horario_medico_extended.py",
+    "/app/backend/scripts/test_horario_medico.py",
+    "/app/test_reports/pytest/horario_medico.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Enforcement in agenda.py is applied in insertar_cita, actualizar_cita and external/disponibilidad – covers both internal and X-API-Key paths as required.",
+    "Compatibility (null horario_semanal) correctly bypasses restriction – verified.",
+    "Frontend Medicos.js correctly disables time inputs when día.activo=false and persists via PUT /api/doctors/{id}."
+  ],
+  "updated_files": ["/app/backend/tests/test_horario_medico_extended.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin/nova2024; X-API-Key from backend/.env",
+  "seed_data_creation": "Temporary citas created and cleaned; doctor horario restored to original after tests",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend script test_horario_medico.py + pytest test_horario_medico_extended.py cover horario_semanal enforcement end-to-end. Frontend data-testids used: doctor-horario-section, horario-activo-{1..7}, horario-inicio-{1..7}, horario-fin-{1..7}, submit-doctor, edit-doctor-{id}. Use fechas 2026-12-14 (Lunes) y 2026-12-15 (Martes) for isoweekday tests."
+}
