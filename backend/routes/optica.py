@@ -4,7 +4,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
 
@@ -27,6 +27,9 @@ class DoctorBase(BaseModel):
     email: Optional[str] = ""
     license_number: Optional[str] = ""
     notes: Optional[str] = ""
+    # Horario laboral semanal: claves "1"(Lunes).."7"(Domingo),
+    # cada día: {"activo": bool, "hora_inicio": "HH:MM", "hora_fin": "HH:MM"}
+    horario_semanal: Optional[Dict[str, Any]] = None
 
 class DoctorCreate(DoctorBase):
     pass
@@ -39,6 +42,7 @@ class DoctorUpdate(BaseModel):
     license_number: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    horario_semanal: Optional[Dict[str, Any]] = None
 
 class DoctorResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -50,6 +54,7 @@ class DoctorResponse(BaseModel):
     license_number: Optional[str] = ""
     notes: Optional[str] = ""
     is_active: bool = True
+    horario_semanal: Optional[Dict[str, Any]] = None
     created_by: str
     created_at: str
     updated_at: Optional[str] = None
@@ -488,6 +493,7 @@ async def create_doctor(doctor_data: DoctorCreate, current_user: dict = Depends(
         "license_number": doctor_data.license_number or "",
         "notes": doctor_data.notes or "",
         "is_active": True,
+        "horario_semanal": doctor_data.horario_semanal or None,
         "created_by": current_user["id"],
         "created_at": now,
         "updated_at": now

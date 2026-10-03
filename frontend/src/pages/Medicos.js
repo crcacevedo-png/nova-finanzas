@@ -14,6 +14,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Switch } from '../components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
   Dialog,
@@ -36,6 +37,30 @@ import { Badge } from '../components/ui/badge';
 import { toast, Toaster } from 'sonner';
 import { doctorApi } from '../services/api';
 
+// Días de la semana (isoweekday: 1=Lunes .. 7=Domingo)
+const DIAS_SEMANA = [
+  { num: '1', label: 'Lunes' },
+  { num: '2', label: 'Martes' },
+  { num: '3', label: 'Miércoles' },
+  { num: '4', label: 'Jueves' },
+  { num: '5', label: 'Viernes' },
+  { num: '6', label: 'Sábado' },
+  { num: '7', label: 'Domingo' },
+];
+
+const buildHorario = (existente) => {
+  const base = {};
+  DIAS_SEMANA.forEach(({ num }) => {
+    const prev = existente?.[num] || {};
+    base[num] = {
+      activo: prev.activo || false,
+      hora_inicio: prev.hora_inicio || '08:00',
+      hora_fin: prev.hora_fin || '17:00',
+    };
+  });
+  return base;
+};
+
 const Medicos = () => {
   const { hasPermission } = useAuth();
   const [doctors, setDoctors] = useState([]);
@@ -53,7 +78,8 @@ const Medicos = () => {
     phone: '',
     email: '',
     license_number: '',
-    notes: ''
+    notes: '',
+    horario: buildHorario(null)
   });
 
   const canManage = hasPermission('manage_doctors');
@@ -108,7 +134,8 @@ const Medicos = () => {
         phone: doctor.phone || '',
         email: doctor.email || '',
         license_number: doctor.license_number || '',
-        notes: doctor.notes || ''
+        notes: doctor.notes || '',
+        horario: buildHorario(doctor.horario_semanal)
       });
     } else {
       setEditingDoctor(null);
@@ -118,7 +145,8 @@ const Medicos = () => {
         phone: '',
         email: '',
         license_number: '',
-        notes: ''
+        notes: '',
+        horario: buildHorario(null)
       });
     }
     setDialogOpen(true);
@@ -138,7 +166,8 @@ const Medicos = () => {
       phone: formData.phone.trim(),
       email: formData.email.trim(),
       license_number: formData.license_number.trim(),
-      notes: formData.notes.trim()
+      notes: formData.notes.trim(),
+      horario_semanal: formData.horario
     };
 
     setSubmitting(true);
@@ -364,7 +393,7 @@ const Medicos = () => {
 
         {/* Create/Edit Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--text-primary)' }}>
                 {editingDoctor ? 'Editar Médico' : 'Nuevo Médico'}
@@ -434,6 +463,59 @@ const Medicos = () => {
                   />
                 </div>
               </div>
+
+              {/* Horario de disponibilidad semanal */}
+              <div className="space-y-2 rounded-lg border p-3" data-testid="doctor-horario-section">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Horario de disponibilidad</Label>
+                  <span className="text-xs text-slate-500">Activa los días y define la franja de atención</span>
+                </div>
+                <div className="space-y-1.5">
+                  {DIAS_SEMANA.map(({ num, label }) => {
+                    const dia = formData.horario[num];
+                    return (
+                      <div key={num} className="flex items-center gap-2" data-testid={`horario-dia-${num}`}>
+                        <div className="flex items-center gap-2 w-32 shrink-0">
+                          <Switch
+                            checked={dia.activo}
+                            onCheckedChange={(v) => setFormData(prev => ({
+                              ...prev,
+                              horario: { ...prev.horario, [num]: { ...prev.horario[num], activo: v } }
+                            }))}
+                            data-testid={`horario-activo-${num}`}
+                          />
+                          <span className={`text-sm ${dia.activo ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{label}</span>
+                        </div>
+                        <Input
+                          type="time"
+                          value={dia.hora_inicio}
+                          disabled={!dia.activo}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            horario: { ...prev.horario, [num]: { ...prev.horario[num], hora_inicio: e.target.value } }
+                          }))}
+                          className="h-8 w-28"
+                          data-testid={`horario-inicio-${num}`}
+                        />
+                        <span className="text-slate-400 text-sm">a</span>
+                        <Input
+                          type="time"
+                          value={dia.hora_fin}
+                          disabled={!dia.activo}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            horario: { ...prev.horario, [num]: { ...prev.horario[num], hora_fin: e.target.value } }
+                          }))}
+                          className="h-8 w-28"
+                          data-testid={`horario-fin-${num}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-slate-500">Si no activas ningún día, el médico queda sin restricción de horario.</p>
+              </div>
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="btn-outline">
                   Cancelar

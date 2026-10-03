@@ -152,6 +152,46 @@ async def verificar_bloqueo(medico_id: str, fecha: str, hora_inicio: Optional[st
     return None
 
 
+async def verificar_horario_medico(medico_id: str, fecha: str, hora_inicio: Optional[str] = None, hora_fin: Optional[str] = None):
+    """Devuelve un motivo (str) si la cita queda FUERA del horario laboral del médico, o None.
+
+    El horario se define por día de semana en el documento del médico
+    (`horario_semanal`, claves "1"=Lunes.."7"=Domingo). Si el médico no tiene
+    horario configurado, no se restringe (compatibilidad con datos existentes).
+    """
+    medico = await db.doctors.find_one({"id": medico_id}, {"_id": 0, "horario_semanal": 1})
+    if not medico:
+        return None
+    horario = medico.get("horario_semanal")
+    if not horario:
+        return None
+    try:
+        dia = str(datetime.strptime(fecha, "%Y-%m-%d").isoweekday())  # 1=Lun .. 7=Dom
+    except ValueError:
+        return None
+    cfg = horario.get(dia)
+    if not cfg or not cfg.get("activo"):
+        return "El médico no atiende ese día"
+    h_ini = cfg.get("hora_inicio")
+    h_fin = cfg.get("hora_fin")
+    if h_ini and h_fin and hora_inicio and hora_fin:
+        if hora_inicio < h_ini or hora_fin > h_fin:
+            return f"Fuera del horario del médico ({h_ini}–{h_fin})"
+    return None
+
+
+async def motivo_no_disponible(medico_id: str, fecha: str, hora_inicio: Optional[str] = None, hora_fin: Optional[str] = None):
+    """Combina bloqueos y horario del médico. Devuelve (motivo, bloqueo) o (None, None)."""
+    bloqueo = await verificar_bloqueo(medico_id, fecha, hora_inicio, hora_fin)
+    if bloqueo:
+        motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
+        return motivo, bloqueo
+    motivo_h = await verificar_horario_medico(medico_id, fecha, hora_inicio, hora_fin)
+    if motivo_h:
+        return motivo_h, None
+    return None, None
+
+
 async def listar_citas_conflicto(bloqueo: dict):
     """Lista las citas activas que caen dentro de un bloqueo (para reprogramación manual)."""
     query = {
@@ -186,13 +226,12 @@ async def insertar_cita(cita: CitaCreate, creado_por_id: str, creado_por_nombre:
         hora_fin_dt = hora_inicio_dt + timedelta(minutes=cita.duracion_minutos)
         hora_fin = hora_fin_dt.strftime("%H:%M")
 
-    # Enforcement: verificar bloqueos antes de crear
-    bloqueo = await verificar_bloqueo(cita.medico_id, cita.fecha, cita.hora_inicio, hora_fin)
-    if bloqueo:
-        motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
+    # Enforcement: verificar bloqueos y horario del médico antes de crear
+    motivo, _bloqueo = await motivo_no_disponible(cita.medico_id, cita.fecha, cita.hora_inicio, hora_fin)
+    if motivo:
         raise HTTPException(
             status_code=409,
-            detail=f"No se puede agendar: espacio bloqueado ({motivo})"
+            detail=f"No se puede agendar: {motivo}"
         )
 
     cita_doc = {
@@ -345,10 +384,9 @@ async def actualizar_cita(
         nueva_fecha = update_data.get("fecha", cita["fecha"])
         nueva_hora_ini = update_data.get("hora_inicio", cita["hora_inicio"])
         nueva_hora_fin = update_data.get("hora_fin", cita.get("hora_fin"))
-        bloqueo = await verificar_bloqueo(nuevo_medico, nueva_fecha, nueva_hora_ini, nueva_hora_fin)
-        if bloqueo:
-            motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
-            raise HTTPException(status_code=409, detail=f"No se puede reprogramar: espacio bloqueado ({motivo})")
+        motivo, _bloqueo = await motivo_no_disponible(nuevo_medico, nueva_fecha, nueva_hora_ini, nueva_hora_fin)
+        if motivo:
+            raise HTTPException(status_code=409, detail=f"No se puede reprogramar: {motivo}")
     
     update_data["actualizado_por"] = current_user["id"]
     update_data["fecha_actualizacion"] = datetime.now(timezone.utc).isoformat()
@@ -873,11 +911,10 @@ async def crear_proxima_cita(
     hora_fin_dt = hora_inicio_dt + timedelta(minutes=duracion)
     hora_fin = hora_fin_dt.strftime("%H:%M")
     
-    # Enforcement de bloqueos
-    bloqueo = await verificar_bloqueo(cita_data.medico_id, cita_data.fecha, cita_data.hora_inicio, hora_fin)
-    if bloqueo:
-        motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
-        raise HTTPException(status_code=409, detail=f"No se puede agendar: espacio bloqueado ({motivo})")
+    # Enforcement de bloqueos y horario del médico
+    motivo, _bloqueo = await motivo_no_disponible(cita_data.medico_id, cita_data.fecha, cita_data.hora_inicio, hora_fin)
+    if motivo:
+        raise HTTPException(status_code=409, detail=f"No se puede agendar: {motivo}")
     
     cita_doc = {
         "id": str(uuid.uuid4()),
@@ -1051,7 +1088,7 @@ async def disponibilidad_externa(
     hora_fin: Optional[str] = Query(None, description="HH:MM"),
     _: bool = Depends(verificar_clave_api_externa)
 ):
-    """Consulta disponibilidad de un médico considerando bloqueos y citas existentes."""
+    """Consulta disponibilidad de un médico considerando bloqueos, horario laboral y citas existentes."""
     bloqueo = await verificar_bloqueo(medico_id, fecha, hora_inicio, hora_fin)
     if bloqueo:
         motivo = bloqueo.get("motivo") or ("Feriado/Vacaciones" if bloqueo["tipo"] == "clinica" else "Horario bloqueado")
@@ -1059,6 +1096,16 @@ async def disponibilidad_externa(
             disponible=False,
             motivo=motivo,
             bloqueo=BloqueoAgendaResponse(**_bloqueo_to_response(bloqueo)),
+            citas_existentes=[]
+        )
+
+    # Fuera del horario laboral del médico
+    motivo_horario = await verificar_horario_medico(medico_id, fecha, hora_inicio, hora_fin)
+    if motivo_horario:
+        return DisponibilidadResponse(
+            disponible=False,
+            motivo=motivo_horario,
+            bloqueo=None,
             citas_existentes=[]
         )
 
