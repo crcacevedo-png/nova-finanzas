@@ -1,0 +1,30 @@
+{
+  "summary": "E2E completo de Nota de cirugía en historial clínico (Fase 1 MVP). Backend reconfirmado con script /app/backend/scripts/test_nota_cirugia.py (7/7 ✅). Frontend verificado end-to-end: creación de cirugía con paciente registrado desde Sala de Operaciones usando buscador (surgery-patient-search → surgery-patient-results → surgery-patient-option-{id} → surgery-patient-linked), apertura de Historial clínico desde Pacientes (evaluaciones-patient-{id}), listado de Cirugías con item nota-cirugia-item-{id} (badge 'Abierta'), editor con toolbar (nota-bold/italic/list), guardar (nota-guardar), cerrar (nota-cerrar) con badge 'Cerrada' y toast de confirmación. Bloqueo verificado desde rol 'usuario' (nota-bloqueo-aviso visible, contenteditable=false, toolbar/guardar ocultos). No regresión: la sección 'Evaluaciones' sigue presente dentro del mismo diálogo. Datos de prueba limpiados vía DELETE /api/surgeries.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dialog Nota de cirugía", "issues": ["Advertencia a11y de Radix: 'Missing Description or aria-describedby for DialogContent' en el diálogo de Sala de Operaciones. Agregar DialogDescription o aria-describedby."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/scripts/test_nota_cirugia.py"
+  ],
+  "action_items": [
+    "(Opcional) Agregar DialogDescription al Dialog de 'Registrar cirugía' para eliminar warning a11y de Radix."
+  ],
+  "critical_code_review_comments": [
+    "SalaOperaciones.js (1573 líneas) excede las ~700 recomendadas: considerar extraer el formulario de cirugía, el buscador de pacientes y los diálogos de equipo/insumo a componentes separados.",
+    "NotaCirugia.js maneja correctamente el estado backend-driven (editable, bloqueada, motivo_bloqueo). El contrato cliente/servidor es consistente con lo validado por script.",
+    "EvaluacionesPacienteDialog combina cirugías y evaluaciones con buenos data-testids; renderizado condicional del título ('Historial clínico'/'Detalle'/'Nota de cirugía') correcto."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7 script)", "frontend": "100% (flujo completo + lock + no-regresión)"},
+  "test_credentials": "superadmin/nova2024, usuario/user2024 (de /app/memory/test_credentials.md)",
+  "seed_data_creation": "Cirugía E2E creada y eliminada automáticamente al final del test (patient_id=2272d65e-7531-4ad8-9a5b-187b55702c17, procedure='E2E Test Vitrectomía'). Cleanup confirmó deleted=1.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend ya tiene script test_nota_cirugia.py (7/7). Frontend E2E cubierto. Para re-testear: ejecutar el script y reproducir flujo UI (crear cirugía con buscador paciente, abrir historial, cerrar nota, verificar lock como 'usuario'). El bloqueo automático a 1 mes no se puede probar por UI; validar a nivel backend ajustando bloqueo_fecha en Mongo si fuera necesario.",
+  "rca of the issue": "No se encontraron bugs. El comportamiento observado donde la nota permanece editable para superadmin tras 'Cerrar nota' es el correcto por diseño (nota bloqueada = solo lectura EXCEPTO superadmin). Para rol 'usuario' el bloqueo es efectivo (editor no editable + aviso + sin toolbar/save)."
+}
