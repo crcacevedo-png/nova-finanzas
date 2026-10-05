@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { surgeryApi, formatCurrency } from '../services/api';
+import { surgeryApi, formatCurrency, doctorApi } from '../services/api';
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Pencil, Trash2, X, Calendar, Clock, User, Building2,
@@ -47,17 +47,20 @@ import { toast, Toaster } from 'sonner';
 
 // Constantes
 const ANESTHESIA_TYPES = [
-  { value: 'local', label: 'Local' },
   { value: 'topica', label: 'Tópica' },
+  { value: 'local', label: 'Local' },
+  { value: 'local_asistida', label: 'Local Asistida' },
   { value: 'general', label: 'General' },
-  { value: 'retrobulbar', label: 'Retrobulbar' },
-  { value: 'peribulbar', label: 'Peribulbar' },
-  { value: 'sedacion', label: 'Sedación' },
 ];
 
 const INSTITUTIONS = [
-  'IGSS', 'Privado', 'UNAERC', 'Hospital Roosevelt', 'Hospital San Juan de Dios', 'Otro'
+  'Novavision', 'Alquiler', 'Seguro Privado', 'IGSS'
 ];
+
+const getAnesthesiaLabel = (value) => {
+  const t = ANESTHESIA_TYPES.find(a => a.value === value);
+  return t ? t.label : (value || '');
+};
 
 const PROCEDURES_SUGGESTIONS = [
   'Facoemulsificación + LIO', 'Vitrectomía', 'Pterigión', 'Trabeculectomía',
@@ -129,6 +132,7 @@ const SalaOperaciones = () => {
   const [surgeries, setSurgeries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState({ surgeons: [], institutions: [], anesthesiologists: [] });
+  const [doctorsList, setDoctorsList] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
   
   // Filters
@@ -166,6 +170,7 @@ const SalaOperaciones = () => {
     anesthesiologist: '',
     institution: '',
     igss_data: { unit: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' },
+    insurance_name: '',
     observations: '',
   });
   
@@ -212,6 +217,19 @@ const SalaOperaciones = () => {
     }
   };
 
+  // Cargar médicos registrados para seleccionar al cirujano
+  useEffect(() => {
+    const cargarMedicos = async () => {
+      try {
+        const res = await doctorApi.getAll();
+        setDoctorsList(res.data.data || []);
+      } catch (e) {
+        console.error('Error cargando médicos:', e);
+      }
+    };
+    cargarMedicos();
+  }, []);
+
   const handleSearch = () => {
     setPage(1);
     fetchSurgeries();
@@ -245,6 +263,7 @@ const SalaOperaciones = () => {
       anesthesiologist: '',
       institution: '',
       igss_data: { unit: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' },
+      insurance_name: '',
       observations: '',
     });
     setSurgeryDialogOpen(true);
@@ -264,6 +283,7 @@ const SalaOperaciones = () => {
       anesthesiologist: surgery.anesthesiologist,
       institution: surgery.institution,
       igss_data: surgery.igss_data || { unit: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' },
+      insurance_name: surgery.insurance_name || '',
       observations: surgery.observations || '',
     });
     setSurgeryDialogOpen(true);
@@ -284,6 +304,11 @@ const SalaOperaciones = () => {
         toast.error('Complete todos los campos de IGSS');
         return;
       }
+    }
+    
+    if (formData.institution === 'Seguro Privado' && !formData.insurance_name.trim()) {
+      toast.error('Ingrese el nombre del seguro');
+      return;
     }
     
     setSubmitting(true);
@@ -653,7 +678,7 @@ const SalaOperaciones = () => {
                           <TableCell className="text-sm">{surgery.procedure}</TableCell>
                           <TableCell className="text-sm">{surgery.surgeon}</TableCell>
                           <TableCell>{getEyeBadge(surgery.eye)}</TableCell>
-                          <TableCell className="text-sm capitalize">{surgery.anesthesia_type}</TableCell>
+                          <TableCell className="text-sm">{getAnesthesiaLabel(surgery.anesthesia_type)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
                               <span className="text-sm">{surgery.institution}</span>
@@ -929,15 +954,19 @@ const SalaOperaciones = () => {
                   </div>
                   <div>
                     <Label>Cirujano *</Label>
-                    <Input
-                      value={formData.surgeon}
-                      onChange={(e) => setFormData({ ...formData, surgeon: e.target.value })}
-                      list="surgeons-list"
-                      placeholder="Nombre del cirujano"
-                    />
-                    <datalist id="surgeons-list">
-                      {options.surgeons.map(s => <option key={s} value={s} />)}
-                    </datalist>
+                    <Select value={formData.surgeon} onValueChange={(v) => setFormData({ ...formData, surgeon: v })}>
+                      <SelectTrigger data-testid="surgery-surgeon">
+                        <SelectValue placeholder="Seleccione un médico" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formData.surgeon && !doctorsList.some(d => d.name === formData.surgeon) && (
+                          <SelectItem value={formData.surgeon}>{formData.surgeon}</SelectItem>
+                        )}
+                        {doctorsList.map(d => (
+                          <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label>Ojo a operar *</Label>
@@ -1073,6 +1102,22 @@ const SalaOperaciones = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Seguro Privado: nombre del seguro */}
+                {formData.institution === 'Seguro Privado' && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 animate-in slide-in-from-top-2">
+                    <Badge className="bg-emerald-100 text-emerald-700 border-0">Seguro Privado</Badge>
+                    <div>
+                      <Label>Nombre del seguro *</Label>
+                      <Input
+                        value={formData.insurance_name}
+                        onChange={(e) => setFormData({ ...formData, insurance_name: e.target.value })}
+                        placeholder="Ej: Seguros G&T, Mapfre, Roble..."
+                        data-testid="surgery-insurance-name"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Section: Observaciones */}
@@ -1126,9 +1171,12 @@ const SalaOperaciones = () => {
                     <div><span className="text-xs uppercase text-slate-400">Procedimiento</span><p className="font-medium">{selectedSurgery.procedure}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Cirujano</span><p className="font-medium">{selectedSurgery.surgeon}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Ojo</span><p>{getEyeBadge(selectedSurgery.eye)}</p></div>
-                    <div><span className="text-xs uppercase text-slate-400">Tipo anestesia</span><p className="font-medium capitalize">{selectedSurgery.anesthesia_type}</p></div>
+                    <div><span className="text-xs uppercase text-slate-400">Tipo anestesia</span><p className="font-medium">{getAnesthesiaLabel(selectedSurgery.anesthesia_type)}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Anestesiólogo</span><p className="font-medium">{selectedSurgery.anesthesiologist}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Institución</span><p className="font-medium">{selectedSurgery.institution}</p></div>
+                    {selectedSurgery.institution === 'Seguro Privado' && selectedSurgery.insurance_name && (
+                      <div><span className="text-xs uppercase text-slate-400">Seguro</span><p className="font-medium">{selectedSurgery.insurance_name}</p></div>
+                    )}
                   </div>
                   
                   {/* IGSS Data */}

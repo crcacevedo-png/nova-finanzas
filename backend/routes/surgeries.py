@@ -51,10 +51,11 @@ class SurgeryBase(BaseModel):
     procedure: str
     surgeon: str
     eye: str  # OD, OI, AO
-    anesthesia_type: str  # local, topica, general, retrobulbar, peribulbar, sedacion
+    anesthesia_type: str  # topica, local, local_asistida, general
     anesthesiologist: str
-    institution: str
+    institution: str  # Novavision, Alquiler, Seguro Privado, IGSS
     igss_data: Optional[IGSSData] = None
+    insurance_name: Optional[str] = ""
     observations: Optional[str] = ""
 
 class SurgeryCreate(SurgeryBase):
@@ -71,6 +72,7 @@ class SurgeryUpdate(BaseModel):
     anesthesiologist: Optional[str] = None
     institution: Optional[str] = None
     igss_data: Optional[IGSSData] = None
+    insurance_name: Optional[str] = None
     observations: Optional[str] = None
     status: Optional[str] = None  # activo, cancelado
     cancellation_reason: Optional[str] = None
@@ -89,6 +91,7 @@ class SurgeryResponse(BaseModel):
     anesthesiologist: str
     institution: str
     igss_data: Optional[IGSSData] = None
+    insurance_name: Optional[str] = ""
     observations: Optional[str] = ""
     equipment: List[EquipmentItem] = []
     supplies: List[SupplyItem] = []
@@ -221,6 +224,10 @@ async def create_surgery(
         igss = surgery.igss_data
         if not all([igss.unit, igss.sps, igss.affiliation_number, igss.code, igss.procedure_cost is not None]):
             raise HTTPException(status_code=400, detail="Todos los campos IGSS son obligatorios")
+    
+    # Validar nombre del seguro si la institución es Seguro Privado
+    if surgery.institution == "Seguro Privado" and not (surgery.insurance_name or "").strip():
+        raise HTTPException(status_code=400, detail="El nombre del seguro es requerido")
     
     now = datetime.now(timezone.utc).isoformat()
     
@@ -560,7 +567,7 @@ async def export_surgeries(
             
             # Etiquetas de anestesia
             anesthesia_labels = {
-                "local": "Local", "topica": "Tópica", "general": "General",
+                "topica": "Tópica", "local": "Local", "local_asistida": "Local Asistida", "general": "General",
                 "retrobulbar": "Retrobulbar", "peribulbar": "Peribulbar", "sedacion": "Sedación"
             }
             
@@ -705,7 +712,7 @@ async def export_surgeries(
             elements.append(Spacer(1, 0.15*inch))
             
             anesthesia_labels = {
-                "local": "Local", "topica": "Tópica", "general": "General",
+                "topica": "Tópica", "local": "Local", "local_asistida": "Local Asist.", "general": "General",
                 "retrobulbar": "Retrob.", "peribulbar": "Perib.", "sedacion": "Sedación"
             }
             
