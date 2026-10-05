@@ -4,7 +4,24 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 28)
+**Última actualización**: 2026-06 (Sesión 30)
+
+### Feature (2026-06 Sesión 30) — Sala de Operaciones: cirujano desde médicos, anestesia e instituciones
+- ✅ **Cirujano** ahora se selecciona de la lista de médicos registrados (Select poblado de `/api/doctors`); el anestesiólogo queda como texto libre. En edición conserva el valor previo aunque no esté en la lista.
+- ✅ **Tipos de anestesia** reducidos a: **Tópica / Local / Local Asistida / General** (`local_asistida` nuevo). Etiquetas corregidas en tabla, detalle y export Excel/PDF.
+- ✅ **Instituciones**: **Novavision / Alquiler / Seguro Privado / IGSS**. IGSS mantiene su bloque de datos. **Seguro Privado** muestra campo obligatorio "Nombre del seguro" (`insurance_name`, validado en frontend y backend). Novavision/Alquiler sin campos extra.
+- ✅ **Migración de datos** aplicada: anestesia `retrobulbar`→`local`; institución `Privado`→`Seguro Privado` (equivalencias confirmadas por el usuario).
+- **Backend** (`routes/surgeries.py`): `insurance_name` en `SurgeryBase/Update/Response`; validación de nombre de seguro en `create_surgery`.
+- **Verificado**: testing agent iteration_63.json → backend 100% + frontend E2E 100%, sin issues. Script: `/app/backend/scripts/test_sala_operaciones.py`.
+- ⚠️ Requiere redespliegue para producción.
+
+### Feature (2026-06 Sesión 29) — Horario de disponibilidad por médico
+- ✅ **Horario semanal por médico** (claves "1"=Lun.."7"=Dom, cada día {activo, hora_inicio, hora_fin}) configurable en la pantalla de Médicos (`horario_semanal` en el doctor).
+- ✅ **Enforcement duro**: agendar/reprogramar/próxima-cita fuera del horario del médico → 409 ("Fuera del horario del médico" / "El médico no atiende ese día"). Respetado también por la API del agente externo (`/agenda/external/disponibilidad` y `/citas`).
+- ✅ **Compatibilidad**: médico sin horario configurado = sin restricción.
+- ✅ **Disponibilidad = horario + sin bloqueos/feriados** (combina con los bloqueos de la Sesión 28).
+- **Backend** (`routes/agenda.py`): `verificar_horario_medico`, `motivo_no_disponible`. **Frontend** (`Medicos.js`): editor de 7 días con toggle + horas.
+- **Verificado**: testing agent iteration_62.json → backend 100% + frontend 100%. Script: `/app/backend/scripts/test_horario_medico.py`.
 
 ### Feature (2026-06 Sesión 28) — Bloqueo de Agenda (espacios, días, feriados y vacaciones) [Fase 1 MVP]
 - ✅ **Bloqueos por médico**: franja de horas en una fecha o día completo (individual por médico).

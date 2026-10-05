@@ -1,0 +1,24 @@
+{
+  "summary": "E2E frontend testing of Sala de Operaciones module. All frontend changes verified against spec: surgeon select bound to /api/doctors; anesthesia options exactly [Tópica, Local, Local Asistida, General]; institution options exactly [Novavision, Alquiler, Seguro Privado, IGSS]; Seguro Privado reveals required insurance_name field; IGSS reveals Datos IGSS block; Novavision/Alquiler show no extra fields; validation blocks save when insurance_name missing; successful save with Seguro Privado persists all fields correctly (institution=Seguro Privado, insurance_name='TEST Seguros G&T', anesthesia_type='local_asistida', surgeon from doctors list); detail view displays insurance_name. Migrated legacy surgeries (3 remaining) all have valid anesthesia/institution values. Test surgery cleaned up via UI delete.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sala de Operaciones - Registrar cirugía dialog", "issues": ["Minor a11y: DialogContent missing aria-describedby (React warning in console); no data-testid on 'Guardar registro' / 'Cancelar' buttons nor on anesthesia/institution Select triggers inside dialog (only surgeon trigger has one). Adding would simplify future automated testing."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/scripts/test_sala_operaciones.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SalaOperaciones.js is ~1521 lines — consider splitting into subcomponents (SurgeryFormDialog, SurgeryDetailDialog, SurgeryTable) for maintainability.",
+    "Add data-testid to anesthesia-type trigger, institution trigger, save button, and eye-selector buttons to improve testability (currently tests rely on nth(1)/nth(2) ordering of comboboxes)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100% (previously verified)", "frontend": "100%" },
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None persisted. Created 1 test surgery (TEST_PRB Paciente Seguro / 2026-12-20) during flow and deleted it via UI.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All Sala de Operaciones spec checks pass. Backend was already verified by /app/backend/scripts/test_sala_operaciones.py (400 for Seguro Privado without insurance_name, 200 with name & persists, local_asistida persists, Novavision 200). Cookie-based auth may return 403 for programmatic fetch inside page.evaluate — prefer UI interactions or extract Authorization bearer from localStorage. Login rate limit is 5/min/IP, reuse sessions. Combobox ordering in New Surgery dialog: 0=surgeon, 1=anesthesia, 2=institution."
+}
