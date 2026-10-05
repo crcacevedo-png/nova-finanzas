@@ -6,6 +6,10 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-06 (Sesión 30)
 
+### Mejora (2026-06 Sesión 30b) — Nombre del seguro en exportaciones de cirugías
+- ✅ Las exportaciones de cirugías (Excel y PDF, `GET /api/reports/surgeries`) ahora muestran la institución como "Seguro Privado (Nombre del seguro)" cuando aplica. Helper `format_institution` en `routes/surgeries.py`; ancho de columna del PDF ajustado.
+- **Verificado por curl**: xlsx 200 (contiene el nombre del seguro) y pdf 200.
+
 ### Feature (2026-06 Sesión 30) — Sala de Operaciones: cirujano desde médicos, anestesia e instituciones
 - ✅ **Cirujano** ahora se selecciona de la lista de médicos registrados (Select poblado de `/api/doctors`); el anestesiólogo queda como texto libre. En edición conserva el valor previo aunque no esté en la lista.
 - ✅ **Tipos de anestesia** reducidos a: **Tópica / Local / Local Asistida / General** (`local_asistida` nuevo). Etiquetas corregidas en tabla, detalle y export Excel/PDF.

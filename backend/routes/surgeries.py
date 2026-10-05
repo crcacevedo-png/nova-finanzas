@@ -534,6 +534,13 @@ async def export_surgeries(
         supplies_total = get_supplies_total(surgery.get("supplies", []))
         return procedure_cost + supplies_total
     
+    def format_institution(surgery):
+        """Institución; si es Seguro Privado agrega el nombre del seguro."""
+        inst = surgery.get("institution", "") or ""
+        if inst == "Seguro Privado" and (surgery.get("insurance_name") or "").strip():
+            return f"Seguro Privado ({surgery['insurance_name'].strip()})"
+        return inst
+    
     if format == "xlsx":
         try:
             import openpyxl
@@ -579,7 +586,7 @@ async def export_surgeries(
                 ws.cell(row=row, column=5, value=s["surgeon"]).border = thin_border
                 ws.cell(row=row, column=6, value=s["eye"]).border = thin_border
                 ws.cell(row=row, column=7, value=anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", ""))).border = thin_border
-                ws.cell(row=row, column=8, value=s["institution"]).border = thin_border
+                ws.cell(row=row, column=8, value=format_institution(s)).border = thin_border
                 
                 proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
                 cell_proc = ws.cell(row=row, column=9, value=proc_cost)
@@ -731,13 +738,13 @@ async def export_surgeries(
                     s["surgeon"][:18] + "..." if len(s["surgeon"]) > 18 else s["surgeon"],
                     s["eye"],
                     anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", "")[:6]),
-                    s["institution"][:12] + "..." if len(s["institution"]) > 12 else s["institution"],
+                    (lambda inst: inst[:16] + "..." if len(inst) > 16 else inst)(format_institution(s)),
                     f'Q {proc_cost:,.2f}',
                     f'Q {supplies_total:,.2f}',
                     f'Q {total:,.2f}'
                 ])
             
-            col_widths = [0.7*inch, 0.5*inch, 1.5*inch, 1.2*inch, 1.1*inch, 0.4*inch, 0.55*inch, 0.8*inch, 0.75*inch, 0.75*inch, 0.75*inch]
+            col_widths = [0.7*inch, 0.5*inch, 1.1*inch, 1.1*inch, 1.1*inch, 0.4*inch, 0.55*inch, 1.3*inch, 0.75*inch, 0.75*inch, 0.75*inch]
             table = Table(table_data, colWidths=col_widths)
             
             table.setStyle(TableStyle([
