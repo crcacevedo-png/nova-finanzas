@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { surgeryApi, formatCurrency, doctorApi } from '../services/api';
+import { surgeryApi, formatCurrency, doctorApi, patientApi } from '../services/api';
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Pencil, Trash2, X, Calendar, Clock, User, Building2,
@@ -133,6 +133,8 @@ const SalaOperaciones = () => {
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState({ surgeons: [], institutions: [], anesthesiologists: [] });
   const [doctorsList, setDoctorsList] = useState([]);
+  const [patientResults, setPatientResults] = useState([]);
+  const [showPatientResults, setShowPatientResults] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});
   
   // Filters
@@ -163,6 +165,7 @@ const SalaOperaciones = () => {
     date: new Date().toISOString().split('T')[0],
     time: new Date().toTimeString().slice(0, 5),
     patient_name: '',
+    patient_id: null,
     procedure: '',
     surgeon: '',
     eye: '',
@@ -230,6 +233,29 @@ const SalaOperaciones = () => {
     cargarMedicos();
   }, []);
 
+  const buscarPacientes = async (texto) => {
+    if (!texto || texto.length < 2) { setPatientResults([]); setShowPatientResults(false); return; }
+    try {
+      const res = await patientApi.getAll({ search: texto, limit: 8 });
+      setPatientResults(res.data.data || []);
+      setShowPatientResults(true);
+    } catch (e) {
+      setPatientResults([]);
+    }
+  };
+
+  const handlePatientInput = (val) => {
+    setFormData(prev => ({ ...prev, patient_name: val, patient_id: null }));
+    buscarPacientes(val);
+  };
+
+  const selectPatient = (p) => {
+    const nombre = p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ');
+    setFormData(prev => ({ ...prev, patient_name: nombre, patient_id: p.id }));
+    setShowPatientResults(false);
+    setPatientResults([]);
+  };
+
   const handleSearch = () => {
     setPage(1);
     fetchSurgeries();
@@ -256,6 +282,7 @@ const SalaOperaciones = () => {
       date: new Date().toISOString().split('T')[0],
       time: new Date().toTimeString().slice(0, 5),
       patient_name: '',
+      patient_id: null,
       procedure: '',
       surgeon: '',
       eye: '',
@@ -276,6 +303,7 @@ const SalaOperaciones = () => {
       date: surgery.date,
       time: surgery.time,
       patient_name: surgery.patient_name,
+      patient_id: surgery.patient_id || null,
       procedure: surgery.procedure,
       surgeon: surgery.surgeon,
       eye: surgery.eye,
@@ -932,13 +960,37 @@ const SalaOperaciones = () => {
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     />
                   </div>
-                  <div className="col-span-2">
-                    <Label>Nombre del paciente *</Label>
+                  <div className="col-span-2 relative">
+                    <Label>Paciente * (buscar registrado)</Label>
                     <Input
                       value={formData.patient_name}
-                      onChange={(e) => setFormData({ ...formData, patient_name: e.target.value })}
-                      placeholder="Nombre completo del paciente"
+                      onChange={(e) => handlePatientInput(e.target.value)}
+                      onFocus={() => formData.patient_name.length >= 2 && patientResults.length > 0 && setShowPatientResults(true)}
+                      placeholder="Buscar por nombre, DPI o expediente..."
+                      autoComplete="off"
+                      data-testid="surgery-patient-search"
                     />
+                    {formData.patient_id ? (
+                      <p className="text-xs text-emerald-600 mt-1" data-testid="surgery-patient-linked">✓ Vinculado al expediente — se creará la nota en su historial clínico</p>
+                    ) : formData.patient_name ? (
+                      <p className="text-xs text-amber-600 mt-1">Paciente no registrado seleccionado — no se creará nota clínica</p>
+                    ) : null}
+                    {showPatientResults && patientResults.length > 0 && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto" data-testid="surgery-patient-results">
+                        {patientResults.map((p) => (
+                          <button
+                            type="button"
+                            key={p.id}
+                            onClick={() => selectPatient(p)}
+                            className="w-full text-left px-3 py-2 hover:bg-emerald-50 text-sm border-b border-slate-100 last:border-0"
+                            data-testid={`surgery-patient-option-${p.id}`}
+                          >
+                            <span className="font-medium text-slate-800">{p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</span>
+                            <span className="text-xs text-slate-500 ml-2">Exp. {p.record_number || 's/exp'}{p.dpi ? ` · DPI ${p.dpi}` : ''}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="col-span-2">
                     <Label>Procedimiento *</Label>

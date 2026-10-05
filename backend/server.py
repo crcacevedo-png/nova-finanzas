@@ -2815,12 +2815,13 @@ api_router.include_router(evaluaciones_router, tags=["Evaluaciones Oftalmológic
 api_router.include_router(catalogos_router, tags=["Catálogos - Evaluaciones"])
 
 # ==================== MÓDULO DE CIRUGÍAS (Refactorizado) ====================
-from routes.surgeries import router as surgeries_router, reports_router as surgeries_reports_router
+from routes.surgeries import router as surgeries_router, reports_router as surgeries_reports_router, notas_router as surgery_notes_router
 from routes.surgery_crm import router as surgery_crm_router
 
 # Incluir routers de cirugías
 api_router.include_router(surgeries_router, tags=["Cirugías"])
 api_router.include_router(surgeries_reports_router, tags=["Reportes de Cirugías"])
+api_router.include_router(surgery_notes_router, tags=["Notas de Cirugía"])
 api_router.include_router(surgery_crm_router, tags=["CRM Cirugías"])
 
 # ==================== MÓDULO DE GASTOS Y PAGOS (Refactorizado) ====================

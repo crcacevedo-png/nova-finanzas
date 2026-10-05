@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 import io
 
@@ -48,6 +48,7 @@ class SurgeryBase(BaseModel):
     date: str
     time: str
     patient_name: str
+    patient_id: Optional[str] = None
     procedure: str
     surgeon: str
     eye: str  # OD, OI, AO
@@ -84,6 +85,7 @@ class SurgeryResponse(BaseModel):
     date: str
     time: str
     patient_name: str
+    patient_id: Optional[str] = None
     procedure: str
     surgeon: str
     eye: str
@@ -245,6 +247,10 @@ async def create_surgery(
     }
     
     await db.surgeries.insert_one(surgery_doc)
+    
+    # Crear evento/nota de cirugía en el historial clínico si hay paciente registrado
+    if surgery.patient_id:
+        await crear_nota_cirugia(surgery_doc, current_user)
     
     created = await db.surgeries.find_one({"id": surgery_doc["id"]}, {"_id": 0})
     enriched = await enrich_surgery(created)
@@ -804,10 +810,132 @@ async def export_surgeries(
             raise HTTPException(status_code=500, detail=f"Librería PDF no disponible: {str(e)}")
 
 
+# ==================== NOTAS DE CIRUGÍA (historial clínico) ====================
+
+notas_router = APIRouter(prefix="/surgery-notes", tags=["Notas de Cirugía"])
+
+
+def nota_bloqueada(note: dict):
+    """Devuelve (bloqueada: bool, motivo: str|None) según cierre o vencimiento (1 mes)."""
+    if note.get("estado") == "cerrada":
+        return True, "Nota cerrada"
+    bf = note.get("bloqueo_fecha")
+    if bf and datetime.now(timezone.utc).isoformat() > bf:
+        return True, "Bloqueada automáticamente (1 mes desde su creación)"
+    return False, None
+
+
+def serialize_note(note: dict, user: dict):
+    bloqueada, motivo = nota_bloqueada(note)
+    es_super = user.get("role") == "superadmin"
+    data = {k: v for k, v in note.items() if k != "_id"}
+    data["bloqueada"] = bloqueada
+    data["motivo_bloqueo"] = motivo
+    data["editable"] = (not bloqueada) or es_super
+    return data
+
+
+async def crear_nota_cirugia(surgery_doc: dict, user: dict):
+    """Crea automáticamente la nota/evento de cirugía en el historial del paciente."""
+    now = datetime.now(timezone.utc)
+    note = {
+        "id": str(uuid.uuid4()),
+        "surgery_id": surgery_doc["id"],
+        "patient_id": surgery_doc.get("patient_id"),
+        "patient_name": surgery_doc.get("patient_name"),
+        "procedure": surgery_doc.get("procedure"),
+        "fecha": surgery_doc.get("date"),
+        "time": surgery_doc.get("time"),
+        "eye": surgery_doc.get("eye"),
+        "surgeon": surgery_doc.get("surgeon"),
+        "institution": surgery_doc.get("institution"),
+        "contenido": "",
+        "estado": "abierta",
+        "bloqueo_fecha": (now + timedelta(days=30)).isoformat(),
+        "created_at": now.isoformat(),
+        "created_by": user.get("id"),
+        "updated_at": now.isoformat(),
+        "cerrada_at": None,
+        "cerrada_por": None,
+    }
+    await db.notas_cirugia.insert_one(note)
+    return note
+
+
+@notas_router.get("")
+async def listar_notas_cirugia(
+    patient_id: Optional[str] = Query(None),
+    surgery_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Lista notas de cirugía del historial clínico (por paciente o por cirugía)."""
+    query = {}
+    if patient_id:
+        query["patient_id"] = patient_id
+    if surgery_id:
+        query["surgery_id"] = surgery_id
+    notas = await db.notas_cirugia.find(query, {"_id": 0}).sort("fecha", -1).to_list(500)
+    return {"data": [serialize_note(n, current_user) for n in notas], "total": len(notas)}
+
+
+@notas_router.get("/{note_id}")
+async def obtener_nota_cirugia(note_id: str, current_user: dict = Depends(get_current_user)):
+    note = await db.notas_cirugia.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Nota no encontrada")
+    return serialize_note(note, current_user)
+
+
+@notas_router.put("/{note_id}")
+async def actualizar_nota_cirugia(
+    note_id: str,
+    body: dict = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Edita el contenido de la nota. Bloqueada si está cerrada o venció el mes (excepto superadmin)."""
+    note = await db.notas_cirugia.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Nota no encontrada")
+    bloqueada, motivo = nota_bloqueada(note)
+    if bloqueada and current_user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail=f"Nota bloqueada: {motivo}")
+    await db.notas_cirugia.update_one(
+        {"id": note_id},
+        {"$set": {
+            "contenido": body.get("contenido", ""),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "actualizada_por": current_user.get("id"),
+        }}
+    )
+    actualizada = await db.notas_cirugia.find_one({"id": note_id}, {"_id": 0})
+    return serialize_note(actualizada, current_user)
+
+
+@notas_router.post("/{note_id}/close")
+async def cerrar_nota_cirugia(note_id: str, current_user: dict = Depends(get_current_user)):
+    """Cierra la nota: queda bloqueada y de solo lectura (cualquier usuario puede cerrar)."""
+    note = await db.notas_cirugia.find_one({"id": note_id}, {"_id": 0})
+    if not note:
+        raise HTTPException(status_code=404, detail="Nota no encontrada")
+    if note.get("estado") == "cerrada":
+        raise HTTPException(status_code=400, detail="La nota ya está cerrada")
+    bloqueada, _ = nota_bloqueada(note)
+    if bloqueada and current_user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Nota ya bloqueada")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.notas_cirugia.update_one(
+        {"id": note_id},
+        {"$set": {"estado": "cerrada", "cerrada_at": now, "cerrada_por": current_user.get("id"), "updated_at": now}}
+    )
+    actualizada = await db.notas_cirugia.find_one({"id": note_id}, {"_id": 0})
+    return serialize_note(actualizada, current_user)
+
+
 # Exportar modelos para uso externo
 __all__ = [
     'router',
     'reports_router',
+    'notas_router',
     'IGSSData',
     'EquipmentItem',
     'SupplyItem',

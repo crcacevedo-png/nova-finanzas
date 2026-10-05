@@ -23,7 +23,11 @@ import {
   Pill,
   ClipboardList,
   Activity,
+  Scissors,
 } from 'lucide-react';
+import { NotaCirugia } from './NotaCirugia';
+import { surgeryNoteApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -125,11 +129,23 @@ const RecetaLentes = ({ receta }) => {
 };
 
 export const EvaluacionesPacienteDialog = ({ patient, open, onOpenChange }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [evaluaciones, setEvaluaciones] = useState([]);
+  const [notas, setNotas] = useState([]);
+  const [selectedNota, setSelectedNota] = useState(null);
   const [selected, setSelected] = useState(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [pdfLoadingId, setPdfLoadingId] = useState(null);
+
+  const fetchNotas = useCallback(async (pid) => {
+    try {
+      const { data } = await surgeryNoteApi.getByPatient(pid);
+      setNotas(data.data || []);
+    } catch (error) {
+      setNotas([]);
+    }
+  }, []);
 
   const fetchEvaluaciones = useCallback(async (pid) => {
     setLoading(true);
@@ -154,13 +170,17 @@ export const EvaluacionesPacienteDialog = ({ patient, open, onOpenChange }) => {
   useEffect(() => {
     if (open && patient?.id) {
       setSelected(null);
+      setSelectedNota(null);
       fetchEvaluaciones(patient.id);
+      fetchNotas(patient.id);
     }
     if (!open) {
       setEvaluaciones([]);
+      setNotas([]);
       setSelected(null);
+      setSelectedNota(null);
     }
-  }, [open, patient?.id, fetchEvaluaciones]);
+  }, [open, patient?.id, fetchEvaluaciones, fetchNotas]);
 
   const abrirDetalle = async (ev) => {
     setLoadingDetalle(true);
@@ -212,17 +232,49 @@ export const EvaluacionesPacienteDialog = ({ patient, open, onOpenChange }) => {
         </div>
       );
     }
-    if (evaluaciones.length === 0) {
+    if (evaluaciones.length === 0 && notas.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <ClipboardList className="mb-3 h-10 w-10 text-slate-300" />
-          <p className="text-sm text-slate-500">Este paciente aún no tiene evaluaciones registradas</p>
+          <p className="text-sm text-slate-500">Este paciente aún no tiene registros clínicos</p>
         </div>
       );
     }
     return (
-      <div className="space-y-2" data-testid="lista-evaluaciones-paciente">
-        {evaluaciones.map((ev) => {
+      <div className="space-y-4">
+        {/* Eventos de cirugía */}
+        {notas.length > 0 && (
+          <div className="space-y-2" data-testid="lista-notas-cirugia">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Cirugías</p>
+            {notas.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => setSelectedNota(n)}
+                className="flex w-full items-center justify-between rounded-lg border border-purple-200 bg-purple-50/40 p-3 text-left transition-colors hover:border-purple-400 hover:bg-purple-50"
+                data-testid={`nota-cirugia-item-${n.id}`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Scissors className="h-4 w-4 text-purple-600" />
+                    <span className="truncate font-semibold text-slate-800">{n.procedure}</span>
+                    {n.estado === 'cerrada' && <Badge className="bg-red-100 text-red-700 text-[10px]"><Lock className="mr-1 h-3 w-3" />Cerrada</Badge>}
+                    {n.estado !== 'cerrada' && n.bloqueada && <Badge className="bg-amber-100 text-amber-700 text-[10px]"><Lock className="mr-1 h-3 w-3" />Bloqueada</Badge>}
+                    {n.estado !== 'cerrada' && !n.bloqueada && <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Abierta</Badge>}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">{formatFecha(n.fecha)} · {n.eye} · {n.surgeon}</p>
+                </div>
+                <Eye className="h-4 w-4 shrink-0 text-purple-600" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Evaluaciones */}
+        {evaluaciones.length > 0 && (
+          <div className="space-y-2" data-testid="lista-evaluaciones-paciente">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Evaluaciones</p>
+            {evaluaciones.map((ev) => {
           const dxList = Array.isArray(ev.diagnosticos) ? ev.diagnosticos : [];
           const dxPrincipal = dxList.length > 0
             ? (dxList[0].descripcion || dxList[0].nombre || '')
@@ -288,6 +340,8 @@ export const EvaluacionesPacienteDialog = ({ patient, open, onOpenChange }) => {
             </div>
           );
         })}
+          </div>
+        )}
       </div>
     );
   };
@@ -424,20 +478,20 @@ export const EvaluacionesPacienteDialog = ({ patient, open, onOpenChange }) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[#0F6E56]">
             <ClipboardList className="h-5 w-5" />
-            {selected ? 'Detalle de evaluación' : 'Evaluaciones previas'}
+            {selectedNota ? 'Nota de cirugía' : selected ? 'Detalle de evaluación' : 'Historial clínico'}
           </DialogTitle>
           <DialogDescription>
             {nombrePaciente}
             {patient?.record_number ? ` · Exp. ${patient.record_number}` : ''}
-            {!selected && !loading && evaluaciones.length > 0 ? ` · ${evaluaciones.length} evaluación(es)` : ''}
+            {!selected && !selectedNota && !loading && (evaluaciones.length > 0 || notas.length > 0) ? ` · ${notas.length} cirugía(s), ${evaluaciones.length} evaluación(es)` : ''}
           </DialogDescription>
         </DialogHeader>
 
-        {selected && (
+        {(selected || selectedNota) && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSelected(null)}
+            onClick={() => { setSelected(null); setSelectedNota(null); }}
             className="mb-1 w-fit gap-1 text-slate-600 hover:bg-slate-100"
             data-testid="volver-lista-evaluaciones"
           >
@@ -446,7 +500,16 @@ export const EvaluacionesPacienteDialog = ({ patient, open, onOpenChange }) => {
           </Button>
         )}
 
-        {selected ? renderDetalle() : renderLista()}
+        {selectedNota ? (
+          <NotaCirugia
+            note={selectedNota}
+            isSuperadmin={user?.role === 'superadmin'}
+            onUpdated={(data) => {
+              setSelectedNota(data);
+              setNotas((prev) => prev.map((n) => (n.id === data.id ? data : n)));
+            }}
+          />
+        ) : selected ? renderDetalle() : renderLista()}
       </DialogContent>
     </Dialog>
   );

@@ -1,80 +1,75 @@
-# Bloqueo de Agenda (espacios, días, feriados y vacaciones)
+# Nota de cirugía en el historial clínico del paciente
 
-Permite reservar espacios de la agenda para que no se puedan agendar citas: por médico (franjas de horas o días completos) y para toda la clínica (feriados o vacaciones).
-Los bloqueos son consultables y respetados también por un agente externo (n8n/Claude) que agenda citas por API.
+Al registrar una cirugía para un paciente, el sistema crea automáticamente un evento en el historial clínico de ese paciente con el nombre de la cirugía realizada y una nota de cirugía editable. La nota puede cerrarse para dejarla como registro definitivo y se bloquea automáticamente un mes después de creada.
 
 ## Para quién es
-- Personal de recepción y cualquier usuario del sistema que gestiona la agenda diaria.
-- Médicos que necesitan apartar horarios o ausentarse.
-- Un agente externo automatizado (n8n + Claude) que verifica disponibilidad y agenda citas por API con una clave fija.
+- Médicos y cirujanos que documentan lo realizado en cada cirugía.
+- Personal de recepción/asistentes que registran cirugías en la Sala de Operaciones.
+- Cualquier usuario que consulta el historial clínico del paciente.
 
 ## Funcionalidades y experiencia
 
-### Bloqueos por médico
-- Bloquear una **franja de horas** en una fecha específica (ej. 10:00–12:00 el 15 de julio).
-- Bloquear un **día completo** para un médico.
-- Cada bloqueo es individual por médico y no afecta a los demás.
-- Motivo opcional (ej. Vacaciones, Congreso, Almuerzo, Personal).
+### 1. Vincular la cirugía a un paciente registrado
+- En el formulario de "Registrar cirugía", el campo de paciente pasa de texto libre a un **buscador de pacientes registrados** (por nombre/expediente/DPI).
+- Si se selecciona un paciente registrado, la cirugía queda asociada a ese paciente.
+- Si no se encuentra/selecciona un paciente registrado, la cirugía puede guardarse igual (con nombre escrito), pero **no se crea evento clínico** para ese caso.
 
-### Bloqueo de clínica completa
-- Bloquear un **día** o un **rango de fechas** para toda la clínica (feriados, vacaciones colectivas).
-- Afecta a todos los médicos durante ese período.
+### 2. Evento de cirugía en el historial clínico
+- Al registrar una cirugía para un paciente registrado, aparece automáticamente un **evento** en el historial clínico de ese paciente.
+- El evento muestra como título el **nombre de la cirugía realizada** (el procedimiento) y datos de referencia: fecha, ojo, cirujano e institución.
+- El evento queda listado junto al resto del historial del paciente, ordenado por fecha.
 
-### Reglas de uso
-- **Cualquier usuario** puede crear bloqueos (de médico y de clínica).
-- **Cualquier usuario** puede eliminar cualquier bloqueo (incluidos los de clínica completa).
-- Al intentar agendar una cita en un espacio/día bloqueado, el sistema **impide** la cita y muestra el motivo del bloqueo (bloqueo duro). Esto aplica tanto a la agenda interna como al agente externo.
-- Si al crear un bloqueo ya existen citas en ese horario/día, el bloqueo **se crea igual** y el sistema **lista las citas en conflicto** para que se reprogramen manualmente. Las citas existentes no se cancelan automáticamente; solo se impiden citas nuevas.
+### 3. Nota de cirugía
+- Cada evento de cirugía tiene una **nota de cirugía** donde se escribe el detalle de lo realizado.
+- La nota admite **formato básico** (negritas, cursiva, listas) además de texto.
+- Mientras está abierta, cualquier usuario puede escribir y editar la nota.
 
-### Consulta y agendado por agente externo (API)
-- Acceso mediante una **clave de API fija** (se entrega para configurarla en n8n).
-- El agente externo puede:
-  - **Consultar disponibilidad** de un médico en una fecha/hora, considerando bloqueos y citas existentes.
-  - **Listar los bloqueos** vigentes (por médico y de clínica).
-  - **Agendar una cita**, respetando los bloqueos (si el espacio está bloqueado, la API lo rechaza con el motivo).
-- Los bloqueos creados desde la interfaz se reflejan de inmediato para el agente externo y viceversa.
+### 4. Cierre y bloqueo de la nota
+- Botón **"Cerrar nota"**: al cerrarla, queda **bloqueada de inmediato** y pasa a ser solo lectura.
+- **Bloqueo automático**: aunque no se cierre manualmente, la nota se bloquea **un mes después de haber sido creada**.
+- Una nota bloqueada (cerrada o vencido el mes) **no puede modificarse**, con una excepción: el **superadmin** sí puede editarla.
+- El estado de la nota se muestra claramente: Abierta / Cerrada / Bloqueada por tiempo, con la fecha a partir de la cual queda bloqueada.
 
 ## Flujo de uso
-1. Un usuario abre la Agenda y elige "Bloquear" sobre un espacio, un día de un médico, o un período de clínica.
-2. Define médico (o "toda la clínica"), fecha/rango, franja de horas o día completo, y un motivo opcional.
-3. Si hay citas en conflicto, el sistema las muestra en una lista para reprogramarlas; el bloqueo queda activo.
-4. En la vista de agenda, los espacios/días bloqueados se muestran marcados y no permiten agendar.
-5. El agente externo (n8n) consulta disponibilidad con su clave de API; si está libre, agenda; si está bloqueado, recibe el rechazo con el motivo.
-6. Cualquier usuario puede eliminar un bloqueo cuando ya no aplica.
+1. Un usuario registra una cirugía en la Sala de Operaciones y busca/selecciona al paciente registrado.
+2. Al guardar, se crea el evento de cirugía en el historial clínico del paciente, con el nombre del procedimiento.
+3. El médico abre el evento y redacta la nota de cirugía (con formato básico); puede guardarla y seguir editándola.
+4. Cuando la da por terminada, pulsa "Cerrar nota": la nota queda bloqueada y de solo lectura.
+5. Si nunca se cierra, al cumplirse un mes desde su creación se bloquea sola.
+6. Después del bloqueo, solo el superadmin puede hacer correcciones.
 
 ## Estilo (UI/UX)
-- Integrado a la agenda actual, sin cambiar su diseño general.
-- Espacios bloqueados con indicación visual clara (sombreado/trama) y el motivo visible al pasar o tocar.
-- Los bloqueos de clínica completa se muestran como una franja/etiqueta destacada en el día (ej. "Feriado", "Vacaciones").
-- Un panel o listado para ver y eliminar bloqueos vigentes.
-- Mensajes claros al impedir una cita por bloqueo, indicando el motivo.
+- Integrado al historial clínico existente del paciente, sin cambiar su diseño general; el evento de cirugía se distingue con una etiqueta/ícono propio.
+- Editor de nota sencillo y limpio, con una barra mínima de formato (negrita, cursiva, lista).
+- Indicadores de estado visibles (Abierta/Cerrada/Bloqueada) y, cuando está bloqueada, mensaje claro del motivo y la fecha.
+- Acceso a la nota tanto desde el historial clínico del paciente como desde el detalle de la cirugía en la Sala de Operaciones.
 
 ## Fases de implementación
 
 ### Fase 1 — MVP (se construye ahora)
-- Bloqueos por médico: franja de horas en una fecha y día completo.
-- Bloqueos de clínica completa: día y rango de fechas.
-- Crear y eliminar bloqueos por cualquier usuario; motivo opcional.
-- Listado de citas en conflicto al crear un bloqueo (para reprogramación manual).
-- Enforcement duro: la agenda interna impide agendar en espacios/días bloqueados.
-- Indicación visual de bloqueos en la agenda y panel para administrarlos.
-- API con clave fija para el agente externo: consultar disponibilidad, listar bloqueos y agendar citas respetando los bloqueos.
+- Buscador de paciente registrado en el formulario de cirugía (reemplaza el texto libre; permite guardar sin evento si no hay paciente registrado).
+- Creación automática del evento de cirugía en el historial clínico, titulado con el nombre del procedimiento y con datos de referencia.
+- Nota de cirugía con formato básico, editable mientras está abierta.
+- Botón "Cerrar nota" (bloqueo inmediato) y bloqueo automático al mes de creada.
+- Nota bloqueada en solo lectura para todos, con excepción del superadmin.
+- Visualización del estado de la nota y acceso desde historial clínico y desde el detalle de la cirugía.
 
 ### Fase 2 — Mejoras
-- Bloqueos **recurrentes** (ej. almuerzo todos los días, día libre semanal).
-- Herramienta para **reprogramar en lote** las citas en conflicto.
-- Notificación a pacientes afectados cuando un bloqueo genera conflicto.
+- Sincronizar el evento si la cirugía se edita (p. ej. cambia el procedimiento) y manejar el caso de cirugía cancelada/eliminada.
+- Adjuntar imágenes/archivos a la nota de cirugía.
+- Imprimir/exportar la nota de cirugía (PDF).
 
 ### Fase 3 — Avanzado
-- Horarios/calendarios laborales individuales por médico y plantillas de disponibilidad.
-- Registro de auditoría de bloqueos (quién creó/eliminó y cuándo).
-- API externa ampliada (cancelar/reprogramar citas, estados).
+- Plantillas de nota de cirugía por tipo de procedimiento.
+- Registro de auditoría de la nota (quién creó/editó/cerró y cuándo), incluidas las ediciones del superadmin tras el bloqueo.
+- Firma electrónica del cirujano en la nota.
 
 ## Supuestos
-- El agente externo necesita **tanto consultar disponibilidad como agendar** citas por API; la clave fija habilita ambas acciones de forma controlada.
-- Los bloqueos por médico se definen como **franja de horas en una fecha** o **día completo**; los de clínica como **día o rango de fechas**.
-- Cada bloqueo incluye un **motivo opcional**.
-- Los bloqueos **recurrentes** quedan para la Fase 2 (en el MVP se crean por fecha o rango).
-- Al bloquear con citas existentes, estas **no se cancelan automáticamente**; solo se listan para reprogramación y se impiden citas nuevas.
-- La clave de API se **genera y entrega** para configurarla en n8n; puede rotarse si se requiere.
-- El enforcement aplica a la creación/reprogramación de citas; las citas ya finalizadas no se ven afectadas.
+- El "nombre de la cirugía" del evento es el **procedimiento** registrado en la cirugía.
+- El mes de bloqueo se cuenta **desde la creación de la nota** (no desde la fecha de la cirugía ni desde el cierre).
+- "Cerrar nota" puede hacerlo cualquier usuario; una vez cerrada, solo el superadmin puede reabrir/editar.
+- Si una cirugía no se asocia a un paciente registrado, no se genera evento clínico (se permite guardar la cirugía con nombre escrito).
+- Eliminar o cancelar una cirugía **no borra** el evento clínico ya creado en el MVP (se aborda en la Fase 2).
+- Solo se crea **una nota de cirugía por evento de cirugía**.
+- El formato básico se limita a negritas, cursiva y listas (sin imágenes ni tablas en el MVP).
+- El bloqueo aplica a la nota; los datos de la cirugía en la Sala de Operaciones conservan sus reglas actuales.

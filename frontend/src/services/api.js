@@ -290,6 +290,14 @@ export const doctorApi = {
   search: (q, limit = 10) => axios.get(`${API_URL}/doctors/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 };
 
+export const surgeryNoteApi = {
+  getByPatient: (patientId) => axios.get(`${API_URL}/surgery-notes?patient_id=${patientId}`),
+  get: (id) => axios.get(`${API_URL}/surgery-notes/${id}`),
+  update: (id, contenido) => axios.put(`${API_URL}/surgery-notes/${id}`, { contenido }),
+  close: (id) => axios.post(`${API_URL}/surgery-notes/${id}/close`),
+};
+
+
 // Frame Inventory API (Inventario de Aros)
 export const frameApi = {
   getAll: (params = {}) => {
