@@ -1,0 +1,23 @@
+{
+  "summary": "Validación independiente del fix H-03 (abono a CxC se duplicaba en Dashboard Financiero). Backend: 8/8 pytest OK en /app/backend/tests/test_auditoria_p26_h03.py cubriendo (a) abono con registrar_en_caja=True suma Q100 exactos al dashboard (antes +Q200), (b) abono con registrar_en_caja=False también suma Q100 exactos, (c) el abono guarda movimiento_caja_id cuando registrar_en_caja=True, y (d) regresiones: GET /api/cxc, GET /api/cierres-financieros, login admin, GET /api/patients, GET /api/inventario/productos. UI: Dashboard Financiero (como superadmin) muestra 'Ingresos Cobrados Q1,175.00' con desglose correcto 'Caja: Q 725.00 | CxC: Q 450.00' y el gráfico 'Ingresos por Tipo de Pagador' acredita Q450.00 a 'Cobro CxC' una sola vez (no duplicado). Caja → Cuentas por Cobrar lista 60+ cuentas sin error 500 y el modal 'Registrar Abono' incluye el switch 'Registrar como ingreso en caja diaria' activado por defecto, lo que corresponde al parámetro registrar_en_caja del endpoint.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_auditoria_p26_h03.py",
+    "/app/test_reports/pytest/p26_h03.xml",
+    "/app/backend/tests/test_auditoria_p26_invariantes.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "El fix en dashboard_financiero.py (líneas ~94-108) deduplica abonos excluyendo los que tengan movimiento_caja_id. Esto depende de que caja.py registrar_abono SIEMPRE escriba el campo cuando corresponde. Validado por el test test_h03_movimiento_caja_id_presente_cuando_registrar_en_caja. Observación: para abonos legados anteriores al fix cuyo movimiento_caja_id esté en None pero sí haya un caja_movimiento asociado, el conteo seguirá siendo doble. Si se quiere endurecer, correr un script de reconciliación histórica (opcional).",
+    "test_auditoria_p26_invariantes.py presenta errores 'Event loop is closed' cuando se ejecutan varios tests en el mismo run (fixture event_loop session-scoped + motor usando run_in_executor). No afecta la validez del fix pero conviene convertir event_loop a scope='function' o migrar a httpx AsyncClient aislado por test. Workaround: ejecutar tests uno a uno. El nuevo test_auditoria_p26_h03.py evita el problema usando requests síncrono contra el ingress."
+  ],
+  "updated_files": ["/app/backend/tests/test_auditoria_p26_h03.py (nuevo, 8 tests)"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (Dashboard Financiero, CxC, modal abono)"},
+  "test_credentials": "superadmin/nova2024, admin/Admin2024Nuevo! (/app/memory/test_credentials.md)",
+  "seed_data_creation": "Producto TEST-H03-{tag}-P + proveedor TEST-H03-{tag}-Prov + responsable TEST-H03-{tag}-Resp. Producto eliminado con force=true en teardown; proveedor y responsable quedan como datos sintéticos identificables con prefijo TEST-H03-. 3 ventas CxC Q100/Q50/Q50 creadas y abonadas durante los tests (visibles como VTA-20261006-00xx con estado Pagado en la UI).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "H-03 (doble conteo de abonos CxC en dashboard financiero) está validado end-to-end: backend (3 escenarios + 5 regresiones) y UI (dashboard financiero, listado CxC, modal con switch 'Registrar como ingreso en caja diaria'). Tests reutilizables en /app/backend/tests/test_auditoria_p26_h03.py. Hallazgos pendientes de P26 (H-06, H-07, H-08, H-09, H-10, H-12) permanecen en backlog según /app/docs/auditoria/P26_informe.md.",
+  "rca of the issue": "Antes del fix: cuando un abono CxC se registraba con 'registrar en caja' activado, se creaba un caja_movimiento (sumando a total_ingresos vía /api/dashboard/financiero) Y el abono también se sumaba independientemente en ingresos_cxc_periodo, resultando en Q200 por un abono de Q100. Fix aplicado por E1: (1) caja.py registrar_abono (~L663) guarda movimiento_caja_id en abonos[] solo si realmente creó el movimiento de caja; (2) dashboard_financiero.py (~L94-108) excluye del conteo CxC cualquier abono con movimiento_caja_id. Reproducción (ya no reproducible, debe sumar +100): POST /api/cxc/{id}/abono {monto:100, registrar_en_caja:true} y comparar ingresos.total_cobrado en /api/dashboard/financiero?periodo=anual antes/después. Mitigación: fix de código ya en producción + test de regresión."
+}
