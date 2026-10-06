@@ -91,7 +91,10 @@ async def get_dashboard_financiero(
         tipo = m.get("categoria", "Otro")
         ingresos_por_pagador[tipo] = ingresos_por_pagador.get(tipo, 0) + m.get("monto", 0)
     
-    # Abonos de CxC como ingresos
+    # Abonos de CxC como ingresos — EXCLUYENDO los que ya se registraron como movimiento
+    # de caja (campo movimiento_caja_id), ya que esos ya estan sumados en total_ingresos.
+    # Antes este bloque sumaba TODOS los abonos sin importar si ya tenian un movimiento de
+    # caja asociado, duplicando el ingreso reportado (hallazgo H-03, auditoría P26).
     cxc_con_abonos = await db.cuentas_por_cobrar.find({
         "origen": "clinica",
         "abonos": {"$exists": True, "$ne": []}
@@ -101,6 +104,8 @@ async def get_dashboard_financiero(
     for cxc in cxc_con_abonos:
         tipo = cxc.get("tipo_pagador", "Otro")
         for abono in cxc.get("abonos", []):
+            if abono.get("movimiento_caja_id"):
+                continue  # ya contabilizado en total_ingresos (caja_movimientos)
             fecha_abono = abono.get("fecha", "")[:10]
             if fecha_inicio_str <= fecha_abono <= fecha_fin_str:
                 monto_abono = abono.get("monto", 0)

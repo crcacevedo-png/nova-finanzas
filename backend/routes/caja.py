@@ -675,6 +675,23 @@ async def registrar_abono(
     
     now = datetime.now(timezone.utc)
     
+    # Si se solicita registrar en caja, verificar que la caja este abierta ANTES de decidir
+    # el id del movimiento, para no enlazar un abono con un movimiento que nunca se crea
+    # (lo que haria que el Dashboard Financiero ignore ese ingreso por completo).
+    caja_abierta = None
+    if abono.registrar_en_caja:
+        fecha_hoy = now.strftime("%Y-%m-%d")
+        caja_abierta = await db.caja_cierres.find_one({
+            "fecha": fecha_hoy,
+            "origen": "clinica",
+            "estado": "Abierto"
+        })
+    
+    # El id del movimiento de caja se enlaza en el abono SOLO si realmente se va a crear
+    # (evita que el Dashboard Financiero cuente el mismo ingreso dos veces: una via
+    # caja_movimientos y otra via cuentas_por_cobrar.abonos).
+    movimiento_caja_id = str(uuid.uuid4()) if caja_abierta else None
+    
     # Crear registro de abono
     abono_dict = {
         "id": str(uuid.uuid4()),
@@ -683,7 +700,8 @@ async def registrar_abono(
         "metodo_pago": abono.metodo_pago,
         "referencia": abono.referencia,
         "registrado_por": current_user["id"],
-        "registrado_por_nombre": current_user["name"]
+        "registrado_por_nombre": current_user["name"],
+        "movimiento_caja_id": movimiento_caja_id
     }
     
     # Actualizar cuenta
@@ -705,34 +723,26 @@ async def registrar_abono(
     )
     
     # Si se solicita, registrar en caja
-    if abono.registrar_en_caja:
-        fecha_hoy = now.strftime("%Y-%m-%d")
-        caja_abierta = await db.caja_cierres.find_one({
-            "fecha": fecha_hoy,
+    if caja_abierta:
+        mov_dict = {
+            "id": movimiento_caja_id,
             "origen": "clinica",
-            "estado": "Abierto"
-        })
-        
-        if caja_abierta:
-            mov_dict = {
-                "id": str(uuid.uuid4()),
-                "origen": "clinica",
-                "fecha": now.isoformat(),
-                "tipo": "Ingreso",
-                "categoria": "Cobro CxC",
-                "concepto": f"Abono CxC: {cuenta.get('concepto', '')} - {cuenta.get('paciente_nombre', '')}",
-                "monto": abono.monto,
-                "metodo_pago": abono.metodo_pago,
-                "referencia": abono.referencia,
-                "paciente_id": cuenta.get("paciente_id"),
-                "paciente_nombre": cuenta.get("paciente_nombre"),
-                "bloqueado": False,
-                "creado_por": current_user["id"],
-                "creado_por_nombre": current_user["name"],
-                "fecha_creacion": now.isoformat(),
-                "cxc_id": cuenta_id
-            }
-            await db.caja_movimientos.insert_one(mov_dict)
+            "fecha": now.isoformat(),
+            "tipo": "Ingreso",
+            "categoria": "Cobro CxC",
+            "concepto": f"Abono CxC: {cuenta.get('concepto', '')} - {cuenta.get('paciente_nombre', '')}",
+            "monto": abono.monto,
+            "metodo_pago": abono.metodo_pago,
+            "referencia": abono.referencia,
+            "paciente_id": cuenta.get("paciente_id"),
+            "paciente_nombre": cuenta.get("paciente_nombre"),
+            "bloqueado": False,
+            "creado_por": current_user["id"],
+            "creado_por_nombre": current_user["name"],
+            "fecha_creacion": now.isoformat(),
+            "cxc_id": cuenta_id
+        }
+        await db.caja_movimientos.insert_one(mov_dict)
     
     updated = await db.cuentas_por_cobrar.find_one({"id": cuenta_id}, {"_id": 0})
     return updated

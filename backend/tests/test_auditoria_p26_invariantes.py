@@ -124,9 +124,9 @@ async def test_inv37_cxc_sin_paciente_no_rompe_api(auth_client, auditoria_setup)
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="H-03: dashboard_financiero.py suma el abono dos veces (caja_movimientos + cuentas_por_cobrar.abonos), ver P26_informe.md")
 async def test_inv38_abono_no_se_duplica_en_dashboard(auth_client, auditoria_setup):
-    """INV-38: ningun abono de CxC se suma dos veces en el estado de resultados."""
+    """CORREGIDO 2026-10-06: el abono ahora guarda movimiento_caja_id y el dashboard
+    excluye los abonos ya contabilizados via caja_movimientos (H-03)."""
     bodega_id = auditoria_setup["bodega_id"]
     producto_id = auditoria_setup["producto_id"]
     proveedor_id = auditoria_setup["proveedor_id"]
