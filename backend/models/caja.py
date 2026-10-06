@@ -243,8 +243,8 @@ class CierreFinancieroResponse(BaseModel):
     id: str
     tipo: str
     periodo: Dict  # {mes, anio} o {semestre, anio}
-    fecha_inicio: str
-    fecha_fin: str
+    fecha_inicio: Optional[str] = ""
+    fecha_fin: Optional[str] = ""
     ingresos_caja: float = 0
     egresos_caja: float = 0
     costo_ventas: float = 0
