@@ -2165,11 +2165,11 @@ async def registrar_entrada_rapida(
         motivo=entrada.motivo
     )
     
+    # Recalcular costo promedio ANTES de actualizar existencia (usa la existencia previa a esta entrada)
+    await recalcular_costo_promedio(db, entrada.producto_id, entrada.cantidad, entrada.costo_unitario)
+    
     # Actualizar existencia
     await actualizar_existencia(db, entrada.producto_id, entrada.bodega_id, entrada.cantidad)
-    
-    # Recalcular costo promedio
-    await recalcular_costo_promedio(db, entrada.producto_id, entrada.cantidad, entrada.costo_unitario)
     
     return {"message": f"Entrada registrada: {entrada.cantidad} unidades"}
 

@@ -495,11 +495,11 @@ async def crear_recepcion(
             referencia_id=numero_recepcion
         )
         
+        # Recalcular costo promedio ANTES de actualizar existencia (usa la existencia previa a esta entrada)
+        await recalcular_costo_promedio(db, item.producto_id, item.cantidad, item.costo_unitario)
+        
         # Actualizar existencia
         await actualizar_existencia(db, item.producto_id, recepcion.bodega_id, item.cantidad)
-        
-        # Recalcular costo promedio
-        await recalcular_costo_promedio(db, item.producto_id, item.cantidad, item.costo_unitario)
         
         item_costo = item.cantidad * item.costo_unitario
         total_costo += item_costo

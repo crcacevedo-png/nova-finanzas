@@ -147,9 +147,9 @@ class Abono(BaseModel):
 
 
 class CuentaCobrarBase(BaseModel):
-    paciente_id: str
-    paciente_nombre: str
-    tipo_pagador_id: str
+    paciente_id: Optional[str] = None
+    paciente_nombre: Optional[str] = ""
+    tipo_pagador_id: Optional[str] = None
     tipo_pagador_nombre: str = ""
     pagador_nombre: Optional[str] = ""  # Aseguradora específica, No. IGSS, etc.
     concepto: str
@@ -247,6 +247,9 @@ class CierreFinancieroResponse(BaseModel):
     fecha_fin: str
     ingresos_caja: float = 0
     egresos_caja: float = 0
+    costo_ventas: float = 0
+    gastos_pagados: float = 0
+    utilidad_bruta: float = 0
     resultado_neto: float = 0
     cxc_por_tipo: List[ResumenCxCFinanciero] = []
     cxc_total_emitido: float = 0

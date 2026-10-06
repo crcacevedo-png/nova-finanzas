@@ -842,6 +842,9 @@ const Caja = () => {
               <tr><th>Concepto</th><th>Monto</th></tr>
               <tr><td>Ingresos</td><td>${formatCurrency(cierre.ingresos_caja)}</td></tr>
               <tr><td>Egresos</td><td>${formatCurrency(cierre.egresos_caja)}</td></tr>
+              <tr><td>Costo de Ventas</td><td>${formatCurrency(cierre.costo_ventas)}</td></tr>
+              <tr><td>Gastos Pagados</td><td>${formatCurrency(cierre.gastos_pagados)}</td></tr>
+              <tr><td>Utilidad Bruta</td><td>${formatCurrency(cierre.utilidad_bruta)}</td></tr>
               <tr><td><strong>Resultado Neto</strong></td><td><strong>${formatCurrency(cierre.resultado_neto)}</strong></td></tr>
             </table>
           </div>
@@ -1375,6 +1378,8 @@ const Caja = () => {
                           <TableHead>Período</TableHead>
                           <TableHead className="text-right">Ingresos</TableHead>
                           <TableHead className="text-right">Egresos</TableHead>
+                          <TableHead className="text-right">Costo Ventas</TableHead>
+                          <TableHead className="text-right">Utilidad Bruta</TableHead>
                           <TableHead className="text-right">Resultado Neto</TableHead>
                           <TableHead className="text-right">CxC Pendiente</TableHead>
                           <TableHead>Estado</TableHead>
@@ -1394,6 +1399,8 @@ const Caja = () => {
                               <TableCell className="font-medium">{periodoLabel}</TableCell>
                               <TableCell className="text-right text-green-600">{formatCurrency(cierre.ingresos_caja)}</TableCell>
                               <TableCell className="text-right text-red-600">{formatCurrency(cierre.egresos_caja)}</TableCell>
+                              <TableCell className="text-right text-red-600">{formatCurrency(cierre.costo_ventas)}</TableCell>
+                              <TableCell className="text-right text-blue-600">{formatCurrency(cierre.utilidad_bruta)}</TableCell>
                               <TableCell className={`text-right font-medium ${cierre.resultado_neto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {formatCurrency(cierre.resultado_neto)}
                               </TableCell>
@@ -2366,7 +2373,7 @@ const Caja = () => {
               {/* Resumen de Caja */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Resumen de Caja</CardTitle>
+                  <CardTitle className="text-base">Flujo de Caja (cobrado/pagado en efectivo/banco)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4 text-center">
@@ -2375,8 +2382,39 @@ const Caja = () => {
                       <p className="text-lg font-bold text-green-600">{formatCurrency(cierreFinancieroDetalle.ingresos_caja)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-slate-500">Egresos</p>
+                      <p className="text-sm text-slate-500">Egresos (caja)</p>
                       <p className="text-lg font-bold text-red-600">{formatCurrency(cierreFinancieroDetalle.egresos_caja)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Saldo de caja</p>
+                      <p className={`text-lg font-bold ${(cierreFinancieroDetalle.ingresos_caja - cierreFinancieroDetalle.egresos_caja) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(cierreFinancieroDetalle.ingresos_caja - cierreFinancieroDetalle.egresos_caja)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Utilidad Real */}
+              <Card data-testid="cierre-utilidad-real-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Utilidad Real (resta costo de ventas y gastos pagados)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-center mb-4">
+                    <div>
+                      <p className="text-sm text-slate-500">Costo de ventas</p>
+                      <p className="text-lg font-bold text-red-600">{formatCurrency(cierreFinancieroDetalle.costo_ventas)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Gastos pagados</p>
+                      <p className="text-lg font-bold text-red-600">{formatCurrency(cierreFinancieroDetalle.gastos_pagados)}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-center border-t pt-4">
+                    <div>
+                      <p className="text-sm text-slate-500">Utilidad Bruta</p>
+                      <p className="text-lg font-bold text-blue-600">{formatCurrency(cierreFinancieroDetalle.utilidad_bruta)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Resultado Neto</p>
@@ -2385,6 +2423,10 @@ const Caja = () => {
                       </p>
                     </div>
                   </div>
+                  <p className="text-xs text-slate-400 mt-3">
+                    Utilidad Bruta = Ingresos de caja − Costo de ventas. Resultado Neto = Utilidad Bruta − Gastos pagados − Egresos de caja.
+                    No incluye servicios clínicos sin costo definido ni ajuste de IVA (ver auditoría P26).
+                  </p>
                 </CardContent>
               </Card>
               

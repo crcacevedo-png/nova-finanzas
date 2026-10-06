@@ -785,6 +785,31 @@ async def calcular_cierre_financiero(tipo: str, periodo: dict) -> dict:
     ingresos = sum(m["monto"] for m in movimientos if m["tipo"] == "Ingreso")
     egresos = sum(m["monto"] for m in movimientos if m["tipo"] == "Egreso")
     
+    # Costo de ventas real del período: suma del costo_total guardado en el kardex
+    # para cada movimiento tipo "venta" (snapshot de costo vigente al momento de vender,
+    # NO el costo_promedio actual del catálogo).
+    costo_ventas_agg = await db.movimientos_inventario.aggregate([
+        {"$match": {
+            "origen": "clinica",
+            "tipo": "venta",
+            "fecha": {"$gte": f"{inicio}T00:00:00+00:00", "$lt": f"{fin}T00:00:00+00:00"}
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$costo_total"}}}
+    ]).to_list(1)
+    costo_ventas = costo_ventas_agg[0]["total"] if costo_ventas_agg else 0
+    
+    # Gastos de la empresa realmente pagados en el período (independiente de si el pago
+    # se registró en caja_movimientos; la mayoría se paga vía Autorizaciones de Pago, que
+    # NO genera un movimiento de caja, por lo que antes quedaban fuera del cierre).
+    gastos_pagados_agg = await db.payments.aggregate([
+        {"$match": {"date": {"$gte": inicio, "$lt": fin}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+    ]).to_list(1)
+    gastos_pagados = gastos_pagados_agg[0]["total"] if gastos_pagados_agg else 0
+    
+    utilidad_bruta = ingresos - costo_ventas
+    resultado_neto = utilidad_bruta - gastos_pagados - egresos
+    
     # CxC del período
     cuentas = await db.cuentas_por_cobrar.find({
         "origen": "clinica",
@@ -793,8 +818,8 @@ async def calcular_cierre_financiero(tipo: str, periodo: dict) -> dict:
     
     cxc_por_tipo = {}
     for c in cuentas:
-        tipo_id = c.get("tipo_pagador_id", "otro")
-        tipo_nombre = c.get("tipo_pagador_nombre", "Otro")
+        tipo_id = c.get("tipo_pagador_id", "otro") or "otro"
+        tipo_nombre = c.get("tipo_pagador_nombre", "Otro") or "Otro"
         if tipo_id not in cxc_por_tipo:
             cxc_por_tipo[tipo_id] = {"tipo_pagador_id": tipo_id, "tipo_pagador_nombre": tipo_nombre, "emitido": 0, "cobrado": 0, "pendiente": 0}
         cxc_por_tipo[tipo_id]["emitido"] += c.get("monto_total", 0)
@@ -804,7 +829,10 @@ async def calcular_cierre_financiero(tipo: str, periodo: dict) -> dict:
     return {
         "ingresos_caja": ingresos,
         "egresos_caja": egresos,
-        "resultado_neto": ingresos - egresos,
+        "costo_ventas": round(costo_ventas, 2),
+        "gastos_pagados": round(gastos_pagados, 2),
+        "utilidad_bruta": round(utilidad_bruta, 2),
+        "resultado_neto": round(resultado_neto, 2),
         "cxc_por_tipo": list(cxc_por_tipo.values()),
         "cxc_total_emitido": sum(t["emitido"] for t in cxc_por_tipo.values()),
         "cxc_total_cobrado": sum(t["cobrado"] for t in cxc_por_tipo.values()),
@@ -881,6 +909,9 @@ async def crear_cierre_financiero(
         "estado": "Borrador",
         "ingresos_caja": calculos["ingresos_caja"],
         "egresos_caja": calculos["egresos_caja"],
+        "costo_ventas": calculos["costo_ventas"],
+        "gastos_pagados": calculos["gastos_pagados"],
+        "utilidad_bruta": calculos["utilidad_bruta"],
         "resultado_neto": calculos["resultado_neto"],
         "cxc_por_tipo": calculos["cxc_por_tipo"],
         "cxc_total_emitido": calculos["cxc_total_emitido"],
@@ -947,6 +978,9 @@ async def recalcular_cierre_financiero(
     update_data = {
         "ingresos_caja": calculos["ingresos_caja"],
         "egresos_caja": calculos["egresos_caja"],
+        "costo_ventas": calculos["costo_ventas"],
+        "gastos_pagados": calculos["gastos_pagados"],
+        "utilidad_bruta": calculos["utilidad_bruta"],
         "resultado_neto": calculos["resultado_neto"],
         "cxc_por_tipo": calculos["cxc_por_tipo"],
         "cxc_total_emitido": calculos["cxc_total_emitido"],

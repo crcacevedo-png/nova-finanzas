@@ -49,8 +49,8 @@ async def auditoria_setup(auth_client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="H-02: recalcular_costo_promedio cuenta la cantidad nueva 2 veces (ver P26_informe.md)")
 async def test_inv33_costo_promedio_ponderado(auth_client, auditoria_setup):
+    """CORREGIDO 2026-10-06: recalcular_costo_promedio ahora corre antes de actualizar_existencia."""
     """INV-33: el costo promedio tras cada entrada = recalculado desde el kardex completo."""
     producto_id = auditoria_setup["producto_id"]
     bodega_id = auditoria_setup["bodega_id"]
@@ -89,11 +89,18 @@ async def test_inv42_compra_no_es_gasto(auth_client, auditoria_setup):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="H-01: CuentaCobrarResponse exige paciente_id/tipo_pagador_id obligatorios; ventas.py permite None (ver P26_informe.md)")
 async def test_inv37_cxc_sin_paciente_no_rompe_api(auth_client, auditoria_setup):
+    """CORREGIDO 2026-10-06: paciente_id/tipo_pagador_id ahora son opcionales en CuentaCobrarResponse."""
     """INV-37 (prerequisito): una CxC generada por venta sin paciente vinculado debe poder listarse y abonarse sin error 500."""
     bodega_id = auditoria_setup["bodega_id"]
     producto_id = auditoria_setup["producto_id"]
+    proveedor_id = auditoria_setup["proveedor_id"]
+
+    r = await auth_client.post("/api/inventario/recepciones", json={
+        "proveedor_id": proveedor_id, "bodega_id": bodega_id,
+        "items": [{"producto_id": producto_id, "cantidad": 5, "costo_unitario": 50.0}]
+    })
+    assert r.status_code == 200, r.text
 
     r = await auth_client.get("/api/caja/estado")
     if not r.json().get("caja_abierta"):
@@ -122,6 +129,13 @@ async def test_inv38_abono_no_se_duplica_en_dashboard(auth_client, auditoria_set
     """INV-38: ningun abono de CxC se suma dos veces en el estado de resultados."""
     bodega_id = auditoria_setup["bodega_id"]
     producto_id = auditoria_setup["producto_id"]
+    proveedor_id = auditoria_setup["proveedor_id"]
+
+    r = await auth_client.post("/api/inventario/recepciones", json={
+        "proveedor_id": proveedor_id, "bodega_id": bodega_id,
+        "items": [{"producto_id": producto_id, "cantidad": 5, "costo_unitario": 50.0}]
+    })
+    assert r.status_code == 200, r.text
 
     r = await auth_client.get("/api/caja/estado")
     if not r.json().get("caja_abierta"):
