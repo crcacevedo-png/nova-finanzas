@@ -4,7 +4,24 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 30)
+**Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
+
+### Auditoría (2026-10 Sesión 31) — Prompt 26: ¿Es real la utilidad que muestra el sistema?
+- ✅ **Nota de cirugía (cierre de sesión anterior)**: `iteration_64.json` confirmó 100% backend+frontend, sin bugs (solo advertencia a11y opcional). Tarea cerrada.
+- ✅ **Auditoría integral ejecutada** (solo lectura en producción; pruebas con datos sintéticos `AUD26-*` ya purgados). Entregables: `/app/docs/auditoria/P26_descubrimiento.md` (Fase 0: mapa de colecciones + origen literal de cada cifra financiera), `/app/docs/auditoria/P26_informe.md` + `.xlsx` (Fase 3: hallazgos + plan de corrección NO aplicado), `/app/backend/scripts/test_auditoria_p26_utilidad_real.py` (script reproducible del escenario de referencia), `/app/backend/tests/test_auditoria_p26_invariantes.py` (INV-33/37/38/42/43, xfail documentando hallazgos vigentes).
+- **Conclusión ejecutiva: la utilidad mostrada HOY NO es real.** Es flujo de caja (ingresos−egresos de `caja_movimientos`), nunca resta costo de ventas. Hallazgos críticos confirmados **empíricamente** contra el backend real:
+  - **H-01 (CRÍTICO, YA ACTIVO en esta BD)**: `GET /api/cxc` responde 500 si una CxC no tiene `paciente_id`/`tipo_pagador_id` (5 registros reales ya en este estado) — el módulo de CxC Clínica está roto ahora mismo. El abono también crashea después de guardarse en Mongo (riesgo de duplicado por reintento).
+  - **H-02 (CRÍTICO)**: `recalcular_costo_promedio` se llama DESPUÉS de `actualizar_existencia`, duplicando la cantidad comprada en el denominador. Probado: 10@Q100+10@Q120 → costo promedio Q73.33 en vez de Q110.00. Afecta a todo producto con 2+ compras ya registradas.
+  - **H-03 (CRÍTICO)**: un abono de Q200 a CxC con `registrar_en_caja=true` duplica el ingreso en el Dashboard Financiero (Q400 en vez de Q200).
+  - **H-04/H-05 (CRÍTICO)**: el "Resultado Neto" de Cierres Financieros = ingresos−egresos de `caja_movimientos`, sin costo de ventas, e IGNORA gastos pagados vía el flujo de Autorizaciones (egresos_caja quedó en Q0 tras pagar Q150 autorizados).
+  - **H-06 (CRÍTICO)**: `POST /api/payments` paga cualquier gasto SIN verificar autorización previa (bypass de `payment_authorizations`).
+  - **H-07 (ALTO)**: `reabrir_caja` (SuperAdmin) desbloquea cierres diarios sellados; `cierres_financieros` nunca llega a un estado sellado.
+  - **H-08 (ALTO)**: servicios clínicos (consultas/cirugías) no tienen costo/honorario — entran con costo cero sin marcarse "sin costear".
+  - **H-09 (ALTO)**: "Evolución Mensual de Rentabilidad" (clínica) usa precio/costo ACTUALES del catálogo, no los vigentes al momento de cada venta histórica (reescribe retroactivamente la utilidad pasada).
+  - **H-10/H-12 (MEDIO)**: `crear_venta` no valida `es_punto_venta` en el `bodega_id` recibido; no existe concepto de cuentas por pagar a proveedor.
+  - **H-11 (positivo, confirmar)**: las compras de inventario NO se registran como gasto (correcto, no tocar).
+- ⚠️ **NO se aplicó ninguna corrección** (regla de la auditoría: detectar, no corregir, sin aprobación explícita). Plan de corrección priorizado por riesgo financiero en `P26_informe.md`, sección final.
+- **Pendiente de decisión del SuperAdmin**: aprobar o no el plan de corrección (empezar por H-01, cambio de bajo riesgo: volver opcionales `paciente_id`/`tipo_pagador_id` en el modelo de respuesta de CxC, ya que el módulo está roto en producción/preview en este momento).
 
 ### Mejora (2026-06 Sesión 30b) — Nombre del seguro en exportaciones de cirugías
 - ✅ Las exportaciones de cirugías (Excel y PDF, `GET /api/reports/surgeries`) ahora muestran la institución como "Seguro Privado (Nombre del seguro)" cuando aplica. Helper `format_institution` en `routes/surgeries.py`; ancho de columna del PDF ajustado.

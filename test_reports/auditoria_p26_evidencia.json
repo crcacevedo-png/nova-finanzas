@@ -1,0 +1,51 @@
+{
+  "hallazgos": [
+    {
+      "id": "P26-H-COSTO-PROMEDIO",
+      "severidad": "ALTO",
+      "detalle": "Costo promedio tras 2 compras (10@100 + 10@120) = 73.3333, esperado 110.00 (INV-33)"
+    },
+    {
+      "id": "P26-H-DOBLE-CONTEO-ABONO",
+      "severidad": "CRITICO",
+      "detalle": "Un abono de Q200 a CxC (via /cxc/{id}/abono con registrar_en_caja=True) incrementa 'ingresos.total_cobrado' del dashboard financiero en Q400.00 en vez de Q200.00 (INV-38). Causa: dashboard_financiero.py suma caja_movimientos (incluye el movimiento 'Cobro CxC' creado por el abono) Y TAMBIEN vuelve a sumar el mismo abono leyendo cuentas_por_cobrar.abonos."
+    },
+    {
+      "id": "P26-H-COLECCION-INCORRECTA-HISTORICO",
+      "severidad": "CRITICO",
+      "detalle": "GET /inventario/reportes/rentabilidad-historico (clinica) consulta db.ventas_optica filtrando origen='clinica' (routes/inventario.py linea 2449), pero las ventas de clinica POS se guardan en db.ventas (routes/ventas.py linea 736). Resultado: el reporte historico de clinica queda vacio o incompleto independientemente de las ventas reales registradas."
+    }
+  ],
+  "evidencia": {
+    "paciente_id_usado": "9196b3cf-3b23-4097-895b-23b0c82b74d1",
+    "responsable_id_usado": "49c4e30b-42e4-4cf0-a9cd-bd95a78557ed",
+    "recepcion1_gasto_id": null,
+    "costo_promedio_tras_2_compras": 73.3333,
+    "costo_promedio_esperado": 110.0,
+    "compra_no_es_gasto": true,
+    "venta_contado_total": 672.0,
+    "venta_credito_total": 448.0,
+    "cxc_id": "0a5b4eca-f838-4577-9784-c867ac421365",
+    "cxc_saldo_tras_abono": 248.0,
+    "delta_total_cobrado_tras_abono_200": 400.0,
+    "delta_de_caja_directa_tras_abono_200": 200.0,
+    "delta_de_abonos_cxc_tras_abono_200": 200.0,
+    "gasto_pagado_via_autorizacion": false,
+    "cierre_financiero_status": 404,
+    "cierre_financiero_resultado_neto": null,
+    "rentabilidad_historico_status": 200,
+    "rentabilidad_historico_datos": [
+      {
+        "mes": "2026-10",
+        "mes_nombre": "Octubre 2026",
+        "total_ventas": 2,
+        "ingresos_brutos": 1120.0,
+        "costo_total": 366.67,
+        "ganancia_neta": 753.33,
+        "margen_promedio": 67.26,
+        "productos_vendidos": 5
+      }
+    ],
+    "limpieza": "Producto AUD26-PROD1 eliminado (force). Venta/CxC/Gasto AUD26 quedan como registros de prueba identificables por el prefijo AUD26 (sin DELETE fisico disponible); recomendar purga manual post-auditoria."
+  }
+}
