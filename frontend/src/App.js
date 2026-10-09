@@ -192,7 +192,7 @@ function AppRoutes() {
         } 
       />
       <Route 
-        path="/configuracion/unidades-igss" 
+        path="/igss/unidades" 
         element={
           <ProtectedRoute requiredPermission="manage_igss_units">
             <UnidadesIGSS />

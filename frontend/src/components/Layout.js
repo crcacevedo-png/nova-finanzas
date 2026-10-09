@@ -68,6 +68,7 @@ const Layout = ({ children }) => {
     ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta'].some(p => location.pathname.startsWith(p))
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
+  const [igssOpen, setIgssOpen] = useState(location.pathname.startsWith('/igss'));
   
   // Estado para menús habilitados del usuario
   const [enabledMenuIds, setEnabledMenuIds] = useState(null);
@@ -213,11 +214,11 @@ const Layout = ({ children }) => {
     });
   }
 
-  // Unidades IGSS - visible para SuperAdmin (todos los menús) y para roles con el menú
-  // activado en "Menús por Rol" que además tengan el permiso manage_igss_units
+  // Módulo IGSS - visible si el menú está habilitado y el usuario tiene el permiso
+  const igssItems = [];
   if (isMenuEnabled('unidades_igss') && hasPermission('manage_igss_units')) {
-    configItems.push({ 
-      path: '/configuracion/unidades-igss', 
+    igssItems.push({ 
+      path: '/igss/unidades', 
       icon: Building, 
       label: 'Unidades IGSS', 
       testId: 'nav-unidades-igss' 
@@ -396,6 +397,37 @@ const Layout = ({ children }) => {
               {inventarioOpen && (
                 <div className="ml-4 mt-1 space-y-1">
                   {inventarioItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4.75. IGSS Section */}
+          {igssItems.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setIgssOpen(!igssOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  location.pathname.startsWith('/igss') ? 'active' : ''
+                }`}
+                data-testid="nav-igss"
+              >
+                <div className="flex items-center gap-3">
+                  <Building className={`w-5 h-5 icon ${location.pathname.startsWith('/igss') ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">IGSS</span>
+                </div>
+                {igssOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+              
+              {igssOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {igssItems.map((item) => (
                     <NavLink key={item.path} item={item} />
                   ))}
                 </div>

@@ -298,15 +298,16 @@ AVAILABLE_MENUS = {
         "category": "inventario",
         "description": "Punto de venta general"
     },
-    # Configuración
+    # Módulo IGSS
     "unidades_igss": {
         "id": "unidades_igss",
         "label": "Unidades IGSS",
-        "path": "/configuracion/unidades-igss",
+        "path": "/igss/unidades",
         "icon": "Building",
-        "category": "configuracion",
+        "category": "igss",
         "description": "Catálogo de unidades del IGSS"
     },
+    # Configuración
     "gestion_usuarios": {
         "id": "gestion_usuarios",
         "label": "Gestión de Usuarios",
@@ -365,7 +366,8 @@ MENU_CATEGORIES = {
     "optica": {"label": "Óptica", "order": 3},
     "finanzas": {"label": "Finanzas", "order": 4},
     "inventario": {"label": "Inventario", "order": 5},
-    "configuracion": {"label": "Configuración", "order": 6}
+    "igss": {"label": "IGSS", "order": 6},
+    "configuracion": {"label": "Configuración", "order": 7}
 }
 
 
