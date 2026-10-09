@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
+from utils.timezone import now_gt, rango_gt_a_utc
 from calendar import monthrange
 from pydantic import BaseModel
 from io import BytesIO
@@ -40,7 +41,7 @@ async def get_dashboard_financiero(
     """
     from datetime import date
     
-    now = datetime.now(timezone.utc)
+    now = now_gt()
     
     # Calcular fechas según período seleccionado
     if periodo == "mes_actual":
@@ -70,11 +71,12 @@ async def get_dashboard_financiero(
     fecha_fin_str = fecha_fin_dt.isoformat()
     
     # ========== INGRESOS DE CAJA (solo clínica) ==========
-    # Usar formato con timezone para coincidir con las fechas guardadas (isoformat UTC)
+    # Rango del día local de Guatemala convertido a UTC (coincide con isoformat UTC)
+    _ing_ini, _ing_fin = rango_gt_a_utc(fecha_inicio_str, fecha_fin_str)
     ingresos_query = {
         "origen": "clinica",
         "tipo": "Ingreso",
-        "fecha": {"$gte": fecha_inicio_str + "T00:00:00+00:00", "$lte": fecha_fin_str + "T23:59:59+00:00"}
+        "fecha": {"$gte": _ing_ini, "$lte": _ing_fin}
     }
     movimientos_ingreso = await db.caja_movimientos.find(ingresos_query, {"_id": 0}).to_list(10000)
     
@@ -181,12 +183,13 @@ async def get_dashboard_financiero(
         else:
             mes_fin = date(target_year, target_month, ultimo_dia)
         
-        # Ingresos del mes - usar timezone UTC para coincidir con fechas guardadas
+        # Ingresos del mes (rango Guatemala -> UTC)
+        _mes_ini, _mes_fin = rango_gt_a_utc(mes_inicio.isoformat(), mes_fin.isoformat())
         ingresos_mes = await db.caja_movimientos.aggregate([
             {"$match": {
                 "origen": "clinica",
                 "tipo": "Ingreso",
-                "fecha": {"$gte": mes_inicio.isoformat() + "T00:00:00+00:00", "$lte": mes_fin.isoformat() + "T23:59:59+00:00"}
+                "fecha": {"$gte": _mes_ini, "$lte": _mes_fin}
             }},
             {"$group": {"_id": None, "total": {"$sum": "$monto"}}}
         ]).to_list(1)

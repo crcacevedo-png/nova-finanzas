@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
+from utils.timezone import now_gt, today_str_gt, dia_gt_a_rango_utc, GUATEMALA_TZ
 from pymongo import ReturnDocument
 import uuid
 import logging
@@ -147,7 +148,7 @@ async def generar_numero_venta(db) -> str:
     Usa un contador atómico por día en la colección `counters` para evitar
     números DUPLICADOS cuando varios cajeros venden en simultáneo.
     """
-    hoy = datetime.now(timezone.utc).strftime("%Y%m%d")
+    hoy = now_gt().strftime("%Y%m%d")
     prefijo = f"VTA-{hoy}-"
     counter_key = f"venta_num_{hoy}"
 
@@ -481,7 +482,7 @@ async def crear_venta(
     """
     db = get_db()
     now = datetime.now(timezone.utc)
-    fecha_hoy = now.strftime("%Y-%m-%d")
+    fecha_hoy = today_str_gt()
     
     # Verificar permisos
     if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
@@ -638,7 +639,7 @@ async def crear_venta(
             cxc_doc = {
                 "id": cxc_id,
                 "origen": "clinica",
-                "numero_cuenta": f"CXC-CLI-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}",
+                "numero_cuenta": f"CXC-CLI-{now_gt().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8].upper()}",
                 "paciente_id": venta.paciente_id,
                 "paciente_nombre": venta.paciente_nombre or "Cliente General",
                 # Campos del nuevo sistema de responsables
@@ -789,11 +790,12 @@ async def ventas_del_dia(
 ):
     """Obtiene las ventas del día actual"""
     db = get_db()
-    fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_hoy = today_str_gt()
+    _ini, _fin = dia_gt_a_rango_utc(fecha_hoy)
     
     ventas = await db.ventas.find({
         "origen": "clinica",
-        "fecha": {"$gte": f"{fecha_hoy}T00:00:00", "$lte": f"{fecha_hoy}T23:59:59"}
+        "fecha": {"$gte": _ini, "$lte": _fin}
     }, {"_id": 0}).sort("fecha", -1).to_list(500)
     
     return {"data": ventas, "total": len(ventas)}
@@ -805,12 +807,13 @@ async def resumen_ventas_dia(
 ):
     """Obtiene un resumen de las ventas del día"""
     db = get_db()
-    fecha_consulta = fecha or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_consulta = fecha or today_str_gt()
+    _ini, _fin = dia_gt_a_rango_utc(fecha_consulta)
     
     ventas = await db.ventas.find({
         "origen": "clinica",
         "estado": "completada",
-        "fecha": {"$gte": f"{fecha_consulta}T00:00:00", "$lte": f"{fecha_consulta}T23:59:59"}
+        "fecha": {"$gte": _ini, "$lte": _fin}
     }, {"_id": 0}).to_list(500)
     
     total_ventas = len(ventas)
@@ -986,7 +989,7 @@ async def obtener_ticket_venta(
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     
     # Formatear fecha para Guatemala (GMT-6)
-    fecha_dt = datetime.fromisoformat(venta["fecha"].replace("Z", "+00:00"))
+    fecha_dt = datetime.fromisoformat(venta["fecha"].replace("Z", "+00:00")).astimezone(GUATEMALA_TZ)
     fecha_formateada = fecha_dt.strftime("%d/%m/%Y %H:%M")
     
     # Obtener nombre del vendedor si existe

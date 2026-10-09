@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Literal, Dict, Set
 import uuid
 from datetime import datetime, timezone, timedelta
+from utils.timezone import now_gt, GUATEMALA_TZ
 import jwt
 import bcrypt
 import io
@@ -3088,7 +3089,7 @@ async def get_monthly_chart(current_user: dict = Depends(require_permission("vie
 async def get_upcoming_payments(current_user: dict = Depends(require_permission("view_due_payments"))):
     await check_overdue_expenses()
     
-    today = datetime.now(timezone.utc).date()
+    today = now_gt().date()
     expenses = await db.expenses.find(
         {"status": {"$in": ["pendiente", "parcial", "vencido"]}},
         {"_id": 0}
@@ -3863,7 +3864,7 @@ scheduler = AsyncIOScheduler()
 
 async def generate_fixed_expenses_for_today() -> int:
     """Genera gastos a partir de los gastos fijos configurados para el día actual"""
-    today = datetime.now(timezone.utc)
+    today = now_gt()
     day_of_month = today.day
     current_month = today.strftime("%Y-%m")
     today_str = today.strftime("%Y-%m-%d")
@@ -3978,10 +3979,10 @@ async def generate_fixed_expenses_for_today() -> int:
 
 def start_scheduler():
     """Inicia el scheduler para tareas programadas"""
-    # Ejecutar todos los días a las 00:05 hora del servidor
+    # Ejecutar todos los días a las 00:05 hora de Guatemala
     scheduler.add_job(
         generate_fixed_expenses_for_today,
-        CronTrigger(hour=0, minute=5),
+        CronTrigger(hour=0, minute=5, timezone=GUATEMALA_TZ),
         id="generate_fixed_expenses",
         replace_existing=True
     )

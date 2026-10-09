@@ -41,6 +41,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import axios from 'axios';
 import { agendaApi } from '../services/agendaApi';
+import { getGuatemalaDate } from '../services/api';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -282,7 +283,7 @@ const EvaluacionOftalmologica = () => {
     paciente_edad: 0,
     paciente_sexo: '',
     paciente_expediente: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: getGuatemalaDate(),
     medico_id: '',
     medico_nombre: '',
     motivo_consulta: '',
@@ -2445,7 +2446,7 @@ const EvaluacionOftalmologica = () => {
                           onChange={(e) => updateNestedField('proxima_cita.fecha', e.target.value)}
                           disabled={isReadOnly}
                           className="input-teal h-8 text-xs"
-                          min={new Date().toISOString().split('T')[0]}
+                          min={getGuatemalaDate()}
                         />
                       </div>
                       <div className="space-y-1">
@@ -2605,7 +2606,7 @@ const EvaluacionOftalmologica = () => {
                         Receta #{idx + 1}
                         {receta.fecha_creacion && (
                           <span className="text-gray-400 font-normal">
-                            ({new Date(receta.fecha_creacion).toLocaleDateString('es-GT')})
+                            ({new Date(receta.fecha_creacion).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })})
                           </span>
                         )}
                       </CardTitle>
@@ -2818,7 +2819,7 @@ const EvaluacionOftalmologica = () => {
                         Receta #{idx + 1}
                         {receta.fecha_creacion && (
                           <span className="text-gray-400 font-normal">
-                            ({new Date(receta.fecha_creacion).toLocaleDateString('es-GT')})
+                            ({new Date(receta.fecha_creacion).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })})
                           </span>
                         )}
                       </CardTitle>

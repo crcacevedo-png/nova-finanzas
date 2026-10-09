@@ -5,6 +5,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
+from utils.timezone import now_gt, today_str_gt
 import uuid
 
 from models.agenda import (
@@ -296,8 +297,8 @@ async def listar_citas(
     if fecha:
         query["fecha"] = fecha
     else:
-        # Por defecto, hoy
-        query["fecha"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Por defecto, hoy (hora Guatemala)
+        query["fecha"] = today_str_gt()
     
     if medico_id:
         query["medico_id"] = medico_id
@@ -580,7 +581,7 @@ async def listar_presentes(
 ):
     """Listar pacientes presentes en clínica, agrupados por médico"""
     if not fecha:
-        fecha = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        fecha = today_str_gt()
     
     # Obtener citas con estado Presente o En consulta
     citas = await db.citas.find({
@@ -640,7 +641,7 @@ async def obtener_contadores(
 ):
     """Obtener contadores del día (para tablero)"""
     if not fecha:
-        fecha = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        fecha = today_str_gt()
     
     # Pipeline de agregación para contar por estado
     pipeline = [
@@ -701,7 +702,7 @@ async def mi_agenda_del_dia(
     
     # Fecha de trabajo: la enviada por el frontend o el día actual en hora Guatemala
     if not fecha:
-        fecha = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime("%Y-%m-%d")
+        fecha = today_str_gt()
     medico_id = medico["id"] if medico else None
     medico_nombre = medico["name"] if medico else current_user["name"]
     
@@ -763,7 +764,7 @@ async def registrar_walk_in(
     current_user: dict = Depends(get_current_user)
 ):
     """Registrar paciente que llega sin cita (walk-in)"""
-    now = datetime.now(timezone.utc)
+    now = now_gt()
     fecha = now.strftime("%Y-%m-%d")
     hora = now.strftime("%H:%M")
     

@@ -42,7 +42,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { agendaApi } from '../services/agendaApi';
-import { patientApi, googleCalendarApi } from '../services/api';
+import { patientApi, googleCalendarApi, getGuatemalaDate } from '../services/api';
 import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
 import { BloqueosAgenda } from './AgendaBloqueos';
 
@@ -243,7 +243,7 @@ const Agenda = () => {
   const startOfWeek = (s) => { const d = parseISO(s); const off = (d.getDay() + 6) % 7; return addDays(d, -off); };
   const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(getGuatemalaDate());
   
   // WebSocket para actualizaciones en tiempo real
   const { isConnected: wsConnected, lastMessage: wsMessage } = useAgendaWebSocket({
@@ -938,7 +938,7 @@ const Agenda = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setFechaSeleccionada(new Date().toISOString().split('T')[0])}
+                      onClick={() => setFechaSeleccionada(getGuatemalaDate())}
                     >
                       Hoy
                     </Button>
@@ -1080,7 +1080,7 @@ const Agenda = () => {
                       {Array.from({ length: 7 }).map((_, i) => {
                         const dia = addDays(startOfWeek(fechaSeleccionada), i);
                         const diaISO = toISODate(dia);
-                        const esHoy = diaISO === toISODate(new Date());
+                        const esHoy = diaISO === getGuatemalaDate();
                         return (
                           <button
                             key={diaISO}
@@ -1139,7 +1139,7 @@ const Agenda = () => {
                   {Array.from({ length: 7 }).map((_, i) => {
                     const dia = addDays(startOfWeek(fechaSeleccionada), i);
                     const diaISO = toISODate(dia);
-                    const esHoy = diaISO === toISODate(new Date());
+                    const esHoy = diaISO === getGuatemalaDate();
                     const citasDia = citasRango
                       .filter(c => c.fecha === diaISO)
                       .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
@@ -1180,7 +1180,7 @@ const Agenda = () => {
                 const primerDia = new Date(d.getFullYear(), d.getMonth(), 1);
                 const gridInicio = startOfWeek(toISODate(primerDia));
                 const celdas = Array.from({ length: 42 }).map((_, i) => addDays(gridInicio, i));
-                const hoyISO = toISODate(new Date());
+                const hoyISO = getGuatemalaDate();
                 return (
                   <div>
                     <div className="text-center text-sm font-semibold text-slate-700 mb-2 capitalize">

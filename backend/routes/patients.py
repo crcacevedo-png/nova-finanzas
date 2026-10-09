@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from typing import Optional, List, Literal
 from datetime import datetime, timezone
+from utils.timezone import now_gt
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
 import io
@@ -872,7 +873,7 @@ async def export_patients_pdf(
         title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16,
                                      alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#0F6E56'))
         elements.append(Paragraph("NovaVision - Lista de Pacientes", title_style))
-        elements.append(Paragraph(f"Generado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
+        elements.append(Paragraph(f"Generado: {now_gt().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
         elements.append(Spacer(1, 0.3*inch))
         
         table_data = [["Expediente", "Nombre Completo", "Género", "Edad", "Teléfono", "DPI", "Institución", "Unidad IGSS", "NOG"]]

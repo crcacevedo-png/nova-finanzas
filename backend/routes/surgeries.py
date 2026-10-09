@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from utils.timezone import now_gt
 import uuid
 import io
 
@@ -705,7 +706,7 @@ async def export_surgeries(
             
             elements.append(Paragraph("NovaVision — Reporte de Cirugías", title_style))
             
-            generated_at = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M")
+            generated_at = now_gt().strftime("%d/%m/%Y %H:%M")
             filters_text = []
             if date_from:
                 filters_text.append(f"Desde: {date_from}")

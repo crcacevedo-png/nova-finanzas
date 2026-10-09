@@ -43,7 +43,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast, Toaster } from 'sonner';
-import { fixedExpenseApi, supplierApi, formatCurrency, formatDate } from '../services/api';
+import { fixedExpenseApi, supplierApi, formatCurrency, formatDate, getGuatemalaDate } from '../services/api';
 
 const GastosFijos = () => {
   const { user } = useAuth();
@@ -105,9 +105,8 @@ const GastosFijos = () => {
       });
     } else {
       setEditingExpense(null);
-      // Calcular fecha de inicio por defecto (hoy)
-      const today = new Date();
-      const defaultStartDate = today.toISOString().split('T')[0];
+      // Calcular fecha de inicio por defecto (hoy, hora Guatemala)
+      const defaultStartDate = getGuatemalaDate();
       setFormData({
         supplier_id: '',
         expense_name: '',
@@ -612,7 +611,7 @@ const GastosFijos = () => {
                       value={formData.end_date}
                       onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
                       className="input-teal"
-                      min={new Date().toISOString().split('T')[0]}
+                      min={getGuatemalaDate()}
                       data-testid="end-date-input"
                     />
                     <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
@@ -707,7 +706,7 @@ const GastosFijos = () => {
                 Generar Gastos Fijos Ahora
               </DialogTitle>
               <DialogDescription style={{ color: 'var(--text-secondary)' }}>
-                Esta acción generará inmediatamente todos los gastos fijos configurados para el día de hoy ({new Date().getDate()}). 
+                Esta acción generará inmediatamente todos los gastos fijos configurados para el día de hoy ({parseInt(getGuatemalaDate().split('-')[2], 10)}). 
                 Solo se generarán aquellos que no hayan sido generados este mes.
               </DialogDescription>
             </DialogHeader>

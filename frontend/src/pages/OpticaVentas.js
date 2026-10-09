@@ -62,7 +62,8 @@ import {
   formatCurrency, 
   formatDate,
   opticaPaymentMethodLabels,
-  saleStatusLabels
+  saleStatusLabels,
+  getGuatemalaDate
 } from '../services/api';
 import {
   BarChart,
@@ -140,8 +141,8 @@ const OpticaVentas = () => {
   
   // Report states
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
-  const [reportYear, setReportYear] = useState(new Date().getFullYear());
-  const [reportMonth, setReportMonth] = useState(new Date().getMonth() + 1);
+  const [reportYear, setReportYear] = useState(parseInt(getGuatemalaDate().split('-')[0], 10));
+  const [reportMonth, setReportMonth] = useState(parseInt(getGuatemalaDate().split('-')[1], 10));
   const [exportingReport, setExportingReport] = useState(false);
 
   const canManage = hasPermission('manage_optica_sales');

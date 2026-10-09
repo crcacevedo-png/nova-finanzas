@@ -8,6 +8,8 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
+from utils.timezone import now_gt, today_str_gt, dia_gt_a_rango_utc, GUATEMALA_TZ
+
 from models.caja import (
     CajaMovimientoCreate, CajaMovimientoUpdate, CajaMovimientoResponse, CajaMovimientoListResponse,
     CajaCierreApertura, CajaCierreRequest, CajaCierreResponse, CajaEstadoResponse, TotalesPorMetodo,
@@ -61,9 +63,8 @@ async def notify_caja_update(event_type: str, data: dict, exclude_ws=None):
 
 async def calcular_totales_caja_dia(fecha_dia: str) -> dict:
     """Calcula totales del día para la caja clínica"""
-    # Usar timezone UTC para coincidir con fechas guardadas con isoformat()
-    inicio = f"{fecha_dia}T00:00:00+00:00"
-    fin = f"{fecha_dia}T23:59:59+00:00"
+    # Día local de Guatemala convertido a rango UTC (coincide con fechas isoformat en UTC)
+    inicio, fin = dia_gt_a_rango_utc(fecha_dia)
     
     movimientos = await db.caja_movimientos.find({
         "origen": "clinica",
@@ -98,7 +99,7 @@ async def get_caja_estado(
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Obtener estado de la caja del día"""
-    fecha_hoy = fecha or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_hoy = fecha or today_str_gt()
     
     cierre = await db.caja_cierres.find_one({
         "fecha": fecha_hoy,
@@ -128,7 +129,7 @@ async def abrir_caja(
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Abrir caja del día"""
-    fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_hoy = today_str_gt()
     now = datetime.now(timezone.utc)
     
     # Verificar que no existe caja abierta para hoy
@@ -193,9 +194,8 @@ async def get_movimientos(
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Listar movimientos del día"""
-    fecha_hoy = fecha or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    inicio = f"{fecha_hoy}T00:00:00+00:00"
-    fin = f"{fecha_hoy}T23:59:59+00:00"
+    fecha_hoy = fecha or today_str_gt()
+    inicio, fin = dia_gt_a_rango_utc(fecha_hoy)
     
     query = {
         "origen": "clinica",
@@ -218,7 +218,7 @@ async def crear_movimiento(
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Crear nuevo movimiento de caja"""
-    fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_hoy = today_str_gt()
     now = datetime.now(timezone.utc)
     
     # Verificar que la caja está abierta
@@ -311,7 +311,7 @@ async def cerrar_caja(
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
     """Cerrar caja del día"""
-    fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_hoy = today_str_gt()
     now = datetime.now(timezone.utc)
     
     cierre = await db.caja_cierres.find_one({
@@ -345,9 +345,10 @@ async def cerrar_caja(
     
     await db.caja_cierres.update_one({"id": cierre["id"]}, {"$set": update_data})
     
-    # Bloquear todos los movimientos del día - usar timezone UTC
+    # Bloquear todos los movimientos del día (rango del día local de Guatemala)
+    _ini_dia, _fin_dia = dia_gt_a_rango_utc(fecha_hoy)
     await db.caja_movimientos.update_many(
-        {"origen": "clinica", "fecha": {"$gte": f"{fecha_hoy}T00:00:00+00:00", "$lte": f"{fecha_hoy}T23:59:59+00:00"}},
+        {"origen": "clinica", "fecha": {"$gte": _ini_dia, "$lte": _fin_dia}},
         {"$set": {"bloqueado": True}}
     )
     
@@ -424,9 +425,10 @@ async def reabrir_caja(
         }}
     )
     
-    # Desbloquear movimientos del día - usar timezone UTC
+    # Desbloquear movimientos del día (rango del día local de Guatemala)
+    _ini_dia, _fin_dia = dia_gt_a_rango_utc(cierre['fecha'])
     await db.caja_movimientos.update_many(
-        {"origen": "clinica", "fecha": {"$gte": f"{cierre['fecha']}T00:00:00+00:00", "$lte": f"{cierre['fecha']}T23:59:59+00:00"}},
+        {"origen": "clinica", "fecha": {"$gte": _ini_dia, "$lte": _fin_dia}},
         {"$set": {"bloqueado": False}}
     )
     
@@ -603,7 +605,7 @@ async def crear_cuenta_cobrar(
         "monto_pagado": 0,
         "saldo_pendiente": cuenta.monto_total,
         "estado": "Pendiente",
-        "fecha_emision": now.strftime("%Y-%m-%d"),
+        "fecha_emision": today_str_gt(),
         "fecha_vencimiento": cuenta.fecha_vencimiento,
         "notas": cuenta.notas,
         "abonos": [],
@@ -680,7 +682,7 @@ async def registrar_abono(
     # (lo que haria que el Dashboard Financiero ignore ese ingreso por completo).
     caja_abierta = None
     if abono.registrar_en_caja:
-        fecha_hoy = now.strftime("%Y-%m-%d")
+        fecha_hoy = today_str_gt()
         caja_abierta = await db.caja_cierres.find_one({
             "fecha": fecha_hoy,
             "origen": "clinica",
@@ -786,10 +788,14 @@ async def calcular_cierre_financiero(tipo: str, periodo: dict) -> dict:
             inicio = f"{year}-07-01"
             fin = f"{year + 1}-01-01"
     
-    # Movimientos de caja del período - usar timezone UTC
+    # Límites del período en hora de Guatemala convertidos a UTC
+    _ini_utc = datetime.strptime(inicio, "%Y-%m-%d").replace(tzinfo=GUATEMALA_TZ).astimezone(timezone.utc).isoformat()
+    _fin_utc = datetime.strptime(fin, "%Y-%m-%d").replace(tzinfo=GUATEMALA_TZ).astimezone(timezone.utc).isoformat()
+
+    # Movimientos de caja del período (rango Guatemala -> UTC)
     movimientos = await db.caja_movimientos.find({
         "origen": "clinica",
-        "fecha": {"$gte": f"{inicio}T00:00:00+00:00", "$lt": f"{fin}T00:00:00+00:00"}
+        "fecha": {"$gte": _ini_utc, "$lt": _fin_utc}
     }, {"_id": 0}).to_list(10000)
     
     ingresos = sum(m["monto"] for m in movimientos if m["tipo"] == "Ingreso")
@@ -802,7 +808,7 @@ async def calcular_cierre_financiero(tipo: str, periodo: dict) -> dict:
         {"$match": {
             "origen": "clinica",
             "tipo": "venta",
-            "fecha": {"$gte": f"{inicio}T00:00:00+00:00", "$lt": f"{fin}T00:00:00+00:00"}
+            "fecha": {"$gte": _ini_utc, "$lt": _fin_utc}
         }},
         {"$group": {"_id": None, "total": {"$sum": "$costo_total"}}}
     ]).to_list(1)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { surgeryApi, formatCurrency, doctorApi, patientApi } from '../services/api';
+import { surgeryApi, formatCurrency, doctorApi, patientApi, getGuatemalaDate, getGuatemalaTimeHM } from '../services/api';
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Pencil, Trash2, X, Calendar, Clock, User, Building2,
@@ -162,8 +162,8 @@ const SalaOperaciones = () => {
   
   // Form state
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    time: new Date().toTimeString().slice(0, 5),
+    date: getGuatemalaDate(),
+    time: getGuatemalaTimeHM(),
     patient_name: '',
     patient_id: null,
     procedure: '',
@@ -279,8 +279,8 @@ const SalaOperaciones = () => {
   const openCreateDialog = () => {
     setEditMode(false);
     setFormData({
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toTimeString().slice(0, 5),
+      date: getGuatemalaDate(),
+      time: getGuatemalaTimeHM(),
       patient_name: '',
       patient_id: null,
       procedure: '',

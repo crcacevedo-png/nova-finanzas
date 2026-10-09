@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
+from utils.timezone import today_gt
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
@@ -149,7 +150,7 @@ async def update_expense_amounts(expense_id: str):
     elif expense.get("due_date"):
         try:
             due_date = datetime.fromisoformat(expense["due_date"]).date()
-            today = datetime.now(timezone.utc).date()
+            today = today_gt()
             if due_date < today and paid_amount < expense["amount"]:
                 status = "vencido"
             elif paid_amount > 0:
@@ -174,7 +175,7 @@ async def update_expense_amounts(expense_id: str):
 
 async def check_overdue_expenses():
     """Verifica y actualiza gastos vencidos"""
-    today = datetime.now(timezone.utc).date()
+    today = today_gt()
     expenses = await db.expenses.find(
         {"status": {"$in": ["pendiente", "parcial"]}, "due_date": {"$ne": None}},
         {"_id": 0, "id": 1, "due_date": 1, "status": 1}
@@ -288,7 +289,7 @@ async def create_expense(expense_data: ExpenseCreate, current_user: dict = Depen
     if expense_data.due_date:
         try:
             due_date = datetime.fromisoformat(expense_data.due_date).date()
-            if due_date < datetime.now(timezone.utc).date():
+            if due_date < today_gt():
                 status = "vencido"
         except Exception:
             pass

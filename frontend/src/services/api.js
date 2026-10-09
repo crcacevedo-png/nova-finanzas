@@ -452,6 +452,16 @@ export const getGuatemalaDateTime = () => {
   return new Date().toLocaleString('es-GT', { timeZone: GUATEMALA_TIMEZONE });
 };
 
+// Obtener hora actual 'HH:MM' en Guatemala (para inputs de tipo time)
+export const getGuatemalaTimeHM = () => {
+  return new Date().toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: GUATEMALA_TIMEZONE
+  });
+};
+
 // Type labels (categorías)
 export const typeLabels = {
   fijo: 'Gasto Fijo',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { expenseApi, paymentApi, dashboardApi, bankAccountApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels } from '../services/api';
+import { expenseApi, paymentApi, dashboardApi, bankAccountApi, formatCurrency, formatDate, typeLabels, statusLabels, paymentMethodLabels, getGuatemalaDate } from '../services/api';
 import { 
   Plus, 
   Search, 
@@ -59,11 +59,15 @@ const initialExpenseForm = {
   name: '',
   type: 'fijo',
   amount: '',
-  date: new Date().toISOString().split('T')[0],
+  date: getGuatemalaDate(),
   due_date: (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    return d.toISOString().split('T')[0];
+    const [y, m, d] = getGuatemalaDate().split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + 30);
+    const ny = date.getFullYear();
+    const nm = String(date.getMonth() + 1).padStart(2, '0');
+    const nd = String(date.getDate()).padStart(2, '0');
+    return `${ny}-${nm}-${nd}`;
   })(),
   invoice_number: '',
   notes: ''
@@ -84,7 +88,7 @@ const calculateDueDate = (dateString) => {
 
 const initialPaymentForm = {
   amount: '',
-  date: new Date().toISOString().split('T')[0],
+  date: getGuatemalaDate(),
   method: 'Efectivo',
   reference: '',
   notes: ''
@@ -427,7 +431,8 @@ const Gastos = () => {
   // Calcular días hasta vencimiento
   const getDaysUntilDue = (dueDate) => {
     if (!dueDate) return null;
-    const today = new Date();
+    const [ty, tm, td] = getGuatemalaDate().split('-').map(Number);
+    const today = new Date(ty, tm - 1, td);
     today.setHours(0, 0, 0, 0);
     const due = new Date(dueDate);
     due.setHours(0, 0, 0, 0);

@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useCajaWebSocket } from '../hooks/useWebSocket';
 import axios from 'axios';
-import { formatCurrency, formatDate, formatTime } from '../services/api';
+import { formatCurrency, formatDate, formatTime, getGuatemalaDate } from '../services/api';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 import { 
@@ -123,9 +123,9 @@ const initialAbonoForm = {
 
 const initialCierreFinancieroForm = {
   tipo: 'Mensual',
-  mes: new Date().getMonth() + 1,
+  mes: parseInt(getGuatemalaDate().split('-')[1], 10),
   semestre: 1,
-  anio: new Date().getFullYear(),
+  anio: parseInt(getGuatemalaDate().split('-')[0], 10),
   observaciones: ''
 };
 

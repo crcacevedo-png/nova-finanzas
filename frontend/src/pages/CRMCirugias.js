@@ -44,7 +44,7 @@ import {
 } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
-import api from '../services/api';
+import api, { getGuatemalaDate } from '../services/api';
 
 const CRMCirugias = () => {
   const { user } = useAuth();
@@ -867,7 +867,7 @@ const CRMCirugias = () => {
                   type="date"
                   value={scheduleDate}
                   onChange={(e) => setScheduleDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={getGuatemalaDate()}
                   className="input-teal"
                 />
               </div>

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
+from utils.timezone import today_str_gt
 import asyncio
 
 from routes.auth import get_current_user
@@ -743,7 +744,7 @@ async def estado_transacciones_prueba(
     }
     
     # Verificar si hay caja de prueba abierta
-    fecha_hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    fecha_hoy = today_str_gt()
     caja_abierta = await db.caja_cierres.find_one({
         "fecha": fecha_hoy,
         "esDatoPrueba": True,

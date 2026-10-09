@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime, timezone
+from utils.timezone import today_gt
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
@@ -62,7 +63,7 @@ async def update_expense_amounts(expense_id: str):
     elif expense.get("due_date"):
         try:
             due_date = datetime.fromisoformat(expense["due_date"]).date()
-            today = datetime.now(timezone.utc).date()
+            today = today_gt()
             if due_date < today and paid_amount < expense["amount"]:
                 status = "vencido"
             elif paid_amount > 0:

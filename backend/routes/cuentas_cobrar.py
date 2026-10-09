@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime, timezone
+from utils.timezone import now_gt
 from bson import ObjectId
 import uuid
 
@@ -110,7 +111,7 @@ class AbonoCxC(BaseModel):
 async def generar_numero_cuenta(origen: str) -> str:
     """Genera número de cuenta secuencial"""
     prefijo = "CXC-OPT" if origen == "optica" else "CXC-NOV"
-    fecha = datetime.now(timezone.utc).strftime("%Y%m")
+    fecha = now_gt().strftime("%Y%m")
     
     # Buscar último número del mes
     ultimo = await db.cuentas_por_cobrar.find_one(

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
 from datetime import datetime, timezone
+from utils.timezone import now_gt, today_str_gt
 from pydantic import BaseModel, ConfigDict
 import uuid
 import re
@@ -649,7 +650,7 @@ async def create_evaluacion(
     evaluacion_dict["ultimo_autoguardado"] = now
     
     if not evaluacion_dict.get("fecha"):
-        evaluacion_dict["fecha"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        evaluacion_dict["fecha"] = today_str_gt()
     
     await db.evaluaciones_oftalmologicas.insert_one(evaluacion_dict)
     

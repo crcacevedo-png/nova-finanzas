@@ -4,6 +4,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
+from utils.timezone import now_gt
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
@@ -352,7 +353,7 @@ class OpticaPurchaseListResponse(BaseModel):
 
 async def get_next_order_number() -> str:
     """Genera el siguiente número de orden correlativo"""
-    prefix = datetime.now(timezone.utc).strftime("ORD-%Y%m-")
+    prefix = now_gt().strftime("ORD-%Y%m-")
     
     last_sale = await db.optica_sales.find_one(
         {"order_number": {"$regex": f"^{prefix}"}},

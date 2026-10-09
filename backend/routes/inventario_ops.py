@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from utils.timezone import today_gt, today_str_gt
 import uuid
 import logging
 
@@ -1059,7 +1060,7 @@ async def obtener_alertas(
     dias_alerta = config.get("dias_alerta_vencimiento", [90, 60, 30]) if config else [90, 60, 30]
     max_dias = max(dias_alerta)
     
-    hoy = datetime.now(timezone.utc).date()
+    hoy = today_gt()
     
     # Alertas de productos bajo mínimo
     productos = await db.productos_inventario.find({
@@ -1217,7 +1218,7 @@ async def obtener_panel_inventario(
             bajo_minimo += 1
     
     # Lotes por vencer en 90 días
-    hoy = datetime.now(timezone.utc).date()
+    hoy = today_gt()
     fecha_90 = (hoy + timedelta(days=90)).strftime("%Y-%m-%d")
     lotes_por_vencer = await db.lotes_inventario.count_documents({
         "origen": "clinica",

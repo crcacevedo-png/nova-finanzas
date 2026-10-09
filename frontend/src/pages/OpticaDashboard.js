@@ -20,7 +20,7 @@ import {
   RefreshCw, Download, Eye, Package, Users, Building2, FileText,
   BarChart3, PieChart, Clock, CreditCard, Percent, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-import { opticaSaleApi, formatCurrency, formatDate } from '../services/api';
+import { opticaSaleApi, formatCurrency, formatDate, getGuatemalaDate } from '../services/api';
 import { toast } from 'sonner';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart as RechartsPie, Pie, Cell,
@@ -42,8 +42,8 @@ const OpticaDashboard = () => {
   
   // Filtros
   const [periodoRentabilidad, setPeriodoRentabilidad] = useState('mes');
-  const [mesInforme, setMesInforme] = useState(new Date().getMonth() + 1);
-  const [yearInforme, setYearInforme] = useState(new Date().getFullYear());
+  const [mesInforme, setMesInforme] = useState(parseInt(getGuatemalaDate().split('-')[1], 10));
+  const [yearInforme, setYearInforme] = useState(parseInt(getGuatemalaDate().split('-')[0], 10));
 
   const loadDashboardData = useCallback(async () => {
     try {

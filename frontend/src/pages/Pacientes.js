@@ -62,7 +62,8 @@ import {
   formatDate, 
   referralInstitutionLabels, 
   genderLabels,
-  calculateAge 
+  calculateAge,
+  getGuatemalaDate
 } from '../services/api';
 
 const Pacientes = () => {
@@ -971,7 +972,7 @@ const Pacientes = () => {
                     value={formData.birth_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))}
                     className="input-teal"
-                    max={new Date().toISOString().split('T')[0]}
+                    max={getGuatemalaDate()}
                     data-testid="patient-birth-date"
                   />
                 </div>

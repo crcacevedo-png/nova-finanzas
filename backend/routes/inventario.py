@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body, UploadFile, 
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
+from utils.timezone import today_gt, today_str_gt
 from bson import ObjectId
 from pymongo import ReturnDocument
 import uuid
@@ -686,7 +687,7 @@ async def obtener_lotes_fefo(db, producto_id: str, bodega_id: str, cantidad_requ
     
     # Excluir lotes vencidos si está configurado
     if bloquear_vencidos:
-        hoy = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        hoy = today_str_gt()
         filtro["fecha_vencimiento"] = {"$gt": hoy}
     
     # Ordenar por fecha de vencimiento (primero el que vence antes)
@@ -1883,7 +1884,7 @@ async def listar_lotes(
     productos = {p["id"]: p for p in await db.productos_inventario.find({"origen": "clinica"}).to_list(1000)}
     bodegas = {b["id"]: b for b in await db.bodegas_inventario.find({"origen": "clinica"}).to_list(100)}
     
-    hoy = datetime.now(timezone.utc).date()
+    hoy = today_gt()
     
     data = []
     for l in lotes:

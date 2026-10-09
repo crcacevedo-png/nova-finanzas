@@ -17,7 +17,7 @@ import {
   ChevronLeft, ChevronRight, DollarSign, BarChart3, RefreshCw, 
   FileSpreadsheet, FileText, Building2, Mail, Phone, MapPin, Save
 } from 'lucide-react';
-import { inventarioApi, formatCurrency } from '../../services/api';
+import { inventarioApi, formatCurrency, getGuatemalaDate } from '../../services/api';
 import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -82,8 +82,8 @@ const Sociedades = () => {
   
   // Resumen mensual
   const [resumenMensual, setResumenMensual] = useState(null);
-  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth() + 1);
-  const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [mesSeleccionado, setMesSeleccionado] = useState(parseInt(getGuatemalaDate().split('-')[1], 10));
+  const [anioSeleccionado, setAnioSeleccionado] = useState(parseInt(getGuatemalaDate().split('-')[0], 10));
 
   // Fetch sociedades
   const fetchSociedades = useCallback(async () => {
@@ -677,7 +677,7 @@ const Sociedades = () => {
                           {consumos.map((consumo) => (
                             <tr key={consumo.id} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-sm">
-                                {new Date(consumo.fecha).toLocaleDateString('es-GT')}
+                                {new Date(consumo.fecha).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}
                               </td>
                               <td className="px-4 py-3">
                                 <div>

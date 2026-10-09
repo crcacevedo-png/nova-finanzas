@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone, timedelta
+from utils.timezone import today_gt
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
@@ -50,7 +51,7 @@ class UpcomingPayments(BaseModel):
 
 async def check_overdue_expenses():
     """Check and update status for overdue expenses"""
-    today = datetime.now(timezone.utc).date()
+    today = today_gt()
     expenses = await db.expenses.find(
         {"status": {"$in": ["pendiente", "parcial"]}, "due_date": {"$ne": None}},
         {"_id": 0, "id": 1, "due_date": 1, "status": 1}

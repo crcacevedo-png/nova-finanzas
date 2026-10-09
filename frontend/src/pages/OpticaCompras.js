@@ -48,7 +48,8 @@ import {
   opticaPurchaseApi,
   supplierApi,
   formatCurrency, 
-  formatDate
+  formatDate,
+  getGuatemalaDate
 } from '../services/api';
 
 const categoryLabels = {
@@ -92,8 +93,8 @@ const OpticaCompras = () => {
   const totalCompras = purchases.reduce((sum, p) => sum + (p.total || 0), 0);
   const totalMes = purchases.filter(p => {
     const purchaseDate = new Date(p.purchase_date);
-    const now = new Date();
-    return purchaseDate.getMonth() === now.getMonth() && purchaseDate.getFullYear() === now.getFullYear();
+    const [gy, gm] = getGuatemalaDate().split('-').map(Number);
+    return purchaseDate.getMonth() === (gm - 1) && purchaseDate.getFullYear() === gy;
   }).reduce((sum, p) => sum + (p.total || 0), 0);
 
   const fetchPurchases = useCallback(async () => {
@@ -135,7 +136,7 @@ const OpticaCompras = () => {
       unit_price: '',
       total: '',
       invoice_number: '',
-      purchase_date: new Date().toISOString().split('T')[0],
+      purchase_date: getGuatemalaDate(),
       notes: ''
     });
     setEditingPurchase(null);
