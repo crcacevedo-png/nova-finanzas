@@ -1,0 +1,25 @@
+{
+  "summary": "Validación del fix de zona horaria Guatemala (GMT-6). Momento del test crítico: UTC=2026-10-09 pero GT=2026-10-08 (ventana noche GT donde UTC ya avanzó al día siguiente). Backend: 11/11 pytest OK en /app/backend/tests/test_timezone_gt_fix.py cubriendo (1) GET /api/agenda/citas, /contadores, /presentes sin fecha usan día GT; (2) GET /api/caja/estado sin fecha devuelve caja del día GT; (3) flujo completo apertura→movimiento→totales_dia→cierre→reabrir todos tageados con fecha GT 2026-10-08; (4) GET /api/ventas/hoy y /resumen-dia OK (sin 500); (5) GET /api/dashboard/financiero?periodo=mes_actual retorna fecha_inicio con mes GT (2026-10-01), sin errores 500; (6) /api/dashboard/upcoming, /stats y /expenses OK. Frontend: tras login superadmin, (a) Agenda inicializa input[type=date]=2026-10-08 (día GT, no UTC 2026-10-09); (b) Auditoría muestra fechas en GT 2026-10-08; (c) Caja muestra 'Estado Abierta', 'Ingresos Hoy Q0.00', 'Saldo Efectivo Q10.00' coherente con caja abierta por el test de hoy GT. No se detectaron 500 ni discrepancias UTC/GT.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_timezone_gt_fix.py",
+    "/app/test_reports/pytest/timezone_gt_fix.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "utils/timezone.py está correctamente centralizado y es usado uniformemente por caja.py, ventas.py, agenda.py, dashboard_financiero.py, dashboard.py, expenses.py, payments.py y server.py (scheduler con CronTrigger timezone=GUATEMALA_TZ). Buen patrón.",
+    "dia_gt_a_rango_utc convierte el día GT a rango UTC [T06:00:00+00:00, T+1 05:59:59+00:00] lo cual es correcto porque Guatemala no usa DST (offset fijo -06:00). Si en el futuro se agrega otra zona con DST, habrá que revisar.",
+    "El scheduler (server.py) y /dashboard/upcoming migraron a now_gt(). Confirmar que generate_fixed_expenses_for_today también haya cambiado el documento 'ultima_ejecucion' a formato GT para consistencia (fuera del scope de este test).",
+    "Frontend getGuatemalaDate() en api.js usa Intl.DateTimeFormat con timeZone='America/Guatemala' lo cual es confiable cross-browser. Agenda, Caja, AuditLogs, Gastos, GastosFijos, SalaOperaciones, EvaluacionOftalmologica fueron migrados.",
+    "test_caja_timezone.py (iteración previa) usa datetime.now(timezone.utc).strftime('%Y-%m-%d') para construir el filtro ?fecha=; esto podría fallar en la ventana noche GT porque el filtro ya pasó al día UTC pero el movimiento está indexado al día GT. Recomendación: actualizar ese test legacy a usar fecha GT para evitar flakes en ventanas similares futuras."
+  ],
+  "updated_files": ["/app/backend/tests/test_timezone_gt_fix.py (nuevo, 11 tests)"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (Agenda hoy=GT, AuditLogs=GT, Caja=hoy GT)"},
+  "test_credentials": "superadmin/nova2024 (de /app/memory/test_credentials.md)",
+  "seed_data_creation": "Caja del día abierta con Q10 (fecha GT 2026-10-08) y 1 movimiento TEST_TZ_GT_movimiento Q7 (eliminado en teardown). Un cierre temporal fue creado y reabierto durante test_abrir_movimiento_totales_cerrar. No queda data sucia relevante.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fix de zona horaria GT validado end-to-end durante la ventana crítica (noche GT). Tests reusables en /app/backend/tests/test_timezone_gt_fix.py. Centralización correcta en utils/timezone.py: now_gt/today_gt/today_str_gt/dia_gt_a_rango_utc/rango_gt_a_utc. Si llegan reportes futuros sobre 'día que no coincide', priorizar verificar que la ruta nueva importe de utils.timezone en lugar de datetime.utcnow().",
+  "rca of the issue": "Antes del fix, los endpoints usaban datetime.utcnow() o datetime.now() del servidor (UTC). Entre 18:00 GT y 00:00 GT (00:00 UTC - 06:00 UTC) UTC ya está en el día siguiente, por lo que 'hoy' retornaba el día GT+1 (sin movimientos, sin caja). Fix: utils/timezone.py centraliza now_gt (ZoneInfo America/Guatemala) y helpers de rango GT->UTC isoformat. Para caja/cierres la clave del día (string YYYY-MM-DD) ahora es la fecha GT; para filtros sobre documentos almacenados en UTC isoformat se usa dia_gt_a_rango_utc(fecha) que produce [fechaT06:00:00+00:00, fecha+1T05:59:59+00:00]. Reproducción (ya no reproducible): a las 19:10 GT (01:10 UTC) GET /api/caja/estado debería mostrar caja de 2026-10-08 (hoy GT); confirmado 200 + caja.fecha='2026-10-08'."
+}

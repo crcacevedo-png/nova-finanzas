@@ -6,6 +6,23 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
 
+### Corrección Zona Horaria Guatemala GMT-6 (2026-10 Sesión 32)
+- ✅ **Problema resuelto**: el sistema adelantaba el día (a las 6:46 PM jueves GT mostraba viernes) porque "hoy" se calculaba en UTC. Ahora TODO el sistema usa hora oficial de Guatemala (GMT-6, sin horario de verano).
+- ✅ **Util central nueva** `/app/backend/utils/timezone.py`: `now_gt()`, `today_gt()`, `today_str_gt()`, `dia_gt_a_rango_utc(fecha)` (día GT→rango UTC [fecha 06:00, fecha+1 05:59:59]), `rango_gt_a_utc(ini,fin)`, `GUATEMALA_TZ`.
+- ✅ **Estrategia**: almacenamiento sigue en UTC isoformat (sin migración de datos). Solo se corrige (a) cálculo de "hoy" a GT y (b) filtros/totales "del día" convierten el día GT a rango UTC, lo que agrupa correctamente incluso datos históricos.
+- ✅ **Backend corregido**: caja.py (estado/abrir/movimientos/cierre/totales/cierres financieros), ventas.py (/hoy, /resumen-dia, nº venta, caja abierta), agenda.py (citas/contadores/presentes/mi-agenda/walk-in), dashboard.py, dashboard_financiero.py, expenses.py, payments.py, inventario.py, inventario_ops.py, evaluaciones.py, optica.py, cuentas_cobrar.py, laboratorio_pruebas.py, patients.py, surgeries.py, server.py (gastos fijos + CronTrigger con timezone GT + /dashboard/upcoming).
+- ✅ **Frontend corregido**: nuevo `getGuatemalaTimeHM()` en api.js; Agenda.js (fechaSeleccionada/botón Hoy/esHoy), Caja.js, Gastos.js, GastosFijos.js, SalaOperaciones.js, OpticaCompras.js, OpticaVentas.js, OpticaDashboard.js, Sociedades.js, EvaluacionOftalmologica.js, CRMCirugias.js, Pacientes.js (defaults de fecha/mes/año y min/max de date pickers) + AuditLogs.js (muestra marcas de tiempo en America/Guatemala).
+- ✅ **Google Calendar** ya usaba America/Guatemala (sin cambios).
+- ✅ **Verificado**: `iteration_67.json` 100% backend (11/11 pytest `test_timezone_gt_fix.py`) + frontend. Probado en ventana crítica (UTC=Oct 9 / GT=Oct 8): Agenda muestra "Jueves 8 de Octubre" correctamente.
+- **Pendiente Fase 2**: etiqueta opcional "hora de Guatemala (GMT-6)" en pantallas clave; revisar recordatorios programados.
+
+### Módulo IGSS separado de Configuración (2026-10 Sesión 32)
+- ✅ Se creó el módulo/categoría "IGSS" (menu_config.py) y se movió "Unidades IGSS" ahí (ruta `/igss/unidades`), sacándolo de Configuración. Aparece como grupo propio en el sidebar y como categoría seleccionable en Usuarios→Menús por Rol.
+
+### Búsqueda Walk-in por nombre (2026-10 Sesión 32)
+- ✅ Corregido: el diálogo Walk-in en Agenda.js usaba `first_name/last_name` pero `/api/patients/search` devuelve `full_name`; ahora muestra el nombre completo.
+
+
 ### Auditoría (2026-10 Sesión 31) — Prompt 26: ¿Es real la utilidad que muestra el sistema?
 - ✅ **Nota de cirugía (cierre de sesión anterior)**: `iteration_64.json` confirmó 100% backend+frontend, sin bugs (solo advertencia a11y opcional). Tarea cerrada.
 - ✅ **Auditoría integral ejecutada** (solo lectura en producción; pruebas con datos sintéticos `AUD26-*` ya purgados). Entregables: `/app/docs/auditoria/P26_descubrimiento.md` (Fase 0: mapa de colecciones + origen literal de cada cifra financiera), `/app/docs/auditoria/P26_informe.md` + `.xlsx` (Fase 3: hallazgos + plan de corrección NO aplicado), `/app/backend/scripts/test_auditoria_p26_utilidad_real.py` (script reproducible del escenario de referencia), `/app/backend/tests/test_auditoria_p26_invariantes.py` (INV-33/37/38/42/43, xfail documentando hallazgos vigentes).
