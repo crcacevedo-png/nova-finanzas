@@ -86,7 +86,7 @@ const formatTime = (time) => {
 };
 
 // Componente de tarjeta de cita compacta
-const CitaCard = ({ cita, onEstadoChange, onAsignar, onEdit, onVerPaciente, compact = false }) => {
+const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, compact = false }) => {
   const estadoConfig = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
   const IconoEstado = estadoConfig.icon;
   
@@ -140,9 +140,6 @@ const CitaCard = ({ cita, onEstadoChange, onAsignar, onEdit, onVerPaciente, comp
                 <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'No asistió')}>
                   <XCircle className="w-4 h-4 mr-2" /> No asistió
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'Cancelada')}>
-                  <XCircle className="w-4 h-4 mr-2" /> Cancelar
-                </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />
@@ -152,6 +149,18 @@ const CitaCard = ({ cita, onEstadoChange, onAsignar, onEdit, onVerPaciente, comp
             <DropdownMenuItem onClick={() => onEdit(cita)}>
               <Calendar className="w-4 h-4 mr-2" /> Editar cita
             </DropdownMenuItem>
+            {!['Atendida', 'No asistió', 'Cancelada'].includes(cita.estado) && onEliminar && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onEliminar(cita)}
+                  className="text-red-600 focus:text-red-600"
+                  data-testid={`eliminar-cita-${cita.id}`}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -562,6 +571,17 @@ const Agenda = () => {
     }
   };
   
+  const handleEliminarCita = async (cita) => {
+    if (!window.confirm('¿Eliminar esta cita? Se marcará como cancelada y dejará de aparecer en la agenda.')) return;
+    try {
+      await agendaApi.cambiarEstado(cita.id, 'Cancelada');
+      toast.success('Cita eliminada');
+      fetchAll();
+    } catch (error) {
+      toast.error('No se pudo eliminar la cita');
+    }
+  };
+  
   const handleCancelarLlegada = async (citaId) => {
     try {
       await agendaApi.revertirLlegada(citaId);
@@ -637,6 +657,8 @@ const Agenda = () => {
     if (!c) return;
     const nuevaFecha = fecha || c.fecha;
     if (c.medico_id === medicoId && c.hora_inicio === slot && c.fecha === nuevaFecha) return;
+    // Datos originales para poder deshacer
+    const original = { medico_id: c.medico_id, medico_nombre: c.medico_nombre, hora_inicio: c.hora_inicio, fecha: c.fecha };
     try {
       const med = medicos.find(m => m.id === medicoId);
       await agendaApi.updateCita(c.id, {
@@ -645,10 +667,30 @@ const Agenda = () => {
         hora_inicio: slot,
         fecha: nuevaFecha,
       });
-      toast.success('Cita movida correctamente');
       fetchAll();
+      toast.success('Cita reagendada', {
+        action: {
+          label: 'Deshacer',
+          onClick: async () => {
+            try {
+              await agendaApi.updateCita(c.id, {
+                medico_id: original.medico_id,
+                medico_nombre: original.medico_nombre,
+                hora_inicio: original.hora_inicio,
+                fecha: original.fecha,
+              });
+              toast.success('Cambio deshecho');
+              fetchAll();
+            } catch (e) {
+              toast.error(e.response?.data?.detail || 'No se pudo deshacer');
+            }
+          }
+        }
+      });
     } catch (e) {
-      toast.error('No se pudo mover la cita');
+      const msg = e.response?.data?.detail || 'No se pudo mover la cita';
+      toast.error(msg);
+      fetchAll();
     }
   };
   
@@ -1056,6 +1098,7 @@ const Agenda = () => {
                                     cita={cita}
                                     compact
                                     onEstadoChange={handleCambiarEstado}
+                                    onEliminar={handleEliminarCita}
                                     onEdit={handleOpenCitaDialog}
                                     onVerPaciente={handleVerPaciente}
                                   />
@@ -1300,6 +1343,7 @@ const Agenda = () => {
                         <CitaCard
                           key={cita.id}
                           cita={{...cita, medico_color: medicos.find(m => m.id === cita.medico_id)?.color}}
+                          onEliminar={handleEliminarCita}
                           onEstadoChange={handleCambiarEstado}
                           onEdit={handleOpenCitaDialog}
                           onVerPaciente={handleVerPaciente}
@@ -1426,6 +1470,7 @@ const Agenda = () => {
                         miAgenda.citas_del_dia.map(cita => (
                           <CitaCard
                             key={cita.id}
+                            onEliminar={handleEliminarCita}
                             cita={cita}
                             onEstadoChange={handleCambiarEstado}
                             onEdit={handleOpenCitaDialog}

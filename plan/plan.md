@@ -1,51 +1,54 @@
-# Corrección de Horario a Hora de Guatemala (GMT-6) en Todo el Sistema
+# Agenda: eliminar citas que de verdad desaparezcan + reagendar arrastrando
 
-El sistema actualmente adelanta el día: a las 6:46 PM del jueves ya muestra el viernes. Este trabajo hace que todo el sistema use la hora oficial de Guatemala (GMT-6) de forma consistente, para que "hoy", las fechas y las horas coincidan con la realidad local.
+Corrige dos cosas en la Agenda de Pacientes: que al eliminar una cita esta deje de aparecer en la pantalla, y que se pueda reagendar una cita arrastrándola a otro horario.
 
 ## Para quién es
-Personal de la clínica NovaVisión en Guatemala (recepción, médicos, caja, administración) que depende de que la agenda, las ventas y los cierres reflejen el día y la hora correctos.
+Personal de la clínica NovaVisión (recepción, médicos, administración) que gestiona las citas del día y de la semana.
 
 ## Qué se corrige y cómo se verá
 
-- **El día "hoy" será siempre el de Guatemala.** El cambio de día ocurrirá a la medianoche de Guatemala, no a las 6:00 PM. La Agenda abrirá en el día correcto y el botón "Hoy" llevará al día real.
-- **Las horas mostradas serán horas de Guatemala.** Horas de citas, timbres de llegada de pacientes, fechas de ventas, movimientos de caja, cierres financieros, historial de pagos, reportes y registros de auditoría se mostrarán y se agruparán según la hora local.
-- **Los filtros y totales "del día" cuadrarán con el calendario local.** "Ventas de hoy", "citas de hoy", "pacientes presentes", conteos del tablero y cierres de caja tomarán como referencia el día de Guatemala.
-- **Los selectores de fecha** (nueva cita, reportes, cierres) partirán del día correcto por defecto.
-- **La sincronización con Google Calendar** enviará los eventos con la zona horaria de Guatemala para que no se corran de hora.
+### 1. Eliminar una cita
+Hoy, al eliminar una cita desde la vista de calendario, la cita se queda visible como si nada hubiera pasado. Se corrige así:
+- Al eliminar una cita, el sistema pide una confirmación corta ("¿Eliminar esta cita?").
+- Al confirmar, la cita se marca como **Cancelada** y desaparece de inmediato de todas las vistas activas de la agenda: calendario por día, por semana, por mes y el tablero del día.
+- La cita no se borra de la base de datos: queda guardada como cancelada (para historial), pero ya no estorba en la agenda ni se cuenta como cita activa.
+- Los contadores del día (Agendados, Confirmados, etc.) dejan de incluir las citas canceladas.
 
-La apariencia y el funcionamiento no cambian; solo se corrige el cálculo de fechas y horas.
+### 2. Reagendar arrastrando (click & drop)
+Permite mover una cita a otro horario sin abrir ningún formulario:
+- Funciona en la **vista de Día** (arrastrar entre franjas horarias del mismo día y entre médicos) y en la **vista de Semana** (arrastrar entre días y franjas horarias).
+- Al soltar la cita en el nuevo espacio, se reagenda **de inmediato**, sin ventana de confirmación. Aparece un aviso breve de éxito con la opción **Deshacer** por si fue un error.
+- Si el nuevo horario ya está ocupado por otra cita del mismo médico, el sistema **bloquea el movimiento**: la cita vuelve a su lugar y se muestra un mensaje claro ("Ese horario ya está ocupado para este médico").
 
-## Alcance acordado
-- **Todo el sistema** (Agenda, Dashboards, Caja/Cierres, reportes financieros, auditoría y cualquier punto que use "hoy" o fechas).
-- **Los datos ya guardados no se modifican.** La corrección aplica de aquí en adelante en cómo se calcula "hoy" y cómo se muestran las horas. Registros históricos muy antiguos podrían verse desfasados por unas horas en su presentación, pero no se tocan para evitar riesgo sobre la información existente.
+La apariencia general de la agenda no cambia; solo mejora el comportamiento de eliminar y de arrastrar.
 
-## Experiencia del usuario (flujo)
-1. El usuario entra al sistema estando en Guatemala (o desde cualquier lugar) y el sistema asume siempre hora de Guatemala.
-2. La Agenda muestra el día local correcto; "Hoy" y la navegación por día/semana/mes respetan ese día.
-3. Al registrar citas, ventas, pagos o cierres, la fecha y hora quedan ancladas a Guatemala.
-4. Los tableros y reportes "del día" muestran lo ocurrido en el día local, sin adelantarse ni atrasarse.
+## Flujo de uso
+1. El usuario abre la Agenda en la vista de Día o Semana.
+2. Para eliminar: abre el menú de la cita, elige Eliminar, confirma, y la cita desaparece de la vista.
+3. Para reagendar: toma la cita con el cursor y la suelta en la nueva franja/día.
+4. Si el horario está libre, la cita se mueve al instante (con opción de deshacer). Si está ocupado, no se mueve y se avisa.
 
 ## Sensación / UI
-Sin cambios visuales de diseño. El beneficio es de confianza: las fechas y horas "simplemente son correctas" sin importar la hora del día.
+Sin rediseño. Movimientos fluidos al arrastrar, mensajes claros de éxito/bloqueo, y una agenda que refleja de inmediato lo que el usuario hizo.
 
 ## Fases de implementación
 
 **Fase 1 (MVP, se construye ahora):**
-- Establecer una única forma de obtener "hoy" y la hora actual en Guatemala, usada en todo el sistema.
-- Corregir el cálculo de "hoy" y la presentación de fechas/horas en: Agenda, Dashboard, Dashboard Financiero, Caja y Cierres, Gastos e Historial de Pagos, reportes y Auditoría.
-- Asegurar que los filtros/totales "del día" usen el día de Guatemala.
-- Ajustar la sincronización con Google Calendar para usar zona horaria de Guatemala.
-- Verificar el caso crítico (entre 6:00 PM y medianoche) en Agenda y en los conteos del día.
+- Eliminar una cita: confirmación, marcado como Cancelada, y desaparición inmediata de todas las vistas de la agenda y de los contadores.
+- Reagendar arrastrando en vista de Día y de Semana, con movimiento inmediato, opción de deshacer y bloqueo cuando el horario del médico ya está ocupado.
 
 **Fase 2 (después):**
-- Mostrar de forma opcional una etiqueta "hora de Guatemala (GMT-6)" en pantallas clave para dejarlo explícito.
-- Revisar notificaciones/recordatorios programados para que disparen según hora local.
+- Reagendar arrastrando también en la vista de Mes (mover una cita de un día a otro).
+- Un filtro/interruptor para ver las citas canceladas cuando se necesite revisarlas.
 
 **Fase 3 (futuro):**
-- Si algún día se opera en más de un país, permitir zona horaria configurable por sede.
+- Registro de historial de reagendamientos y cancelaciones (quién, cuándo y motivo).
+- Aviso automático al paciente cuando su cita se reagenda o cancela.
 
 ## Supuestos
-- Guatemala no usa horario de verano; se usa un desfase fijo GMT-6 todo el año.
-- El sistema siempre debe operar en hora de Guatemala, aunque un usuario ingrese desde un dispositivo o servidor en otra zona horaria.
-- No se migran ni recalculan los datos históricos ya almacenados; solo se corrige el cálculo y la presentación de ahora en adelante.
-- No se cambia el diseño ni el flujo; es una corrección de exactitud de fecha/hora.
+- "Eliminar" significa marcar la cita como Cancelada (no borrado permanente), según lo confirmado.
+- Las citas canceladas se ocultan de todas las vistas activas de la agenda; se podrán revisar más adelante mediante el filtro de la Fase 2.
+- Se pide confirmación antes de eliminar (para evitar cancelaciones accidentales), pero NO se pide confirmación al reagendar arrastrando (se mueve de inmediato con opción de deshacer), según lo confirmado.
+- El bloqueo por choque de horario considera ocupado un espacio cuando el mismo médico ya tiene otra cita activa a esa misma hora de inicio ese día.
+- Las citas ya marcadas como Atendida o No asistió siguen mostrándose como hasta ahora; solo cambia el manejo de las canceladas.
+- No se modifican datos históricos existentes.

@@ -304,7 +304,11 @@ async def listar_citas(
         query["medico_id"] = medico_id
     
     if estado:
+        # Filtro explícito por estado (permite ver Canceladas si se solicita, p.ej. Fase 2)
         query["estado"] = estado
+    else:
+        # Por defecto, ocultar las citas canceladas de las vistas activas
+        query["estado"] = {"$ne": EstadoCita.CANCELADA.value}
     
     citas = await db.citas.find(query, {"_id": 0}).sort([("hora_inicio", 1)]).to_list(500)
     return CitaListResponse(data=citas, total=len(citas))
@@ -320,7 +324,9 @@ async def listar_citas_rango(
     """Listar citas en un rango de fechas (para vista semanal)"""
     query = {
         "tipo_agenda": "pacientes",
-        "fecha": {"$gte": desde, "$lte": hasta}
+        "fecha": {"$gte": desde, "$lte": hasta},
+        # Ocultar canceladas de las vistas de semana/mes
+        "estado": {"$ne": EstadoCita.CANCELADA.value}
     }
     
     if medico_id:
@@ -388,6 +394,17 @@ async def actualizar_cita(
         motivo, _bloqueo = await motivo_no_disponible(nuevo_medico, nueva_fecha, nueva_hora_ini, nueva_hora_fin)
         if motivo:
             raise HTTPException(status_code=409, detail=f"No se puede reprogramar: {motivo}")
+        # Bloquear choque de horario: otra cita activa del mismo médico a la misma hora de inicio ese día
+        conflicto = await db.citas.find_one({
+            "tipo_agenda": "pacientes",
+            "id": {"$ne": cita_id},
+            "medico_id": nuevo_medico,
+            "fecha": nueva_fecha,
+            "hora_inicio": nueva_hora_ini,
+            "estado": {"$nin": [EstadoCita.ATENDIDA.value, EstadoCita.NO_ASISTIO.value, EstadoCita.CANCELADA.value]}
+        })
+        if conflicto:
+            raise HTTPException(status_code=409, detail="Ese horario ya está ocupado para este médico")
     
     update_data["actualizado_por"] = current_user["id"]
     update_data["fecha_actualizacion"] = datetime.now(timezone.utc).isoformat()
@@ -652,9 +669,9 @@ async def obtener_contadores(
     resultados = await db.citas.aggregate(pipeline).to_list(20)
     contadores = {r["_id"]: r["count"] for r in resultados}
     
-    # Pipeline para contar por médico
+    # Pipeline para contar por médico (excluye canceladas del total activo)
     pipeline_medico = [
-        {"$match": {"tipo_agenda": "pacientes", "fecha": fecha}},
+        {"$match": {"tipo_agenda": "pacientes", "fecha": fecha, "estado": {"$ne": EstadoCita.CANCELADA.value}}},
         {"$group": {
             "_id": "$medico_id",
             "medico_nombre": {"$first": "$medico_nombre"},
