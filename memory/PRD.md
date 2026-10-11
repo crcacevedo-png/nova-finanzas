@@ -6,6 +6,14 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
 
+### Agenda: Eliminar (cancelar) + Reagendar arrastrando (2026-10 Sesión 32)
+- ✅ **Eliminar cita**: nuevo ítem "Eliminar" (ícono papelera, data-testid `eliminar-cita-{id}`) con confirmación; marca la cita como `Cancelada` (soft, no se borra de BD) y desaparece de inmediato de todas las vistas activas.
+- ✅ **Ocultar canceladas** (backend agenda.py): `listar_citas` excluye Cancelada salvo filtro `estado` explícito (permite Fase 2 ver canceladas); `listar_citas_rango` (semana/mes) excluye Cancelada; `obtener_contadores` excluye canceladas del total por médico.
+- ✅ **Reagendar drag & drop** (Día y Semana): ya existía el arrastre; ahora al soltar se reagenda sin confirmación con toast "Cita reagendada" + botón **Deshacer** (revierte médico/fecha/hora originales).
+- ✅ **Bloqueo de choque** (`actualizar_cita`): si el mismo médico ya tiene otra cita activa a esa hora de inicio ese día → 409 "Ese horario ya está ocupado para este médico"; la cita permanece en su lugar.
+- ✅ **Verificado**: `iteration_68.json` 100% backend (4/4 pytest) + frontend (eliminar, drag libre, Deshacer, drag conflicto bloqueado con mensaje exacto).
+- **Pendiente Fase 2**: drag&drop también en vista Mes; filtro para ver citas canceladas.
+
 ### Corrección Zona Horaria Guatemala GMT-6 (2026-10 Sesión 32)
 - ✅ **Problema resuelto**: el sistema adelantaba el día (a las 6:46 PM jueves GT mostraba viernes) porque "hoy" se calculaba en UTC. Ahora TODO el sistema usa hora oficial de Guatemala (GMT-6, sin horario de verano).
 - ✅ **Util central nueva** `/app/backend/utils/timezone.py`: `now_gt()`, `today_gt()`, `today_str_gt()`, `dia_gt_a_rango_utc(fecha)` (día GT→rango UTC [fecha 06:00, fecha+1 05:59:59]), `rango_gt_a_utc(ini,fin)`, `GUATEMALA_TZ`.

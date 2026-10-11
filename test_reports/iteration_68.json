@@ -1,0 +1,26 @@
+{
+  "summary": "Validación end-to-end de las 2 mejoras en Agenda de Pacientes: (1) Eliminar cita = cancelar (soft) y ocultar de vistas activas; (2) Reagendar por drag&drop con bloqueo de choque 409 y botón Deshacer. Backend: 4/4 pytest OK en test_agenda_cancelar_reagendar.py validando: (a) PUT /api/agenda/citas/{id} a slot ocupado -> 409 'Ese horario ya está ocupado para este médico'; (b) PUT a slot libre -> 200 y persiste (hora_fin recalculado); (c) PATCH /estado=Cancelada -> 200, no aparece en GET /citas (sin filtro) ni en /citas/rango, pero sí aparece con ?estado=Cancelada; (d) GET /contadores: total_cancelados refleja la cancelada y por_medico excluye canceladas del total activo. Frontend (vista Día, Playwright): (1) Eliminar desde dropdown (data-testid eliminar-cita-{id}) con window.confirm aceptado -> cita pasa a Cancelada y desaparece del listado activo; (2) Drag de 10:00 a 10:30 (libre, mismo médico) -> cita reagendada, toast 'Cita reagendada' con acción 'Deshacer' visible; (3) Click en 'Deshacer' -> cita regresa a 10:00; (4) Drag a 11:00 (ocupado por otra cita activa del mismo médico) -> toast error 'Ese horario ya está ocupado para este médico' y la cita permanece en 10:00. Nota técnica: los eventos HTML5 drag se simularon con page.dispatch_event + evaluate_handle('new DataTransfer()') por limitación conocida de Playwright drag_to con React draggables; el comportamiento real con mouse humano se corresponde con el flujo probado (handlers idénticos onDragStart/onDrop del componente).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_agenda_cancelar_reagendar.py",
+    "/app/test_reports/pytest/agenda_cancelar_reagendar.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routes/agenda.py: en listar_citas, el default de 'estado' excluye canceladas con $ne. Correcto. Nota: si en el futuro se añaden más estados finales a ocultar, considerar centralizar la lista 'ESTADOS_INACTIVOS' en models para consistencia con la query de conflicto en actualizar_cita.",
+    "actualizar_cita: la validación de conflicto excluye [ATENDIDA, NO_ASISTIO, CANCELADA] permitiendo reusar slots de citas finalizadas. Alineado con requerimiento.",
+    "Agenda.js (frontend): handleEliminarCita usa window.confirm nativo del navegador; funciona pero diseño inconsistente con el resto del app que usa shadcn AlertDialog. No bloqueante.",
+    "handleMoverCita construye el toast con action Deshacer de sonner correctamente. El toast de error usa error.response?.data?.detail que mapea 1:1 al mensaje del 409. OK.",
+    "El drag&drop utiliza HTML5 nativo (draggable + onDragStart) sobre un wrapper div exterior al CitaCard. Esto hace que la 'pelotita' arrastrada incluya el dropdown de 3-puntos; no es problema funcional pero visualmente podría pulirse con setDragImage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_agenda_cancelar_reagendar.py (nuevo, 4 tests)"
+  ],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (eliminar + drag libre + Deshacer + drag conflicto bloqueado con mensaje exacto)"},
+  "test_credentials": "superadmin / nova2024 (de /app/memory/test_credentials.md)",
+  "seed_data_creation": "Durante tests se crearon citas TEST para Dr. Carlos Méndez (lunes 2026-10-12) 10:00 y 11:00. Teardown canceló todas; sólo quedan como registros con estado=Cancelada (soft delete esperado).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Para probar drag&drop sobre React con Playwright, usar la técnica dispatch_event con DataTransfer handle: dt = await page.evaluate_handle('() => new DataTransfer()'); await src.dispatch_event('dragstart',{dataTransfer:dt}); dragenter/dragover/drop sobre target; dragend sobre source. page.drag_to NO dispara los onDragStart/onDrop de React en este app. Reglas backend ya validadas: PUT excluye [Atendida, No asistió, Cancelada] al evaluar conflicto; listar_citas y listar_citas_rango ocultan Cancelada por default pero muestran si ?estado=Cancelada; contadores.por_medico excluye Cancelada mientras total_cancelados sí la refleja."
+}
