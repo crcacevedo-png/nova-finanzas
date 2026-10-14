@@ -1,0 +1,26 @@
+{
+  "summary": "Validación end-to-end del acceso del rol 'medico' en ERP NovaVisión. Backend (9/9 pytest OK en test_medico_role_access.py): (1) Login medico_test devuelve permisos view_agenda/view_evaluacion/view_sala_operaciones/create_patients/edit_patients=True y delete_patients/view_dashboard/view_optica=False; (2) GET /api/roles/available-permissions incluye categoría 'clinica' con los 4 permisos (view_agenda, view_evaluacion, manage_recetas, view_sala_operaciones); (3) GET /api/roles/medico retorna display_name 'Médico' y los 4 permisos clínicos True; (4) GET /api/agenda/mi-dia con token medico_test retorna medico_nombre='Dr. Carlos Méndez' y todas las citas pertenecen a la ficha a8bb541a-7fcb-49ab-bd20-32788f57acb5; (5) GET /api/menu-config/role/medico retorna enabled_menus con {pacientes, agenda, evaluacion_oftalmologica, sala_operaciones} y sin dashboard/finanzas/inventario/optica; (6) PATCH /api/medicos-agenda/{id} con usuario_id persiste y GET /medicos-agenda lo refleja; (7) rol usuario conserva view_agenda=True (regresión OK); (8) rol optica sigue sin view_agenda/view_evaluacion/view_sala_operaciones; (9) Un usuario médico recién creado SIN ficha vinculada recibe 403 'Usuario no vinculado a un médico' en /mi-dia. Frontend (Playwright, viewport 1920x1080): (A) Login medico_test → sidebar muestra EXACTAMENTE Pacientes, Evaluación Oftalmológica, Sala de operaciones, Agenda (no Dashboard/Finanzas/Inventario/Óptica/Usuarios/Roles) y header muestra 'Dr. Carlos Méndez / medico'; (B) /agenda abre con pestaña activa 'Mi Agenda' y renderiza 'Dr. Carlos Méndez'; (C) /sala-operaciones y /evaluacion-oftalmologica se cargan correctamente para el médico (no hay redirect a login/forbidden); (D) /usuarios como superadmin → al abrir modal 'Nuevo Usuario' el selector data-testid='select-medico-ficha' NO está presente antes y SÍ aparece después de elegir Rol='Médico' con el texto 'Médico asignado (ficha)' y la ayuda 'Vincula esta cuenta con su ficha de médico para que la Agenda muestre solo sus citas.'. No se encontraron defectos; todos los criterios de aceptación de la review_request se cumplen.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_medico_role_access.py",
+    "/app/test_reports/pytest/medico_role_access.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/routes/roles.py: get_all_roles usa expresiones condicionales anidadas con 'or' + ternario que son difíciles de leer (ej. line 200). Funciona pero sería más claro con dict.get por defecto. No bloqueante.",
+    "backend/routes/agenda.py mi_agenda_del_dia: fallback para admin/superadmin sin médico vinculado deja medico_id vacío y lista TODAS las citas del día; podría ser intencional pero conviene documentarlo en el handler para evitar confusión futura.",
+    "backend/routes/agenda.py medicos_agenda PATCH acepta dict suelto sin Pydantic; cualquier campo adicional se ignora silenciosamente (seguro por whitelist actual). Considerar un modelo DoctorAgendaUpdate con color/usuario_id tipados.",
+    "Hay dos matrices PERMISSIONS (server.py y config/permissions.py) que ambas incluyen 'medico'. Mantener sincronización es frágil; a futuro conviene consolidar en config/permissions.py y re-exportar.",
+    "frontend Usuarios: el selector 'select-medico-ficha' aparece sólo cuando role==='medico'; falta validación visible si el usuario intenta guardar sin elegir ficha (actualmente permite guardar sin vínculo y luego Agenda muestra sin-vinculo). No bloqueante por diseño, pero mejoraría UX."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_medico_role_access.py (nuevo, 9 tests)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (sidebar + mi-agenda default + rutas clínicas + select-medico-ficha condicional)"},
+  "test_credentials": "superadmin/nova2024, medico_test/medico2024, usuario/user2024 (de /app/memory/test_credentials.md)",
+  "seed_data_creation": "test_mi_dia_sin_vinculo crea un usuario médico temporal con prefijo TEST_medico_sin_ficha_<ts> y lo elimina al final del test (cleanup incluido).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Todo el flujo del rol 'medico' está verificado. Credenciales medico_test/medico2024 funcionan; ficha vinculada: Dr. Carlos Méndez (id a8bb541a-7fcb-49ab-bd20-32788f57acb5). Endpoint de menú: GET /api/menu-config/role/{role} (no /api/menu-config/{role}). medicos-agenda list devuelve {data:[...], total:n}. mi_agenda_del_dia devuelve 403 si usuario médico sin doctor.usuario_id vinculado (frontend lo muestra como mi-agenda-sin-vinculo). Para sembrar citas del Dr. Méndez usar LUNES 08:00-12:00 (horario_semanal). test_medico_role_access.py es reusable como regresión; requiere REACT_APP_BACKEND_URL en env."
+}

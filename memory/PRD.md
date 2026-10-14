@@ -6,6 +6,16 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
 
+### Acceso clínico configurable para rol Médico (2026-10 Sesión 32)
+- ✅ **Permisos clínicos activables por rol**: nueva categoría "Clínica" en Roles con `view_agenda`, `view_evaluacion`, `manage_recetas`, `view_sala_operaciones` (roles.py AVAILABLE_PERMISSIONS). Disponibles para cualquier rol.
+- ✅ **Rol "medico"** como rol de sistema editable (SYSTEM_ROLES + SYSTEM_ROLES_MENU), preconfigurado: Agenda, Evaluación, Recetas, Sala de Operaciones, crear/editar Pacientes (sin eliminar). Menús: pacientes, agenda, evaluacion_oftalmologica, sala_operaciones.
+- ⚠️ IMPORTANTE: existen DOS matrices PERMISSIONS (server.py y config/permissions.py) — ambas deben mantenerse sincronizadas. `validar_rol_existe` (server.py) incluye 'medico'.
+- ✅ **Agenda del médico** abre en pestaña "Mi Agenda" (activeTab inicial según rol) y muestra solo sus citas (mi-dia filtra por `doctors.usuario_id`). Si no hay ficha vinculada, muestra aviso (data-testid `mi-agenda-sin-vinculo`).
+- ✅ **Vínculo usuario↔ficha** en Gestión de Usuarios: selector "Médico asignado (ficha)" cuando role==='medico'; al guardar hace PATCH /api/medicos-agenda/{id} con usuario_id.
+- ✅ **Rutas clínicas** (/agenda, /evaluacion-oftalmologica, /sala-operaciones) ahora con requiredPermission; canEdit en Evaluación/Sala por permiso. Roles existentes conservan acceso.
+- ✅ **Verificado**: `iteration_69.json` 100% backend (9/9) + frontend. Credencial de prueba: `medico_test`/`medico2024` (ficha Dr. Carlos Méndez).
+- **Pendiente Fase 2**: médico ve días anteriores/siguientes y resumen semanal; permisos más finos (ver sin editar).
+
 ### Agenda: Eliminar (cancelar) + Reagendar arrastrando (2026-10 Sesión 32)
 - ✅ **Eliminar cita**: nuevo ítem "Eliminar" (ícono papelera, data-testid `eliminar-cita-{id}`) con confirmación; marca la cita como `Cancelada` (soft, no se borra de BD) y desaparece de inmediato de todas las vistas activas.
 - ✅ **Ocultar canceladas** (backend agenda.py): `listar_citas` excluye Cancelada salvo filtro `estado` explícito (permite Fase 2 ver canceladas); `listar_citas_rango` (semana/mes) excluye Cancelada; `obtener_contadores` excluye canceladas del total por médico.
