@@ -66,6 +66,8 @@ export const agendaApi = {
   // Mi día (médico)
   getMiDia: (fecha) => axios.get(`${API_URL}/api/agenda/mi-dia${fecha ? `?fecha=${fecha}` : ''}`, getAuthHeaders()),
   getMiSemana: (desde, hasta) => axios.get(`${API_URL}/api/agenda/mi-semana?desde=${desde}&hasta=${hasta}`, getAuthHeaders()),
+  getPreferenciasMedicos: () => axios.get(`${API_URL}/api/agenda/preferencias-medicos`, getAuthHeaders()),
+  setPreferenciasMedicos: (orden, ocultos) => axios.put(`${API_URL}/api/agenda/preferencias-medicos`, { orden, ocultos }, getAuthHeaders()),
   
   // Walk-in
   createWalkIn: (data) => axios.post(`${API_URL}/api/agenda/walk-in`, data, getAuthHeaders()),

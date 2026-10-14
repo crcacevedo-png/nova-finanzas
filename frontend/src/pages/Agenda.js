@@ -8,8 +8,9 @@ import { useAgendaWebSocket } from '../hooks/useWebSocket';
 import { 
   Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
-  AlertCircle, Phone, Eye, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2
+  AlertCircle, Phone, Eye, EyeOff, GripVertical, SlidersHorizontal, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2
 } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -297,6 +298,10 @@ const Agenda = () => {
   // Datos
   const [citas, setCitas] = useState([]);
   const [medicos, setMedicos] = useState([]);
+  const [medicosOrden, setMedicosOrden] = useState([]);
+  const [medicosOcultos, setMedicosOcultos] = useState([]);
+  const [organizarOpen, setOrganizarOpen] = useState(false);
+  const [dragMedicoId, setDragMedicoId] = useState(null);
   const [contadores, setContadores] = useState(null);
   const [presentes, setPresentes] = useState({ por_medico: [], total_presentes: 0 });
   const [miAgenda, setMiAgenda] = useState(null);
@@ -346,6 +351,48 @@ const Agenda = () => {
       setMedicos(response.data.data || []);
     } catch (error) {
       console.error('Error fetching médicos:', error);
+    }
+  }, []);
+  
+  const fetchPreferenciasMedicos = useCallback(async () => {
+    try {
+      const response = await agendaApi.getPreferenciasMedicos();
+      setMedicosOrden(response.data.orden || []);
+      setMedicosOcultos(response.data.ocultos || []);
+    } catch (error) {
+      setMedicosOrden([]);
+      setMedicosOcultos([]);
+    }
+  }, []);
+  
+  // Lista de médicos ordenada según preferencia (incluye ocultos; para el panel)
+  const medicosOrdenadosTodos = React.useMemo(() => {
+    if (!medicos.length) return [];
+    const idx = (id) => {
+      const i = medicosOrden.indexOf(id);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return [...medicos].sort((a, b) => idx(a.id) - idx(b.id));
+  }, [medicos, medicosOrden]);
+  
+  // Médicos visibles y ordenados (para renderizar columnas)
+  const medicosVisibles = React.useMemo(
+    () => medicosOrdenadosTodos.filter(m => !medicosOcultos.includes(m.id)),
+    [medicosOrdenadosTodos, medicosOcultos]
+  );
+  
+  const ordenMedicoIdx = useCallback((id) => {
+    const i = medicosOrden.indexOf(id);
+    return i === -1 ? 999999 : i;
+  }, [medicosOrden]);
+  
+  const guardarPreferenciasMedicos = useCallback(async (orden, ocultos) => {
+    setMedicosOrden(orden);
+    setMedicosOcultos(ocultos);
+    try {
+      await agendaApi.setPreferenciasMedicos(orden, ocultos);
+    } catch (e) {
+      toast.error('No se pudo guardar la preferencia de médicos');
     }
   }, []);
   
@@ -450,6 +497,7 @@ const Agenda = () => {
     setLoading(true);
     await Promise.all([
       fetchMedicos(),
+      fetchPreferenciasMedicos(),
       fetchCitas(),
       fetchContadores(),
       fetchPresentes(),
@@ -460,7 +508,7 @@ const Agenda = () => {
       if (miAgendaVista === 'semana') await fetchMiSemana();
     }
     setLoading(false);
-  }, [fetchMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, fetchMiSemana, miAgendaVista, activeTab]);
+  }, [fetchMedicos, fetchPreferenciasMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, fetchMiSemana, miAgendaVista, activeTab]);
   
   // Recargar semana del médico al cambiar de fecha o entrar a vista semana
   useEffect(() => {
@@ -897,7 +945,7 @@ const Agenda = () => {
   const citasPorMedicoYSlot = () => {
     const resultado = {};
     const slots = generarSlots();
-    const medicosToShow = medicoFiltro === 'todos' ? medicos : medicos.filter(m => m.id === medicoFiltro);
+    const medicosToShow = medicoFiltro === 'todos' ? medicosVisibles : medicosVisibles.filter(m => m.id === medicoFiltro);
     
     medicosToShow.forEach(medico => {
       resultado[medico.id] = {
@@ -1040,6 +1088,74 @@ const Agenda = () => {
                   
                   {/* Filtros */}
                   <div className="flex gap-2 ml-auto">
+                    <Popover open={organizarOpen} onOpenChange={setOrganizarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" data-testid="organizar-medicos-btn">
+                          <SlidersHorizontal className="w-4 h-4 mr-1" />
+                          Médicos
+                          {medicosOcultos.length > 0 && (
+                            <Badge variant="outline" className="ml-1">{medicosVisibles.length}/{medicos.length}</Badge>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-72 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-semibold">Organizar médicos</span>
+                          <button
+                            type="button"
+                            className="text-xs text-blue-600 hover:underline"
+                            data-testid="organizar-medicos-reset"
+                            onClick={() => guardarPreferenciasMedicos([], [])}
+                          >
+                            Restablecer
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-2">Arrastra para ordenar. Usa el ojo para mostrar/ocultar.</p>
+                        <div className="space-y-1 max-h-[320px] overflow-y-auto" data-testid="organizar-medicos-lista">
+                          {medicosOrdenadosTodos.map((m) => {
+                            const oculto = medicosOcultos.includes(m.id);
+                            return (
+                              <div
+                                key={m.id}
+                                draggable
+                                onDragStart={() => setDragMedicoId(m.id)}
+                                onDragEnd={() => setDragMedicoId(null)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  if (!dragMedicoId || dragMedicoId === m.id) return;
+                                  const ids = medicosOrdenadosTodos.map(x => x.id);
+                                  const from = ids.indexOf(dragMedicoId);
+                                  const to = ids.indexOf(m.id);
+                                  ids.splice(to, 0, ids.splice(from, 1)[0]);
+                                  guardarPreferenciasMedicos(ids, medicosOcultos);
+                                  setDragMedicoId(null);
+                                }}
+                                data-testid={`organizar-medico-row-${m.id}`}
+                                className={`flex items-center gap-2 px-2 py-1.5 rounded border bg-white cursor-move transition-opacity ${oculto ? 'opacity-50' : ''} ${dragMedicoId === m.id ? 'ring-2 ring-blue-400' : ''}`}
+                              >
+                                <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                                <span className="flex-1 text-sm truncate">{m.name}</span>
+                                <button
+                                  type="button"
+                                  data-testid={`organizar-medico-toggle-${m.id}`}
+                                  onClick={() => {
+                                    const nuevos = oculto
+                                      ? medicosOcultos.filter(id => id !== m.id)
+                                      : [...medicosOcultos, m.id];
+                                    guardarPreferenciasMedicos(medicosOrdenadosTodos.map(x => x.id), nuevos);
+                                  }}
+                                  className="text-gray-500 hover:text-gray-800"
+                                >
+                                  {oculto ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <Select value={medicoFiltro} onValueChange={setMedicoFiltro}>
                       <SelectTrigger className="w-40">
                         <SelectValue placeholder="Médico" />
@@ -1368,11 +1484,12 @@ const Agenda = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-[500px] overflow-y-auto">
-                  {citas.filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado)).length === 0 ? (
+                  {citas.filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado) && !medicosOcultos.includes(c.medico_id)).length === 0 ? (
                     <p className="text-center text-gray-500 py-8">No hay citas pendientes</p>
                   ) : (
                     citas
-                      .filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado))
+                      .filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado) && !medicosOcultos.includes(c.medico_id))
+                      .sort((a, b) => (ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id)) || (a.hora_inicio || '').localeCompare(b.hora_inicio || ''))
                       .map(cita => (
                         <CitaCard
                           key={cita.id}
@@ -1397,10 +1514,13 @@ const Agenda = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 max-h-[500px] overflow-y-auto">
-                  {presentes.por_medico.length === 0 ? (
+                  {presentes.por_medico.filter(g => !medicosOcultos.includes(g.medico_id)).length === 0 ? (
                     <p className="text-center text-gray-500 py-8">No hay pacientes presentes</p>
                   ) : (
-                    presentes.por_medico.map(grupo => (
+                    presentes.por_medico
+                      .filter(g => !medicosOcultos.includes(g.medico_id))
+                      .sort((a, b) => ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id))
+                      .map(grupo => (
                       <div key={grupo.medico_id} className="mb-4">
                         <div 
                           className="text-sm font-semibold mb-2 flex items-center gap-2 p-2 rounded"

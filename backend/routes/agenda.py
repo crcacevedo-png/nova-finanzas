@@ -4,6 +4,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional, List
+from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 from utils.timezone import now_gt, today_str_gt
 import uuid
@@ -807,6 +808,45 @@ async def mi_agenda_semana(
         "citas": citas,
         "total": len(citas)
     }
+
+
+# ==================== PREFERENCIAS DE MÉDICOS (POR USUARIO) ====================
+
+class PreferenciasMedicos(BaseModel):
+    orden: List[str] = []
+    ocultos: List[str] = []
+
+
+@router.get("/preferencias-medicos")
+async def get_preferencias_medicos(current_user: dict = Depends(get_current_user)):
+    """Devuelve el orden y los médicos ocultos configurados por el usuario para la vista Día/Tablero."""
+    pref = await db.user_preferences.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    if not pref:
+        return {"orden": [], "ocultos": []}
+    return {
+        "orden": pref.get("medicos_orden", []),
+        "ocultos": pref.get("medicos_ocultos", [])
+    }
+
+
+@router.put("/preferencias-medicos")
+async def set_preferencias_medicos(
+    prefs: PreferenciasMedicos,
+    current_user: dict = Depends(get_current_user)
+):
+    """Guarda el orden y los médicos ocultos del usuario (se recuerda en su cuenta)."""
+    await db.user_preferences.update_one(
+        {"user_id": current_user["id"]},
+        {"$set": {
+            "user_id": current_user["id"],
+            "medicos_orden": prefs.orden,
+            "medicos_ocultos": prefs.ocultos,
+            "updated_at": now_gt().isoformat()
+        }},
+        upsert=True
+    )
+    return {"orden": prefs.orden, "ocultos": prefs.ocultos}
+
 
 
 # ==================== WALK-IN (SIN CITA) ====================
