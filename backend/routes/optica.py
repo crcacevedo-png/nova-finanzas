@@ -213,6 +213,8 @@ class OpticaSaleCreateV2(BaseModel):
     """Modelo V2 para crear venta desde el POS de Óptica"""
     patient_id: Optional[str] = None
     patient_name: str = "Consumidor Final"
+    doctor_id: Optional[str] = None
+    doctor_name: Optional[str] = None
     items: List[SaleItemV2] = []
     subtotal: float = Field(ge=0)
     discount: float = Field(ge=0, default=0)
@@ -1168,7 +1170,8 @@ async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dic
         "order_number": order_number,
         "patient_id": sale_data.patient_id or "",
         "patient_name": patient_name,
-        "doctor_id": "",
+        "doctor_id": sale_data.doctor_id or "",
+        "doctor_name": sale_data.doctor_name or "",
         "frame_id": frame_id or "",
         "frame_price": frame_price,
         "contact_lens_id": contact_lens_id or "",

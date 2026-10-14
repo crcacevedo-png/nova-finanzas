@@ -11,12 +11,19 @@ import {
   FileText 
 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { formatCurrency } from '../../services/api';
 
 const POSCart = ({
   carrito,
   paciente,
   receta,
+  medico,
+  medicoSearch,
+  onMedicoSearchChange,
+  medicosResults = [],
+  onSeleccionarMedico,
+  onRemoverMedico,
   calcularSubtotal,
   calcularTotal,
   onModificarCantidad,
@@ -76,6 +83,50 @@ const POSCart = ({
             </Button>
           )}
         </div>
+
+        {/* Médico (obligatorio cuando hay paciente) - autollenable de la lista general */}
+        {paciente && (
+          <div className="mt-3" data-testid="pos-optica-medico-block">
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+              Médico <span className="text-red-500">*</span>
+            </label>
+            {medico ? (
+              <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'var(--bg-hover)' }}>
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }} data-testid="pos-optica-medico-seleccionado">
+                  {medico.name}
+                </span>
+                <Button variant="ghost" size="sm" onClick={onRemoverMedico} data-testid="pos-optica-medico-remover">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  value={medicoSearch}
+                  onChange={(e) => onMedicoSearchChange(e.target.value)}
+                  placeholder="Buscar médico..."
+                  className="h-9"
+                  data-testid="pos-optica-medico-input"
+                />
+                {medicosResults.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="pos-optica-medico-resultados">
+                    {medicosResults.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50"
+                        data-testid={`pos-optica-medico-opcion-${d.id}`}
+                        onClick={() => onSeleccionarMedico({ id: d.id, name: d.name })}
+                      >
+                        {d.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       {/* Items del carrito */}

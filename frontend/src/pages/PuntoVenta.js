@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { ventasApi, inventarioApi, formatCurrency, formatDate, formatTime } from '../services/api';
+import { ventasApi, inventarioApi, doctorApi, formatCurrency, formatDate, formatTime } from '../services/api';
 import axios from 'axios';
 import { 
   Search, 
@@ -103,6 +103,11 @@ const PuntoVenta = () => {
   const [searchingPacientes, setSearchingPacientes] = useState(false);
   const [pacienteDialogOpen, setPacienteDialogOpen] = useState(false);
   
+  // Médico (autollenable de la lista general de médicos)
+  const [medico, setMedico] = useState(null);
+  const [medicoSearch, setMedicoSearch] = useState('');
+  const [medicosResults, setMedicosResults] = useState([]);
+  
   // Pago
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
   const [metodoPagoActual, setMetodoPagoActual] = useState('Efectivo');
@@ -177,6 +182,23 @@ const PuntoVenta = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [pacienteSearch]);
+  
+  // Búsqueda de médicos con debounce (lista general de médicos)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (medicoSearch && medicoSearch.length >= 2 && !medico) {
+        try {
+          const res = await doctorApi.search(medicoSearch, 10);
+          setMedicosResults(res.data || []);
+        } catch (e) {
+          setMedicosResults([]);
+        }
+      } else {
+        setMedicosResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [medicoSearch, medico]);
 
   // ==================== API CALLS ====================
 
@@ -405,6 +427,9 @@ const PuntoVenta = () => {
   const limpiarCarrito = () => {
     setCarrito([]);
     setPaciente(null);
+    setMedico(null);
+    setMedicoSearch('');
+    setMedicosResults([]);
     setObservaciones('');
     setFormasPago([]);
     setMetodoPagoActual('Efectivo');
@@ -523,6 +548,12 @@ const PuntoVenta = () => {
       return;
     }
     
+    // Si hay paciente seleccionado, el médico es obligatorio
+    if (paciente && !medico) {
+      toast.error('Seleccione el médico para esta venta');
+      return;
+    }
+    
     setSubmitting(true);
     
     try {
@@ -544,6 +575,8 @@ const PuntoVenta = () => {
         paciente_id: paciente?.id || null,
         paciente_nombre: paciente?.nombre || paciente?.nombre_completo || 
           (paciente ? `${paciente.first_name} ${paciente.last_name}` : null),
+        medico_id: medico?.id || null,
+        medico_nombre: medico?.name || null,
         items: carrito.map(item => ({
           producto_id: item.producto_id,
           codigo: item.codigo,
@@ -1217,6 +1250,53 @@ const PuntoVenta = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Médico (obligatorio cuando hay paciente) - autollenable de la lista general */}
+            {paciente && (
+              <div className="p-3 border-b bg-slate-50" data-testid="pos-medico-block">
+                <label className="text-xs font-medium text-slate-500 mb-1 block">
+                  Médico <span className="text-red-500">*</span>
+                </label>
+                {medico ? (
+                  <div className="flex items-center justify-between bg-white border rounded-md px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700" data-testid="pos-medico-seleccionado">{medico.name}</span>
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-red-500"
+                      data-testid="pos-medico-remover"
+                      onClick={() => { setMedico(null); setMedicoSearch(''); setMedicosResults([]); }}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Input
+                      value={medicoSearch}
+                      onChange={(e) => setMedicoSearch(e.target.value)}
+                      placeholder="Buscar médico..."
+                      className="h-9"
+                      data-testid="pos-medico-input"
+                    />
+                    {medicosResults.length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="pos-medico-resultados">
+                        {medicosResults.map((d) => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50"
+                            data-testid={`pos-medico-opcion-${d.id}`}
+                            onClick={() => { setMedico({ id: d.id, name: d.name }); setMedicoSearch(''); setMedicosResults([]); }}
+                          >
+                            {d.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Items del carrito */}
             <div className="flex-1 overflow-y-auto p-3">

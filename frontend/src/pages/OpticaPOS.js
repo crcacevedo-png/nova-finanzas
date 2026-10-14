@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency } from '../services/api';
+import { formatCurrency, doctorApi } from '../services/api';
 import axios from 'axios';
 import { 
   Search, 
@@ -61,6 +61,9 @@ const OpticaPOS = () => {
   // Estado del carrito
   const [carrito, setCarrito] = useState([]);
   const [paciente, setPaciente] = useState(null);
+  const [medico, setMedico] = useState(null);
+  const [medicoSearch, setMedicoSearch] = useState('');
+  const [medicosResults, setMedicosResults] = useState([]);
   
   // Categoría activa
   const [categoriaActiva, setCategoriaActiva] = useState('armazones');
@@ -138,6 +141,23 @@ const OpticaPOS = () => {
     }, 300);
     return () => clearTimeout(delaySearch);
   }, [pacienteSearch]);
+
+  // Búsqueda de médicos con debounce (lista general de médicos)
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (medicoSearch && medicoSearch.length >= 2 && !medico) {
+        try {
+          const res = await doctorApi.search(medicoSearch, 10);
+          setMedicosResults(res.data || []);
+        } catch (e) {
+          setMedicosResults([]);
+        }
+      } else {
+        setMedicosResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [medicoSearch, medico]);
 
   // ==================== API CALLS ====================
 
@@ -276,6 +296,9 @@ const OpticaPOS = () => {
   const limpiarCarrito = () => {
     setCarrito([]);
     setPaciente(null);
+    setMedico(null);
+    setMedicoSearch('');
+    setMedicosResults([]);
     setFormasPago([]);
     setReceta({
       od_esfera: '', od_cilindro: '', od_eje: '', od_add: '',
@@ -373,6 +396,12 @@ const OpticaPOS = () => {
       return;
     }
     
+    // Si hay paciente seleccionado, el médico es obligatorio
+    if (paciente && !medico) {
+      toast.error('Seleccione el médico para esta venta');
+      return;
+    }
+    
     setSubmitting(true);
     
     try {
@@ -395,6 +424,8 @@ const OpticaPOS = () => {
       const ventaPayload = {
         patient_id: paciente?.id || null,
         patient_name: paciente ? `${paciente.primer_nombre} ${paciente.primer_apellido}` : 'Consumidor Final',
+        doctor_id: medico?.id || null,
+        doctor_name: medico?.name || null,
         items,
         subtotal: calcularSubtotal(),
         discount: 0,
@@ -444,6 +475,9 @@ const OpticaPOS = () => {
       // Limpiar estado
       setCarrito([]);
       setPaciente(null);
+      setMedico(null);
+      setMedicoSearch('');
+      setMedicosResults([]);
       setFormasPago([]);
       setObservaciones('');
       setReceta({
@@ -625,6 +659,12 @@ const OpticaPOS = () => {
           carrito={carrito}
           paciente={paciente}
           receta={receta}
+          medico={medico}
+          medicoSearch={medicoSearch}
+          onMedicoSearchChange={setMedicoSearch}
+          medicosResults={medicosResults}
+          onSeleccionarMedico={(m) => { setMedico(m); setMedicoSearch(''); setMedicosResults([]); }}
+          onRemoverMedico={() => { setMedico(null); setMedicoSearch(''); setMedicosResults([]); }}
           calcularSubtotal={calcularSubtotal}
           calcularTotal={calcularTotal}
           onModificarCantidad={modificarCantidad}

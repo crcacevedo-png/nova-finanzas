@@ -45,6 +45,8 @@ class VentaCreate(BaseModel):
     bodega_id: str
     paciente_id: Optional[str] = None
     paciente_nombre: Optional[str] = None
+    medico_id: Optional[str] = None
+    medico_nombre: Optional[str] = None
     items: List[VentaItem]
     formas_pago: List[FormaPago]
     observaciones: Optional[str] = None
@@ -60,6 +62,8 @@ class VentaResponse(BaseModel):
     bodega_nombre: Optional[str] = None
     paciente_id: Optional[str] = None
     paciente_nombre: Optional[str] = None
+    medico_id: Optional[str] = None
+    medico_nombre: Optional[str] = None
     items: List[dict]
     cantidad_items: int
     subtotal: float
@@ -710,6 +714,8 @@ async def crear_venta(
         "bodega_nombre": bodega.get("nombre"),
         "paciente_id": venta.paciente_id,
         "paciente_nombre": venta.paciente_nombre,
+        "medico_id": venta.medico_id,
+        "medico_nombre": venta.medico_nombre,
         "items": items_procesados,
         "cantidad_items": sum(item["cantidad"] for item in items_procesados),
         "subtotal": round(subtotal, 2),
