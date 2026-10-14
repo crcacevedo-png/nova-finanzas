@@ -683,3 +683,10 @@ Ver `/app/memory/test_credentials.md`
 - WebSocket puede no funcionar en entornos preview sin soporte WSS
 - Índices MongoDB envueltos en try/except para evitar `IndexSpecsConflict`
 - FEL debe mantenerse deshabilitado hasta implementación completa
+
+## Médico por defecto en POS (sugerencia por cita de hoy) — Implementado (2026-10-13)
+- Al seleccionar un paciente en el POS (Clínica y Óptica), si tiene una cita activa HOY (hora Guatemala), el campo "Médico" se autocompleta con el médico de esa cita y muestra un aviso.
+- Endpoint: `GET /api/agenda/cita-hoy-paciente/{paciente_id}` → `{medico: {id, name} | null}` (ignora canceladas, toma la más temprana por `hora_inicio`).
+- El médico sigue siendo editable/removible manualmente; la sugerencia no impide elegir otro.
+- Archivos: `backend/routes/agenda.py`, `frontend/src/services/agendaApi.js`, `frontend/src/pages/PuntoVenta.js`, `frontend/src/pages/OpticaPOS.js`.
+- Verificado por curl E2E (devuelve el médico de la cita de hoy; null si no hay cita).

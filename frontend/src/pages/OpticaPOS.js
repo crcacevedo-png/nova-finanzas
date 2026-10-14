@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, doctorApi } from '../services/api';
+import { agendaApi } from '../services/agendaApi';
 import axios from 'axios';
 import { 
   Search, 
@@ -373,6 +374,24 @@ const OpticaPOS = () => {
     setPacienteSearch('');
     setPacientesResults([]);
     toast.success(`Paciente: ${p.primer_nombre} ${p.primer_apellido}`);
+    sugerirMedicoPorCita(p.id);
+  };
+
+  // Sugerir automáticamente el médico si el paciente tiene una cita hoy
+  const sugerirMedicoPorCita = async (pacienteId) => {
+    if (!pacienteId) return;
+    try {
+      const res = await agendaApi.getCitaHoyPaciente(pacienteId);
+      const med = res.data?.medico;
+      if (med && med.id) {
+        setMedico({ id: med.id, name: med.name });
+        setMedicoSearch('');
+        setMedicosResults([]);
+        toast.success(`Médico sugerido por cita de hoy: ${med.name}`);
+      }
+    } catch (e) {
+      // Silencioso: la sugerencia es opcional
+    }
   };
 
   // ==================== PROCESAR VENTA ====================

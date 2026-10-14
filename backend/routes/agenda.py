@@ -337,6 +337,29 @@ async def listar_citas_rango(
     return CitaListResponse(data=citas, total=len(citas))
 
 
+@router.get("/cita-hoy-paciente/{paciente_id}")
+async def cita_hoy_paciente(
+    paciente_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Devuelve el médico de la cita activa de HOY (hora Guatemala) para un paciente.
+    Se usa en el POS para sugerir automáticamente el médico. Si no hay cita, devuelve null."""
+    cita = await db.citas.find_one(
+        {
+            "tipo_agenda": "pacientes",
+            "paciente_id": paciente_id,
+            "fecha": today_str_gt(),
+            "estado": {"$ne": EstadoCita.CANCELADA.value},
+            "medico_id": {"$nin": [None, ""]},
+        },
+        {"_id": 0, "medico_id": 1, "medico_nombre": 1, "hora_inicio": 1},
+        sort=[("hora_inicio", 1)],
+    )
+    if not cita:
+        return {"medico": None}
+    return {"medico": {"id": cita.get("medico_id"), "name": cita.get("medico_nombre")}}
+
+
 @router.get("/citas/{cita_id}", response_model=CitaResponse)
 async def obtener_cita(
     cita_id: str,
