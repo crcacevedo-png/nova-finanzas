@@ -6,6 +6,12 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
 
+### Agenda: elegir y ordenar médicos visibles (2026-10 Sesión 32)
+- ✅ Panel "Organizar médicos" (botón "Médicos") en la vista Día: lista arrastrable para **reordenar** columnas y un **ojo** para mostrar/ocultar cada médico (no es obligatorio verlos todos), más "Restablecer" y badge visibles/total.
+- ✅ Preferencia guardada **en la cuenta** (servidor, por usuario): `GET/PUT /api/agenda/preferencias-medicos` (colección `user_preferences`: `medicos_orden`, `medicos_ocultos`).
+- ✅ Aplica a **vista Día** (columnas via `medicosVisibles`) y **Tablero del Día** ("Citas del día" y "Pacientes Presentes" filtran ocultos y ordenan por preferencia). El filtro "Médico" del toolbar sigue listando todos.
+- ✅ **Verificado**: `iteration_71.json` 100% backend + frontend (ocultar quita columna, reordenar persiste tras recargar, Restablecer).
+
 ### Agenda Multi-día del Médico + Auditoría de expedientes (2026-10 Sesión 32)
 - ✅ **Mi Agenda navegable por día**: barra con Anterior/Hoy/Siguiente (data-testid `mi-agenda-prev/hoy/next`) que cambia la fecha de trabajo (hora Guatemala).
 - ✅ **Vista Semana propia** (`mi-agenda-semana`): toggle Día/Semana; grid de 7 días (Lun-Dom) con las citas activas del médico agrupadas por día; Anterior/Siguiente saltan de semana en semana; click en cita abre el paciente; click en cabecera de día abre esa fecha en vista Día.

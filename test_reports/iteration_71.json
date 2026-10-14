@@ -1,0 +1,23 @@
+{
+  "summary": "Tested per-user doctor ordering/visibility preferences for Agenda (NovaVisión ERP). Backend: 6/6 pytest cases pass on /api/agenda/preferencias-medicos (default empty, PUT/GET persistence, per-user isolation vs medico_test, reset, 401 unauthorized, cleanup). Frontend (superadmin login): on Calendario>Día the 'Médicos' button opens the panel with 5 rows (organizar-medico-row-{id}), each with a visibility toggle and a Restablecer button. Hiding Dr. Carlos Méndez removes his column immediately and the badge shows '4/5'; after full page reload the preference persists (still 4/5). Reset clears preference and all 5 columns return. Tablero del Día: hidden doctor id does not appear in rendered HTML of the Tablero (no citas today to visually confirm, verified by code path and DOM scan). Preference for superadmin left RESTABLECIDA (orden:[], ocultos:[]) at end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_preferencias_medicos.py",
+    "/app/test_reports/pytest/preferencias_medicos.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Agenda.js is now very large (>1500 lines) - consider extracting the 'Organizar médicos' popover + preferencias logic into its own component/hook for maintainability.",
+    "Drag-and-drop reorder was not fully exercised via Playwright (HTML5 DnD is unreliable in headless); code review confirms it calls guardarPreferenciasMedicos with the reordered id list, which is covered by the backend persistence test. Consider adding keyboard-accessible up/down buttons for a11y."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_preferencias_medicos.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin/nova2024, medico_test/medico2024",
+  "seed_data_creation": "None. Only temporary preferences written via PUT; superadmin preference cleaned up at test end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Preferencias de médicos endpoint at /api/agenda/preferencias-medicos verified. Collection db.user_preferences keyed por user_id with fields medicos_orden/medicos_ocultos. Reorder via drag not asserted in UI (HTML5 DnD limitations) but backend path is covered. Superadmin's preference is reset to {orden:[],ocultos:[]}."
+}
