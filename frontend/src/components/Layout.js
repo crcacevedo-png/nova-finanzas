@@ -108,8 +108,12 @@ const Layout = ({ children }) => {
 
   // Función helper para verificar si un menú está habilitado
   const isMenuEnabled = (menuId) => {
-    // SuperAdmin o si no se han cargado los menús, mostrar todo
-    if (isSuperAdmin || enabledMenuIds === null) return true;
+    // SuperAdmin siempre ve todo
+    if (isSuperAdmin) return true;
+    // Mientras cargan los menús del usuario, no mostrar nada (evita destello de menús no autorizados)
+    if (!menusLoaded) return false;
+    // Si hubo error al cargar, usar fallback: mostrar todo
+    if (enabledMenuIds === null) return true;
     return enabledMenuIds.includes(menuId);
   };
 
