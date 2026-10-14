@@ -6,6 +6,12 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
 
+### POS: Médico obligatorio y autollenable tras seleccionar paciente (2026-10 Sesión 32)
+- ✅ En el POS de Clínica (`PuntoVenta.js`) y de Óptica (`OpticaPOS.js`/`POSCart.js`): al seleccionar un paciente aparece el campo "Médico *" con autocompletado desde la lista general de médicos (`GET /api/doctors/search?q=`).
+- ✅ Obligatorio solo cuando hay paciente: bloquea el cobro con "Seleccione el médico para esta venta" si falta. Con Cliente/Consumidor General no se exige.
+- ✅ Persistencia: `ventas` guarda `medico_id/medico_nombre` (VentaCreate/VentaResponse); `optica_sales` guarda `doctor_id/doctor_name` (OpticaSaleCreateV2). 
+- ✅ **Verificado**: `iteration_72.json` 100% backend + frontend.
+
 ### Agenda: elegir y ordenar médicos visibles (2026-10 Sesión 32)
 - ✅ Panel "Organizar médicos" (botón "Médicos") en la vista Día: lista arrastrable para **reordenar** columnas y un **ojo** para mostrar/ocultar cada médico (no es obligatorio verlos todos), más "Restablecer" y badge visibles/total.
 - ✅ Preferencia guardada **en la cuenta** (servidor, por usuario): `GET/PUT /api/agenda/preferencias-medicos` (colección `user_preferences`: `medicos_orden`, `medicos_ocultos`).
