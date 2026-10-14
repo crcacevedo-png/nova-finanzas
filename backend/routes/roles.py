@@ -14,7 +14,7 @@ from .auth import get_current_user, require_permission
 router = APIRouter(prefix="/roles", tags=["Roles"])
 
 # Roles del sistema que no pueden eliminarse
-SYSTEM_ROLES = ["superadmin", "admin", "usuario", "optica"]
+SYSTEM_ROLES = ["superadmin", "admin", "usuario", "optica", "medico"]
 
 # Lista de todos los permisos disponibles organizados por categoría
 AVAILABLE_PERMISSIONS = {
@@ -50,6 +50,15 @@ AVAILABLE_PERMISSIONS = {
             {"id": "delete_patients", "label": "Eliminar Pacientes", "description": "Eliminar registros de pacientes"},
             {"id": "import_patients", "label": "Importar Pacientes", "description": "Importación masiva de pacientes"},
             {"id": "export_patients", "label": "Exportar Pacientes", "description": "Exportar datos de pacientes"},
+        ]
+    },
+    "clinica": {
+        "label": "Clínica",
+        "permissions": [
+            {"id": "view_agenda", "label": "Agenda", "description": "Ver y gestionar la agenda de citas"},
+            {"id": "view_evaluacion", "label": "Evaluación Oftalmológica", "description": "Ver y editar la evaluación oftalmológica"},
+            {"id": "manage_recetas", "label": "Recetas", "description": "Emitir recetas médicas y de lentes en la evaluación"},
+            {"id": "view_sala_operaciones", "label": "Sala de Operaciones", "description": "Ver y editar el registro de sala de operaciones"},
         ]
     },
     "administracion": {
@@ -173,14 +182,16 @@ async def get_all_roles(
             "superadmin": "Super Administrador",
             "admin": "Administrador", 
             "usuario": "Usuario",
-            "optica": "Óptica"
+            "optica": "Óptica",
+            "medico": "Médico"
         }
         
         colors = {
             "superadmin": "red",
             "admin": "blue",
             "usuario": "gray",
-            "optica": "purple"
+            "optica": "purple",
+            "medico": "teal"
         }
         
         roles.append({
@@ -233,7 +244,8 @@ async def get_role(
             "superadmin": "Super Administrador",
             "admin": "Administrador",
             "usuario": "Usuario", 
-            "optica": "Óptica"
+            "optica": "Óptica",
+            "medico": "Médico"
         }
         
         return {

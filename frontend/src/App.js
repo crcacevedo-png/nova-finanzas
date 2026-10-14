@@ -298,7 +298,7 @@ function AppRoutes() {
       <Route 
         path="/sala-operaciones" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="view_sala_operaciones">
             <SalaOperaciones />
           </ProtectedRoute>
         } 
@@ -318,7 +318,7 @@ function AppRoutes() {
       <Route 
         path="/evaluacion-oftalmologica" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="view_evaluacion">
             <EvaluacionOftalmologica />
           </ProtectedRoute>
         } 
@@ -348,7 +348,7 @@ function AppRoutes() {
       <Route 
         path="/agenda" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="view_agenda">
             <Agenda />
           </ProtectedRoute>
         } 

@@ -235,7 +235,7 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
 // ==================== COMPONENTE PRINCIPAL ====================
 const Agenda = () => {
   const { user, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState('calendario');
+  const [activeTab, setActiveTab] = useState(user?.role === 'medico' ? 'mi-agenda' : 'calendario');
   const [loading, setLoading] = useState(true);
   const [gcalOpen, setGcalOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -300,6 +300,7 @@ const Agenda = () => {
   const [contadores, setContadores] = useState(null);
   const [presentes, setPresentes] = useState({ por_medico: [], total_presentes: 0 });
   const [miAgenda, setMiAgenda] = useState(null);
+  const [miAgendaError, setMiAgendaError] = useState(null);
   const [config, setConfig] = useState(null);
   
   // Filtros
@@ -406,8 +407,14 @@ const Agenda = () => {
     try {
       const response = await agendaApi.getMiDia(fechaSeleccionada);
       setMiAgenda(response.data);
+      setMiAgendaError(null);
     } catch (error) {
-      console.error('Error fetching mi agenda:', error);
+      setMiAgenda(null);
+      if (error.response?.status === 403) {
+        setMiAgendaError('Tu cuenta de médico aún no está vinculada a una ficha de médico. Pide al administrador que la asigne en Gestión de Usuarios.');
+      } else {
+        setMiAgendaError('No se pudo cargar tu agenda. Intenta de nuevo.');
+      }
     }
   }, [fechaSeleccionada]);
   
@@ -1487,9 +1494,8 @@ const Agenda = () => {
                 <CardContent className="p-8 text-center">
                   <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Usuario no vinculado a médico</h3>
-                  <p className="text-gray-500">
-                    Tu usuario no está vinculado a un médico. 
-                    Contacta al administrador para configurar tu perfil.
+                  <p className="text-gray-500" data-testid="mi-agenda-sin-vinculo">
+                    {miAgendaError || 'Tu usuario no está vinculado a un médico. Contacta al administrador para configurar tu perfil.'}
                   </p>
                 </CardContent>
               </Card>

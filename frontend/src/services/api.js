@@ -493,6 +493,7 @@ export const roleLabels = {
   admin: 'Administrador',
   usuario: 'Usuario',
   optica: 'Óptica',
+  medico: 'Médico',
   administrador_igss: 'Administrador IGSS',
 };
 

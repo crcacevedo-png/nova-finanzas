@@ -1,54 +1,86 @@
-# Agenda: eliminar citas que de verdad desaparezcan + reagendar arrastrando
+# Acceso clínico configurable para el rol Médico
 
-Corrige dos cosas en la Agenda de Pacientes: que al eliminar una cita esta deje de aparecer en la pantalla, y que se pueda reagendar una cita arrastrándola a otro horario.
+Permite que una cuenta de médico entre al sistema y trabaje su día: ver sus propias citas, atender pacientes y dejar registrada la consulta.
+Además, deja que el administrador controle, desde una sola pantalla, qué puede y qué no puede hacer el médico (y cualquier otro rol).
 
 ## Para quién es
-Personal de la clínica NovaVisión (recepción, médicos, administración) que gestiona las citas del día y de la semana.
+Clínica NovaVisión en Guatemala: los médicos que atienden consulta y cirugía, y el administrador que gestiona los usuarios y decide qué ve cada rol.
 
 ## Qué se corrige y cómo se verá
 
-### 1. Eliminar una cita
-Hoy, al eliminar una cita desde la vista de calendario, la cita se queda visible como si nada hubiera pasado. Se corrige así:
-- Al eliminar una cita, el sistema pide una confirmación corta ("¿Eliminar esta cita?").
-- Al confirmar, la cita se marca como **Cancelada** y desaparece de inmediato de todas las vistas activas de la agenda: calendario por día, por semana, por mes y el tablero del día.
-- La cita no se borra de la base de datos: queda guardada como cancelada (para historial), pero ya no estorba en la agenda ni se cuenta como cita activa.
-- Los contadores del día (Agendados, Confirmados, etc.) dejan de incluir las citas canceladas.
+Hoy la cuenta de médico solo puede entrar a "Pacientes". Con este cambio, el administrador podrá
+otorgarle (y quitarle) accesos clínicos, y el rol "médico" quedará listo para trabajar.
 
-### 2. Reagendar arrastrando (click & drop)
-Permite mover una cita a otro horario sin abrir ningún formulario:
-- Funciona en la **vista de Día** (arrastrar entre franjas horarias del mismo día y entre médicos) y en la **vista de Semana** (arrastrar entre días y franjas horarias).
-- Al soltar la cita en el nuevo espacio, se reagenda **de inmediato**, sin ventana de confirmación. Aparece un aviso breve de éxito con la opción **Deshacer** por si fue un error.
-- Si el nuevo horario ya está ocupado por otra cita del mismo médico, el sistema **bloquea el movimiento**: la cita vuelve a su lugar y se muestra un mensaje claro ("Ese horario ya está ocupado para este médico").
+### 1. Permisos clínicos que se podrán activar/desactivar por rol
+En la pantalla de Roles aparecerá una nueva sección "Clínica" con interruptores para:
+- **Agenda** (ver y gestionar citas).
+- **Evaluación Oftalmológica** (ver y editar la evaluación del paciente).
+- **Recetas** (médicas y de lentes) dentro de la evaluación.
+- **Sala de Operaciones** (ver y editar la evaluación/registro quirúrgico).
+- **Pacientes**: crear y editar (sin eliminar).
 
-La apariencia general de la agenda no cambia; solo mejora el comportamiento de eliminar y de arrastrar.
+El administrador podrá combinarlos libremente para el rol médico o para cualquier rol que cree.
+
+### 2. El rol "Médico" queda listo de una vez
+El rol médico quedará configurado con todos estos accesos activados: su Agenda del día,
+edición de pacientes (sin borrarlos), evaluaciones oftalmológicas, sala de operaciones y recetas.
+El administrador podrá seguir ajustándolo cuando quiera.
+
+### 3. La Agenda del médico muestra solo lo suyo
+Cuando entra un médico, la Agenda abre en "su agenda del día": verá únicamente las citas
+asignadas a él, no las de toda la clínica.
+
+### 4. Cada cuenta de médico se liga a su ficha de médico
+En Gestión de Usuarios, al crear o editar una cuenta de médico, se podrá elegir a qué médico
+(ficha/doctor del sistema) corresponde esa cuenta. Ese vínculo es lo que permite mostrarle
+"sus propias citas". Si una cuenta de médico aún no tiene médico asignado, la Agenda se lo
+indicará con un mensaje claro en lugar de mostrar algo incorrecto.
 
 ## Flujo de uso
-1. El usuario abre la Agenda en la vista de Día o Semana.
-2. Para eliminar: abre el menú de la cita, elige Eliminar, confirma, y la cita desaparece de la vista.
-3. Para reagendar: toma la cita con el cursor y la suelta en la nueva franja/día.
-4. Si el horario está libre, la cita se mueve al instante (con opción de deshacer). Si está ocupado, no se mueve y se avisa.
 
-## Sensación / UI
-Sin rediseño. Movimientos fluidos al arrastrar, mensajes claros de éxito/bloqueo, y una agenda que refleja de inmediato lo que el usuario hizo.
+**Administrador**
+1. Entra a Gestión de Usuarios → Roles y ve la nueva sección "Clínica" con los interruptores.
+2. El rol médico ya viene con los accesos activados; puede dejarlos así o ajustarlos.
+3. En Usuarios, al crear/editar una cuenta de médico, elige la ficha de médico que le corresponde.
+
+**Médico**
+1. Inicia sesión y en el menú ve: Pacientes, Agenda, Evaluación Oftalmológica y Sala de Operaciones.
+2. Abre la Agenda y ve solo sus citas del día.
+3. Abre un paciente, lo edita si hace falta, registra la evaluación oftalmológica o de sala de
+   operaciones y emite recetas médicas o de lentes.
+4. No puede eliminar pacientes ni entrar a las áreas que el administrador no le haya activado.
+
+## UI/UX feel
+Sin rediseño. Se reutiliza la pantalla actual de Roles (se añade la sección "Clínica") y la de
+Usuarios (se añade el selector de médico). Mensajes claros cuando falte un acceso o el vínculo
+con la ficha de médico. El médico ve un menú corto y enfocado en lo clínico.
 
 ## Fases de implementación
 
-**Fase 1 (MVP, se construye ahora):**
-- Eliminar una cita: confirmación, marcado como Cancelada, y desaparición inmediata de todas las vistas de la agenda y de los contadores.
-- Reagendar arrastrando en vista de Día y de Semana, con movimiento inmediato, opción de deshacer y bloqueo cuando el horario del médico ya está ocupado.
+**Fase 1 (lo que se construye ahora):**
+- Nuevos permisos clínicos activables por rol: Agenda, Evaluación Oftalmológica, Recetas,
+  Sala de Operaciones y edición de Pacientes (sin eliminar).
+- El rol "médico" queda configurado con todos esos accesos y con su menú clínico visible.
+- Agenda del médico filtrada a sus propias citas del día.
+- Selector de "médico asignado" en la cuenta de usuario, con aviso cuando no esté asignado.
 
 **Fase 2 (después):**
-- Reagendar arrastrando también en la vista de Mes (mover una cita de un día a otro).
-- Un filtro/interruptor para ver las citas canceladas cuando se necesite revisarlas.
+- Que el médico pueda ver sus citas de días anteriores/siguientes (no solo el día actual) y un
+  resumen semanal propio.
+- Permisos clínicos más finos (por ejemplo, ver evaluación sin poder editarla).
 
 **Fase 3 (futuro):**
-- Registro de historial de reagendamientos y cancelaciones (quién, cuándo y motivo).
-- Aviso automático al paciente cuando su cita se reagenda o cancela.
+- Que cada médico vea únicamente los expedientes de sus propios pacientes.
+- Firma del médico en recetas y registro de quién editó cada evaluación.
 
 ## Supuestos
-- "Eliminar" significa marcar la cita como Cancelada (no borrado permanente), según lo confirmado.
-- Las citas canceladas se ocultan de todas las vistas activas de la agenda; se podrán revisar más adelante mediante el filtro de la Fase 2.
-- Se pide confirmación antes de eliminar (para evitar cancelaciones accidentales), pero NO se pide confirmación al reagendar arrastrando (se mueve de inmediato con opción de deshacer), según lo confirmado.
-- El bloqueo por choque de horario considera ocupado un espacio cuando el mismo médico ya tiene otra cita activa a esa misma hora de inicio ese día.
-- Las citas ya marcadas como Atendida o No asistió siguen mostrándose como hasta ahora; solo cambia el manejo de las canceladas.
-- No se modifican datos históricos existentes.
+- "Eliminar" el acceso del médico a pacientes queda fuera: el médico crea y edita, pero no borra
+  expedientes.
+- "Agenda del día" = solo las citas del propio médico, del día en curso (hora de Guatemala).
+- Las recetas médicas y de lentes forman parte de la Evaluación Oftalmológica (se emiten desde ahí).
+- Cada cuenta de médico se vincula a una ficha de médico existente mediante un selector en
+  Gestión de Usuarios; si no está vinculada, la Agenda lo avisa en lugar de fallar.
+- El rol médico se deja preconfigurado con los accesos solicitados, pero todo sigue siendo editable
+  por el administrador desde la pantalla de Roles.
+- Estos nuevos permisos quedan disponibles para cualquier rol, no solo para el médico.
+- No se modifican los accesos de los roles existentes (superadmin, administrador, usuario, óptica).

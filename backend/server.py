@@ -348,7 +348,12 @@ PERMISSIONS = {
         "manage_doctors": True,
         "manage_lens_catalog": True,
         # Permisos de Auditoría (Solo SuperAdmin)
-        "view_audit_logs": True
+        "view_audit_logs": True,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": True,
+        "view_sala_operaciones": True
     },
     "admin": {
         "view_dashboard": True,
@@ -383,7 +388,12 @@ PERMISSIONS = {
         "manage_doctors": False,
         "manage_lens_catalog": False,
         # Sin acceso a Auditoría
-        "view_audit_logs": False
+        "view_audit_logs": False,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": True,
+        "view_sala_operaciones": True
     },
     "usuario": {
         "view_dashboard": True,
@@ -418,7 +428,12 @@ PERMISSIONS = {
         "manage_doctors": False,
         "manage_lens_catalog": False,
         # Sin acceso a Auditoría
-        "view_audit_logs": False
+        "view_audit_logs": False,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": False,
+        "view_sala_operaciones": False
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
@@ -459,7 +474,52 @@ PERMISSIONS = {
         "manage_doctors": True,
         "manage_lens_catalog": True,
         # Sin acceso a Auditoría
-        "view_audit_logs": False
+        "view_audit_logs": False,
+        # Permisos clínicos
+        "view_agenda": False,
+        "view_evaluacion": False,
+        "manage_recetas": False,
+        "view_sala_operaciones": False
+    },
+    "medico": {
+        "view_dashboard": False,
+        "view_expenses": False,
+        "view_payment_history": False,
+        "view_due_payments": False,
+        "create_expenses": False,
+        "edit_expenses": False,
+        "delete_expenses": False,
+        "register_payments": False,
+        "delete_payments": False,
+        "manage_users": False,
+        "view_user_management": False,
+        "export_reports": False,
+        "authorize_payments": False,
+        "view_payment_authorizations": False,
+        "execute_payment_authorizations": False,
+        # Permisos de Pacientes (crear y editar, sin eliminar)
+        "view_patients": True,
+        "create_patients": True,
+        "edit_patients": True,
+        "delete_patients": False,
+        "manage_igss_units": False,
+        "import_patients": False,
+        "export_patients": False,
+        # Sin acceso a Óptica
+        "view_optica": False,
+        "manage_optica_inventory": False,
+        "manage_optica_sales": False,
+        "manage_optica_expenses": False,
+        "view_optica_reports": False,
+        "manage_doctors": False,
+        "manage_lens_catalog": False,
+        # Sin acceso a Auditoría
+        "view_audit_logs": False,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": True,
+        "view_sala_operaciones": True
     }
 }
 
@@ -499,7 +559,7 @@ async def resolve_permissions(role: str) -> dict:
 
 async def validar_rol_existe(role: str) -> bool:
     """RBAC: valida que un rol sea de sistema o exista como rol personalizado en db.roles."""
-    if role in ["superadmin", "admin", "usuario", "optica"]:
+    if role in ["superadmin", "admin", "usuario", "optica", "medico"]:
         return True
     return await db.roles.find_one({"name": role}) is not None
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { userApi, menuConfigApi, rolesApi, roleLabels, formatDate } from '../services/api';
+import { agendaApi } from '../services/agendaApi';
 import { 
   Plus, 
   Trash2,
@@ -67,7 +68,8 @@ const initialFormState = {
   username: '',
   name: '',
   password: '',
-  role: 'usuario'
+  role: 'usuario',
+  medico_ficha_id: ''
 };
 
 const roleColors = {
@@ -110,6 +112,7 @@ const Usuarios = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState(initialFormState);
+  const [medicosFichas, setMedicosFichas] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -205,6 +208,9 @@ const Usuarios = () => {
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    agendaApi.getMedicosAgenda()
+      .then((r) => setMedicosFichas((r.data?.data) || r.data || []))
+      .catch(() => setMedicosFichas([]));
   }, [fetchRoles]);
 
   useEffect(() => {
@@ -478,6 +484,7 @@ const Usuarios = () => {
 
     try {
       setIsSubmitting(true);
+      let targetUserId = editingUser?.id;
       if (editingUser) {
         const updateData = {
           name: formData.name,
@@ -489,8 +496,20 @@ const Usuarios = () => {
         await userApi.update(editingUser.id, updateData);
         toast.success('Usuario actualizado correctamente');
       } else {
-        await userApi.create(formData);
+        const res = await userApi.create(formData);
+        targetUserId = res.data?.id;
         toast.success('Usuario creado correctamente');
+      }
+      // Vincular/actualizar la ficha de médico asignada a la cuenta
+      if (formData.role === 'medico' && formData.medico_ficha_id && targetUserId) {
+        try {
+          await agendaApi.updateMedicoAgenda(formData.medico_ficha_id, { usuario_id: targetUserId });
+          // Refrescar fichas para reflejar el vínculo
+          const r = await agendaApi.getMedicosAgenda();
+          setMedicosFichas((r.data?.data) || r.data || []);
+        } catch (e) {
+          toast.error('Usuario guardado, pero no se pudo vincular la ficha de médico');
+        }
       }
       setIsDialogOpen(false);
       setFormData(initialFormState);
@@ -507,11 +526,13 @@ const Usuarios = () => {
 
   const handleEdit = (user) => {
     setEditingUser(user);
+    const fichaAsignada = medicosFichas.find((m) => m.usuario_id === user.id);
     setFormData({
       username: user.username,
       name: user.name,
       password: '',
-      role: user.role
+      role: user.role,
+      medico_ficha_id: fichaAsignada ? fichaAsignada.id : ''
     });
     setIsDialogOpen(true);
   };
@@ -1041,6 +1062,27 @@ const Usuarios = () => {
                   </SelectContent>
                 </Select>
               </div>
+              {formData.role === 'medico' && (
+                <div className="space-y-2">
+                  <Label htmlFor="medico_ficha">Médico asignado (ficha)</Label>
+                  <Select
+                    value={formData.medico_ficha_id || ''}
+                    onValueChange={(value) => handleInputChange('medico_ficha_id', value)}
+                  >
+                    <SelectTrigger data-testid="select-medico-ficha">
+                      <SelectValue placeholder="Selecciona la ficha de médico" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {medicosFichas.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Vincula esta cuenta con su ficha de médico para que la Agenda muestre solo sus citas.
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button

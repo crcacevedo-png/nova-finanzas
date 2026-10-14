@@ -36,7 +36,12 @@ PERMISSIONS = {
         "manage_optica_expenses": True,
         "view_optica_reports": True,
         "manage_doctors": True,
-        "manage_lens_catalog": True
+        "manage_lens_catalog": True,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": True,
+        "view_sala_operaciones": True
     },
     "admin": {
         "view_dashboard": True,
@@ -69,7 +74,12 @@ PERMISSIONS = {
         "manage_optica_expenses": False,
         "view_optica_reports": False,
         "manage_doctors": False,
-        "manage_lens_catalog": False
+        "manage_lens_catalog": False,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": True,
+        "view_sala_operaciones": True
     },
     "usuario": {
         "view_dashboard": True,
@@ -102,7 +112,12 @@ PERMISSIONS = {
         "manage_optica_expenses": False,
         "view_optica_reports": False,
         "manage_doctors": False,
-        "manage_lens_catalog": False
+        "manage_lens_catalog": False,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": False,
+        "view_sala_operaciones": False
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
@@ -142,6 +157,43 @@ PERMISSIONS = {
         "view_optica_reports": True,
         "manage_doctors": True,
         "manage_lens_catalog": True
+    },
+    "medico": {
+        "view_dashboard": False,
+        "view_expenses": False,
+        "view_payment_history": False,
+        "view_due_payments": False,
+        "create_expenses": False,
+        "edit_expenses": False,
+        "delete_expenses": False,
+        "register_payments": False,
+        "delete_payments": False,
+        "manage_users": False,
+        "view_user_management": False,
+        "export_reports": False,
+        "authorize_payments": False,
+        "view_payment_authorizations": False,
+        # Permisos de Pacientes (crear y editar, sin eliminar)
+        "view_patients": True,
+        "create_patients": True,
+        "edit_patients": True,
+        "delete_patients": False,
+        "manage_igss_units": False,
+        "import_patients": False,
+        "export_patients": False,
+        # Sin acceso a Óptica
+        "view_optica": False,
+        "manage_optica_inventory": False,
+        "manage_optica_sales": False,
+        "manage_optica_expenses": False,
+        "view_optica_reports": False,
+        "manage_doctors": False,
+        "manage_lens_catalog": False,
+        # Permisos clínicos
+        "view_agenda": True,
+        "view_evaluacion": True,
+        "manage_recetas": True,
+        "view_sala_operaciones": True
     }
 }
 

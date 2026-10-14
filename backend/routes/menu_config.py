@@ -12,7 +12,7 @@ router = APIRouter(prefix="/menu-config", tags=["Menu Configuration"])
 
 # Roles de sistema para la configuración de menús.
 # Los roles personalizados (p. ej. "administrador_igss") se leen dinámicamente de db.roles.
-SYSTEM_ROLES_MENU = ["superadmin", "admin", "usuario", "optica"]
+SYSTEM_ROLES_MENU = ["superadmin", "admin", "usuario", "optica", "medico"]
 
 
 async def _get_configurable_roles():
@@ -356,6 +356,9 @@ DEFAULT_MENU_CONFIG = {
     ],
     "administrador_igss": [
         "pacientes", "unidades_igss"
+    ],
+    "medico": [
+        "pacientes", "agenda", "evaluacion_oftalmologica", "sala_operaciones"
     ]
 }
 
