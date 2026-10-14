@@ -301,6 +301,8 @@ const Agenda = () => {
   const [presentes, setPresentes] = useState({ por_medico: [], total_presentes: 0 });
   const [miAgenda, setMiAgenda] = useState(null);
   const [miAgendaError, setMiAgendaError] = useState(null);
+  const [miAgendaVista, setMiAgendaVista] = useState('dia');
+  const [miSemana, setMiSemana] = useState(null);
   const [config, setConfig] = useState(null);
   
   // Filtros
@@ -418,6 +420,23 @@ const Agenda = () => {
     }
   }, [fechaSeleccionada]);
   
+  const fetchMiSemana = useCallback(async () => {
+    try {
+      const sw = startOfWeek(fechaSeleccionada);
+      const desde = toISODate(sw);
+      const hasta = toISODate(addDays(sw, 6));
+      const response = await agendaApi.getMiSemana(desde, hasta);
+      setMiSemana(response.data);
+      setMiAgendaError(null);
+    } catch (error) {
+      setMiSemana(null);
+      if (error.response?.status === 403) {
+        setMiAgendaError('Tu cuenta de médico aún no está vinculada a una ficha de médico. Pide al administrador que la asigne en Gestión de Usuarios.');
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fechaSeleccionada]);
+  
   const fetchConfig = useCallback(async () => {
     try {
       const response = await agendaApi.getConfig();
@@ -438,9 +457,17 @@ const Agenda = () => {
     ]);
     if (activeTab === 'mi-agenda') {
       await fetchMiAgenda();
+      if (miAgendaVista === 'semana') await fetchMiSemana();
     }
     setLoading(false);
-  }, [fetchMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, activeTab]);
+  }, [fetchMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, fetchMiSemana, miAgendaVista, activeTab]);
+  
+  // Recargar semana del médico al cambiar de fecha o entrar a vista semana
+  useEffect(() => {
+    if (activeTab === 'mi-agenda' && miAgendaVista === 'semana') {
+      fetchMiSemana();
+    }
+  }, [activeTab, miAgendaVista, fechaSeleccionada, fetchMiSemana]);
   
   // Cargar citas del rango visible en vista semana/mes
   useEffect(() => {
@@ -1406,7 +1433,97 @@ const Agenda = () => {
           
           {/* ==================== TAB: MI AGENDA ==================== */}
           <TabsContent value="mi-agenda" className="mt-4">
-            {miAgenda ? (
+            {/* Barra: navegación por día + selector Día/Semana */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" data-testid="mi-agenda-prev"
+                  onClick={() => setFechaSeleccionada(toISODate(addDays(parseISO(fechaSeleccionada), miAgendaVista === 'semana' ? -7 : -1)))}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" data-testid="mi-agenda-hoy"
+                  onClick={() => setFechaSeleccionada(getGuatemalaDate())}>Hoy</Button>
+                <Button variant="outline" size="sm" data-testid="mi-agenda-next"
+                  onClick={() => setFechaSeleccionada(toISODate(addDays(parseISO(fechaSeleccionada), miAgendaVista === 'semana' ? 7 : 1)))}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <span className="ml-2 text-sm font-medium capitalize text-gray-700">{formatDate(fechaSeleccionada)}</span>
+              </div>
+              <div className="inline-flex rounded-lg border p-0.5 bg-gray-50">
+                <button type="button" data-testid="mi-agenda-vista-dia" onClick={() => setMiAgendaVista('dia')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${miAgendaVista === 'dia' ? 'bg-white shadow font-medium text-blue-700' : 'text-gray-500'}`}>Día</button>
+                <button type="button" data-testid="mi-agenda-vista-semana" onClick={() => setMiAgendaVista('semana')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${miAgendaVista === 'semana' ? 'bg-white shadow font-medium text-blue-700' : 'text-gray-500'}`}>Semana</button>
+              </div>
+            </div>
+
+            {miAgendaVista === 'semana' ? (
+              miSemana ? (
+                <div data-testid="mi-agenda-semana">
+                  <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white mb-4">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-bold">{miSemana.medico_nombre}</h2>
+                        <p className="text-blue-100">Mi semana: {formatDate(miSemana.desde)} al {formatDate(miSemana.hasta)}</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-3xl font-bold">{miSemana.total}</div>
+                        <div className="text-xs text-blue-100">Citas</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const dia = addDays(startOfWeek(fechaSeleccionada), i);
+                      const diaISO = toISODate(dia);
+                      const esHoy = diaISO === getGuatemalaDate();
+                      const citasDia = (miSemana.citas || []).filter(c => c.fecha === diaISO)
+                        .sort((a, b) => (a.hora_inicio || '').localeCompare(b.hora_inicio || ''));
+                      return (
+                        <Card key={diaISO} className={`flex flex-col ${esHoy ? 'ring-2 ring-blue-400' : ''}`}>
+                          <CardHeader className="py-2 px-3 bg-gray-50">
+                            <button type="button" className="text-left w-full"
+                              onClick={() => { setFechaSeleccionada(diaISO); setMiAgendaVista('dia'); }}
+                              data-testid={`mi-semana-dia-${diaISO}`}>
+                              <div className="text-xs font-semibold capitalize">
+                                {dia.toLocaleDateString('es-GT', { weekday: 'short' })}
+                              </div>
+                              <div className="text-sm font-bold">{dia.getDate()}</div>
+                              <div className="text-xs text-gray-400">{citasDia.length} citas</div>
+                            </button>
+                          </CardHeader>
+                          <CardContent className="p-2 space-y-1 max-h-[320px] overflow-y-auto">
+                            {citasDia.length === 0 ? (
+                              <p className="text-[11px] text-center text-gray-400 py-3">—</p>
+                            ) : (
+                              citasDia.map(c => {
+                                const est = ESTADOS_CITA[c.estado] || {};
+                                return (
+                                  <button key={c.id} type="button"
+                                    onClick={() => handleVerPaciente(c.paciente_id)}
+                                    data-testid={`mi-semana-cita-${c.id}`}
+                                    className={`w-full text-left rounded px-2 py-1 text-xs border ${est.color || 'bg-gray-50'} hover:opacity-80`}>
+                                    <span className="font-semibold">{c.hora_inicio}</span> {c.paciente_nombre}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                    <p className="text-gray-500" data-testid="mi-agenda-sin-vinculo">
+                      {miAgendaError || 'Tu usuario no está vinculado a un médico. Contacta al administrador para configurar tu perfil.'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )
+            ) : miAgenda ? (
               <div className="space-y-4">
                 {/* Header de mi agenda */}
                 <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">

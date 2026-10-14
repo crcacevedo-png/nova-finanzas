@@ -724,7 +724,7 @@ async def mi_agenda_del_dia(
     medico_nombre = medico["name"] if medico else current_user["name"]
     
     # Si es admin sin médico vinculado, mostrar todas las citas
-    query = {"tipo_agenda": "pacientes", "fecha": fecha}
+    query = {"tipo_agenda": "pacientes", "fecha": fecha, "estado": {"$ne": EstadoCita.CANCELADA.value}}
     if medico_id:
         query["$or"] = [
             {"medico_id": medico_id},
@@ -771,6 +771,42 @@ async def mi_agenda_del_dia(
         pacientes_presentes=presentes,
         contadores=contadores
     )
+
+
+@router.get("/mi-semana")
+async def mi_agenda_semana(
+    desde: str = Query(..., description="Fecha inicio YYYY-MM-DD"),
+    hasta: str = Query(..., description="Fecha fin YYYY-MM-DD"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Resumen semanal del médico autenticado: sus citas activas en el rango [desde, hasta]."""
+    medico = await get_medico_vinculado(current_user["id"])
+    if not medico and current_user["role"] not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="Usuario no vinculado a un médico")
+
+    medico_id = medico["id"] if medico else None
+    medico_nombre = medico["name"] if medico else current_user["name"]
+
+    query = {
+        "tipo_agenda": "pacientes",
+        "fecha": {"$gte": desde, "$lte": hasta},
+        "estado": {"$ne": EstadoCita.CANCELADA.value}
+    }
+    if medico_id:
+        query["$or"] = [
+            {"medico_id": medico_id},
+            {"asignado_a_medico_id": medico_id}
+        ]
+
+    citas = await db.citas.find(query, {"_id": 0}).sort([("fecha", 1), ("hora_inicio", 1)]).to_list(1000)
+    return {
+        "desde": desde,
+        "hasta": hasta,
+        "medico_id": medico_id or "",
+        "medico_nombre": medico_nombre,
+        "citas": citas,
+        "total": len(citas)
+    }
 
 
 # ==================== WALK-IN (SIN CITA) ====================
