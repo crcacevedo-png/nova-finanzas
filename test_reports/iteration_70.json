@@ -1,0 +1,33 @@
+{
+  "summary": "Fase 2 'Mi Agenda Multi-día del Médico' validada end-to-end. Backend (5/5 pytest OK en test_mi_agenda_semanal.py): (1) GET /api/agenda/mi-semana?desde&hasta con token medico_test devuelve medico_id/medico_nombre='Dr. Carlos Méndez', total>=3 y todas las citas pertenecen al médico, con estado != Cancelada; (2) Tras cancelar una cita del rango, mi-semana la excluye correctamente; (3) Un usuario con rol 'medico' SIN ficha vinculada recibe 403 'Usuario no vinculado a un médico'; (4) GET /api/agenda/mi-dia?fecha=YYYY-MM-DD respeta la fecha enviada, retorna medico_nombre correcto y filtra Canceladas; (5) Regresión: superadmin (sin vínculo) puede llamar /mi-semana y recibe las citas del rango (fallback admin). Frontend (Playwright, 1920x1080, login medico_test): barra data-testid mi-agenda-prev/hoy/next y toggle mi-agenda-vista-dia/mi-agenda-vista-semana presentes (count=1 cada uno); vista Día: Siguiente avanza de 'martes, 13 de octubre' a 'miércoles, 14 de octubre' y Hoy regresa a 'martes, 13 de octubre'; vista Semana (mi-agenda-semana) renderiza 7 tarjetas data-testid='mi-semana-dia-YYYY-MM-DD'; Anterior salta exactamente 7 días (2026-10-12 → 2026-10-05); al click en encabezado de un día la vista cambia a Día (clase bg-white shadow en mi-agenda-vista-dia). Regresión superadmin: /agenda muestra 3 tabs (Calendario/Tablero del Día/Mi Agenda) y la barra de 'Mi Agenda' sigue funcional. Fase 3 (Auditoría): un PUT /api/patients/{id} realizado por medico_test retorna 200 (sin bloqueo); al revisar GET /api/security/audit-logs como superadmin NO aparece ningún registro para la edición del paciente — el módulo Pacientes NO está integrado con audit_logs (sólo se registran LOGIN_SUCCESS/SECURITY_ALERT). Esto contradice la expectativa del enunciado ('sus cambios quedan registrados en Auditoría').",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/patients/{id}", "issue": "No genera entrada en audit_logs al editar paciente. El enunciado de Fase 3 asume Audit Logging habilitado para edición de pacientes por médicos; routes/patients.py no invoca audit.log en update_patient. Evaluaciones sí registran auditoría (routes/evaluaciones.py:668,1171)."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_mi_agenda_semanal.py",
+    "/app/test_reports/pytest/mi_agenda_semanal.xml"
+  ],
+  "action_items": [
+    "Añadir audit.log() en PUT /api/patients/{id} (y preferiblemente en POST/DELETE) para que las ediciones del rol medico queden auditadas, cumpliendo lo que el usuario estableció en Fase 3. Patrón idéntico al usado en routes/evaluaciones.py (líneas 668 y 1171)."
+  ],
+  "critical_code_review_comments": [
+    "routes/agenda.py:784-785: condición 'if not medico and current_user[\"role\"] not in [\"superadmin\",\"admin\"]' se repite en mi_agenda_del_dia y mi_agenda_semana. Extraer a helper (p.ej. require_medico_o_admin) para DRY.",
+    "routes/agenda.py mi_agenda_semana no valida que 'hasta' sea posterior o igual a 'desde' ni limita el rango máximo. Un cliente podría pedir rangos muy amplios; el .to_list(1000) mitiga, pero conviene validar y responder 400 si hasta<desde.",
+    "routes/patients.py update_patient: ausencia total de audit logging. Dado el requerimiento de trazabilidad del médico sobre expedientes de otros pacientes, es un gap real; añadir audit.log con action='PATIENT_UPDATED' y detalles del diff.",
+    "frontend Agenda.js vista Semana: cuando no hay citas en un día la tarjeta queda vacía sin placeholder; se recomienda mostrar '— sin citas —' para claridad visual (menor)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_mi_agenda_semanal.py (nuevo, 5 tests)"
+  ],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% (todos los data-testid y navegación día/semana funcionan)"},
+  "test_credentials": "superadmin/nova2024, medico_test/medico2024",
+  "seed_data_creation": "Fixture seed_citas crea 3 citas (08:30/09:30/10:30) en el próximo LUNES disponible para Dr. Carlos Méndez (paciente 93d83ba3) y las cancela al terminar vía PATCH /citas/{id}/estado estado=Cancelada.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fase 2 Mi Agenda Semanal verificada 100%. test_mi_agenda_semanal.py sirve como regresión (requiere medico_test/medico2024 y paciente 93d83ba3-b447-4950-8a97-1e3df0a5a165 presentes). Para auditoría, endpoint real es GET /api/security/audit-logs (no /api/audit-logs). routes/patients.py no tiene audit logging implementado — es un gap para Fase 3 que el agente principal debe decidir si cerrar.",
+  "rca of the issue": "Patient edits sin auditoría: routes/patients.py importa get_current_user de routes.auth pero no importa ni usa el AuditLogger del server.py ni crea uno propio como evaluaciones.py; por eso la edición de un expediente por un médico queda sin trazabilidad en db.audit_logs."
+}

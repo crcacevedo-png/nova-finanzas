@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from typing import Optional, List, Literal
 from datetime import datetime, timezone
 from utils.timezone import now_gt
+from routes.evaluaciones import audit
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
 import io
@@ -622,6 +623,18 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
     
     await db.patients.update_one({"id": patient_id}, {"$set": update_data})
     updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    
+    # Auditoría: registrar qué usuario editó el expediente y qué campos cambió
+    await audit.log(
+        action="PATIENT_UPDATED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={
+            "patient_id": patient_id,
+            "patient_name": f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip(),
+            "campos_modificados": [k for k in update_data.keys() if k not in ("updated_by", "updated_at")]
+        }
+    )
     
     enriched = await enrich_patient(updated)
     return PatientResponse(**enriched)

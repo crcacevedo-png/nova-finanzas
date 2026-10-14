@@ -6,6 +6,14 @@ Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, 
 ## Estado Actual del Proyecto
 **Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
 
+### Agenda Multi-día del Médico + Auditoría de expedientes (2026-10 Sesión 32)
+- ✅ **Mi Agenda navegable por día**: barra con Anterior/Hoy/Siguiente (data-testid `mi-agenda-prev/hoy/next`) que cambia la fecha de trabajo (hora Guatemala).
+- ✅ **Vista Semana propia** (`mi-agenda-semana`): toggle Día/Semana; grid de 7 días (Lun-Dom) con las citas activas del médico agrupadas por día; Anterior/Siguiente saltan de semana en semana; click en cita abre el paciente; click en cabecera de día abre esa fecha en vista Día.
+- ✅ **Backend**: nuevo `GET /api/agenda/mi-semana?desde=&hasta=` (resuelve médico vía `doctors.usuario_id`, excluye Canceladas, 403 si no vinculado); `mi-dia` respeta `fecha` y excluye Canceladas.
+- ✅ **Fase 3 (aclarada por el usuario)**: la restricción "solo mis pacientes" aplica SOLO a la agenda (ya cubierta por mi-dia/mi-semana). El médico puede abrir cualquier expediente desde Pacientes; sus cambios quedan en Auditoría. Se agregó registro `PATIENT_UPDATED` en `PUT /api/patients/{id}` (antes no se auditaba; evaluaciones ya auditaban).
+- ✅ **Verificado**: `iteration_70.json` 100% backend (5/5) + frontend; auditoría de edición de paciente verificada (user medico_test, campos modificados).
+- **Pendiente Fase 2 restante**: permisos clínicos más finos (ver evaluación sin editar).
+
 ### Acceso clínico configurable para rol Médico (2026-10 Sesión 32)
 - ✅ **Permisos clínicos activables por rol**: nueva categoría "Clínica" en Roles con `view_agenda`, `view_evaluacion`, `manage_recetas`, `view_sala_operaciones` (roles.py AVAILABLE_PERMISSIONS). Disponibles para cualquier rol.
 - ✅ **Rol "medico"** como rol de sistema editable (SYSTEM_ROLES + SYSTEM_ROLES_MENU), preconfigurado: Agenda, Evaluación, Recetas, Sala de Operaciones, crear/editar Pacientes (sin eliminar). Menús: pacientes, agenda, evaluacion_oftalmologica, sala_operaciones.
