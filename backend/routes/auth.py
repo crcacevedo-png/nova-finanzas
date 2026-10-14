@@ -155,7 +155,7 @@ async def login(request: Request, credentials: UserLogin):
             last_login=datetime.now(timezone.utc).isoformat(),
             created_at=user["created_at"],
             updated_at=user.get("updated_at"),
-            permissions=get_permissions(user["role"])
+            permissions=await resolve_permissions(user["role"])
         )
     )
 

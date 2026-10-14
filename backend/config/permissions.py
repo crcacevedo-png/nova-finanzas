@@ -248,7 +248,13 @@ async def resolve_permissions(role: str) -> dict:
     except Exception:
         custom = None
     if custom and isinstance(custom.get("permissions"), dict) and custom["permissions"]:
-        perms = custom["permissions"]
+        # Fusionar: partir de los permisos por defecto del rol de sistema (si existe)
+        # y aplicar encima las personalizaciones guardadas en db.roles.
+        # Así, si el doc en db.roles fue guardado antes de existir una clave nueva
+        # (p.ej. permisos clínicos de 'medico'), esa clave toma el valor por defecto
+        # en vez de quedar ausente/False y romper el acceso.
+        perms = dict(PERMISSIONS.get(role, {}))
+        perms.update(custom["permissions"])
     elif role in PERMISSIONS:
         perms = PERMISSIONS[role]
     else:

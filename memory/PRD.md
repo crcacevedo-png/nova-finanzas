@@ -690,3 +690,12 @@ Ver `/app/memory/test_credentials.md`
 - El médico sigue siendo editable/removible manualmente; la sugerencia no impide elegir otro.
 - Archivos: `backend/routes/agenda.py`, `frontend/src/services/agendaApi.js`, `frontend/src/pages/PuntoVenta.js`, `frontend/src/pages/OpticaPOS.js`.
 - Verificado por curl E2E (devuelve el médico de la cita de hoy; null si no hay cita).
+
+## Fix navegación rol Médico: todos los botones iban a Pacientes (2026-06) — CAUSA RAÍZ RESUELTA
+- Síntoma (en PRODUCCIÓN): con usuario médico, al pulsar Agenda/Evaluación/Sala, todas las rutas redirigían a `/pacientes`.
+- Causa raíz: el sistema de auth EN VIVO está en `server.py` (NO en `routes/auth.py` ni `config/permissions.py`, que son duplicados sin uso para estas rutas). Su `resolve_permissions()` devolvía `custom["permissions"]` DIRECTO cuando existía un override del rol en `db.roles`. En producción hay un rol `medico` guardado en `db.roles` (vía UI de Roles) creado ANTES de que existieran los permisos clínicos, por lo que le faltaban `view_agenda/view_evaluacion/view_sala_operaciones/manage_recetas`. Tras login, el frontend llama a `/auth/me` → `get_current_user` → `resolve_permissions` → devolvía el override incompleto → `ProtectedRoute` redirigía a `/pacientes`.
+- Por qué preview no lo reproducía: preview NO tenía documento `medico` en `db.roles`, así que caía en los defaults estáticos (correctos). Producción usa otra base de datos con el override incompleto.
+- Fix: en `server.py::resolve_permissions`, FUSIONAR los permisos por defecto del rol de sistema con el override de `db.roles` (`perms = dict(PERMISSIONS.get(role, {})); perms.update(custom["permissions"])`). Así, claves nuevas faltantes toman el valor por defecto; las personalizaciones explícitas siguen ganando.
+- También se alineó `routes/auth.py` (`/login` usa `await resolve_permissions`) y `config/permissions.py` por consistencia, aunque no son la ruta activa.
+- Verificación E2E (preview, simulando el override incompleto de producción en `db.roles`): `/auth/me` devuelve 34 permisos con clínicos en True; navegación headless Login→Pacientes, +reload, Agenda→/agenda, Sala→/sala-operaciones, Evaluación→/evaluacion-oftalmologica, todas correctas. Rol de simulación eliminado tras la prueba.
+- Requiere REDESPLIEGUE para que producción tome el fix de `server.py`.
