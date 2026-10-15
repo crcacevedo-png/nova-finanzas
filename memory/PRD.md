@@ -795,3 +795,7 @@ El usuario adjuntó 2 Excel: Medicamentos (33) y Procedimientos (611), cada uno 
 - Frontend (EvaluacionOftalmologica.js): los renglones de Medicamentos y de Estudios/Procedimientos usan el componente Autocomplete (nuevo prop testId) con fetchUrl a los endpoints IGSS. El dropdown muestra [codigo] en verde + descripción; al seleccionar rellena el renglón con la descripción (texto libre, se mantiene editable). data-testid de inputs: igss-medicamento-<idx>, igss-estudio-<idx>.
 Verificación: seed 33+611 OK; búsqueda por nombre y por código OK (curl); screenshot confirma sugerencia "[1228] Timolol maleato..." al escribir en el renglón de medicamentos.
 Nota: no se almacena el código por separado (plan Fase 1: una sola línea de texto libre); el código se muestra solo como pista en el dropdown.
+
+## IGSS autorelleno: ajustes (2026-06)
+1) Al seleccionar una sugerencia (medicamentos y estudios/procedimientos), el renglón ahora se rellena con "[código] nombre" (antes solo el nombre). En Autocomplete onClick: label = item.codigo ? `[${codigo}] ${nombre}` : nombre. Otros catálogos sin código quedan igual (solo nombre).
+2) El dropdown de "Estudios / Procedimientos" (último renglón) quedaba cortado por overflow-hidden de CollapsibleSection. Se agregó prop overflowVisible a CollapsibleSection (root sin overflow-hidden, header con rounded-t-lg) y la sección IGSS lo usa. Verificado por screenshot: cascada visible y valor "[416631] OFTALMOLOGIA..." tras seleccionar.

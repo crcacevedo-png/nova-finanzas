@@ -158,7 +158,9 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
               key={item.id || index}
               className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
               onClick={() => {
-                onChange(item.nombre || item.nombre_completo || item.name || '');
+                const nombre = item.nombre || item.nombre_completo || item.name || '';
+                const label = item.codigo ? `[${item.codigo}] ${nombre}` : nombre;
+                onChange(label);
                 setShowSuggestions(false);
               }}
             >
@@ -179,7 +181,7 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
 };
 
 // Componente de sección colapsable
-const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, badge, onPrint, accent = 'blue' }) => {
+const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, badge, onPrint, accent = 'blue', overflowVisible = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const A = {
     blue: { header: 'from-blue-50 to-white hover:from-blue-100', icon: 'text-blue-600', badge: 'bg-blue-100 text-blue-700', print: 'hover:bg-blue-100 text-blue-600', border: 'var(--border-card)' },
@@ -187,10 +189,10 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, b
   }[accent] || {};
 
   return (
-    <div className="border rounded-lg overflow-hidden" style={{ borderColor: A.border }}>
+    <div className={`border rounded-lg ${overflowVisible ? '' : 'overflow-hidden'}`} style={{ borderColor: A.border }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r ${A.header} transition-colors`}
+        className={`w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r ${A.header} transition-colors rounded-t-lg`}
       >
         <div className="flex items-center gap-2">
           {Icon && <Icon className={`w-4 h-4 ${A.icon}`} />}
@@ -2328,6 +2330,7 @@ const EvaluacionOftalmologica = () => {
               title="Medicamentos y Procedimientos (EXCLUSIVO IGSS)"
               icon={Pill}
               accent="emerald"
+              overflowVisible
               defaultOpen={false}
               onPrint={() => handlePrint('igss')}
               badge={`${(formData.igss_med_proc?.medicamentos?.length || 0) + (formData.igss_med_proc?.estudios_procedimientos?.length || 0)}`}
