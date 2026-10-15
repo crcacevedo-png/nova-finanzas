@@ -177,19 +177,23 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
 };
 
 // Componente de sección colapsable
-const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, badge, onPrint }) => {
+const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, badge, onPrint, accent = 'blue' }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  
+  const A = {
+    blue: { header: 'from-blue-50 to-white hover:from-blue-100', icon: 'text-blue-600', badge: 'bg-blue-100 text-blue-700', print: 'hover:bg-blue-100 text-blue-600', border: 'var(--border-card)' },
+    emerald: { header: 'from-emerald-50 to-white hover:from-emerald-100', icon: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700', print: 'hover:bg-emerald-100 text-emerald-600', border: '#34d399' }
+  }[accent] || {};
+
   return (
-    <div className="border rounded-lg overflow-hidden" style={{ borderColor: 'var(--border-card)' }}>
+    <div className="border rounded-lg overflow-hidden" style={{ borderColor: A.border }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 transition-colors"
+        className={`w-full px-4 py-3 flex items-center justify-between bg-gradient-to-r ${A.header} transition-colors`}
       >
         <div className="flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-blue-600" />}
+          {Icon && <Icon className={`w-4 h-4 ${A.icon}`} />}
           <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{title}</span>
-          {badge && <Badge className="ml-2 bg-blue-100 text-blue-700 text-xs">{badge}</Badge>}
+          {badge && <Badge className={`ml-2 ${A.badge} text-xs`}>{badge}</Badge>}
         </div>
         <div className="flex items-center gap-2">
           {onPrint && (
@@ -198,7 +202,7 @@ const CollapsibleSection = ({ title, icon: Icon, children, defaultOpen = true, b
                 e.stopPropagation();
                 onPrint();
               }}
-              className="p-1.5 rounded-md hover:bg-blue-100 text-blue-600 cursor-pointer transition-colors"
+              className={`p-1.5 rounded-md ${A.print} cursor-pointer transition-colors`}
               title="Imprimir receta"
             >
               <Printer className="w-4 h-4" />
@@ -334,6 +338,10 @@ const EvaluacionOftalmologica = () => {
     diagnosticos: [],
     plan: '',
     lectura_examenes: '',
+    igss_med_proc: {
+      medicamentos: [],
+      estudios_procedimientos: []
+    },
     recomendaciones: {
       estudios_a_realizar: [],
       recomendaciones_generales: ''
@@ -940,6 +948,7 @@ const EvaluacionOftalmologica = () => {
       examen: migratedExamen,
       lectura_examenes: evaluacion.lectura_examenes || '',
       recomendaciones: { ...evaluacionVacia.recomendaciones, ...evaluacion.recomendaciones },
+      igss_med_proc: { ...evaluacionVacia.igss_med_proc, ...evaluacion.igss_med_proc },
       recetas: migratedRecetas
     });
     setSearchPaciente(evaluacion.paciente_nombre || '');
@@ -2312,6 +2321,120 @@ const EvaluacionOftalmologica = () => {
               </div>
             </CollapsibleSection>
 
+            {/* Medicamentos y Procedimientos (EXCLUSIVO IGSS) */}
+            <CollapsibleSection
+              title="Medicamentos y Procedimientos (EXCLUSIVO IGSS)"
+              icon={Pill}
+              accent="emerald"
+              defaultOpen={false}
+              onPrint={() => handlePrint('igss')}
+              badge={`${(formData.igss_med_proc?.medicamentos?.length || 0) + (formData.igss_med_proc?.estudios_procedimientos?.length || 0)}`}
+            >
+              <div className="space-y-5" data-testid="igss-med-proc-section">
+                {/* Medicamentos */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5 text-emerald-700">
+                      <Pill className="w-3.5 h-3.5" /> Medicamentos
+                    </Label>
+                    {!isReadOnly && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => addArrayItem('igss_med_proc.medicamentos', '')}
+                        data-testid="igss-add-medicamento"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Agregar
+                      </Button>
+                    )}
+                  </div>
+                  {(formData.igss_med_proc?.medicamentos || []).length === 0 ? (
+                    <p className="text-xs text-gray-400 italic py-1">Sin medicamentos. Agrega el primero.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(formData.igss_med_proc?.medicamentos || []).map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Input
+                            value={item}
+                            onChange={(e) => updateNestedField(`igss_med_proc.medicamentos.${idx}`, e.target.value)}
+                            disabled={isReadOnly}
+                            placeholder="Escribe el medicamento..."
+                            className="input-teal h-8 text-sm"
+                            data-testid={`igss-medicamento-${idx}`}
+                          />
+                          {!isReadOnly && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                              onClick={() => removeArrayItem('igss_med_proc.medicamentos', idx)}
+                              data-testid={`igss-remove-medicamento-${idx}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Estudios / Procedimientos */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5 text-emerald-700">
+                      <ClipboardList className="w-3.5 h-3.5" /> Estudios / Procedimientos
+                    </Label>
+                    {!isReadOnly && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => addArrayItem('igss_med_proc.estudios_procedimientos', '')}
+                        data-testid="igss-add-estudio"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Agregar
+                      </Button>
+                    )}
+                  </div>
+                  {(formData.igss_med_proc?.estudios_procedimientos || []).length === 0 ? (
+                    <p className="text-xs text-gray-400 italic py-1">Sin estudios/procedimientos. Agrega el primero.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(formData.igss_med_proc?.estudios_procedimientos || []).map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Input
+                            value={item}
+                            onChange={(e) => updateNestedField(`igss_med_proc.estudios_procedimientos.${idx}`, e.target.value)}
+                            disabled={isReadOnly}
+                            placeholder="Escribe el estudio o procedimiento..."
+                            className="input-teal h-8 text-sm"
+                            data-testid={`igss-estudio-${idx}`}
+                          />
+                          {!isReadOnly && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                              onClick={() => removeArrayItem('igss_med_proc.estudios_procedimientos', idx)}
+                              data-testid={`igss-remove-estudio-${idx}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CollapsibleSection>
+
             {/* Candidato a Cirugía - Sección integrada */}
             <CollapsibleSection 
               title="Candidato a Cirugía" 
@@ -3093,13 +3216,39 @@ const EvaluacionOftalmologica = () => {
             </div>
             
             {/* Contenido según tipo de receta */}
+            {printType === 'igss' && (
+              <div>
+                <h2 className="print-title text-sm font-bold mb-3 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
+                  Medicamentos y Procedimientos (EXCLUSIVO IGSS)
+                </h2>
+                {(formData.igss_med_proc?.medicamentos || []).filter(m => (m || '').trim()).length > 0 && (
+                  <div className="mb-3">
+                    <h3 className="text-xs font-bold uppercase mb-1" style={{ color: '#0F6E56' }}>Medicamentos</h3>
+                    <ol className="list-decimal list-inside text-xs space-y-0.5">
+                      {(formData.igss_med_proc?.medicamentos || []).filter(m => (m || '').trim()).map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+                {(formData.igss_med_proc?.estudios_procedimientos || []).filter(m => (m || '').trim()).length > 0 && (
+                  <div className="mb-3">
+                    <h3 className="text-xs font-bold uppercase mb-1" style={{ color: '#0F6E56' }}>Estudios / Procedimientos</h3>
+                    <ol className="list-decimal list-inside text-xs space-y-0.5">
+                      {(formData.igss_med_proc?.estudios_procedimientos || []).filter(m => (m || '').trim()).map((item, idx) => (
+                        <li key={idx}>{item}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            )}
+
             {printType === 'medicamentos' && (
               <div>
                 <h2 className="print-title text-sm font-bold mb-2 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
                   Receta Médica
                 </h2>
-                
-                {/* Lista de medicamentos en GRID 2 columnas para horizontal */}
                 <div className="print-med-grid grid grid-cols-2 gap-2">
                   {formData.recetas.medicamentos.items.map((item, idx) => (
                     <div key={idx} className="print-med-card border rounded p-2 bg-white text-xs">

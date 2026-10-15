@@ -1,47 +1,55 @@
-# Sobrecupo de citas en la Agenda
+# Medicamentos y Procedimientos (EXCLUSIVO IGSS) en la Evaluación Oftalmológica
 
-Permite agendar una cita aunque el horario del médico ya esté ocupado, avisando primero que el espacio está tomado y pidiendo confirmación. Sigue sin permitir agendar fuera del horario de atención del médico ni sobre bloqueos ya colocados.
+Nueva sección dentro de la evaluación oftalmológica para registrar, en listas, los medicamentos y los estudios/procedimientos relacionados con IGSS.
+Se ubica entre la sección de Diagnóstico y la de Candidato a cirugía, se distingue con un color verde esmeralda, y su contenido aparece en la impresión de la evaluación.
 
 ## Para quién es
-Personal de recepción y médicos de la clínica NovaVisión que gestionan citas desde la pantalla de Agenda y a veces necesitan encajar un paciente adicional en un horario que ya tiene citas.
+Médicos y personal de la clínica NovaVisión que documentan la evaluación oftalmológica del paciente y necesitan dejar registrados los medicamentos y los estudios/procedimientos asociados a IGSS.
 
 ## Funciones y experiencia principales
-- **Agendar sobre un horario ocupado.** Al crear una cita (o registrar un walk-in) desde la Agenda en una hora que ya alcanzó su cupo, el sistema permite continuar en lugar de bloquear.
-- **Aviso y confirmación.** Antes de guardar en un horario lleno, aparece un mensaje claro ("Este horario ya está ocupado (X citas). ¿Agendar de todos modos?") y la cita solo se crea si el usuario confirma. Si cancela, no se crea nada.
-- **Límites que se mantienen.** No se puede agendar fuera del horario de atención del médico ese día, ni en días/franjas bloqueadas, ni en días no laborables. En esos casos se muestra el motivo y no se permite agendar (igual que hoy).
-- **Solo desde la Agenda.** El sobrecupo está disponible únicamente al agendar desde la Agenda (Nueva Cita y Walk-in). La opción "Próxima Cita" dentro de la Evaluación sigue mostrando solo horarios libres y no permite sobrecupo.
-- **Identificación visual.** Las citas que comparten un mismo horario (sobrecupo) se distinguen con una etiqueta "Sobrecupo" en la Agenda, para ver de un vistazo cuándo hay más de un paciente en la misma franja.
+- **Sección propia titulada "Medicamentos y Procedimientos (EXCLUSIVO IGSS)".** Aparece siempre, en toda evaluación, sin importar si el paciente es afiliado IGSS o no.
+- **Color distintivo verde esmeralda.** El bloque usa un color verde esmeralda (distinto del teal del resto de la evaluación) para diferenciarlo visualmente de las demás secciones.
+- **Ubicación fija.** Se muestra entre la sección de Diagnóstico y la de Candidato a cirugía.
+- **Lista de Medicamentos.** El usuario agrega uno o más medicamentos, cada uno en su propio renglón de texto libre. Puede agregar renglones, editarlos y eliminarlos.
+- **Lista de Estudios / Procedimientos.** El usuario agrega uno o más estudios/procedimientos, cada uno en su propio renglón de texto libre. Puede agregar renglones, editarlos y eliminarlos.
+- **Texto libre por ahora.** Cada renglón se escribe libremente. Más adelante se incorporará el autorelleno a partir de un Excel que el usuario proporcionará (fuera del alcance actual).
+- **Se guarda con la evaluación.** El contenido se conserva junto con el resto de la evaluación y se vuelve a mostrar al abrirla.
+- **Aparece en la impresión.** Ambas listas se incluyen en la hoja/resumen impreso de la evaluación, con sus respectivos títulos.
 
 ## Flujo del usuario
-1. En la Agenda, el usuario abre "Nueva Cita" (o "Walk-in") y elige médico, fecha y hora.
-2. Si la fecha/hora cae fuera del horario del médico o sobre un bloqueo, el sistema lo indica con el motivo y no deja continuar.
-3. Si el horario es válido pero ya está lleno, el sistema avisa que está ocupado y pregunta si desea agendar de todos modos.
-4. Si el usuario confirma, la cita se crea y queda visible en la Agenda marcada como "Sobrecupo"; si cancela, no se crea.
-5. Si el horario está libre, la cita se crea normalmente sin aviso.
+1. El usuario abre o crea una evaluación oftalmológica.
+2. Baja hasta la sección "Medicamentos y Procedimientos (EXCLUSIVO IGSS)", ubicada después de Diagnóstico y antes de Candidato a cirugía, identificable por su color verde esmeralda.
+3. En Medicamentos, agrega los renglones que necesite (uno por medicamento) y escribe el texto de cada uno.
+4. En Estudios / Procedimientos, agrega los renglones que necesite (uno por estudio/procedimiento) y escribe el texto de cada uno.
+5. Puede editar o eliminar cualquier renglón.
+6. Guarda la evaluación; el contenido queda registrado.
+7. Al imprimir la evaluación, las dos listas aparecen en el documento.
 
 ## UI/UX feel
-Se mantiene el estilo actual de la Agenda y de los formularios de Nueva Cita y Walk-in. El aviso de ocupación aparece como un cuadro de confirmación breve con dos acciones ("Agendar de todos modos" / "Cancelar"). La etiqueta "Sobrecupo" es una insignia discreta en color de advertencia (ámbar) dentro de la tarjeta de la cita, sin alterar el resto de la tarjeta.
+Se mantiene el estilo visual actual de la evaluación (mismas tipografías, tarjetas y disposición de las demás secciones), pero este bloque adopta un acento verde esmeralda en su encabezado/borde para diferenciarse del teal usado en el resto. La sección se presenta con dos bloques: "Medicamentos" y "Estudios / Procedimientos". Cada bloque muestra sus renglones con un control para agregar uno nuevo y un control para eliminar cada renglón existente. Cuando no hay renglones, se muestra un estado vacío discreto invitando a agregar el primero.
 
 ## Fases de implementación
+
 **Fase 1 (MVP — se construye ahora):**
-- Permitir agendar en horarios ocupados desde Nueva Cita y Walk-in, con aviso y confirmación previa.
-- Mantener el bloqueo para horarios fuera de atención del médico y sobre bloqueos existentes.
-- Mostrar la etiqueta "Sobrecupo" en las citas que comparten horario en la Agenda.
-- Mantener sin cambios la "Próxima Cita" de la Evaluación (solo horarios libres).
+- Agregar la sección "Medicamentos y Procedimientos (EXCLUSIVO IGSS)" entre Diagnóstico y Candidato a cirugía, visible siempre y con color distintivo verde esmeralda.
+- Lista de Medicamentos con texto libre: agregar, editar y eliminar renglones (uno o varios).
+- Lista de Estudios / Procedimientos con texto libre: agregar, editar y eliminar renglones (uno o varios).
+- Guardar y recuperar el contenido junto con la evaluación.
+- Incluir ambas listas en la impresión/PDF de la evaluación.
 
 **Fase 2 (después):**
-- Mostrar en el aviso cuántas citas y de qué pacientes ya existen en ese horario antes de confirmar.
-- Indicador de cupo por franja en la vista de calendario (p. ej. "2/3", "lleno", "sobrecupo").
+- Autorelleno de Medicamentos desde el Excel que el usuario proporcionará (sugerencias/selección al escribir).
+- Autorelleno de Estudios / Procedimientos desde el Excel correspondiente.
 
 **Fase 3 (después):**
-- Reglas de sobrecupo por médico o por tipo de cita (p. ej. permitir sobrecupo solo a ciertos médicos o solo para emergencias).
-- Reporte de horarios con sobrecupo recurrente para ajustar la agenda.
+- Refinamientos derivados del uso del autorelleno (por ejemplo, catálogos editables o campos adicionales por renglón), según se definan más adelante.
 
 ## Assumptions
-- El sobrecupo aplica a Nueva Cita y Walk-in de la Agenda; no aplica a la "Próxima Cita" de la Evaluación, que sigue ofreciendo solo horarios libres.
-- "Ocupado/lleno" significa que el horario ya alcanzó el máximo de citas por franja definido en la configuración de la agenda; al confirmar, el sobrecupo no tiene un tope adicional.
-- Se pide confirmación una sola vez por cita, justo antes de guardar.
-- La etiqueta "Sobrecupo" se muestra en las citas que comparten la misma hora de inicio con otra cita del mismo médico ese día.
-- No hay un permiso especial por rol: cualquier usuario que ya puede agendar desde la Agenda puede confirmar un sobrecupo.
-- No se modifica el comportamiento de bloqueos ni de horarios de atención; solo se relaja el límite de cupo por franja al agendar desde la Agenda.
-- Fechas y horas siguen la hora de Guatemala, como en el resto del sistema.
+- La sección se muestra en todas las evaluaciones, para cualquier paciente (no se limita a afiliados IGSS), según lo indicado.
+- El color distintivo del bloque es verde esmeralda, aplicado al encabezado/borde de la sección sin alterar el estilo general de la evaluación.
+- Cada medicamento y cada estudio/procedimiento es una sola línea de texto libre; no se piden campos separados adicionales (dosis, código, etc.) en esta fase.
+- Se permiten cero, uno o varios renglones en cada lista; una lista vacía es válida.
+- El título visible de la sección es "Medicamentos y Procedimientos (EXCLUSIVO IGSS)" y los sub-bloques se llaman "Medicamentos" y "Estudios / Procedimientos".
+- En la impresión, cada lista aparece bajo su título; si una lista está vacía, no se agrega contenido de esa lista.
+- El autorelleno desde Excel queda fuera del alcance actual y se abordará cuando el usuario adjunte los archivos.
+- Las evaluaciones existentes que no tengan esta información se mostrarán con las listas vacías, sin afectar su contenido actual.

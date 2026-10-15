@@ -217,6 +217,13 @@ class Recetas(BaseModel):
     lentes_contacto_lista: List[dict] = Field(default_factory=list)
 
 
+class MedicamentosProcedimientosIGSS(BaseModel):
+    """Listas de texto libre (EXCLUSIVO IGSS)."""
+    model_config = ConfigDict(extra="ignore")
+    medicamentos: List[str] = Field(default_factory=list)
+    estudios_procedimientos: List[str] = Field(default_factory=list)
+
+
 # ==================== PRÓXIMA CITA ====================
 
 class ProximaCita(BaseModel):
@@ -259,6 +266,9 @@ class EvaluacionOftalmologicaBase(BaseModel):
     diagnosticos: List[Diagnostico] = Field(default_factory=list)
     plan: str = ""
     
+    # Medicamentos y Procedimientos (EXCLUSIVO IGSS)
+    igss_med_proc: MedicamentosProcedimientosIGSS = Field(default_factory=MedicamentosProcedimientosIGSS)
+    
     # Recomendaciones
     recomendaciones: Recomendaciones = Field(default_factory=Recomendaciones)
     
@@ -294,6 +304,7 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
     examen: Optional[ExamenOftalmologico] = None
     diagnosticos: Optional[List[Diagnostico]] = None
     plan: Optional[str] = None
+    igss_med_proc: Optional[MedicamentosProcedimientosIGSS] = None
     recomendaciones: Optional[Recomendaciones] = None
     procedimientos: Optional[List[Procedimiento]] = None
     recetas: Optional[Recetas] = None
