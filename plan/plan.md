@@ -1,50 +1,60 @@
-# NovaVisión — Ajustes de Roles, Cirugías y Ficha de Paciente
+# Flujo de llegada: completar expediente antes de pasar a evaluación
 
-Cuatro mejoras puntuales sobre el ERP: control del módulo Sala de Operaciones por rol, un médico ayudante en las cirugías, un formulario de paciente más ancho y un nuevo dato para pacientes del IGSS.
+Al marcar la llegada de un paciente a la clínica, si su ficha está incompleta se completa el expediente en ese momento; si ya está completo, se usa el expediente existente. Aplica a todas las agendas y todos los médicos.
 
 ## Para quién es
-Personal de la clínica NovaVisión (Guatemala): administradores que configuran accesos, personal que agenda y registra cirugías, y recepción que registra pacientes.
+Recepción y personal de la clínica NovaVisión que registra la llegada de pacientes, y los médicos que luego los atienden en evaluación.
 
 ## Funcionalidades y experiencia
 
-**1. Sala de Operaciones configurable por rol**
-Hoy el acceso a "Sala de Operaciones" no se puede conceder o quitar de forma confiable a cualquier rol desde la configuración. Con el cambio, Sala de Operaciones quedará como una opción más que se activa o desactiva por rol (sistema y personalizados) desde la pantalla de configuración de roles/menús. Al activarla para un rol, los usuarios de ese rol verán el módulo en el menú y podrán entrar; al desactivarla, desaparece del menú y se bloquea el acceso.
+**1. Detección de ficha incompleta**
+Un paciente se considera "sin expediente completo" cuando le falta alguno de estos datos obligatorios: nombre, sexo, fecha de nacimiento, teléfono, documento/DPI, dirección e institución (IGSS o particular). La detección es automática y también aplica a los pacientes que ya existen agendados (no solo a los nuevos). Hoy la agenda permite agendar un paciente "nuevo" capturando solo nombre, teléfono, sexo y edad aproximada, por lo que esos quedan como fichas incompletas.
 
-**2. Médico ayudante en la cirugía**
-Al agregar o editar una cirugía, además del "Cirujano" habrá un campo "Ayudante", justo debajo. El ayudante es otro médico que se elige de la lista de médicos ya registrados. Es un solo ayudante y es opcional (puede quedar vacío). El ayudante se guarda con la cirugía y se muestra junto al cirujano al ver el detalle y en la impresión/exportación de la cirugía.
+**2. Completar la ficha al marcar llegada**
+Al marcar "Presente" (llegada) a un paciente cuya ficha está incompleta, se abre el formulario completo de paciente con los datos que ya se tienen precargados. El paciente no queda marcado como presente hasta que se guarden todos los datos obligatorios. Al guardar, se actualiza el mismo expediente existente (no se crea uno duplicado).
 
-**3. Modal de "Agregar/Editar Paciente" más ancho**
-La ventana para registrar o editar un paciente se mostrará más ancha, para que los campos se vean con más holgura y menos apretados. Mismo contenido y campos; solo cambia el ancho.
+**3. Llegada directa cuando la ficha ya está completa**
+Si el paciente ya tiene su expediente completo, marcar "Presente" lo registra de inmediato, vinculado a su expediente existente, sin pedir datos otra vez.
 
-**4. "Tipo de Paciente" para pacientes del IGSS**
-Cuando la institución del paciente sea IGSS, aparecerá un campo adicional "Tipo de Paciente" (además de los datos IGSS que ya se piden). Es texto libre y opcional. Se guarda en la ficha del paciente y se muestra al ver o editar el paciente. Solo aparece cuando la institución es IGSS.
+**4. Asignación a evaluación con su médico**
+Una vez presente (con ficha completa), el paciente aparece en "Mis Pacientes Presentes" del médico asignado y puede abrirse su evaluación usando su expediente ya creado.
 
-## Flujo de uso
-- Un administrador abre la configuración de roles, activa "Sala de Operaciones" para el rol que quiera; los usuarios de ese rol pasan a ver y usar el módulo.
-- Al registrar una cirugía, se elige el cirujano y, si aplica, el ayudante desde la lista de médicos.
-- Al registrar un paciente, el formulario aparece más ancho; si se marca IGSS, se muestra y captura el "Tipo de Paciente".
+**5. Walk-ins incluidos**
+El mismo comportamiento aplica a los pacientes que llegan sin cita (walk-in): si su ficha está incompleta, se completa al registrarlos como presentes.
 
-## Sensación de la interfaz
-Se mantiene el estilo actual del sistema (mismos colores, componentes y disposición). Los campos nuevos reutilizan los mismos controles ya usados (selector de médicos para el ayudante, campo de texto para "Tipo de Paciente"), para que todo se vea nativo y consistente.
+## User flow
+1. Recepción marca la llegada del paciente (desde una cita agendada o como walk-in).
+2. El sistema revisa si la ficha está completa.
+3. Si falta algún dato obligatorio: se abre el formulario de paciente con lo ya capturado; recepción completa y guarda; recién entonces el paciente pasa a "Presente".
+4. Si la ficha ya está completa: el paciente pasa a "Presente" de inmediato, con su expediente existente.
+5. El paciente presente queda disponible para su médico, que abre la evaluación sobre ese expediente.
+
+## UI/UX feel
+Se mantiene el estilo actual del sistema (mismos colores, componentes y disposición). La captura de la ficha reutiliza el formulario de paciente ya existente, mostrado al momento de marcar la llegada, con los datos previos precargados y los campos obligatorios claramente señalados.
 
 ## Fases de implementación
 
 **Fase 1 (MVP, se construye ahora)**
-- Sala de Operaciones activable/desactivable por rol, con efecto real en menú y acceso.
-- Campo "Ayudante" (un médico, opcional) en alta y edición de cirugía, visible en detalle e impresión.
-- Modal de agregar/editar paciente más ancho.
-- Campo "Tipo de Paciente" (texto libre, opcional) para pacientes IGSS.
+- Detección automática de ficha incompleta por campos obligatorios faltantes (incluye pacientes ya existentes).
+- Al marcar llegada con ficha incompleta: formulario completo precargado, obligatorio completar antes de quedar "Presente"; actualiza el mismo expediente (sin duplicar).
+- Llegada directa cuando la ficha está completa, vinculada al expediente existente.
+- Mismo flujo para citas agendadas y walk-ins, para todas las agendas y médicos.
+- El paciente presente queda asignado a su médico y disponible para evaluación con su expediente.
 
 **Fase 2 (futuro)**
-- Mostrar cirujano y ayudante en los reportes y listados de cirugías, y permitir filtrar por médico.
-- Reportes/estadísticas que incluyan el "Tipo de Paciente" IGSS.
+- Indicador visual en la agenda de qué pacientes agendados tienen ficha incompleta (antes de que lleguen).
+- Reporte/listado de expedientes incompletos para completarlos por adelantado.
 
 **Fase 3 (futuro)**
-- Autocompletado de datos de pacientes IGSS recurrentes (quedó fuera por decisión del usuario; se podría retomar).
+- Captura de más datos al momento de agendar para reducir lo que se completa en recepción.
+- Detección de duplicados por documento/DPI al completar la ficha.
 
 ## Supuestos
-- "Configurar en los roles" (punto 1) se resuelve dentro de la pantalla de configuración de roles/menús ya existente; no se crea una pantalla nueva.
-- El "Ayudante" es un solo médico, opcional, elegido de la lista de médicos registrados; se guarda en el registro de la cirugía y aparece donde hoy aparece el cirujano.
-- "Tipo de Paciente" es texto libre, opcional, y solo se muestra cuando la institución del paciente es IGSS.
-- El punto 3 (autocompletar datos de pacientes IGSS previamente almacenados) queda excluido de este trabajo por indicación del usuario.
-- El idioma de toda la interfaz y los textos se mantiene en español.
+- Campos obligatorios para considerar el expediente "completo": nombre, sexo, fecha de nacimiento, teléfono, documento/DPI, dirección e institución (IGSS/particular). Si la institución es IGSS, se piden además los datos IGSS que el formulario ya solicita.
+- Completar la ficha es obligatorio para pasar a "Presente": no se puede marcar presente ni abrir la evaluación con ficha incompleta.
+- La detección de "incompleto" aplica de forma retroactiva a los pacientes ya existentes, no solo a los nuevos.
+- Al completar la ficha se actualiza el expediente existente del paciente; nunca se crea un expediente nuevo para un paciente que ya tenía uno.
+- El flujo se dispara en el momento de marcar la llegada ("Presente"), tanto en citas agendadas como en walk-ins.
+- Cualquier usuario con acceso a la agenda puede completar la ficha al registrar la llegada.
+- Exigir documento/DPI puede generar fricción en casos sin DPI (menores o extranjeros); se asume obligatorio según lo indicado y podría revisarse más adelante.
+- El idioma de toda la interfaz se mantiene en español.

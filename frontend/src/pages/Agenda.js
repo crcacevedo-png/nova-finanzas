@@ -44,7 +44,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { agendaApi } from '../services/agendaApi';
-import { patientApi, googleCalendarApi, getGuatemalaDate } from '../services/api';
+import { patientApi, googleCalendarApi, getGuatemalaDate, igssUnitApi } from '../services/api';
 import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
 import { BloqueosAgenda } from './AgendaBloqueos';
 
@@ -60,8 +60,17 @@ const ESTADOS_CITA = {
 };
 
 const TIPOS_CITA = [
-  'Primera Consulta', 'Control', 'Control Post Operatorio', 'Lectura de estudios', 'Emergencia'
+  'Primera Consulta', 'Control', 'Control Post Operatorio', 'Lectura de estudios', 'Procedimiento', 'Emergencia'
 ];
+
+// Un expediente se considera incompleto si falta algún dato obligatorio
+const fichaIncompleta = (p) => {
+  if (!p) return true;
+  const req = [p.first_name, p.last_name, p.gender, p.birth_date, p.phone, p.dpi, p.address, p.referral_institution];
+  if (req.some(v => !v || String(v).trim() === '')) return true;
+  if (p.referral_institution === 'igss' && !p.igss_unit_id) return true;
+  return false;
+};
 
 // Helper para formatear fecha
 const formatDate = (date) => {
@@ -88,7 +97,7 @@ const formatTime = (time) => {
 };
 
 // Componente de tarjeta de cita compacta
-const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, compact = false }) => {
+const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, onMarcarLlegada, compact = false }) => {
   const estadoConfig = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
   const IconoEstado = estadoConfig.icon;
   
@@ -122,7 +131,7 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
               </DropdownMenuItem>
             )}
             {['Agendada', 'Confirmada'].includes(cita.estado) && (
-              <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'Presente')}>
+              <DropdownMenuItem onClick={() => onMarcarLlegada ? onMarcarLlegada(cita) : onEstadoChange(cita.id, 'Presente')}>
                 <UserCheck className="w-4 h-4 mr-2" /> Marcar llegada
               </DropdownMenuItem>
             )}
@@ -353,6 +362,13 @@ const Agenda = () => {
   
   // Walk-in dialog
   const [walkInDialogOpen, setWalkInDialogOpen] = useState(false);
+  // Flujo: completar expediente al marcar llegada
+  const [completarOpen, setCompletarOpen] = useState(false);
+  const [completarForm, setCompletarForm] = useState(null);
+  const [savingCompletar, setSavingCompletar] = useState(false);
+  const [igssUnits, setIgssUnits] = useState([]);
+  const completarPidRef = useRef(null);
+  const completarAccionRef = useRef(null);
   
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   
@@ -664,6 +680,71 @@ const Agenda = () => {
       toast.error('Error al cambiar estado');
     }
   };
+
+  // Cargar unidades IGSS para el formulario de completar expediente
+  useEffect(() => {
+    igssUnitApi.getAll().then(r => setIgssUnits(r.data?.data || r.data || [])).catch(() => {});
+  }, []);
+
+  const buildCompletarForm = (p) => ({
+    first_name: p.first_name || '', last_name: p.last_name || '', gender: p.gender || '',
+    birth_date: p.birth_date ? String(p.birth_date).substring(0, 10) : '', phone: p.phone || '',
+    dpi: p.dpi || '', address: p.address || '', referral_institution: p.referral_institution || '',
+    igss_unit_id: p.igss_unit_id || '', igss_afiliacion: p.igss_afiliacion || '', igss_no_sps: p.igss_no_sps || '',
+    igss_codigo: p.igss_codigo || '', igss_tipo_compra: p.igss_tipo_compra || '', igss_nog: p.igss_nog || '',
+  });
+
+  // Marcar llegada: si la ficha está incompleta, abrir formulario antes de pasar a Presente
+  const handleMarcarLlegada = async (cita) => {
+    if (!cita?.paciente_id) {
+      handleCambiarEstado(cita.id, 'Presente');
+      return;
+    }
+    try {
+      const { data: p } = await patientApi.getById(cita.paciente_id);
+      if (fichaIncompleta(p)) {
+        completarPidRef.current = p.id;
+        completarAccionRef.current = () => handleCambiarEstado(cita.id, 'Presente');
+        setCompletarForm(buildCompletarForm(p));
+        setCompletarOpen(true);
+        toast.info('Completa el expediente del paciente para registrar su llegada');
+      } else {
+        handleCambiarEstado(cita.id, 'Presente');
+      }
+    } catch (error) {
+      toast.error('No se pudo verificar el expediente del paciente');
+    }
+  };
+
+  const guardarCompletarFicha = async () => {
+    const f = completarForm;
+    if (!f.first_name.trim() || !f.last_name.trim() || !f.gender || !f.birth_date || !f.phone.trim() || !f.dpi.trim() || !f.address.trim() || !f.referral_institution) {
+      toast.error('Completa todos los campos obligatorios');
+      return;
+    }
+    if (f.dpi && !/^\d{13}$/.test(f.dpi)) {
+      toast.error('El DPI debe tener exactamente 13 dígitos');
+      return;
+    }
+    if (f.referral_institution === 'igss' && !f.igss_unit_id) {
+      toast.error('Selecciona la unidad IGSS');
+      return;
+    }
+    setSavingCompletar(true);
+    try {
+      await patientApi.update(completarPidRef.current, f);
+      setCompletarOpen(false);
+      const accion = completarAccionRef.current;
+      completarAccionRef.current = null;
+      toast.success('Expediente completado');
+      if (accion) await accion();
+    } catch (error) {
+      const d = error.response?.data?.detail;
+      toast.error(Array.isArray(d) ? d.map(x => x.msg).join(', ') : (d || 'No se pudo guardar el expediente'));
+    } finally {
+      setSavingCompletar(false);
+    }
+  };
   
   const handleEliminarCita = async (cita) => {
     if (!window.confirm('¿Eliminar esta cita? Se marcará como cancelada y dejará de aparecer en la agenda.')) return;
@@ -903,24 +984,42 @@ const Agenda = () => {
       toast.error('Seleccione paciente y médico');
       return;
     }
-    
+
+    const doCreateWalkIn = async () => {
+      try {
+        await agendaApi.createWalkIn({
+          paciente_id: citaForm.paciente_id,
+          paciente_nombre: citaForm.paciente_nombre,
+          medico_id: citaForm.medico_id,
+          medico_nombre: citaForm.medico_nombre,
+          tipo_cita: citaForm.tipo_cita,
+          notas: citaForm.notas
+        });
+        toast.success('Paciente registrado como presente');
+        setWalkInDialogOpen(false);
+        fetchCitas();
+        fetchContadores();
+        fetchPresentes();
+      } catch (error) {
+        toast.error('Error al registrar');
+      }
+    };
+
     try {
-      await agendaApi.createWalkIn({
-        paciente_id: citaForm.paciente_id,
-        paciente_nombre: citaForm.paciente_nombre,
-        medico_id: citaForm.medico_id,
-        medico_nombre: citaForm.medico_nombre,
-        tipo_cita: citaForm.tipo_cita,
-        notas: citaForm.notas
-      });
-      toast.success('Paciente registrado como presente');
-      setWalkInDialogOpen(false);
-      fetchCitas();
-      fetchContadores();
-      fetchPresentes();
+      const { data: p } = await patientApi.getById(citaForm.paciente_id);
+      if (fichaIncompleta(p)) {
+        setWalkInDialogOpen(false);
+        completarPidRef.current = p.id;
+        completarAccionRef.current = doCreateWalkIn;
+        setCompletarForm(buildCompletarForm(p));
+        setCompletarOpen(true);
+        toast.info('Completa el expediente del paciente para registrar su llegada');
+        return;
+      }
     } catch (error) {
-      toast.error('Error al registrar');
+      // Si no se pudo verificar, continuar con el registro normal
     }
+    await doCreateWalkIn();
   };
   
   const handleVerPaciente = (pacienteId) => {
@@ -1273,6 +1372,7 @@ const Agenda = () => {
                                     onEdit={handleOpenCitaDialog}
                                     onVerPaciente={handleVerPaciente}
                                     onNuevaEvaluacion={handleNuevaEvaluacion}
+                                    onMarcarLlegada={handleMarcarLlegada}
                                   />
                                 </div>
                               ))}
@@ -1521,6 +1621,7 @@ const Agenda = () => {
                           onEdit={handleOpenCitaDialog}
                           onVerPaciente={handleVerPaciente}
                           onNuevaEvaluacion={handleNuevaEvaluacion}
+                          onMarcarLlegada={handleMarcarLlegada}
                         />
                       ))
                   )}
@@ -1745,6 +1846,7 @@ const Agenda = () => {
                             onEdit={handleOpenCitaDialog}
                             onVerPaciente={handleVerPaciente}
                             onNuevaEvaluacion={handleNuevaEvaluacion}
+                            onMarcarLlegada={handleMarcarLlegada}
                           />
                         ))
                       )}
@@ -2061,6 +2163,71 @@ const Agenda = () => {
       </Dialog>
       
       {/* ==================== DIALOG: WALK-IN ==================== */}
+      {/* Modal: Completar expediente al marcar llegada */}
+      <Dialog open={completarOpen} onOpenChange={setCompletarOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" data-testid="completar-ficha-dialog">
+          <DialogHeader>
+            <DialogTitle>Completar expediente del paciente</DialogTitle>
+            <DialogDescription>Este paciente tiene datos pendientes. Complétalos para registrar su llegada.</DialogDescription>
+          </DialogHeader>
+          {completarForm && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-xs">Nombre *</Label><Input value={completarForm.first_name} onChange={(e) => setCompletarForm(p => ({ ...p, first_name: e.target.value }))} data-testid="cf-first-name" /></div>
+                <div><Label className="text-xs">Apellido *</Label><Input value={completarForm.last_name} onChange={(e) => setCompletarForm(p => ({ ...p, last_name: e.target.value }))} data-testid="cf-last-name" /></div>
+                <div>
+                  <Label className="text-xs">Sexo *</Label>
+                  <Select value={completarForm.gender} onValueChange={(v) => setCompletarForm(p => ({ ...p, gender: v }))}>
+                    <SelectTrigger data-testid="cf-gender"><SelectValue placeholder="Seleccione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="masculino">Masculino</SelectItem>
+                      <SelectItem value="femenino">Femenino</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-xs">Fecha de nacimiento *</Label><Input type="date" value={completarForm.birth_date} max={getGuatemalaDate()} onChange={(e) => setCompletarForm(p => ({ ...p, birth_date: e.target.value }))} data-testid="cf-birth-date" /></div>
+                <div><Label className="text-xs">Teléfono *</Label><Input value={completarForm.phone} onChange={(e) => setCompletarForm(p => ({ ...p, phone: e.target.value }))} data-testid="cf-phone" /></div>
+                <div><Label className="text-xs">DPI *</Label><Input value={completarForm.dpi} maxLength={13} onChange={(e) => setCompletarForm(p => ({ ...p, dpi: e.target.value.replace(/\D/g, '') }))} data-testid="cf-dpi" /></div>
+              </div>
+              <div><Label className="text-xs">Dirección *</Label><Input value={completarForm.address} onChange={(e) => setCompletarForm(p => ({ ...p, address: e.target.value }))} data-testid="cf-address" /></div>
+              <div>
+                <Label className="text-xs">Institución *</Label>
+                <Select value={completarForm.referral_institution} onValueChange={(v) => setCompletarForm(p => ({ ...p, referral_institution: v }))}>
+                  <SelectTrigger data-testid="cf-institution"><SelectValue placeholder="Seleccione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="particular">Particular</SelectItem>
+                    <SelectItem value="igss">IGSS</SelectItem>
+                    <SelectItem value="seguro_privado">Seguro Privado</SelectItem>
+                    <SelectItem value="otra">Otra</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {completarForm.referral_institution === 'igss' && (
+                <div className="grid grid-cols-2 gap-3 border-t pt-3">
+                  <div>
+                    <Label className="text-xs">Unidad IGSS *</Label>
+                    <Select value={completarForm.igss_unit_id} onValueChange={(v) => setCompletarForm(p => ({ ...p, igss_unit_id: v }))}>
+                      <SelectTrigger data-testid="cf-igss-unit"><SelectValue placeholder="Seleccione" /></SelectTrigger>
+                      <SelectContent>
+                        {igssUnits.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label className="text-xs">Afiliación</Label><Input value={completarForm.igss_afiliacion} onChange={(e) => setCompletarForm(p => ({ ...p, igss_afiliacion: e.target.value }))} /></div>
+                  <div><Label className="text-xs">No. SPS</Label><Input value={completarForm.igss_no_sps} onChange={(e) => setCompletarForm(p => ({ ...p, igss_no_sps: e.target.value }))} /></div>
+                  <div><Label className="text-xs">Código</Label><Input value={completarForm.igss_codigo} onChange={(e) => setCompletarForm(p => ({ ...p, igss_codigo: e.target.value }))} /></div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompletarOpen(false)}>Cancelar</Button>
+            <Button onClick={guardarCompletarFicha} disabled={savingCompletar} data-testid="cf-guardar">{savingCompletar ? 'Guardando...' : 'Guardar y marcar llegada'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={walkInDialogOpen} onOpenChange={setWalkInDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
