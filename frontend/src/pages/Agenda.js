@@ -1131,10 +1131,12 @@ const Agenda = () => {
     const doWalkInConSobrecupo = async () => {
       try {
         const fechaNow = getGuatemalaDate();
-        const horaNow = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Guatemala' }).format(new Date());
+        const horaRaw = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Guatemala' }).format(new Date());
+        const intervalo = config?.duracion_slot_minutos || 15;
+        const [hh, mm] = horaRaw.split(':').map(Number);
+        const horaNow = `${String(hh).padStart(2, '0')}:${String(Math.floor(mm / intervalo) * intervalo).padStart(2, '0')}`;
         const { data: chk } = await agendaApi.verificarHorario(citaForm.medico_id, fechaNow, horaNow, 20);
         if (chk.estado === 'lleno') {
-          setWalkInDialogOpen(false);
           sobrecupoActionRef.current = doCreateWalkIn;
           setSobrecupoInfo({ count: chk.ocupadas });
           setSobrecupoOpen(true);
@@ -1219,10 +1221,19 @@ const Agenda = () => {
       });
     });
     
+    const intervalo = config?.duracion_slot_minutos || 15;
+    const floorSlot = (hhmm) => {
+      const [h, m] = hhmm.split(':').map(Number);
+      const fm = Math.floor(m / intervalo) * intervalo;
+      return `${String(h).padStart(2, '0')}:${String(fm).padStart(2, '0')}`;
+    };
+
     citas.forEach(cita => {
       const medicoId = cita.medico_id;
       if (resultado[medicoId]) {
-        const slotKey = cita.hora_inicio;
+        // Ubicar la cita en su slot exacto o, si su hora no cae en la grilla
+        // (hora libre o walk-in), en el slot inferior más cercano para no ocultarla.
+        let slotKey = resultado[medicoId].slots[cita.hora_inicio] ? cita.hora_inicio : floorSlot(cita.hora_inicio);
         if (resultado[medicoId].slots[slotKey]) {
           resultado[medicoId].slots[slotKey].push({
             ...cita,
@@ -1268,7 +1279,7 @@ const Agenda = () => {
                 Limpiar duplicados
               </Button>
             )}
-            <Button onClick={() => handleOpenCitaDialog()} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => handleOpenCitaDialog()} className="bg-blue-600 hover:bg-blue-700" data-testid="nueva-cita-btn">
               <Plus className="w-4 h-4 mr-1" />
               Nueva Cita
             </Button>
@@ -1317,6 +1328,7 @@ const Agenda = () => {
                       value={fechaSeleccionada}
                       onChange={(e) => setFechaSeleccionada(e.target.value)}
                       className="w-40"
+                      data-testid="agenda-fecha-input"
                     />
                     <Button variant="outline" size="sm" onClick={() => navegarFecha(1)}>
                       <ChevronRight className="w-4 h-4" />
@@ -1743,7 +1755,7 @@ const Agenda = () => {
                       <Calendar className="w-5 h-5" />
                       Citas del día
                     </span>
-                    <Button variant="outline" size="sm" onClick={() => setWalkInDialogOpen(true)}>
+                    <Button variant="outline" size="sm" onClick={() => setWalkInDialogOpen(true)} data-testid="walkin-open-btn">
                       <Plus className="w-4 h-4 mr-1" /> Walk-in
                     </Button>
                   </CardTitle>
@@ -2141,6 +2153,7 @@ const Agenda = () => {
                       value={pacienteSearch}
                       onChange={(e) => setPacienteSearch(e.target.value)}
                       className="input-teal"
+                      data-testid="cita-paciente-search"
                     />
                     {pacienteResults.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
@@ -2202,12 +2215,12 @@ const Agenda = () => {
                   }));
                 }}
               >
-                <SelectTrigger className="input-teal">
+                <SelectTrigger className="input-teal" data-testid="cita-medico-select">
                   <SelectValue placeholder="Seleccionar médico" />
                 </SelectTrigger>
                 <SelectContent>
                   {medicos.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
+                    <SelectItem key={m.id} value={m.id} data-testid={`cita-medico-option-${m.id}`}>
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: m.color }} />
                         {m.name}
@@ -2227,6 +2240,7 @@ const Agenda = () => {
                   value={citaForm.fecha}
                   onChange={(e) => setCitaForm(prev => ({ ...prev, fecha: e.target.value }))}
                   className="input-teal"
+                  data-testid="cita-fecha-input"
                 />
               </div>
               <div className="space-y-2">
@@ -2236,6 +2250,7 @@ const Agenda = () => {
                   value={citaForm.hora_inicio}
                   onChange={(e) => setCitaForm(prev => ({ ...prev, hora_inicio: e.target.value }))}
                   className="input-teal"
+                  data-testid="cita-hora-input"
                 />
               </div>
             </div>
@@ -2298,6 +2313,7 @@ const Agenda = () => {
             </Button>
             <Button 
               onClick={handleSaveCita} 
+              data-testid="cita-guardar-btn"
               className="bg-blue-600 hover:bg-blue-700"
               disabled={creandoPaciente}
             >
@@ -2440,6 +2456,7 @@ const Agenda = () => {
                 <div className="relative">
                   <Input
                     placeholder="Buscar paciente..."
+                    data-testid="walkin-paciente-search"
                     value={pacienteSearch}
                     onChange={(e) => setPacienteSearch(e.target.value)}
                     className="input-teal"
@@ -2488,7 +2505,7 @@ const Agenda = () => {
                   }));
                 }}
               >
-                <SelectTrigger className="input-teal">
+                <SelectTrigger className="input-teal" data-testid="walkin-medico-select">
                   <SelectValue placeholder="Seleccionar médico" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2542,7 +2559,7 @@ const Agenda = () => {
             <Button variant="outline" onClick={() => setWalkInDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleWalkIn} className="bg-amber-600 hover:bg-amber-700">
+            <Button onClick={handleWalkIn} className="bg-amber-600 hover:bg-amber-700" data-testid="walkin-registrar-btn">
               <UserCheck className="w-4 h-4 mr-1" />
               Registrar como presente
             </Button>

@@ -1,0 +1,45 @@
+{
+  "summary": "Tested the SOBRECUPO feature end to end (backend + UI). Backend: 9/9 pytest tests pass. GET /agenda/verificar-horario returns 'libre' for a free Monday slot, 'no_disponible' with a reason for Sunday, out-of-hours times and a franja bloqueo (the reason is the bloqueo's motivo), and 'lleno' once max_citas_por_slot=3 is reached. A bad hora returns 400 and a request without auth returns 401/403. A 4th POST /citas into a full slot returns 200 (sobrecupo allowed), and verificar then reports ocupadas=4. POST /citas still returns 409 for Sunday, out-of-hours and bloqueo. Walk-in is still created as Presente. horarios-disponibles leaves out the full slot and proxima-cita into a full slot returns 409. UI, Nueva Cita: on a full slot (3 seeded at 09:40) the sobrecupo-dialog appears with the text 'Este horario ya está ocupado (3 citas). ¿Agendar de todos modos?'. Cancelar creates nothing and the form stays open. Retrying and clicking 'Agendar de todos modos' creates the cita ('Cita creada'), and the DB had exactly 4. A free slot (11:00) is created with no dialog. Sunday shows the toast 'No se puede agendar: El médico no atiende ese día', creates nothing and the form stays open. UI, Walk-in: with 3 citas at the current Guatemala minute for Dra. Ana García, the dialog appears. Cancelar creates nothing. Confirming registers the patient as Presente (exactly 1 walk-in in the DB). Sobrecupo badge: shown on all 4 shared-time citas in Tablero del Día and not on the 11:00 single cita. In Calendario/Día it shows on 3 citas sharing 10:30. Regression: the Próxima Cita hora selector in Evaluación does not list the full 10:30 slot, does list 11:00, and has no sobrecupo dialog. All test citas were deleted afterwards.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/agenda/verificar-horario", "issue": "Occupancy only counts citas whose hora_inicio is exactly the requested time. An overlapping cita (09:40 with 20 min) does not count against 09:45. The Walk-in caller passes the exact current minute (e.g. 10:24) while scheduled citas sit on slot boundaries (10:15/10:30), so the walk-in sobrecupo dialog almost never triggers in real use. It only triggered in testing because 3 citas were seeded at the exact current minute."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Agenda Calendario vista Día (citasPorMedicoYSlot)", "issue": "Citas whose hora_inicio is not aligned to the slot grid (Nueva Cita lets the user type any time, e.g. 09:40, and all walk-ins use the exact minute, e.g. 10:24) are silently NOT rendered in the Day view, because slots[cita.hora_inicio] does not exist. The doctor header counter showed 8 citas but only 4 were visible. Sobrecupo badges for those citas are also invisible there. This existed before, but sobrecupo/walk-in makes it more visible.", "selector": "[data-testid^='slot-<medicoId>-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Walk-in sobrecupo", "issue": "The check uses the exact HH:MM of now rather than the current slot, so in practice it rarely detects a full slot (see backend minor). Suggest rounding now down to duracion_slot_minutos, or counting overlapping active citas.", "affected_selectors": ["[data-testid='walkin-registrar-btn']", "[data-testid='sobrecupo-dialog']"]}
+    ],
+    "design_issues": [
+      {"screen": "Walk-in + sobrecupo dialog", "issues": ["The walk-in dialog is closed before the sobrecupo confirmation opens, so pressing Cancelar leaves the user with no dialog. The form state is kept, but the user has to click Walk-in again."]},
+      {"screen": "Nueva Cita / Agenda header", "issues": ["Uses the browser's native input type=date and type=time pickers instead of the shadcn Calendar/Popover (inconsistent look)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_agenda_sobrecupo.py", "/app/test_reports/pytest/pytest_sobrecupo.xml"],
+  "action_items": [
+    "Calendario Día: place citas with non-aligned hora_inicio into the floor slot (e.g. 09:40 -> 09:30 bucket) so they are not hidden, including walk-ins.",
+    "Walk-in sobrecupo: compute the slot from now (floor to duracion_slot_minutos) before calling verificarHorario, and/or make verificar-horario count overlapping citas instead of only an exact hora_inicio match.",
+    "Optional UX: keep the walk-in dialog open (or reopen it) when the user cancels the sobrecupo confirmation."
+  ],
+  "critical_code_review_comments": [
+    "Agenda.js is about 2590 lines. Split it into modules (CitaDialog, WalkInDialog, DayView, Tablero, SobrecupoDialog).",
+    "handleSaveCita swallows verificarHorario errors and continues. That is acceptable, but log the error or show a toast for observability.",
+    "Check-then-create is not atomic (two users can both see 'libre'). This is acceptable because sobrecupo is allowed.",
+    "Walk-in skips the 'no_disponible' state (it registers even on non-working days or bloqueos). This matches the spec (hard block only for Nueva Cita), but should be confirmed with the product owner.",
+    "Sobrecupo badge keying (medico|fecha|hora_inicio, excluding Cancelada/No asistió) is correct, but it ignores overlapping times that are not identical."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_agenda_sobrecupo.py",
+    "/app/frontend/src/pages/Agenda.js (only added data-testids: nueva-cita-btn, cita-paciente-search, cita-medico-select, cita-medico-option-<id>, cita-fecha-input, cita-hora-input, cita-guardar-btn, walkin-open-btn, walkin-paciente-search, walkin-medico-select, walkin-registrar-btn, agenda-fecha-input)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "~90% (all requested flows pass; Day view hides non-slot-aligned citas; walk-in check rarely triggers in real use)"},
+  "test_credentials": "superadmin / nova2024 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Temporary citas (TEST_Seed*, Juan Perez Lopez 5ae39833...) on 2026-10-26 for Dr. Méndez and on 2026-10-15 for Dra. Ana García, plus 1 walk-in. All were deleted after testing (verified empty).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use Dr. Carlos Méndez (a8bb541a-..., Monday 08:00-12:00 only) on 2026-10-26 and Sunday 2026-10-25. For walk-in sobrecupo, use Dra. Ana García (b05ac3a9-..., no horario_semanal) today and seed 3 citas at the exact current America/Guatemala HH:MM (plus the next few minutes). Patient Juan Perez Lopez 5ae39833-4321-40cb-b292-5f3c1bcd4ca7 has a complete ficha, so no completar-ficha dialog appears. Reopening the walk-in dialog keeps the selected patient, so walkin-paciente-search is hidden. Day view only renders citas whose hora_inicio is slot-aligned, so test badges there at :00/:15/:30/:45.",
+  "rca of the issue": "Day view hidden citas: citasPorMedicoYSlot() pushes a cita into resultado[medico].slots[cita.hora_inicio] only if that exact key exists among generarSlots() (15-min steps), so non-aligned times are dropped. Walk-in check: doWalkInConSobrecupo passes the current minute to verificar-horario, which counts with an exact hora_inicio equality filter."
+}
