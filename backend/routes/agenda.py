@@ -1033,6 +1033,26 @@ async def crear_proxima_cita(
     motivo, _bloqueo = await motivo_no_disponible(cita_data.medico_id, cita_data.fecha, cita_data.hora_inicio, hora_fin)
     if motivo:
         raise HTTPException(status_code=409, detail=f"No se puede agendar: {motivo}")
+
+    # No permitir fechas/horas pasadas (consistente con horarios-disponibles)
+    hoy = today_str_gt()
+    if cita_data.fecha < hoy:
+        raise HTTPException(status_code=409, detail="No se puede agendar: la fecha ya pasó")
+    if cita_data.fecha == hoy and cita_data.hora_inicio <= now_gt().strftime("%H:%M"):
+        raise HTTPException(status_code=409, detail="No se puede agendar: la hora ya pasó")
+
+    # Respetar el sobrecupo máximo por horario (max_citas_por_slot)
+    config = await get_agenda_config()
+    max_por_slot = int(config.get("max_citas_por_slot") or 1)
+    ocupados = await db.citas.count_documents({
+        "tipo_agenda": "pacientes",
+        "medico_id": cita_data.medico_id,
+        "fecha": cita_data.fecha,
+        "hora_inicio": cita_data.hora_inicio,
+        "estado": {"$nin": [EstadoCita.CANCELADA.value, EstadoCita.NO_ASISTIO.value]}
+    })
+    if ocupados >= max_por_slot:
+        raise HTTPException(status_code=409, detail="No se puede agendar: el horario ya está lleno")
     
     cita_doc = {
         "id": str(uuid.uuid4()),

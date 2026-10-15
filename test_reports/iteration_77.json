@@ -1,0 +1,37 @@
+{
+  "summary": "Tested the 'Próxima Cita' feature in Evaluación Oftalmológica end to end (backend + UI). Backend: 10/10 tests passed, 1 skipped. GET /api/agenda/horarios-disponibles returns {disponible, motivo, slots, duracion}. On a Monday it returns 15 slots (08:00-11:30, every 15 min; Dr. Méndez works Monday 08:00-12:00 only). On a Sunday it returns disponible=false, motivo 'El médico no atiende ese día', slots=[]. An invalid date returns 400 and a missing token returns 401/403. POST /api/agenda/proxima-cita creates the appointment with estado Agendada, and the tipo_cita and notas show up in GET /agenda/citas. A duplicate returns 400. Sunday, out-of-hours (23:00) and a blocked time range all return 409 with the reason. A full slot (max_citas_por_slot=3) disappears from the list. UI: the tipo selector shows exactly the 6 types with 'Control' as default. Choosing a Sunday shows the proxima-cita-motivo message and disables the hora selector ('Sin horarios'). Choosing a Monday fills the selector with proxima-cita-slot-* options. Saving creates the appointment (toasts 'Próxima cita agendada' + 'Evaluación guardada correctamente'). It appears in Agenda Calendario/Día and Tablero del Día with 'Lectura de estudios' and the note. Saving again shows the info toast 'Ya existe una cita para esa fecha y hora' and the evaluation still saves.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/agenda/proxima-cita", "issue": "Does not enforce max_citas_por_slot. A 4th appointment at a slot that horarios-disponibles already treats as full was accepted (200). Only the frontend list blocks it, so a direct API call or a stale UI can overbook."},
+      {"endpoint": "POST /api/agenda/proxima-cita", "issue": "No check against past dates or past times. Appointments dated 2026-06-15 were created even though the server date is 2026-10-15. The frontend min attribute on the date field is the only guard."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Re-saving an evaluation with proxima_cita.agendar=true", "issue": "guardarEvaluacion calls createProximaCita on every save. Saving again unchanged shows a 'Ya existe una cita' toast each time. If the user changes the hour or date and saves again, a SECOND appointment is created and the first one stays (duplicate appointments for the patient). Suggest storing the created cita id on the evaluation (or setting agendar=false / showing 'cita agendada' after success) and updating that cita instead of creating a new one.", "affected_selectors": ["proxima-cita-hora"]}
+    ],
+    "design_issues": [
+      {"screen": "Evaluación > Próxima Cita", "issues": ["The Fecha field is the browser's native input type=date, not the shadcn Calendar/Popover", "The checkbox (#agendar_cita), Médico select, Fecha input and Notas input have no data-testid (only tipo/hora/slot/motivo do)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_proxima_cita_horarios.py", "/app/test_reports/pytest/pytest_proxima_cita.xml"],
+  "action_items": [
+    "Prevent duplicate or extra appointments when an evaluation with agendar=true is saved again (keep track of the created cita and update it instead)",
+    "Enforce max_citas_por_slot and reject past dates/times in POST /api/agenda/proxima-cita",
+    "Add data-testid to proxima-cita checkbox, médico select, fecha input and notas input; consider the shadcn date picker"
+  ],
+  "critical_code_review_comments": [
+    "EvaluacionOftalmologica.js is about 3287 lines and agenda.py about 1384 lines; both should be split",
+    "horarios_disponibles repeats the bloqueo/horario logic from verificar_bloqueo/verificar_horario_medico (DRY); share it so GET and POST cannot drift (e.g. the max_por_slot check exists only in GET)",
+    "The duplicate check in crear_proxima_cita matches paciente+fecha+hora_inicio only, so the same patient can still get an appointment that overlaps by 5-15 minutes"
+  ],
+  "updated_files": ["/app/backend/tests/test_proxima_cita_horarios.py"],
+  "success_rate": {"backend": "100% (10/10, 1 skipped)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Test appointments (paciente_id/notas prefixed TEST_) and a TEST_bloqueo were created and then deleted. The UI test saved one evaluation for patient María García López (8c8723a3-...) on the server date 2026-10-15; that evaluation was not deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The container clock is 2026-10-15, so the suggested dates 2026-06-14/15 are in the past (the backend accepts them anyway). For UI tests use a future Monday such as 2026-10-26. Dr. Carlos Méndez (a8bb541a-...) works only Monday 08:00-12:00 (other days inactive). The 'Nueva' button clears the selected patient, so click Nueva first and then search/select the patient. Agenda day slots use data-testid slot-<medicoId>-<HH:MM>.",
+  "test_credentials": "superadmin/nova2024 worked (from /app/memory/test_credentials.md)"
+}

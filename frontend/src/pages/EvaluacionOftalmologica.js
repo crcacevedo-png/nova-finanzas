@@ -1088,10 +1088,10 @@ const EvaluacionOftalmologica = () => {
         }
       }
       
-      // Crear próxima cita si está habilitada
-      if (formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && formData.proxima_cita?.hora && formData.proxima_cita?.medico_id) {
+      // Crear próxima cita si está habilitada (solo una vez; evita duplicados al re-guardar)
+      if (formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && formData.proxima_cita?.hora && formData.proxima_cita?.medico_id && !formData.proxima_cita?.cita_id) {
         try {
-          await agendaApi.createProximaCita({
+          const citaResp = await agendaApi.createProximaCita({
             paciente_id: formData.paciente_id,
             paciente_nombre: formData.paciente_nombre,
             medico_id: formData.proxima_cita.medico_id,
@@ -1102,6 +1102,7 @@ const EvaluacionOftalmologica = () => {
             notas: formData.proxima_cita.notas,
             evaluacion_id: evaluacionId
           });
+          updateNestedField('proxima_cita.cita_id', citaResp?.data?.id || 'creada');
           toast.success('Próxima cita agendada');
         } catch (citaError) {
           const st = citaError.response?.status;
@@ -2480,6 +2481,7 @@ const EvaluacionOftalmologica = () => {
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="agendar_cita"
+                    data-testid="proxima-cita-agendar"
                     checked={formData.proxima_cita?.agendar || false}
                     onCheckedChange={(checked) => updateNestedField('proxima_cita.agendar', checked)}
                     disabled={isReadOnly}
@@ -2503,7 +2505,7 @@ const EvaluacionOftalmologica = () => {
                           }}
                           disabled={isReadOnly}
                         >
-                          <SelectTrigger className="input-teal h-8 text-xs">
+                          <SelectTrigger className="input-teal h-8 text-xs" data-testid="proxima-cita-medico">
                             <SelectValue placeholder="Seleccionar médico" />
                           </SelectTrigger>
                           <SelectContent>
@@ -2536,6 +2538,7 @@ const EvaluacionOftalmologica = () => {
                         <Label className="text-xs">Fecha</Label>
                         <Input
                           type="date"
+                          data-testid="proxima-cita-fecha"
                           value={formData.proxima_cita?.fecha || ''}
                           onChange={(e) => updateNestedField('proxima_cita.fecha', e.target.value)}
                           disabled={isReadOnly}
@@ -2576,6 +2579,7 @@ const EvaluacionOftalmologica = () => {
                       <Label className="text-xs">Notas</Label>
                       <Input
                         value={formData.proxima_cita?.notas || ''}
+                        data-testid="proxima-cita-notas"
                         onChange={(e) => updateNestedField('proxima_cita.notas', e.target.value)}
                         disabled={isReadOnly}
                         placeholder="Indicaciones para la próxima cita..."
