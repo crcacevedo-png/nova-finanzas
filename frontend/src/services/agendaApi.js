@@ -79,6 +79,9 @@ export const agendaApi = {
 
   getHorariosDisponibles: (medicoId, fecha, duracion = 20) =>
     axios.get(`${API_URL}/api/agenda/horarios-disponibles?medico_id=${medicoId}&fecha=${fecha}&duracion=${duracion}`, getAuthHeaders()),
+
+  verificarHorario: (medicoId, fecha, hora, duracion = 20) =>
+    axios.get(`${API_URL}/api/agenda/verificar-horario?medico_id=${medicoId}&fecha=${fecha}&hora=${hora}&duracion=${duracion}`, getAuthHeaders()),
   
   // Configuración
   getConfig: () => axios.get(`${API_URL}/api/agenda/configuracion`, getAuthHeaders()),

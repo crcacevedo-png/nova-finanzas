@@ -1185,6 +1185,42 @@ async def horarios_disponibles(
     return {"disponible": bool(slots), "motivo": motivo, "slots": slots, "duracion": duracion}
 
 
+@router.get("/verificar-horario")
+async def verificar_horario(
+    medico_id: str = Query(...),
+    fecha: str = Query(..., description="YYYY-MM-DD"),
+    hora: str = Query(..., description="HH:MM"),
+    duracion: int = Query(20),
+    current_user: dict = Depends(get_current_user)
+):
+    """Verifica un horario puntual para agendar desde la Agenda.
+    Devuelve estado: 'no_disponible' (bloqueo/horario médico), 'lleno' (alcanzó
+    el cupo máximo por franja) o 'libre'. No crea nada; el sobrecupo se permite
+    tras confirmación del usuario."""
+    try:
+        hora_inicio_dt = datetime.strptime(hora, "%H:%M")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Hora inválida")
+    hora_fin = (hora_inicio_dt + timedelta(minutes=duracion)).strftime("%H:%M")
+
+    motivo, _bloqueo = await motivo_no_disponible(medico_id, fecha, hora, hora_fin)
+    if motivo:
+        return {"estado": "no_disponible", "motivo": motivo, "ocupadas": 0}
+
+    config = await get_agenda_config()
+    max_por_slot = int(config.get("max_citas_por_slot") or 1)
+    ocupadas = await db.citas.count_documents({
+        "tipo_agenda": "pacientes",
+        "medico_id": medico_id,
+        "fecha": fecha,
+        "hora_inicio": hora,
+        "estado": {"$nin": [EstadoCita.CANCELADA.value, EstadoCita.NO_ASISTIO.value]}
+    })
+    if ocupadas >= max_por_slot:
+        return {"estado": "lleno", "motivo": None, "ocupadas": ocupadas}
+    return {"estado": "libre", "motivo": None, "ocupadas": ocupadas}
+
+
 # ==================== BLOQUEOS DE AGENDA ====================
 
 def _bloqueo_to_response(b: dict) -> dict:

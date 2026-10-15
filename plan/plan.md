@@ -1,49 +1,47 @@
-# Agendar la próxima cita desde la Evaluación Oftalmológica
+# Sobrecupo de citas en la Agenda
 
-Permite que, al terminar una evaluación, se agende la siguiente cita del paciente con los mismos tipos de consulta de la agenda y eligiendo solo entre los horarios realmente disponibles del médico. La cita queda visible en la agenda con su tipo de consulta y sus notas, igual que cualquier otra cita.
+Permite agendar una cita aunque el horario del médico ya esté ocupado, avisando primero que el espacio está tomado y pidiendo confirmación. Sigue sin permitir agendar fuera del horario de atención del médico ni sobre bloqueos ya colocados.
 
 ## Para quién es
-Médicos y personal de recepción de la clínica NovaVisión que atienden pacientes y necesitan dejar programada la cita de control/seguimiento sin salir de la pantalla de evaluación.
+Personal de recepción y médicos de la clínica NovaVisión que gestionan citas desde la pantalla de Agenda y a veces necesitan encajar un paciente adicional en un horario que ya tiene citas.
 
 ## Funciones y experiencia principales
-- **Tipos de consulta unificados.** El selector "Tipo de cita" del panel "Próxima Cita" ofrece exactamente la misma lista que la pantalla "Nueva Cita" de la agenda: Primera Consulta, Control, Control Post Operatorio, Lectura de estudios, Procedimiento y Emergencia. (Hoy muestra una lista distinta: Subsecuente, Control post-operatorio, Estudio, Otro.)
-- **Solo horarios disponibles del médico.** Al elegir médico y fecha, el sistema calcula y muestra únicamente las horas libres de ese médico para ese día, tomando en cuenta su horario de atención, los días/franjas bloqueados y las citas ya agendadas. El usuario escoge una de esas horas en lugar de escribir una hora libre.
-- **Bloqueo real fuera de disponibilidad.** Si el médico no atiende ese día, el día está bloqueado o no quedan horas libres, el panel lo indica con el motivo y no deja agendar. No se crea ninguna cita en esos casos.
-- **La cita aparece en la agenda con tipo y notas.** La cita agendada desde la evaluación se ve en la agenda (Calendario, Tablero del Día y Pacientes Presentes) mostrando su tipo de consulta y el texto de las notas, igual que las citas creadas desde la agenda.
-- **La evaluación se guarda aunque no se agende.** Si por disponibilidad no se puede crear la cita, la evaluación igual se guarda normalmente y se avisa que la cita no se agendó para que el usuario elija otra fecha/hora.
+- **Agendar sobre un horario ocupado.** Al crear una cita (o registrar un walk-in) desde la Agenda en una hora que ya alcanzó su cupo, el sistema permite continuar en lugar de bloquear.
+- **Aviso y confirmación.** Antes de guardar en un horario lleno, aparece un mensaje claro ("Este horario ya está ocupado (X citas). ¿Agendar de todos modos?") y la cita solo se crea si el usuario confirma. Si cancela, no se crea nada.
+- **Límites que se mantienen.** No se puede agendar fuera del horario de atención del médico ese día, ni en días/franjas bloqueadas, ni en días no laborables. En esos casos se muestra el motivo y no se permite agendar (igual que hoy).
+- **Solo desde la Agenda.** El sobrecupo está disponible únicamente al agendar desde la Agenda (Nueva Cita y Walk-in). La opción "Próxima Cita" dentro de la Evaluación sigue mostrando solo horarios libres y no permite sobrecupo.
+- **Identificación visual.** Las citas que comparten un mismo horario (sobrecupo) se distinguen con una etiqueta "Sobrecupo" en la Agenda, para ver de un vistazo cuándo hay más de un paciente en la misma franja.
 
 ## Flujo del usuario
-1. En la evaluación, el usuario activa "Agendar próxima cita para este paciente".
-2. Elige el médico (por defecto, el médico de la evaluación si aplica).
-3. Elige el tipo de consulta de la lista unificada.
-4. Elige la fecha. Al hacerlo, el sistema carga las horas disponibles de ese médico para ese día.
-5. Elige una de las horas disponibles. Si no hay horas libres (día no laborable, bloqueo o agenda llena), se muestra el motivo y no se puede continuar con esa fecha.
-6. Opcionalmente escribe notas para la próxima cita.
-7. Al guardar la evaluación, la cita se crea y queda visible en la agenda con su tipo y notas. Si la hora dejó de estar disponible entre tanto, se avisa el motivo y la cita no se crea (la evaluación sí se guarda).
+1. En la Agenda, el usuario abre "Nueva Cita" (o "Walk-in") y elige médico, fecha y hora.
+2. Si la fecha/hora cae fuera del horario del médico o sobre un bloqueo, el sistema lo indica con el motivo y no deja continuar.
+3. Si el horario es válido pero ya está lleno, el sistema avisa que está ocupado y pregunta si desea agendar de todos modos.
+4. Si el usuario confirma, la cita se crea y queda visible en la Agenda marcada como "Sobrecupo"; si cancela, no se crea.
+5. Si el horario está libre, la cita se crea normalmente sin aviso.
 
-## Sensación de la interfaz (UI/UX)
-Se mantiene el estilo actual del panel "Próxima Cita" dentro de la evaluación (mismos colores, tamaños y disposición en dos columnas). El único cambio visible es que el campo de hora pasa de ser una hora escrita libremente a una lista/selección de horas disponibles, y que aparece un mensaje claro de motivo cuando no hay disponibilidad. El selector de tipo de cita conserva su apariencia, solo cambian las opciones.
+## UI/UX feel
+Se mantiene el estilo actual de la Agenda y de los formularios de Nueva Cita y Walk-in. El aviso de ocupación aparece como un cuadro de confirmación breve con dos acciones ("Agendar de todos modos" / "Cancelar"). La etiqueta "Sobrecupo" es una insignia discreta en color de advertencia (ámbar) dentro de la tarjeta de la cita, sin alterar el resto de la tarjeta.
 
 ## Fases de implementación
 **Fase 1 (MVP — se construye ahora):**
-- Unificar el selector de tipo de cita con la lista de la agenda.
-- Mostrar solo las horas disponibles del médico para la fecha elegida (según horario del médico, bloqueos y citas existentes).
-- Bloquear el agendado con mensaje de motivo cuando no haya disponibilidad.
-- Asegurar que la cita creada se vea en la agenda con tipo de consulta y notas, y que la evaluación se guarde aunque la cita no pueda crearse.
+- Permitir agendar en horarios ocupados desde Nueva Cita y Walk-in, con aviso y confirmación previa.
+- Mantener el bloqueo para horarios fuera de atención del médico y sobre bloqueos existentes.
+- Mostrar la etiqueta "Sobrecupo" en las citas que comparten horario en la Agenda.
+- Mantener sin cambios la "Próxima Cita" de la Evaluación (solo horarios libres).
 
 **Fase 2 (después):**
-- Elegir la duración de la próxima cita (hoy es fija en 20 minutos) y que las horas disponibles se ajusten a esa duración.
-- Ver en el mismo panel un resumen de la agenda de ese médico ese día (cuántas citas ya tiene) antes de elegir la hora.
+- Mostrar en el aviso cuántas citas y de qué pacientes ya existen en ese horario antes de confirmar.
+- Indicador de cupo por franja en la vista de calendario (p. ej. "2/3", "lleno", "sobrecupo").
 
 **Fase 3 (después):**
-- Reprogramar/cancelar la cita agendada directamente desde la evaluación.
-- Confirmación automática al paciente (recordatorio) de la próxima cita.
+- Reglas de sobrecupo por médico o por tipo de cita (p. ej. permitir sobrecupo solo a ciertos médicos o solo para emergencias).
+- Reporte de horarios con sobrecupo recurrente para ajustar la agenda.
 
-## Supuestos
-- Los tipos de consulta serán exactamente los de la lista de la agenda (Primera Consulta, Control, Control Post Operatorio, Lectura de estudios, Procedimiento, Emergencia). El valor por defecto sugerido será "Control" por tratarse de un seguimiento; el usuario puede cambiarlo.
-- La duración de cada cita se mantiene en 20 minutos (igual que hoy en la próxima cita), por lo que las horas disponibles se muestran en intervalos coherentes con la configuración de la agenda.
-- "Horas disponibles" significa: dentro del horario de atención del médico ese día de la semana, fuera de días/franjas bloqueados, y sin superar el máximo de citas por horario que ya permite la configuración de la agenda (es decir, se respeta el sobrecupo permitido actualmente; una hora solo se oculta cuando está llena según esa configuración).
-- Si un médico no tiene horario de atención configurado, se usan como referencia el horario de apertura y cierre y los días laborables de la configuración general de la agenda.
-- Las fechas y horas siguen la hora de Guatemala, como en el resto del sistema.
-- La cita se crea al guardar la evaluación (comportamiento actual); no se agrega un botón separado para crear la cita antes de guardar.
-- No se modifica la pantalla "Nueva Cita" de la agenda ni el comportamiento de las citas existentes; el cambio es solo en el panel "Próxima Cita" de la evaluación y en el cálculo de disponibilidad que lo alimenta.
+## Assumptions
+- El sobrecupo aplica a Nueva Cita y Walk-in de la Agenda; no aplica a la "Próxima Cita" de la Evaluación, que sigue ofreciendo solo horarios libres.
+- "Ocupado/lleno" significa que el horario ya alcanzó el máximo de citas por franja definido en la configuración de la agenda; al confirmar, el sobrecupo no tiene un tope adicional.
+- Se pide confirmación una sola vez por cita, justo antes de guardar.
+- La etiqueta "Sobrecupo" se muestra en las citas que comparten la misma hora de inicio con otra cita del mismo médico ese día.
+- No hay un permiso especial por rol: cualquier usuario que ya puede agendar desde la Agenda puede confirmar un sobrecupo.
+- No se modifica el comportamiento de bloqueos ni de horarios de atención; solo se relaja el límite de cupo por franja al agendar desde la Agenda.
+- Fechas y horas siguen la hora de Guatemala, como en el resto del sistema.

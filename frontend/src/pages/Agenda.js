@@ -27,6 +27,10 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
+  AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel
+} from '../components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -97,7 +101,7 @@ const formatTime = (time) => {
 };
 
 // Componente de tarjeta de cita compacta
-const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, onMarcarLlegada, compact = false }) => {
+const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, onMarcarLlegada, compact = false, sobrecupo = false }) => {
   const estadoConfig = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
   const IconoEstado = estadoConfig.icon;
   
@@ -112,10 +116,15 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
       <div className="flex items-start justify-between gap-1">
         <div className="flex-1 min-w-0">
           <div className="font-medium truncate">{cita.paciente_nombre}</div>
-          <div className="text-xs opacity-75 flex items-center gap-1">
+          <div className="text-xs opacity-75 flex items-center gap-1 flex-wrap">
             <Clock className="w-3 h-3" />
             {formatTime(cita.hora_inicio)}
             {cita.tipo_cita && <span className="ml-1">• {cita.tipo_cita}</span>}
+            {sobrecupo && (
+              <Badge className="ml-1 bg-amber-100 text-amber-800 border border-amber-300 text-[10px] px-1.5 py-0 h-auto" data-testid={`sobrecupo-badge-${cita.id}`}>
+                Sobrecupo
+              </Badge>
+            )}
           </div>
           {cita.notas && (
             <div className="text-xs opacity-80 mt-0.5 flex items-start gap-1" data-testid={`cita-notas-${cita.id}`}>
@@ -342,6 +351,12 @@ const Agenda = () => {
   const [miAgendaVista, setMiAgendaVista] = useState('dia');
   const [miSemana, setMiSemana] = useState(null);
   const [config, setConfig] = useState(null);
+
+  // Confirmación de sobrecupo (horario lleno)
+  const [sobrecupoOpen, setSobrecupoOpen] = useState(false);
+  const [sobrecupoInfo, setSobrecupoInfo] = useState({ count: 0 });
+  const sobrecupoActionRef = useRef(null);
+
   
   // Filtros
   const [medicoFiltro, setMedicoFiltro] = useState('todos');
@@ -423,6 +438,24 @@ const Agenda = () => {
     () => medicosOrdenadosTodos.filter(m => !medicosOcultos.includes(m.id)),
     [medicosOrdenadosTodos, medicosOcultos]
   );
+
+  // Set de horarios con sobrecupo (misma hora_inicio y médico, >1 cita activa ese día)
+  const sobrecupoKeySet = React.useMemo(() => {
+    const counts = {};
+    (citas || [])
+      .filter(c => !['Cancelada', 'No asistió'].includes(c.estado))
+      .forEach(c => {
+        const k = `${c.medico_id}|${c.fecha}|${c.hora_inicio}`;
+        counts[k] = (counts[k] || 0) + 1;
+      });
+    return new Set(Object.keys(counts).filter(k => counts[k] > 1));
+  }, [citas]);
+
+  const esSobrecupo = useCallback(
+    (cita) => sobrecupoKeySet.has(`${cita.medico_id}|${cita.fecha}|${cita.hora_inicio}`),
+    [sobrecupoKeySet]
+  );
+
   
   const ordenMedicoIdx = useCallback((id) => {
     const i = medicosOrden.indexOf(id);
@@ -951,24 +984,7 @@ const Agenda = () => {
     }
   };
   
-  const handleSaveCita = async () => {
-    // Si es paciente nuevo, validar campos adicionales
-    if (citaForm.es_paciente_nuevo) {
-      if (!citaForm.paciente_nombre.trim()) {
-        toast.error('Ingrese el nombre del paciente');
-        return;
-      }
-      if (!citaForm.medico_id) {
-        toast.error('Seleccione un médico');
-        return;
-      }
-    } else {
-      if (!citaForm.paciente_id || !citaForm.medico_id) {
-        toast.error('Seleccione paciente y médico');
-        return;
-      }
-    }
-    
+  const ejecutarGuardarCita = async () => {
     try {
       let pacienteId = citaForm.paciente_id;
       let pacienteNombre = citaForm.paciente_nombre;
@@ -1060,6 +1076,30 @@ const Agenda = () => {
       toast.error(errorMsg);
     }
   };
+
+  const handleSaveCita = async () => {
+    // Validaciones
+    if (citaForm.es_paciente_nuevo) {
+      if (!citaForm.paciente_nombre.trim()) { toast.error('Ingrese el nombre del paciente'); return; }
+      if (!citaForm.medico_id) { toast.error('Seleccione un médico'); return; }
+    } else {
+      if (!citaForm.paciente_id || !citaForm.medico_id) { toast.error('Seleccione paciente y médico'); return; }
+    }
+    // Verificar sobrecupo solo al crear (no al editar)
+    if (!editingCita && citaForm.medico_id && citaForm.fecha && citaForm.hora_inicio) {
+      try {
+        const { data: chk } = await agendaApi.verificarHorario(citaForm.medico_id, citaForm.fecha, citaForm.hora_inicio, citaForm.duracion_minutos);
+        if (chk.estado === 'no_disponible') { toast.error(`No se puede agendar: ${chk.motivo}`); return; }
+        if (chk.estado === 'lleno') {
+          sobrecupoActionRef.current = ejecutarGuardarCita;
+          setSobrecupoInfo({ count: chk.ocupadas });
+          setSobrecupoOpen(true);
+          return;
+        }
+      } catch (e) { /* si falla la verificación, continuar con el guardado normal */ }
+    }
+    await ejecutarGuardarCita();
+  };
   
   const handleWalkIn = async () => {
     if (!citaForm.paciente_id || !citaForm.medico_id) {
@@ -1087,13 +1127,30 @@ const Agenda = () => {
       }
     };
 
+    // Verifica cupo del horario actual; si está lleno pide confirmación (sobrecupo)
+    const doWalkInConSobrecupo = async () => {
+      try {
+        const fechaNow = getGuatemalaDate();
+        const horaNow = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Guatemala' }).format(new Date());
+        const { data: chk } = await agendaApi.verificarHorario(citaForm.medico_id, fechaNow, horaNow, 20);
+        if (chk.estado === 'lleno') {
+          setWalkInDialogOpen(false);
+          sobrecupoActionRef.current = doCreateWalkIn;
+          setSobrecupoInfo({ count: chk.ocupadas });
+          setSobrecupoOpen(true);
+          return;
+        }
+      } catch (e) { /* si falla la verificación, continuar con el registro normal */ }
+      await doCreateWalkIn();
+    };
+
     try {
       const { data: p } = await patientApi.getById(citaForm.paciente_id);
       if (fichaIncompleta(p)) {
         setWalkInDialogOpen(false);
         vincularCitaRef.current = null;
         completarPidRef.current = p.id;
-        completarAccionRef.current = doCreateWalkIn;
+        completarAccionRef.current = doWalkInConSobrecupo;
         setCompletarEsNuevo(false);
         setCompletarModo('completar');
         setCompletarForm(buildCompletarForm(p));
@@ -1104,7 +1161,7 @@ const Agenda = () => {
     } catch (error) {
       // Si no se pudo verificar, continuar con el registro normal
     }
-    await doCreateWalkIn();
+    await doWalkInConSobrecupo();
   };
   
   const handleVerPaciente = (pacienteId) => {
@@ -1452,6 +1509,7 @@ const Agenda = () => {
                                   <CitaCard
                                     cita={cita}
                                     compact
+                                    sobrecupo={esSobrecupo(cita)}
                                     onEstadoChange={handleCambiarEstado}
                                     onEliminar={handleEliminarCita}
                                     onEdit={handleOpenCitaDialog}
@@ -1701,6 +1759,7 @@ const Agenda = () => {
                         <CitaCard
                           key={cita.id}
                           cita={{...cita, medico_color: medicos.find(m => m.id === cita.medico_id)?.color}}
+                          sobrecupo={esSobrecupo(cita)}
                           onEliminar={handleEliminarCita}
                           onEstadoChange={handleCambiarEstado}
                           onEdit={handleOpenCitaDialog}
@@ -1927,6 +1986,7 @@ const Agenda = () => {
                             key={cita.id}
                             onEliminar={handleEliminarCita}
                             cita={cita}
+                            sobrecupo={esSobrecupo(cita)}
                             onEstadoChange={handleCambiarEstado}
                             onEdit={handleOpenCitaDialog}
                             onVerPaciente={handleVerPaciente}
@@ -2489,6 +2549,37 @@ const Agenda = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={sobrecupoOpen} onOpenChange={setSobrecupoOpen}>
+        <AlertDialogContent data-testid="sobrecupo-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Horario ocupado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este horario ya está ocupado ({sobrecupoInfo.count} {sobrecupoInfo.count === 1 ? 'cita' : 'citas'}). ¿Agendar de todos modos?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-testid="sobrecupo-cancelar"
+              onClick={() => { sobrecupoActionRef.current = null; }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="sobrecupo-confirmar"
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={async () => {
+                const fn = sobrecupoActionRef.current;
+                sobrecupoActionRef.current = null;
+                setSobrecupoOpen(false);
+                if (fn) await fn();
+              }}
+            >
+              Agendar de todos modos
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
