@@ -167,6 +167,9 @@ async def verificar_horario_medico(medico_id: str, fecha: str, hora_inicio: Opti
     horario = medico.get("horario_semanal")
     if not horario:
         return None
+    # Si ningún día está marcado como activo, el médico no tiene restricción de horario
+    if not any((v or {}).get("activo") for v in horario.values()):
+        return None
     try:
         dia = str(datetime.strptime(fecha, "%Y-%m-%d").isoweekday())  # 1=Lun .. 7=Dom
     except ValueError:
@@ -1112,6 +1115,9 @@ async def horarios_disponibles(
     medico = await db.doctors.find_one({"id": medico_id}, {"_id": 0, "horario_semanal": 1})
     win_ini, win_fin = None, None
     horario = (medico or {}).get("horario_semanal")
+    # Un horario sin ningún día activo equivale a "sin restricción"
+    if horario and not any((v or {}).get("activo") for v in horario.values()):
+        horario = None
     if horario:
         cfg = horario.get(str(dia_semana))
         if not cfg or not cfg.get("activo"):

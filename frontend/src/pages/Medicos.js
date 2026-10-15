@@ -160,6 +160,7 @@ const Medicos = () => {
       return;
     }
 
+    const algunDiaActivo = Object.values(formData.horario || {}).some(d => d?.activo);
     const payload = {
       name: formData.name.trim(),
       specialty: formData.specialty.trim(),
@@ -167,7 +168,7 @@ const Medicos = () => {
       email: formData.email.trim(),
       license_number: formData.license_number.trim(),
       notes: formData.notes.trim(),
-      horario_semanal: formData.horario
+      horario_semanal: algunDiaActivo ? formData.horario : null
     };
 
     setSubmitting(true);
