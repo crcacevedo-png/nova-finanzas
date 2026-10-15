@@ -136,13 +136,21 @@ export const BloqueosAgenda = ({ medicos = [], fecha, onBloqueosChange }) => {
     }
   };
 
+  const fmtFecha = (f) => {
+    if (!f) return '';
+    const [y, m, d] = String(f).split('-');
+    return (y && m && d) ? `${d}/${m}/${y}` : f;
+  };
+
   const etiquetaBloqueo = (b) => {
+    const rango = b.fecha_fin && b.fecha_fin !== b.fecha_inicio
+      ? `${fmtFecha(b.fecha_inicio)} a ${fmtFecha(b.fecha_fin)}`
+      : fmtFecha(b.fecha_inicio);
     if (b.tipo === 'clinica') {
-      const rango = b.fecha_fin && b.fecha_fin !== b.fecha_inicio ? `${b.fecha_inicio} a ${b.fecha_fin}` : b.fecha_inicio;
       return `Clínica · ${rango}`;
     }
     const horario = b.dia_completo ? 'Día completo' : `${b.hora_inicio}–${b.hora_fin}`;
-    return `${b.medico_nombre || 'Médico'} · ${horario}`;
+    return `${b.medico_nombre || 'Médico'} · ${rango} · ${horario}`;
   };
 
   return (
