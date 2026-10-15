@@ -662,7 +662,8 @@ async def listar_presentes(
             "medico_id": cita["medico_id"],
             "medico_nombre": cita["medico_nombre"],
             "asignado_a_medico_id": cita.get("asignado_a_medico_id"),
-            "asignado_a_medico_nombre": cita.get("asignado_a_medico_nombre")
+            "asignado_a_medico_nombre": cita.get("asignado_a_medico_nombre"),
+            "notas": cita.get("notas", "")
         })
         por_medico[medico_id]["total"] += 1
     

@@ -208,6 +208,12 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
               </span>
             </div>
             <Badge variant="outline" className="mt-1 text-xs">{paciente.tipo_cita}</Badge>
+            {paciente.notas && (
+              <div className="text-xs text-gray-600 mt-1 flex items-start gap-1" data-testid={`presente-notas-${paciente.cita_id}`}>
+                <StickyNote className="w-3 h-3 mt-0.5 shrink-0" />
+                <span className="break-words whitespace-pre-wrap">{paciente.notas}</span>
+              </div>
+            )}
           </div>
           <div className="flex gap-1">
             {paciente.estado === 'Presente' && (

@@ -140,6 +140,7 @@ class PacientePresenteResponse(BaseModel):
     medico_nombre: str
     asignado_a_medico_id: Optional[str] = None
     asignado_a_medico_nombre: Optional[str] = None
+    notas: Optional[str] = None
 
 class PresentesPorMedicoResponse(BaseModel):
     medico_id: str
