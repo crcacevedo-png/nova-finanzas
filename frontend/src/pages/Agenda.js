@@ -9,7 +9,7 @@ import { useAgendaWebSocket } from '../hooks/useWebSocket';
 import { 
   Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
-  AlertCircle, Phone, Eye, EyeOff, GripVertical, SlidersHorizontal, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2, Stethoscope
+  AlertCircle, Phone, Eye, EyeOff, GripVertical, SlidersHorizontal, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2, Stethoscope, StickyNote
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover';
 import { Button } from '../components/ui/button';
@@ -117,6 +117,12 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
             {formatTime(cita.hora_inicio)}
             {cita.tipo_cita && <span className="ml-1">• {cita.tipo_cita}</span>}
           </div>
+          {cita.notas && (
+            <div className="text-xs opacity-80 mt-0.5 flex items-start gap-1" data-testid={`cita-notas-${cita.id}`}>
+              <StickyNote className="w-3 h-3 mt-0.5 shrink-0" />
+              <span className="break-words whitespace-pre-wrap">{cita.notas}</span>
+            </div>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

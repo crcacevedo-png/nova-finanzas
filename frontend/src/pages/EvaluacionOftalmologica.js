@@ -2576,43 +2576,17 @@ const EvaluacionOftalmologica = () => {
                         </Button>
                       )}
                     </div>
-                    <div className="flex items-center rounded-lg border border-teal-200 overflow-hidden bg-white">
-                      <Input
-                        value={item.dosis}
-                        onChange={(e) => {
-                          const items = [...formData.recetas.medicamentos.items];
-                          items[idx] = { ...items[idx], dosis: e.target.value };
-                          updateNestedField('recetas.medicamentos.items', items);
-                        }}
-                        placeholder="Dosis"
-                        disabled={isReadOnly}
-                        className="flex-1 text-xs h-7 border-0 rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
-                      <div className="w-px h-5 bg-teal-200" />
-                      <Input
-                        value={item.frecuencia}
-                        onChange={(e) => {
-                          const items = [...formData.recetas.medicamentos.items];
-                          items[idx] = { ...items[idx], frecuencia: e.target.value };
-                          updateNestedField('recetas.medicamentos.items', items);
-                        }}
-                        placeholder="Frecuencia"
-                        disabled={isReadOnly}
-                        className="flex-1 text-xs h-7 border-0 rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
-                      <div className="w-px h-5 bg-teal-200" />
-                      <Input
-                        value={item.duracion}
-                        onChange={(e) => {
-                          const items = [...formData.recetas.medicamentos.items];
-                          items[idx] = { ...items[idx], duracion: e.target.value };
-                          updateNestedField('recetas.medicamentos.items', items);
-                        }}
-                        placeholder="Duración"
-                        disabled={isReadOnly}
-                        className="flex-1 text-xs h-7 border-0 rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
-                    </div>
+                    <Input
+                      value={item.dosis}
+                      onChange={(e) => {
+                        const items = [...formData.recetas.medicamentos.items];
+                        items[idx] = { ...items[idx], dosis: e.target.value };
+                        updateNestedField('recetas.medicamentos.items', items);
+                      }}
+                      placeholder="Dosis, frecuencia y duración (ej. 1 gota cada 8 horas por 7 días)"
+                      disabled={isReadOnly}
+                      className="text-xs h-7 input-teal"
+                    />
                   </div>
                 ))}
               </div>
