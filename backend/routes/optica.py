@@ -156,6 +156,7 @@ class ContactLensInventoryListResponse(BaseModel):
 class LensTypeBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = ""
+    cost_price: Optional[float] = None
     default_price: float = Field(ge=0)
 
 class LensTypeCreate(LensTypeBase):
@@ -164,6 +165,7 @@ class LensTypeCreate(LensTypeBase):
 class LensTypeUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    cost_price: Optional[float] = None
     default_price: Optional[float] = None
     is_active: Optional[bool] = None
 
@@ -172,6 +174,7 @@ class LensTypeResponse(BaseModel):
     id: str
     name: str
     description: Optional[str] = ""
+    cost_price: Optional[float] = 0
     default_price: Optional[float] = 0
     price: Optional[float] = 0
     sale_price: Optional[float] = 0  # Agregado para compatibilidad con POS
@@ -813,6 +816,7 @@ async def create_lens_type(lens_type_data: LensTypeCreate, current_user: dict = 
         "id": str(uuid.uuid4()),
         "name": lens_type_data.name,
         "description": lens_type_data.description or "",
+        "cost_price": lens_type_data.cost_price,
         "default_price": lens_type_data.default_price,
         "is_active": True,
         "created_by": current_user["id"],

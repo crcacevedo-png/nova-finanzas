@@ -760,3 +760,7 @@ El panel "Próxima Cita" de la Evaluación Oftalmológica ahora:
 5) data-testid añadidos: proxima-cita-agendar, proxima-cita-medico, proxima-cita-tipo, proxima-cita-fecha, proxima-cita-hora, proxima-cita-slot-*, proxima-cita-motivo, proxima-cita-notas.
 Verificación: iteration_77.json (backend 10/10, frontend 100% de flujos). Curl confirma: past date -> 409 'la fecha ya pasó'; 4ta cita en mismo slot -> 409 'el horario ya está lleno'. La cita aparece en Agenda (Calendario/Tablero) con tipo y notas.
 Pendiente (Fase 2/3 según plan): elegir duración de la próxima cita y ajustar slots; resumen de agenda del médico; reprogramar/cancelar desde la evaluación; recordatorio al paciente.
+
+## Fix: Precio Costo en Tipos de Lente (lentes oftálmicos) no se guardaba (2026-06)
+Bug: en Óptica > Inventario, al crear/editar un Tipo de Lente (modal 'Nuevo Tipo de Lente'), el 'Precio Costo' no se almacenaba (columna COSTO mostraba '–'). Causa: backend routes/optica.py — LensTypeBase/Create/Update/Response y el doc de create NO incluían 'cost_price' (el frontend sí lo enviaba). Fix: se agregó cost_price (Optional[float]) a LensTypeBase, LensTypeUpdate y LensTypeResponse, y se persiste en create_lens_type; update ya lo incluye vía model_dump. Verificado por curl: create cost_price=123.45 persiste en lista y update a 99.99 OK.
+Nota: Armazones (frames) y Lentes de Contacto YA guardaban y devolvían cost_price correctamente (verificado por curl 55.5 y 33.3); no requerían cambios.
