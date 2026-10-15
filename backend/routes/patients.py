@@ -43,6 +43,7 @@ class PatientBase(BaseModel):
     igss_tipo_compra: Optional[str] = ""
     igss_nog: Optional[str] = ""
     igss_tipo_paciente: Optional[str] = ""
+    address: Optional[str] = ""
     comments: Optional[str] = ""
 
 
@@ -72,6 +73,7 @@ class PatientUpdate(BaseModel):
     igss_tipo_compra: Optional[str] = None
     igss_nog: Optional[str] = None
     igss_tipo_paciente: Optional[str] = None
+    address: Optional[str] = None
     comments: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -105,6 +107,7 @@ class PatientResponse(BaseModel):
     igss_tipo_compra: Optional[str] = ""
     igss_nog: Optional[str] = ""
     igss_tipo_paciente: Optional[str] = ""
+    address: Optional[str] = ""
     comments: Optional[str] = ""
     is_active: bool = True
     created_by: Optional[str] = ""
@@ -552,6 +555,7 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
         "igss_tipo_compra": patient_data.igss_tipo_compra if patient_data.referral_institution == "igss" else "",
         "igss_nog": patient_data.igss_nog if patient_data.referral_institution == "igss" else "",
         "igss_tipo_paciente": patient_data.igss_tipo_paciente if patient_data.referral_institution == "igss" else "",
+        "address": patient_data.address or "",
         "comments": patient_data.comments or "",
         "is_active": True,
         "created_by": current_user["id"],

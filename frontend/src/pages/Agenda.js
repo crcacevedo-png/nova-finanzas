@@ -367,8 +367,11 @@ const Agenda = () => {
   const [completarForm, setCompletarForm] = useState(null);
   const [savingCompletar, setSavingCompletar] = useState(false);
   const [igssUnits, setIgssUnits] = useState([]);
+  const [completarModo, setCompletarModo] = useState('completar'); // 'completar' | 'vincular'
+  const [completarEsNuevo, setCompletarEsNuevo] = useState(false);
   const completarPidRef = useRef(null);
   const completarAccionRef = useRef(null);
+  const vincularCitaRef = useRef(null);
   
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   
@@ -694,17 +697,70 @@ const Agenda = () => {
     igss_codigo: p.igss_codigo || '', igss_tipo_compra: p.igss_tipo_compra || '', igss_nog: p.igss_nog || '',
   });
 
-  // Marcar llegada: si la ficha está incompleta, abrir formulario antes de pasar a Presente
+  const emptyCompletarForm = () => ({
+    first_name: '', last_name: '', gender: '', birth_date: '', phone: '',
+    dpi: '', address: '', referral_institution: '',
+    igss_unit_id: '', igss_afiliacion: '', igss_no_sps: '',
+    igss_codigo: '', igss_tipo_compra: '', igss_nog: '',
+  });
+
+  // Vincular una cita sin expediente a un paciente existente
+  const seleccionarPacienteVincular = async (p) => {
+    try {
+      const { data: full } = await patientApi.getById(p.id);
+      const nombre = full.full_name || `${full.first_name || ''} ${full.last_name || ''}`.trim();
+      if (fichaIncompleta(full)) {
+        completarPidRef.current = full.id;
+        setCompletarEsNuevo(false);
+        setCompletarForm(buildCompletarForm(full));
+        setPacienteSearch('');
+        setPacienteResults([]);
+      } else {
+        await agendaApi.updateCita(vincularCitaRef.current.id, { paciente_id: full.id, paciente_nombre: nombre });
+        setCompletarOpen(false);
+        const accion = completarAccionRef.current;
+        completarAccionRef.current = null;
+        toast.success('Expediente vinculado a la cita');
+        if (accion) await accion();
+      }
+    } catch (error) {
+      toast.error('No se pudo vincular el paciente');
+    }
+  };
+
+  // Crear un expediente nuevo para una cita sin paciente vinculado
+  const iniciarCrearExpediente = () => {
+    completarPidRef.current = null;
+    setCompletarEsNuevo(true);
+    setCompletarForm(emptyCompletarForm());
+    setPacienteSearch('');
+    setPacienteResults([]);
+  };
+
+  // Marcar llegada: si la ficha está incompleta o la cita no tiene expediente, abrir formulario antes de pasar a Presente
   const handleMarcarLlegada = async (cita) => {
     if (!cita?.paciente_id) {
-      handleCambiarEstado(cita.id, 'Presente');
+      // Cita sin expediente (p.ej. importada de Google): vincular o crear antes de marcar Presente
+      vincularCitaRef.current = { id: cita.id, nombre: cita.paciente_nombre || '' };
+      completarPidRef.current = null;
+      completarAccionRef.current = () => handleCambiarEstado(cita.id, 'Presente');
+      setCompletarEsNuevo(false);
+      setCompletarForm(null);
+      setPacienteSearch('');
+      setPacienteResults([]);
+      setCompletarModo('vincular');
+      setCompletarOpen(true);
+      toast.info('Vincula o crea el expediente del paciente para registrar su llegada');
       return;
     }
     try {
       const { data: p } = await patientApi.getById(cita.paciente_id);
       if (fichaIncompleta(p)) {
+        vincularCitaRef.current = null;
         completarPidRef.current = p.id;
         completarAccionRef.current = () => handleCambiarEstado(cita.id, 'Presente');
+        setCompletarEsNuevo(false);
+        setCompletarModo('completar');
         setCompletarForm(buildCompletarForm(p));
         setCompletarOpen(true);
         toast.info('Completa el expediente del paciente para registrar su llegada');
@@ -732,11 +788,25 @@ const Agenda = () => {
     }
     setSavingCompletar(true);
     try {
-      await patientApi.update(completarPidRef.current, f);
+      let pid = completarPidRef.current;
+      let nombre;
+      if (completarEsNuevo) {
+        const { data: nuevo } = await patientApi.create(f);
+        pid = nuevo.id;
+        nombre = nuevo.full_name || `${nuevo.first_name} ${nuevo.last_name}`.trim();
+      } else {
+        await patientApi.update(pid, f);
+        nombre = `${f.first_name.trim()} ${f.last_name.trim()}`.trim();
+      }
+      // Si la cita no tenía expediente vinculado, vincularlo ahora
+      if (vincularCitaRef.current?.id) {
+        await agendaApi.updateCita(vincularCitaRef.current.id, { paciente_id: pid, paciente_nombre: nombre });
+        vincularCitaRef.current = null;
+      }
       setCompletarOpen(false);
       const accion = completarAccionRef.current;
       completarAccionRef.current = null;
-      toast.success('Expediente completado');
+      toast.success(completarEsNuevo ? 'Expediente creado y vinculado' : 'Expediente completado');
       if (accion) await accion();
     } catch (error) {
       const d = error.response?.data?.detail;
@@ -1009,8 +1079,11 @@ const Agenda = () => {
       const { data: p } = await patientApi.getById(citaForm.paciente_id);
       if (fichaIncompleta(p)) {
         setWalkInDialogOpen(false);
+        vincularCitaRef.current = null;
         completarPidRef.current = p.id;
         completarAccionRef.current = doCreateWalkIn;
+        setCompletarEsNuevo(false);
+        setCompletarModo('completar');
         setCompletarForm(buildCompletarForm(p));
         setCompletarOpen(true);
         toast.info('Completa el expediente del paciente para registrar su llegada');
@@ -2166,13 +2239,46 @@ const Agenda = () => {
       {/* Modal: Completar expediente al marcar llegada */}
       <Dialog open={completarOpen} onOpenChange={(o) => {
         setCompletarOpen(o);
-        if (!o) { completarAccionRef.current = null; completarPidRef.current = null; }
+        if (!o) {
+          completarAccionRef.current = null;
+          completarPidRef.current = null;
+          vincularCitaRef.current = null;
+          setCompletarForm(null);
+          setCompletarEsNuevo(false);
+          setCompletarModo('completar');
+          setPacienteSearch('');
+          setPacienteResults([]);
+        }
       }}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" data-testid="completar-ficha-dialog">
           <DialogHeader>
-            <DialogTitle>Completar expediente del paciente</DialogTitle>
-            <DialogDescription>Este paciente tiene datos pendientes. Complétalos para registrar su llegada.</DialogDescription>
+            <DialogTitle>{completarEsNuevo ? 'Crear expediente del paciente' : (completarModo === 'vincular' && !completarForm ? 'Vincular expediente a la cita' : 'Completar expediente del paciente')}</DialogTitle>
+            <DialogDescription>{completarModo === 'vincular' && !completarForm ? 'Esta cita no tiene un expediente vinculado. Busca uno existente o crea uno nuevo para registrar la llegada.' : 'Este paciente tiene datos pendientes. Complétalos para registrar su llegada.'}</DialogDescription>
           </DialogHeader>
+          {completarModo === 'vincular' && !completarForm && (
+            <div className="space-y-3" data-testid="vincular-panel">
+              {vincularCitaRef.current?.nombre && (
+                <p className="text-xs text-muted-foreground">Cita: <span className="font-medium text-foreground">{vincularCitaRef.current.nombre}</span></p>
+              )}
+              <div>
+                <Label className="text-xs">Buscar expediente existente</Label>
+                <Input value={pacienteSearch} onChange={(e) => setPacienteSearch(e.target.value)} placeholder="Nombre, DPI o No. de expediente" data-testid="vincular-search" />
+                {pacienteResults.length > 0 && (
+                  <div className="mt-1 border rounded-md max-h-48 overflow-y-auto">
+                    {pacienteResults.map(p => (
+                      <button key={p.id} type="button" onClick={() => seleccionarPacienteVincular(p)} className="w-full text-left px-3 py-2 hover:bg-accent text-sm border-b last:border-b-0" data-testid={`vincular-result-${p.id}`}>
+                        <span className="font-medium">{p.full_name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{p.record_number}{p.dpi ? ` · ${p.dpi}` : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="pt-2 border-t">
+                <Button variant="secondary" className="w-full" onClick={iniciarCrearExpediente} data-testid="vincular-crear-nuevo">Crear expediente nuevo</Button>
+              </div>
+            </div>
+          )}
           {completarForm && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -2226,7 +2332,9 @@ const Agenda = () => {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompletarOpen(false)}>Cancelar</Button>
-            <Button onClick={guardarCompletarFicha} disabled={savingCompletar} data-testid="cf-guardar">{savingCompletar ? 'Guardando...' : 'Guardar y marcar llegada'}</Button>
+            {completarForm && (
+              <Button onClick={guardarCompletarFicha} disabled={savingCompletar} data-testid="cf-guardar">{savingCompletar ? 'Guardando...' : (completarEsNuevo ? 'Crear y marcar llegada' : 'Guardar y marcar llegada')}</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
