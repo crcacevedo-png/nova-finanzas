@@ -31,7 +31,18 @@ import {
 } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
-import { lensTypeApi, formatCurrency } from '../services/api';
+import { lensTypeApi, formatCurrency, margenInfo } from '../services/api';
+
+const renderMargen = (cost, sale) => {
+  const m = margenInfo(cost, sale);
+  if (!m) return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+  const color = m.monto >= 0 ? '#0F6E56' : '#DC2626';
+  return (
+    <span className="font-medium" style={{ color }}>
+      {formatCurrency(m.monto)} <span className="text-xs">({m.pct.toFixed(0)}%)</span>
+    </span>
+  );
+};
 
 const TiposLente = () => {
   const { hasPermission } = useAuth();
@@ -246,6 +257,7 @@ const TiposLente = () => {
                       <TableHead className="table-header">Descripción</TableHead>
                       <TableHead className="table-header text-right">Costo</TableHead>
                       <TableHead className="table-header text-right">Precio Venta</TableHead>
+                      <TableHead className="table-header text-right">Margen</TableHead>
                       {canManage && <TableHead className="table-header text-right">Acciones</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -265,6 +277,9 @@ const TiposLente = () => {
                         </TableCell>
                         <TableCell className="text-right font-semibold" style={{ color: 'var(--primary-teal)' }}>
                           {formatCurrency(lensType.default_price)}
+                        </TableCell>
+                        <TableCell className="text-right" data-testid={`lens-type-margen-${lensType.id}`}>
+                          {renderMargen(lensType.cost_price, lensType.default_price)}
                         </TableCell>
                         {canManage && (
                           <TableCell className="text-right">

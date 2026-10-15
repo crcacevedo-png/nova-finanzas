@@ -43,7 +43,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast, Toaster } from 'sonner';
-import { formatCurrency } from '../services/api';
+import { formatCurrency, margenInfo } from '../services/api';
 import axios from 'axios';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -55,6 +55,17 @@ const TIPOS_LENTE_CONTACTO = [
   { value: 'multifocal', label: 'Multifocal' },
   { value: 'cosmetico', label: 'Cosmético' },
 ];
+
+const renderMargen = (cost, sale) => {
+  const m = margenInfo(cost, sale);
+  if (!m) return <span className="text-slate-400">-</span>;
+  const color = m.monto >= 0 ? '#0F6E56' : '#DC2626';
+  return (
+    <span className="font-medium" style={{ color }}>
+      {formatCurrency(m.monto)} <span className="text-xs">({m.pct.toFixed(0)}%)</span>
+    </span>
+  );
+};
 
 const LentesContacto = () => {
   const { hasPermission } = useAuth();
@@ -394,6 +405,7 @@ const LentesContacto = () => {
                     <TableHead>Descripción</TableHead>
                     <TableHead className="text-right">Costo</TableHead>
                     <TableHead className="text-right">Precio Venta</TableHead>
+                    <TableHead className="text-right">Margen</TableHead>
                     <TableHead className="text-center">Stock</TableHead>
                     {canManage && <TableHead className="text-right">Acciones</TableHead>}
                   </TableRow>
@@ -414,6 +426,9 @@ const LentesContacto = () => {
                       <TableCell className="text-right">{formatCurrency(lens.cost_price || 0)}</TableCell>
                       <TableCell className="text-right font-medium text-green-600">
                         {formatCurrency(lens.sale_price || lens.price || 0)}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`contact-lens-margen-${lens.id}`}>
+                        {renderMargen(lens.cost_price, lens.sale_price || lens.price)}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge 

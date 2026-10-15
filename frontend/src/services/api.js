@@ -401,6 +401,17 @@ export const formatCurrency = (amount) => {
   return `Q ${formatted}`;
 };
 
+// Calcula el margen de ganancia (venta - costo) y el porcentaje sobre el costo.
+// Devuelve null si no hay costo o venta válidos (> 0).
+export const margenInfo = (cost, sale) => {
+  const c = Number(cost) || 0;
+  const s = Number(sale) || 0;
+  if (!c || !s) return null;
+  const monto = s - c;
+  const pct = (monto / c) * 100;
+  return { monto, pct };
+};
+
 // Zona horaria de Guatemala (UTC-6)
 const GUATEMALA_TIMEZONE = 'America/Guatemala';
 

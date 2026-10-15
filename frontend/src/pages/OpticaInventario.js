@@ -35,7 +35,18 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast, Toaster } from 'sonner';
-import { frameApi, formatCurrency } from '../services/api';
+import { frameApi, formatCurrency, margenInfo } from '../services/api';
+
+const renderMargen = (cost, sale) => {
+  const m = margenInfo(cost, sale);
+  if (!m) return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+  const color = m.monto >= 0 ? '#0F6E56' : '#DC2626';
+  return (
+    <span className="font-medium" style={{ color }}>
+      {formatCurrency(m.monto)} <span className="text-xs">({m.pct.toFixed(0)}%)</span>
+    </span>
+  );
+};
 
 const OpticaInventario = () => {
   const { user, hasPermission } = useAuth();
@@ -296,6 +307,7 @@ const OpticaInventario = () => {
                       <TableHead className="table-header">Color</TableHead>
                       <TableHead className="table-header text-right">Costo</TableHead>
                       <TableHead className="table-header text-right">Venta</TableHead>
+                      <TableHead className="table-header text-right">Margen</TableHead>
                       <TableHead className="table-header text-center">Stock</TableHead>
                       {canManage && <TableHead className="table-header text-right">Acciones</TableHead>}
                     </TableRow>
@@ -318,6 +330,9 @@ const OpticaInventario = () => {
                         </TableCell>
                         <TableCell className="text-right font-semibold" style={{ color: 'var(--primary-teal)' }}>
                           {formatCurrency(frame.sale_price)}
+                        </TableCell>
+                        <TableCell className="text-right" data-testid={`frame-margen-${frame.id}`}>
+                          {renderMargen(frame.cost_price, frame.sale_price)}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge className={frame.stock <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}>
