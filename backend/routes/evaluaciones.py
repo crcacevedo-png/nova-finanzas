@@ -260,6 +260,36 @@ async def get_catalogo_diagnosticos(
     return items
 
 
+@catalogos_router.get("/igss-medicamentos")
+async def get_catalogo_igss_medicamentos(
+    search: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Autocomplete de medicamentos oftalmológicos IGSS (nombre o código)."""
+    query = {}
+    if search:
+        rx = {"$regex": re.escape(search), "$options": "i"}
+        query["$or"] = [{"nombre": rx}, {"codigo": rx}]
+    items = await db.catalogo_igss_medicamentos.find(query, {"_id": 0}).sort("nombre", 1).limit(limit).to_list(limit)
+    return items
+
+
+@catalogos_router.get("/igss-procedimientos")
+async def get_catalogo_igss_procedimientos(
+    search: str = Query("", min_length=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Autocomplete de estudios/procedimientos oftalmológicos IGSS (nombre o código)."""
+    query = {}
+    if search:
+        rx = {"$regex": re.escape(search), "$options": "i"}
+        query["$or"] = [{"nombre": rx}, {"codigo": rx}]
+    items = await db.catalogo_igss_procedimientos.find(query, {"_id": 0}).sort("nombre", 1).limit(limit).to_list(limit)
+    return items
+
+
 # ==================== EVALUACIONES ENDPOINTS ====================
 
 @router.get("", response_model=EvaluacionOftalmologicaListResponse)

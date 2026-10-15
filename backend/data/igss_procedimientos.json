@@ -1,0 +1,2446 @@
+[
+ {
+  "codigo": "416100",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, GLAUCOMA POR OJO, Umbral FDT (tomografía de doble frecuencia) Mácula (10°) ambos ojos."
+ },
+ {
+  "codigo": "416200",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Tonometría de ojo Unilateral con Sedación"
+ },
+ {
+  "codigo": "416201",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Tonometría de ambos ojos con Sedación"
+ },
+ {
+  "codigo": "416202",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Tonometría más Ultrasonido ambos ojos con anestesia General"
+ },
+ {
+  "codigo": "416204",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Foto a Color de Fondo de Ojo más Tonometría Unilateral con Sedación"
+ },
+ {
+  "codigo": "416205",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Fotos a Color de Fondo de Ojo más Tonometría de ambos Ojos con Sedación"
+ },
+ {
+  "codigo": "416206",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Fotos a Color de Fondo de Ojo más refracción más Tonometría de ambos ojos con Sedación"
+ },
+ {
+  "codigo": "416208",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, OFTALMOPEDIATRÍA POR OJO, Fondo de Ojo Bilateral con Sedación"
+ },
+ {
+  "codigo": "416360",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Oftalmológica General"
+ },
+ {
+  "codigo": "416361",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, CONSULTA, Consulta con neuroftalmólogo"
+ },
+ {
+  "codigo": "416370",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Ocularista"
+ },
+ {
+  "codigo": "416380",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Subespecialista de Oftalmo-Pediatría"
+ },
+ {
+  "codigo": "416390",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Subespecialista de Segmento Anterior"
+ },
+ {
+  "codigo": "416400",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Subespecialista de Retina/Vítreo"
+ },
+ {
+  "codigo": "416410",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Subespecialista de Glaucoma"
+ },
+ {
+  "codigo": "416420",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Subespecialista de Oculoplástica"
+ },
+ {
+  "codigo": "416430",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS CONSULTAS Subespecialista de Estrabismo"
+ },
+ {
+  "codigo": "416440",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Angiofluoresceína retiniana ojo derecho"
+ },
+ {
+  "codigo": "416441",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS,PROCEDIMIENTOS POR OJO, campos visuales neurológicos unilateral"
+ },
+ {
+  "codigo": "416442",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, CAMPOS VISUALES NEUROLÓGICOS EN AMBOS OJOS"
+ },
+ {
+  "codigo": "416450",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Angiofluoresceína retiniana ojo izquierdo"
+ },
+ {
+  "codigo": "416451",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Angiofluoresceína retiniana ambos ojos"
+ },
+ {
+  "codigo": "416452",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, ANGIOVUE (ANGIO-OCT o angiografÍa oct) ojo unilateral"
+ },
+ {
+  "codigo": "416453",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, ANGIOVUE (ANGIO-OCT o angiografía oct) ambos ojos"
+ },
+ {
+  "codigo": "416456",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Prueba de agua oftalmología"
+ },
+ {
+  "codigo": "416460",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Fotos a color de fondo de ojo derecho"
+ },
+ {
+  "codigo": "416470",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Fotos a color de fondo de ojo izquierdo"
+ },
+ {
+  "codigo": "416471",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Fotos a color de fondo de ojo ambos ojos"
+ },
+ {
+  "codigo": "416472",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, Biopsia Excisión de tejido limbal corneal unilateral por ojo con anestesia local."
+ },
+ {
+  "codigo": "416480",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO OCT macular ojo derecho (tomografía óptica coherente de mácula)"
+ },
+ {
+  "codigo": "416490",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO OCT macular ojo izquierdo (tomografía óptica coherente de mácula)"
+ },
+ {
+  "codigo": "416491",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO OCT macular ambos ojos (tomografía óptica coherente de mácula)"
+ },
+ {
+  "codigo": "416500",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO OCT nervio óptico ojo derecho (tomografía óptica coherente de nervio óptico)"
+ },
+ {
+  "codigo": "416510",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO OCT nervio óptico ojo izquierdo (tomografía óptica coherente de nervio óptico)"
+ },
+ {
+  "codigo": "416511",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO OCT nervio óptico ambos ojos (tomografía óptica coherente de nervio óptico)"
+ },
+ {
+  "codigo": "416512",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, OCT de cámara anterior ojo unilateral"
+ },
+ {
+  "codigo": "416513",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, OCT de cámara anterior ambos ojos (Ultrabiomicroscopía)"
+ },
+ {
+  "codigo": "416514",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, OCT de ángulo ambos ojos"
+ },
+ {
+  "codigo": "416515",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, OCT de ángulo ojo unilateral"
+ },
+ {
+  "codigo": "416516",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, tomografía óptica coherente de ángulo camerular unilateral"
+ },
+ {
+  "codigo": "416520",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO USG B ojo derecho (ultrasonido ocular)"
+ },
+ {
+  "codigo": "416530",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO USG B ojo izquierdo (ultrasonido ocular)"
+ },
+ {
+  "codigo": "416531",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO USG B ambos ojos (ultrasonido ocular)"
+ },
+ {
+  "codigo": "416540",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO USG A ojo derecho (Biometría)"
+ },
+ {
+  "codigo": "416550",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO USG A ojo izquierdo (Biometría)"
+ },
+ {
+  "codigo": "416551",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO USG A ambos ojos (Biometría)"
+ },
+ {
+  "codigo": "416560",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Paquimetría corneal ojo derecho"
+ },
+ {
+  "codigo": "416570",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Paquimetría corneal ojo izquierdo"
+ },
+ {
+  "codigo": "416571",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Paquimetría corneal ambos ojos"
+ },
+ {
+  "codigo": "416572",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Mapa Paquimétrico de ojo unilateral"
+ },
+ {
+  "codigo": "416573",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Mapa Paquimétrico de ambos ojos"
+ },
+ {
+  "codigo": "416580",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Topografía corneal ojo derecho"
+ },
+ {
+  "codigo": "416590",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Topografía corneal ojo izquierdo"
+ },
+ {
+  "codigo": "416591",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Topografía corneal ambos ojos"
+ },
+ {
+  "codigo": "416592",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, Topografía Corneal Tipo Scheimpflug Bilateral"
+ },
+ {
+  "codigo": "416593",
+  "nombre": "OFTALMOLOGÍA, PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, Topografía Corneal Tipo Scheimpflug Unilateral"
+ },
+ {
+  "codigo": "416600",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) ojo derecho"
+ },
+ {
+  "codigo": "416601",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 60 grados ojo derecho"
+ },
+ {
+  "codigo": "416602",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 60 grados ojo izquierdo"
+ },
+ {
+  "codigo": "416603",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 60 grados ambos ojos"
+ },
+ {
+  "codigo": "416604",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 30 grados ojo derecho"
+ },
+ {
+  "codigo": "416605",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 30 grados ojo izquierdo"
+ },
+ {
+  "codigo": "416606",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 30 grados ambos ojos"
+ },
+ {
+  "codigo": "416607",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 30 grados supra umbrales ojo derecho"
+ },
+ {
+  "codigo": "416608",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 30 grados supra umbrales ojo izquierdo"
+ },
+ {
+  "codigo": "416609",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 30 grados supra umbrales ambos ojos"
+ },
+ {
+  "codigo": "416610",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) ojo izquierdo"
+ },
+ {
+  "codigo": "416611",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) ambos ojos"
+ },
+ {
+  "codigo": "416612",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 10 grados centrales ojo derecho"
+ },
+ {
+  "codigo": "416613",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 10 grados centrales ojo izquierdo"
+ },
+ {
+  "codigo": "416614",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) de 10 grados centrales ambos ojos"
+ },
+ {
+  "codigo": "416615",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) blanco sobre blanco ojo derecho"
+ },
+ {
+  "codigo": "416616",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) blanco sobre blanco ojo izquierdo"
+ },
+ {
+  "codigo": "416617",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) blanco sobre blanco ambos ojos"
+ },
+ {
+  "codigo": "416618",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) azul-amarillo ojo derecho"
+ },
+ {
+  "codigo": "416619",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) azul-amarillo ojo izquierdo"
+ },
+ {
+  "codigo": "416621",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Perimetría (campimetría) azul-amarillo ambos ojos"
+ },
+ {
+  "codigo": "416622",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO FDT (tomografía de doble frecuencia) ojo derecho"
+ },
+ {
+  "codigo": "416623",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS DIAGNÓSTICOS, PROCEDIMIENTOS POR OJO, Umbral FDT (tomografía de doble frecuencia) Mácula (10°) ojo unilateral"
+ },
+ {
+  "codigo": "416630",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO FDT (tomografía de doble frecuencia) ojo izquierdo"
+ },
+ {
+  "codigo": "416631",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO FDT (tomografía de doble frecuencia) ambos ojos"
+ },
+ {
+  "codigo": "416632",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Campo Visual por Confrontación ojo unilateral"
+ },
+ {
+  "codigo": "416633",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Campo Visual por Confrontación ambos ojos"
+ },
+ {
+  "codigo": "416640",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Foto a color de nervio óptico ojo derecho"
+ },
+ {
+  "codigo": "416650",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Foto a color de nervio óptico ojo izquierdo"
+ },
+ {
+  "codigo": "416651",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Foto a color de nervio óptico ambos ojos"
+ },
+ {
+  "codigo": "416660",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Queratometría ojo derecho"
+ },
+ {
+  "codigo": "416670",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Queratometría ojo izquierdo"
+ },
+ {
+  "codigo": "416671",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Queratometría ambos ojos"
+ },
+ {
+  "codigo": "416672",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Microscopía especular ojo derecho"
+ },
+ {
+  "codigo": "416673",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Microscopía especular ojo izquierdo"
+ },
+ {
+  "codigo": "416674",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Microscopía especular ambos ojos"
+ },
+ {
+  "codigo": "416675",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Pentacam ojo unilateral"
+ },
+ {
+  "codigo": "416676",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Pentacam ambos ojos"
+ },
+ {
+  "codigo": "416677",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, OPD (Diferencial de Vías Ópticas) ojo unilateral"
+ },
+ {
+  "codigo": "416678",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, OPD (Diferencial de Vías Ópticas) ambos ojos"
+ },
+ {
+  "codigo": "416679",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS, PROCEDIMIENTOS POR OJO, Curva de presiones de ambos ojos"
+ },
+ {
+  "codigo": "416680",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Aspiración de humor acuoso ojo derecho (paracentesis diagnóstica de cámara anterior)"
+ },
+ {
+  "codigo": "416690",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Aspiración de humor acuoso ojo izquierdo (paracentesis diagnóstica de cámara anterior)"
+ },
+ {
+  "codigo": "416691",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Aspiración de humor acuoso ambos ojos (paracentesis diagnóstica de cámara anterior)"
+ },
+ {
+  "codigo": "416692",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Histeresis corneal ojo derecho"
+ },
+ {
+  "codigo": "416693",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Histeresis corneal ojo izquierdo"
+ },
+ {
+  "codigo": "416694",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Histeresis corneal ambos ojos"
+ },
+ {
+  "codigo": "416695",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Electrorretinograma ojo derecho"
+ },
+ {
+  "codigo": "416696",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Electrorretinograma ojo izquierdo"
+ },
+ {
+  "codigo": "416697",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Electrorretinograma ambos ojos"
+ },
+ {
+  "codigo": "416698",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Tonometría ambos ojos"
+ },
+ {
+  "codigo": "416699",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS DIAGNOSTICOS PROCEDIMIENTOS POR OJO Frote conjuntival con coloración de Giemsa ambos ojos"
+ },
+ {
+  "codigo": "416700",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Panfotocoagulación ojo derecho"
+ },
+ {
+  "codigo": "416710",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Panfotocoagulación ojo izquierdo"
+ },
+ {
+  "codigo": "416711",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Panfotocoagulación ambos ojos"
+ },
+ {
+  "codigo": "416720",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Sobrepanfotocoagulación ojo derecho"
+ },
+ {
+  "codigo": "416730",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Sobrepanfotocoagulación ojo izquierdo"
+ },
+ {
+  "codigo": "416731",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Sobrepanfotocoagulación ambos ojos"
+ },
+ {
+  "codigo": "416750",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Láser focal ojo derecho"
+ },
+ {
+  "codigo": "416760",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Láser focal ojo izquierdo"
+ },
+ {
+  "codigo": "416761",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Láser focal ambos ojos"
+ },
+ {
+  "codigo": "416762",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Láser Focal Macular ojo unilateral"
+ },
+ {
+  "codigo": "416763",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Láser Focal Macular ambos ojos"
+ },
+ {
+  "codigo": "416770",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Rejilla macular ojo derecho"
+ },
+ {
+  "codigo": "416780",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Rejilla macular ojo izquierdo"
+ },
+ {
+  "codigo": "416781",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Rejilla macular ambos ojos"
+ },
+ {
+  "codigo": "416790",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Triamcinolona intravítrea ojo derecho"
+ },
+ {
+  "codigo": "416800",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Triamcinolona intravítrea ojo izquierdo"
+ },
+ {
+  "codigo": "416801",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Triamcinolona intravítrea ambos ojos"
+ },
+ {
+  "codigo": "416810",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Inyección intravítrea una dosis en ojo derecho de Anti-VEGF (inhibidor del factor de crecimiento endotelial vascular)"
+ },
+ {
+  "codigo": "416811",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Ranibizumab intravítreo ambos ojos."
+ },
+ {
+  "codigo": "416812",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Ranibizumab intravítreo ojo unilateral."
+ },
+ {
+  "codigo": "416813",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, RETINA POR OJO, Aplicación del medicamento ranibizumab unilateral por retinólogo en unidad requirente"
+ },
+ {
+  "codigo": "416814",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, aplicación del medicamento ranibizumab ambos ojos por retinólogo en unidad requirente"
+ },
+ {
+  "codigo": "416815",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, aplicación de medicamento ambos ojos por retinólogo especialista"
+ },
+ {
+  "codigo": "416816",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, aplicación del medicamento Aflibercept ambos ojos por retinólogo en unidad requirente"
+ },
+ {
+  "codigo": "416817",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, Aplicación del medicamento Aflibercept unilateral por retinólogo en unidad requirente"
+ },
+ {
+  "codigo": "416820",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Inyección intravítrea una dosis en ojo izquierdo de Anti-VEGF (inhibidor del factor de crecimiento endotelial vascular)"
+ },
+ {
+  "codigo": "416821",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Inyección intravítrea una dosis en ambos ojos de Anti-VEGF (inhibidor del factor de crecimiento endotelial vascular)"
+ },
+ {
+  "codigo": "416822",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Bevacizumab más triamcinolona intravítreo ojo derecho"
+ },
+ {
+  "codigo": "416823",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Bevacizumab más triamcinolona intravítreo ojo izquierdo"
+ },
+ {
+  "codigo": "416824",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Bevacizumab más triamcinolona intravítreo ambos ojos"
+ },
+ {
+  "codigo": "416825",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Inyección de esteroide de depósito intravítrea ojo derecho"
+ },
+ {
+  "codigo": "416826",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Inyección de esteroide de depósito intravítrea ojo izquierdo"
+ },
+ {
+  "codigo": "416827",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Inyección de esteroide de depósito intravítrea ambos ojos"
+ },
+ {
+  "codigo": "416830",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Críoablación ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "416840",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Críoablación ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "416841",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Críoablación ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "416850",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Críopexia ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "416860",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Críopexia ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "416861",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Críopexia ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "416870",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retinopexia ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "416880",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retinopexia ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "416881",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retinopexia ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "416890",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retinopexia más cerclaje y exoplante ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "416900",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retinopexia más cerclaje y exoplante ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "416901",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retinopexia más cerclaje y exoplante ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "416910",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "416920",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "416921",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "416922",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía más peeling ojo derecho"
+ },
+ {
+  "codigo": "416923",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía más peeling ojo izquierdo"
+ },
+ {
+  "codigo": "416924",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía más peeling ambos ojos"
+ },
+ {
+  "codigo": "416925",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Peeling más Gas ojo unilateral"
+ },
+ {
+  "codigo": "416926",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Peeling más Gas ambos ojos"
+ },
+ {
+  "codigo": "416927",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, RETINA POR OJO, Vitrectomía + lensectomía + lio ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "416928",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, Vitrectomía + lensectomía + lio unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "416930",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Membranectomía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "416940",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Membranectomía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "416941",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Membranectomía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "416942",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Membranectomía más vitrectomía más lensectomía más peeling ojo derecho"
+ },
+ {
+  "codigo": "416943",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Membranectomía más vitrectomía más lensectomía más peeling ojo izquierdo"
+ },
+ {
+  "codigo": "416944",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Membranectomía más vitrectomía más lensectomía más peeling ambos ojos"
+ },
+ {
+  "codigo": "416950",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más lensectomía más membranectomía (anestesia local asistida)"
+ },
+ {
+  "codigo": "416955",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, vitrectomía + membranectomía unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "416956",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, VITRECTOMÍA + LENSECTOMÍA + SILICÓN UNILATERAL CON ANESTESIA LOCAL ASISTIDA"
+ },
+ {
+  "codigo": "416957",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, vitrectomía + lensectomía + silicón ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "416958",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, RETINA POR OJO, Vitrectomía + mebranectomía + lensectomía + lio unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "416959",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, vitrectomía + membranectomía + lensectomía + lio ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "416960",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más lensectomía más membranectomía (anestesia local asistida)"
+ },
+ {
+  "codigo": "416961",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más lensectomía más membranectomía (anestesia local asistida)"
+ },
+ {
+  "codigo": "416962",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Lensectomía más Endoláser ojo unilateral"
+ },
+ {
+  "codigo": "416963",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Lensectomía más Endoláser ambos ojos"
+ },
+ {
+  "codigo": "416964",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Membranectomía más Endoláser con Silicón ojo unilateral"
+ },
+ {
+  "codigo": "416965",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Membranectomía más Endoláser con Silicón ambos ojos"
+ },
+ {
+  "codigo": "416966",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Membranectomía más Lensectomía más Endoláser ojo único"
+ },
+ {
+  "codigo": "416967",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Membranectomía más Lensectomía más Endoláser ambos ojos"
+ },
+ {
+  "codigo": "416968",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Membranectomía más Lensectomía más Silicón ojo único"
+ },
+ {
+  "codigo": "416969",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Vitrectomía más Membranectomía más Lensectomía más Silicón ambos ojos"
+ },
+ {
+  "codigo": "416970",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más retinopexia con exoplante o cerclaje (anestesia local asistida)"
+ },
+ {
+  "codigo": "416971",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, RETINA POR OJO, Vitrectomía + mebranectomía ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "416973",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, RETINA POR OJO, Vitrectomía + mebranectomía + endoláser ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "416974",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, vitrectomía + membranectomía + endoláser unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "416980",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más retinopexia con exoplante o cerclaje (anestesia local asistida)"
+ },
+ {
+  "codigo": "416981",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más retinopexia con exoplante o cerclaje (anestesia local asistida)"
+ },
+ {
+  "codigo": "416990",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más endoláser (anestesia local asistida)"
+ },
+ {
+  "codigo": "417000",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más endoláser (anestesia local asistida)"
+ },
+ {
+  "codigo": "417001",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más endoláser (anestesia local asistida)"
+ },
+ {
+  "codigo": "417010",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Silicón intraocular ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417020",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Silicón intraocular ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417021",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Silicón intraocular ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417030",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más endoláser más gas (anestesia local asistida)"
+ },
+ {
+  "codigo": "417040",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más endoláser más gas (anestesia local asistida)"
+ },
+ {
+  "codigo": "417041",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más endoláser más gas (anestesia local asistida)"
+ },
+ {
+  "codigo": "417050",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más endoláser más silicón (anestesia local asistida)"
+ },
+ {
+  "codigo": "417060",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más endoláser más silicón (anestesia local asistida)"
+ },
+ {
+  "codigo": "417061",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más endoláser más silicón (anestesia local asistida)"
+ },
+ {
+  "codigo": "417070",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más cerclaje o retinopexia o exoplante más silicón (anestesia local asistida)"
+ },
+ {
+  "codigo": "417080",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más cerclaje o retinopexia o exoplante más silicón (anestesia local asistida)"
+ },
+ {
+  "codigo": "417081",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más cerclaje o retinopexia o exoplante más silicón (anestesia local asistida)"
+ },
+ {
+  "codigo": "417090",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más cerclaje o retinopexia o exoplante más líquido pesado (anestesia local asistida)"
+ },
+ {
+  "codigo": "417100",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más cerclaje o retinopexia o exoplante más líquido pesado (anestesia local asistida)"
+ },
+ {
+  "codigo": "417101",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más cerclaje o retinopexia o exoplante más líquido pesado (anestesia local asistida)"
+ },
+ {
+  "codigo": "417110",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo derecho más lente intraocular anclado (anestesia local asistida)"
+ },
+ {
+  "codigo": "417120",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ojo izquierdo más lente intraocular anclado (anestesia local asistida)"
+ },
+ {
+  "codigo": "417121",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Vitrectomía ambos ojos más lente intraocular anclado (anestesia local asistida)"
+ },
+ {
+  "codigo": "417122",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, Vitrectomía anterior ojo unilateral con anestesia local o local asistida"
+ },
+ {
+  "codigo": "417130",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Extracción de cuerpo extrano intraocular ojo derecho más lensectomía más drenaje coroideo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417140",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Extracción de cuerpo extrano intraocular ojo izquierdo más lensectomía más drenaje coroideo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417141",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Extracción de cuerpo extrano intraocular ambos ojos más lensectomía más drenaje coroideo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417150",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Cerclaje, retinopexia o exoplante ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417160",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Cerclaje, retinopexia o exoplante ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417161",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Cerclaje, retinopexia o exoplante ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417162",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, RETINA POR OJO, Anclaje de lente intraocular ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417170",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Extracción de cuerpo extrano ojo derecho más retinopexia, cerclaje o exoplante (anestesia local asistida)"
+ },
+ {
+  "codigo": "417180",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Extracción de cuerpo extrano ojo izquierdo más retinopexia, cerclaje o exoplante (anestesia local asistida)"
+ },
+ {
+  "codigo": "417181",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Extracción de cuerpo extrano ambos ojos más retinopexia, cerclaje o exoplante (anestesia local asistida)"
+ },
+ {
+  "codigo": "417190",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Intercambio gaseoso ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417200",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Intercambio gaseoso ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417201",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Intercambio gaseoso ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417210",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retiro de silicón ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417220",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retiro de silicón ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417221",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS RETINA POR OJO Retiro de silicón ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417222",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Extracción de Silicón más Extracción de Cataráta más Colocación de Lente Intraocular ojo unilateral"
+ },
+ {
+  "codigo": "417223",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, RETINA POR OJO, Extracción de Silicón más Extracción de Cataráta más Colocación de Lente Intraocular ambos ojos"
+ },
+ {
+  "codigo": "417224",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, Cirugía endoláser ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417225",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, Cirugía endoláser unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "417226",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, RETINA POR OJO, lente de contacto fáquica con anestesia local asistida"
+ },
+ {
+  "codigo": "417230",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Iridoplastía láser ojo derecho"
+ },
+ {
+  "codigo": "417240",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Iridoplastía láser ojo izquierdo"
+ },
+ {
+  "codigo": "417241",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Iridoplastía láser ambos ojos"
+ },
+ {
+  "codigo": "417242",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Inyección de Antiangiogénico en Cámara Anterior ojo unilateral"
+ },
+ {
+  "codigo": "417243",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Inyección de Antiangiogénico en Cámara Anterior ambos ojos"
+ },
+ {
+  "codigo": "417244",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Crosslinking corneal ojo unilateral con anestesia local"
+ },
+ {
+  "codigo": "417245",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, SEGMENTO ANTERIOR POR OJO, Crosslinking corneal ambos ojos con anestesia local"
+ },
+ {
+  "codigo": "417250",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Capsulotomía láser ojo derecho"
+ },
+ {
+  "codigo": "417260",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Capsulotomía láser ojo izquierdo"
+ },
+ {
+  "codigo": "417261",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Capsulotomía láser ambos ojos"
+ },
+ {
+  "codigo": "417270",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Pupiloplastía láser ojo derecho"
+ },
+ {
+  "codigo": "417280",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Pupiloplastía láser ojo izquierdo"
+ },
+ {
+  "codigo": "417281",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Pupiloplastía láser ambos ojos"
+ },
+ {
+  "codigo": "417282",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Extracción de Cristalino ojo unilateral Anestesia Local Asistida"
+ },
+ {
+  "codigo": "417283",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Extracción de Cristalino ambos ojos Anestesia Local Asistida"
+ },
+ {
+  "codigo": "417284",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Extracción de Cristalino Claro por Subluxación ojo unilateral"
+ },
+ {
+  "codigo": "417285",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Extracción de Cristalino Claro por Subluxación ambos ojos"
+ },
+ {
+  "codigo": "417286",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Extracción de Cristalino por Aspiración ojo unilateral Anestesia Local Asistida"
+ },
+ {
+  "codigo": "417287",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Extracción de Cristalino por Aspiración ambos ojos Anestesia Local Asistida"
+ },
+ {
+  "codigo": "417290",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Extracción de catarata extracapsular ojo derecho sin lente (anestesia local asistida)"
+ },
+ {
+  "codigo": "417300",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Extracción de catarata extracapsular ojo izquierdo sin lente (anestesia local asistida)"
+ },
+ {
+  "codigo": "417301",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Extracción de catarata extracapsular ambos ojos sin lente (anestesia local asistida)"
+ },
+ {
+  "codigo": "417302",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Queratotomía Astigmática ojo unilateral"
+ },
+ {
+  "codigo": "417303",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Queratotomía Astigmática ambos ojos"
+ },
+ {
+  "codigo": "417310",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía (kpp) - trasplante corneal ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417320",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía (kpp) - trasplante corneal ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417321",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía (kpp) - trasplante corneal ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417330",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía penetrante ojo derecho más catarata más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417340",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía penetrante ojo izquierdo más catarata más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417341",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía penetrante ambos ojos más catarata más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417350",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Cirugía de cataratas ojo derecho más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417360",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Cirugía de cataratas ojo izquierdo más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417361",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Cirugía de cataratas ambos ojos más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417370",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Implante secundario ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417380",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Implante secundario ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417381",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Implante secundario ambos ojos izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417382",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, SEGMENTO ANTERIOR POR OJO, implante (o colocación) secundario de lente intraocular plegable ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417390",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Retiro y recolocación de lente intraocular ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417400",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Retiro y recolocación de lente intraocular ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417401",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Retiro y recolocación de lente intraocular ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417410",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Faco emulsificación ojo derecho más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417411",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Facoemulsificación más colocación de lente intraocular ojo unilateral con anestesia general"
+ },
+ {
+  "codigo": "417412",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, SEGMENTO ANTERIOR POR OJO, facoemulsificacion mas colocación de lente intraocular ambos ojos con anestesia general"
+ },
+ {
+  "codigo": "417420",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Faco emulsificación ojo izquierdo más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417421",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Faco emulsificación ambos ojos más lente intraocular (anestesia local asistida)"
+ },
+ {
+  "codigo": "417430",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía (kpp)-trasplante corneal ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "417440",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía (kpp)-trasplante corneal ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "417441",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía (kpp)-trasplante corneal ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "417450",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía penetrante ojo derecho más catarata más lente intraocular (anestesia general)"
+ },
+ {
+  "codigo": "417460",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía penetrante ojo izquierdo más catarata más lente intraocular (anestesia general)"
+ },
+ {
+  "codigo": "417461",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Queratoplastía penetrante ambos ojos más catarata más lente intraocular (anestesia general)"
+ },
+ {
+  "codigo": "417462",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Colocación de anillo intraestromal ojo derecho"
+ },
+ {
+  "codigo": "417463",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Colocación de anillo intraestromal ojo izquierdo"
+ },
+ {
+  "codigo": "417464",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS SEGMENTO ANTERIOR POR OJO Colocación de anillo intraestromal ambos ojos"
+ },
+ {
+  "codigo": "417465",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Colocación de Anillos intraestromales ojo unilateral"
+ },
+ {
+  "codigo": "417466",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, SEGMENTO ANTERIOR POR OJO, Colocación de Anillos intraestromales ambos ojos"
+ },
+ {
+  "codigo": "417467",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, SEGMENTO ANTERIOR POR OJO, Anclaje de lente intraocular ojo unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "417468",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, SEGMENTO ANTERIOR POR OJO, Lensectomía + lente intraocular ambos ojos"
+ },
+ {
+  "codigo": "417469",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, SEGMENTO ANTERIOR POR OJO, Lensectomía + lente intraocular unilateral"
+ },
+ {
+  "codigo": "417470",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Iridectomía periférica láser (iridotomía) ojo derecho"
+ },
+ {
+  "codigo": "417480",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Iridectomía periférica láser (iridotomía) ojo izquierdo"
+ },
+ {
+  "codigo": "417481",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Iridectomía periférica láser (iridotomía) ambos ojos"
+ },
+ {
+  "codigo": "417490",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Trabeculoplastía láser ojo derecho"
+ },
+ {
+  "codigo": "417500",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Trabeculoplastía láser ojo izquierdo"
+ },
+ {
+  "codigo": "417501",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Trabeculoplastía láser ambos ojos"
+ },
+ {
+  "codigo": "417502",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Trabeculoplastía Selectiva Láser ojo unilateral (Anestesia tópica)"
+ },
+ {
+  "codigo": "417503",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Trabeculoplastía Selectiva Láser ambos ojos"
+ },
+ {
+  "codigo": "417510",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Crioablación ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417520",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Crioablación ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417521",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Crioablación ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417530",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Ciclocrioterapia ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417540",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Ciclocrioterapia ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417541",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Ciclocrioterapia ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417542",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Subciclofotocoagulación transescleral con láser Diodo Ojo Unilateral"
+ },
+ {
+  "codigo": "417543",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, GLAUCOMA POR OJO, Subciclofotocoagulación transescleral con láser diodo ambos ojos"
+ },
+ {
+  "codigo": "417544",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, ciclofotocoagulación unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "417545",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, ciclofotocoagulación ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417546",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS; GLAUCOMA POR OJO; CICLOFOTOCOAGULACIÓN CON LÁSER DE DIODO TRANSESCLERAL MICROPULSADO AMBOS OJOS CON ANESTESIA LOCAL ASISTIDA SERVICIO"
+ },
+ {
+  "codigo": "417547",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS; GLAUCOMA POR OJO; CICLOFOTOCOAGULACIÓN CON LÁSER DE DIODO TRANSESCLERAL MICROPULSADO OJO UNILATERAL CON ANESTESIA LOCAL ASISTIDA SERVICIO"
+ },
+ {
+  "codigo": "417550",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Colocación de válvula ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417560",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Colocación de válvula ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417561",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Colocación de válvula ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417562",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Colocación de Válvula ojo unilateral más Parche Escleral 180 grados superiores"
+ },
+ {
+  "codigo": "417563",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Colocación de Válvula ambos ojos más Parche Escleral 180 grados superiores"
+ },
+ {
+  "codigo": "417564",
+  "nombre": "Oftalmología Procedimientos Médico Quirúrgico, Glaucoma por ojo, Colocación de válvula de Ahmed unilateral por ojo con anestesia local asistida"
+ },
+ {
+  "codigo": "417565",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTO MEDICO QUIRÚRGICO, GLAUCOMA POR OJO, retiro de válvula expuesta ojo unilateral con anestesia local asistida."
+ },
+ {
+  "codigo": "417566",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Retiro de válvula expuesta ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417570",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Cirugía de catarata con lente intraocular más trabeculectomía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417571",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Cirugía filtrante con uso de anti-metabolito unilateral por ojo bajo anestesia local asistida"
+ },
+ {
+  "codigo": "417580",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Cirugía de catarata con lente intraocular más trabeculectomía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417581",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Cirugía de catarata con lente intraocular más trabeculectomía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417590",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Cirugía de catarata sin lente intraocular más trabeculectomía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417600",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Cirugía de catarata sin lente intraocular más trabeculectomía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417601",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Cirugía de catarata sin lente intraocular más trabeculectomía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417602",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Facoemulsificación más Colocación de Lente más Trabeculectomía más Antimetabolito ojo unilateral"
+ },
+ {
+  "codigo": "417603",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Facoemulsificación más Colocación de Lente más Trabeculectomía más Antimetabolito ambos ojos"
+ },
+ {
+  "codigo": "417604",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, revisión con aguja fina de cirugía filtrante ambos ojos con anestesia local"
+ },
+ {
+  "codigo": "417605",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, revisión con aguja fina de cirugía filtrante ojo unilateral con anestesia local"
+ },
+ {
+  "codigo": "417606",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, revisión con aguja fina de cirugía filtrante ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417607",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, revisión con aguja fina de cirugía filtrante ojo unilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "417610",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Trabeculectomía (filtrante) ojo derecho"
+ },
+ {
+  "codigo": "417620",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Trabeculectomía (filtrante) ojo izquierdo"
+ },
+ {
+  "codigo": "417621",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Trabeculectomía (filtrante) ambos ojos"
+ },
+ {
+  "codigo": "417622",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Trabeculectomía ojo unilateral más Antimetabolito"
+ },
+ {
+  "codigo": "417623",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, GLAUCOMA POR OJO, Trabeculectomía ambos ojos más Antimetabolito"
+ },
+ {
+  "codigo": "417624",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, Permeabilización de trabeculectomía unilateral con anestesia local"
+ },
+ {
+  "codigo": "417625",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, GLAUCOMA POR OJO, Permeabilización de trabeculectomía ambos ojos con anestesia local"
+ },
+ {
+  "codigo": "417630",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Facotrabeculectomía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417640",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Facotrabeculectomía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417641",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS GLAUCOMA POR OJO Facotrabeculectomía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417650",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Prótesis ocular ojo derecho"
+ },
+ {
+  "codigo": "417660",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Prótesis ocular ojo izquierdo"
+ },
+ {
+  "codigo": "417661",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Prótesis ocular ambos ojos"
+ },
+ {
+  "codigo": "417670",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Concha escleral ojo derecho"
+ },
+ {
+  "codigo": "417680",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Concha escleral ojo izquierdo"
+ },
+ {
+  "codigo": "417681",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Concha escleral ambos ojos"
+ },
+ {
+  "codigo": "417690",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Pterigión ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417700",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Pterigión ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417701",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Pterigión ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417702",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Resección de pterigión más injerto ojo derecho"
+ },
+ {
+  "codigo": "417703",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Resección de pterigión más injerto ojo izquierdo"
+ },
+ {
+  "codigo": "417704",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Resección de pterigión más injerto ambos ojos"
+ },
+ {
+  "codigo": "417705",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Cirugía de pterigión más plastia libre unilateral por ojo bajo anestesia local"
+ },
+ {
+  "codigo": "417706",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Cirugía de pterigión más plastia libre ambos ojos bajo anestesia local"
+ },
+ {
+  "codigo": "417710",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Chalazión ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417720",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Chalazión ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417721",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Chalazión ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417730",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Granuloma ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417740",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Granuloma ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417741",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Granuloma ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417750",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Puntoplastía ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417751",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLASTICA POR OJO, puntoplastía ambos ojos con anestesia general"
+ },
+ {
+  "codigo": "417752",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLASTICA POR OJO, PUNTOPLASTÍA UNILATERAL CON ANESTESIA GENERAL"
+ },
+ {
+  "codigo": "417753",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLÁSTICA POR OJO, exploración de la vía lagrimal + puntoplastía unilateral con anestesia general"
+ },
+ {
+  "codigo": "417754",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS; OCULOPLASTICA POR OJO; EXPLORACIÓN DE LA VÍA LAGRIMAL + PUNTOPLASTÍA AMBOS OJOS CON ANESTESIA GENERAL SERVICIO"
+ },
+ {
+  "codigo": "417760",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Puntoplastía ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417761",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Puntoplastía ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417769",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Sondeo más Lavado de Puntos Lagrimales en Adultos con Anestesia Tópica ambos ojos"
+ },
+ {
+  "codigo": "417770",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Taponamiento de puntos lagrimales ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417777",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLÁSTICA POR OJO, cauterización de punto lagrimal inferior ambos ojos con anestesia local"
+ },
+ {
+  "codigo": "417778",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLASTICA POR OJO, cauterización de punto lagrimal inferior ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "417779",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, OCULOPLÁSTICA POR OJO, Cauterización de punto lagrimal inferior ojo unilateral con anestesia local o local asistida"
+ },
+ {
+  "codigo": "417780",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Taponamiento de puntos lagrimales ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417781",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Taponamiento de puntos lagrimales ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417782",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Taponamiento de Puntos Lagrimales con tapón de Silicón ojo unilateral"
+ },
+ {
+  "codigo": "417783",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Taponamiento de Puntos Lagrimales con tapón de Silicón ambos ojos"
+ },
+ {
+  "codigo": "417784",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Reposicionamiento de Glándula Lagrimal ojo unilateral"
+ },
+ {
+  "codigo": "417785",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Reposicionamiento de Glándula Lagrimal ambos ojos"
+ },
+ {
+  "codigo": "417786",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Permeabilización de Puntos Lagrimales ojo unilateral"
+ },
+ {
+  "codigo": "417787",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Permeabilización de Puntos Lagrimales ambos ojos"
+ },
+ {
+  "codigo": "417788",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Remoción de tubo de Dacriocistorrinostomía ojo unilateral"
+ },
+ {
+  "codigo": "417789",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Remoción de tubo de Dacriocistorrinostomía ambos ojos"
+ },
+ {
+  "codigo": "417790",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Entropión ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417791",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLASTICA POR OJO, retiro de tubo de silicón unilateral con anestesia general"
+ },
+ {
+  "codigo": "417792",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLASTICA POR OJO, retiro de tubo de silicón ambos ojos con anestesia general"
+ },
+ {
+  "codigo": "417800",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Entropión ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417801",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Entropión ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417810",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ectropión ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "417820",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ectropión ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "417821",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ectropión ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "417830",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Colgajo conjuntival ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417840",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Colgajo conjuntival ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417841",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Colgajo conjuntival ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417842",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Recubrimiento Ocular con Membrana Amniótica ojo unilateral"
+ },
+ {
+  "codigo": "417843",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Recubrimiento Ocular con Membrana Amniótica ambos ojos"
+ },
+ {
+  "codigo": "417852",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía superior párpado ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417853",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía superior párpado ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417854",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía superior párpado ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417855",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía inferior párpado ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417856",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía inferior párpado ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417857",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía inferior párpado ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417861",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Blefaroplastía ambos ojos (anestesia local asistida) SERVICIO"
+ },
+ {
+  "codigo": "417862",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía superior e inferior juntas ojo derecho"
+ },
+ {
+  "codigo": "417863",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía superior e inferior juntas ojo izquierdo"
+ },
+ {
+  "codigo": "417864",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Blefaroplastía superior e inferior juntas ambos ojos"
+ },
+ {
+  "codigo": "417870",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Corrección quirúrgica de distriquiasis ojo derecho"
+ },
+ {
+  "codigo": "417880",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Corrección quirúrgica de distriquiasis ojo izquierdo"
+ },
+ {
+  "codigo": "417881",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Corrección quirúrgica de distriquiasis ambos ojos"
+ },
+ {
+  "codigo": "417890",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Triquiasis ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417900",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Triquiasis ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417901",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Triquiasis ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417910",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Simbléfaron ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417920",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Simbléfaron ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417921",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Simbléfaron ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417930",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Dacriocisto - Rinostomía ojo derecho con o sin tubo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417940",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Dacriocisto - Rinostomía ojo izquierdo con o sin tubo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417941",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Dacriocisto - Rinostomía ambos ojos con o sin tubo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417950",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Conjuntivo - Dacriocisto - Rinostomía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "417960",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Conjuntivo - Dacriocisto - Rinostomía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "417961",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Conjuntivo - Dacriocisto - Rinostomía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "417966",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLÁSTICA POR OJO, colocación de pesa de oro de 1 gramo en párpado superior ambos ojos"
+ },
+ {
+  "codigo": "417967",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OCULOPLASTICA POR OJO, colocación de pesa de oro de 1 gramo en párpado superior unilateral"
+ },
+ {
+  "codigo": "417968",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Colocación de tira tarsal lateral bilateral con anestesia local asistida"
+ },
+ {
+  "codigo": "417969",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Colocación de tira tarsal lateral unilateral por ojo con anestesia local asistida"
+ },
+ {
+  "codigo": "417970",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ptosis palpebral ojo derecho , fasanella - suspensión - resección del elevador (anestesia local asistida)"
+ },
+ {
+  "codigo": "417980",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ptosis palpebral ojo izquierdo, fasanella - suspensión - resección del elevador (anestesia local asistida)"
+ },
+ {
+  "codigo": "417981",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ptosis palpebral ambos ojos, fasanella - suspensión - resección del elevador (anestesia local asistida)"
+ },
+ {
+  "codigo": "417982",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ptosis de ceja ojo derecho"
+ },
+ {
+  "codigo": "417983",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ptosis de ceja ojo izquierdo"
+ },
+ {
+  "codigo": "417984",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Ptosis de ceja ambos ojos"
+ },
+ {
+  "codigo": "417985",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Corrección de ptosis de la cola de la ceja ojo derecho"
+ },
+ {
+  "codigo": "417986",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Corrección de ptosis de la cola de la ceja ojo izquierdo"
+ },
+ {
+  "codigo": "417987",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Corrección de ptosis de la cola de la ceja ambos ojos"
+ },
+ {
+  "codigo": "417988",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Excisión de masa Palpebral ojo unilateral"
+ },
+ {
+  "codigo": "417989",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Excisión de masa Palpebral ambos ojos"
+ },
+ {
+  "codigo": "417990",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Biopsia excisión de masa palpebral ojo derecho"
+ },
+ {
+  "codigo": "418000",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Biopsia excisión de masa palpebral ojo izquierdo"
+ },
+ {
+  "codigo": "418001",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Biopsia excisión de masa palpebral ambos ojos"
+ },
+ {
+  "codigo": "418002",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Biopsia excisión de masa conjuntival ojo derecho"
+ },
+ {
+  "codigo": "418003",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Biopsia excisión de masa conjuntival ojo izquierdo"
+ },
+ {
+  "codigo": "418004",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Biopsia excisión de masa conjuntival ambos ojos"
+ },
+ {
+  "codigo": "418005",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Biopsia escisión de masa conjuntival ojo unilateral Bajo Sedación"
+ },
+ {
+  "codigo": "418006",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Biopsia escisión de masa conjuntival ambos ojos Bajo Sedación"
+ },
+ {
+  "codigo": "418007",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Biopsia Excisión de Masa Intraorbitaria Bajo Anestesia General ojo unilateral"
+ },
+ {
+  "codigo": "418008",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Biopsia Excisión de Masa Intraorbitaria Bajo Anestesia General ambos ojos"
+ },
+ {
+  "codigo": "418010",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cantoplastía ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418020",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cantoplastía ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418021",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cantoplastía ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418030",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Drena - Resección de quiste ojo derecho, palpebral - conjuntival (anestesia local asistida)"
+ },
+ {
+  "codigo": "418040",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Drena - Resección de quiste ojo izquierdo, palpebral - conjuntival (anestesia local asistida)"
+ },
+ {
+  "codigo": "418041",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Drena - Resección de quiste ambos ojos, palpebral - conjuntival (anestesia local asistida)"
+ },
+ {
+  "codigo": "418050",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Reconstrucción palpebral ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418060",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Reconstrucción palpebral ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418061",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Reconstrucción palpebral ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418062",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cirugía de reformación de fórnix superior, con injerto de mucosa bucal, ojo derecho"
+ },
+ {
+  "codigo": "418063",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cirugía de reformación de fórnix superior, con injerto de mucosa bucal, ojo izquierdo"
+ },
+ {
+  "codigo": "418064",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cirugía de reformación de fórnix superior, con injerto de mucosa bucal, ambos ojos"
+ },
+ {
+  "codigo": "418065",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cirugía de reformación de fórnix inferior, con injerto de mucosa bucal, ojo derecho"
+ },
+ {
+  "codigo": "418067",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cirugía de reformación de fórnix inferior, con injerto de mucosa bucal, ojo izquierdo"
+ },
+ {
+  "codigo": "418068",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Cirugía de reformación de fórnix inferior, con injerto de mucosa bucal, ambos ojos"
+ },
+ {
+  "codigo": "418070",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Resección de granuloma más biopsia ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418080",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Resección de granuloma más biopsia ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418081",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Resección de granuloma más biopsia ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418082",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Electrofulguración de pestanas ojo derecho"
+ },
+ {
+  "codigo": "418083",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Electrofulguración de pestanas ojo izquierdo"
+ },
+ {
+  "codigo": "418084",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Electrofulguración de pestanas ambos ojos"
+ },
+ {
+  "codigo": "418085",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Excisión de Paquete Graso Subconjuntival ojo unilateral"
+ },
+ {
+  "codigo": "418086",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Excisión de Paquete Graso Subconjuntival ambos ojos"
+ },
+ {
+  "codigo": "418090",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Exenteración ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418100",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Exenteración ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418101",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OCULOPLASTICA POR OJO Exenteración ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418102",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Inyección de Toxina Botulínica tipo A"
+ },
+ {
+  "codigo": "418103",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OCULOPLASTICA POR OJO, Inyección de Toxina Botulínica para Tratamiento de Estrabismo con anestesia tópica en Adultos"
+ },
+ {
+  "codigo": "418110",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Prótesis ocular ojo derecho"
+ },
+ {
+  "codigo": "418120",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Prótesis ocular ojo izquierdo"
+ },
+ {
+  "codigo": "418121",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Prótesis ocular ambos ojos"
+ },
+ {
+  "codigo": "418130",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Concha escleral ojo derecho"
+ },
+ {
+  "codigo": "418140",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Concha escleral ojo izquierdo"
+ },
+ {
+  "codigo": "418141",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Concha escleral ambos ojos"
+ },
+ {
+  "codigo": "418150",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Sondeo de vías lagrimales ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418160",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Sondeo de vías lagrimales ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418161",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Sondeo de vías lagrimales ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418170",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Entropión congénito ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418180",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Entropión congénito ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418181",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Entropión congénito ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418190",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Intubación de vías lagrimales ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418200",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Intubación de vías lagrimales ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418201",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Intubación de vías lagrimales ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418210",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Corrección de estrabismo en ninos o adultos ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418220",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Corrección de estrabismo en ninos o adultos ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418221",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Corrección de estrabismo en ninos o adultos ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418222",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Inyección de Toxina Botulínica para Tratamiento de Estrabismo con Anestesia General para Ninos"
+ },
+ {
+  "codigo": "418230",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Trabeculectomía ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418240",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Trabeculectomía ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418241",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Trabeculectomía ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418250",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Trabeculotomía ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418260",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Trabeculotomía ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418261",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Trabeculotomía ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418270",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Colocación de válvula ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418280",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Colocación de válvula ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418281",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Colocación de válvula ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418290",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Chalazión ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418300",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Chalazión ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418301",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Chalazión ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418310",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Faco emulsificación con o sin lente intraocular ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418320",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Faco emulsificación con o sin lente intraocular ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418321",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Faco emulsificación con o sin lente intraocular ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418322",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Extracción de Catarata ojo unilateral más Capsulotomía posterior con Anestesia General"
+ },
+ {
+  "codigo": "418323",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Extracción de Catarata ambos ojos más Capsulotomía posterior con Anestesia General"
+ },
+ {
+  "codigo": "418324",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Extracción de Catarata por Aspiración más Vitrectomía Anterior y Colocación de Lente Intraocular ojo unilateral con Anestesia General"
+ },
+ {
+  "codigo": "418325",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Extracción de Catarata por Aspiración más Vitrectomía Anterior y Colocación de Lente Intraocular ambos ojos con Anestesia General"
+ },
+ {
+  "codigo": "418330",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Enucleación ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418340",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Enucleación ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418341",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Enucleación ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418350",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Ptosis palpebral ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418360",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Ptosis palpebral ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418361",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Ptosis palpebral ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418370",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Masas conjuntivales ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418380",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Masas conjuntivales ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418381",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Masas conjuntivales ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418390",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Dacriocisto - Rinostomía con o sin tubo ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418400",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Dacriocisto - Rinostomía con o sin tubo ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418401",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS OFTALMOPEDIATRIA POR OJO Dacriocisto - Rinostomía con o sin tubo ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418402",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Evaluación Oftalmológica en Ninos Bajo Sedación"
+ },
+ {
+  "codigo": "418403",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Cierre de Fístula Nasocutánea ojo unilateral con Anestesia General"
+ },
+ {
+  "codigo": "418404",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, OFTALMOPEDIATRIA POR OJO, Cierre de Fístula Nasocutánea ambos ojos con Anestesia General"
+ },
+ {
+  "codigo": "418405",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, OFTALMOLOPEDIATRÍA POR OJO, Evaluación de fondo de ojo y refracción bajo sedación"
+ },
+ {
+  "codigo": "418406",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OFTALMOPEDIATRÍA POR OJO, cirugía de expansor en oblicuo superior ambos ojos con anestesia general"
+ },
+ {
+  "codigo": "418407",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, OFTALMOPEDIATRÍA POR OJO, cirugía de expansor en oblícuo superior unilateral con anestesia general"
+ },
+ {
+  "codigo": "418410",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de laceración de conjuntiva bulbar ojo derecho (anestesia local)"
+ },
+ {
+  "codigo": "418420",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de laceración de conjuntiva bulbar ojo izquierdo (anestesia local)"
+ },
+ {
+  "codigo": "418421",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de laceración de conjuntiva bulbar ambos ojos (anestesia local)"
+ },
+ {
+  "codigo": "418430",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida palpebral ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418440",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida palpebral ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418441",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida palpebral ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418450",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Colgajo conjuntival ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418460",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Colgajo conjuntival ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418461",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Colgajo conjuntival ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418470",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Parche escleral ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418480",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Parche escleral ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418481",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Parche escleral ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418490",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Colgajo conjuntival y parche escleral ojo derecho (anestesia local asistida)"
+ },
+ {
+  "codigo": "418500",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Colgajo conjuntival y parche escleral ojo izquierdo (anestesia local asistida)"
+ },
+ {
+  "codigo": "418501",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Colgajo conjuntival y parche escleral ambos ojos (anestesia local asistida)"
+ },
+ {
+  "codigo": "418510",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida escleral ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418520",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida escleral ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418521",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida escleral ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418530",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida corneal ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418540",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida corneal ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418541",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida corneal ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418550",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida corneoescleral ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418560",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida corneoescleral ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418561",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cierre de herida corneoescleral ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418570",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Extracción de cuerpo extrano intraocular ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418580",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Extracción de cuerpo extrano intraocular ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418581",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Extracción de cuerpo extrano intraocular ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418590",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Lensectomía ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418600",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Lensectomía ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418601",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Lensectomía ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418610",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Retinopexia o cerclaje más drenaje de líquido subretiniano ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418620",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Retinopexia o cerclaje más drenaje de líquido subretiniano ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418621",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Retinopexia o cerclaje más drenaje de líquido subretiniano ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418630",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Vitrectomía ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418640",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Vitrectomía ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418641",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Vitrectomía ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418650",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Enucleación ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418660",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Enucleación ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418661",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Enucleación ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418670",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Reparación de canalículo lagrimal ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418680",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Reparación de canalículo lagrimal ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418681",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Reparación de canalículo lagrimal ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418690",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cantoplastía ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418700",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cantoplastía ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418701",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Cantoplastía ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418710",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Evisceración ocular ojo derecho (anestesia general)"
+ },
+ {
+  "codigo": "418720",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Evisceración ocular ojo izquierdo (anestesia general)"
+ },
+ {
+  "codigo": "418721",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS TRAUMA OCULAR POR OJO Evisceración ocular ambos ojos (anestesia general)"
+ },
+ {
+  "codigo": "418724",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MEDICO QUIRÚRGICOS, PROCEDIMIENTOS POR OJO, Retiro de sutura ambos ojos con anestesia local"
+ },
+ {
+  "codigo": "418725",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS MEDICO QUIRURGICOS, PROCEDIMIENTOS POR OJO, Retiro de sutura ojo unilateral con anestesia local"
+ },
+ {
+  "codigo": "418726",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS MÉDICO QUIRÚRGICOS, PROCEDIMIENTOS POR OJO, Tomografía óptica coherente de ángulo camerular de ambos ojos"
+ },
+ {
+  "codigo": "418730",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OPTICA Corrección óptica de gafas"
+ },
+ {
+  "codigo": "418731",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS, OPTICA, Rehabilitación de baja visión"
+ },
+ {
+  "codigo": "418732",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS, OPTICA, Iridectomía periférica con uso de intensidad de luz pulsada ambos ojos"
+ },
+ {
+  "codigo": "418740",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OPTICA Corrección óptica con lentes de contacto blandos o rígidos"
+ },
+ {
+  "codigo": "418750",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OPTICA Lente de contacto cosmético"
+ },
+ {
+  "codigo": "418751",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS VARIOS, ÓPTICA, ADAPTACIÓN DE LENTE DE CONTACTO ESCLERAL EN AMBOS OJOS"
+ },
+ {
+  "codigo": "418752",
+  "nombre": "OFTALMOLOGÍA PROCEDIMIENTOS VARIOS, ÓPTICA, adaptación de lente de contacto escleral unilateral"
+ },
+ {
+  "codigo": "418760",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OCULARISTA Prótesis ocular ojo derecho"
+ },
+ {
+  "codigo": "418770",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OCULARISTA Prótesis ocular ojo izquierdo"
+ },
+ {
+  "codigo": "418771",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OCULARISTA Prótesis ocular ambos ojos"
+ },
+ {
+  "codigo": "418780",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OCULARISTA Concha escleral ojo derecho"
+ },
+ {
+  "codigo": "418790",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OCULARISTA Concha escleral ojo izquierdo"
+ },
+ {
+  "codigo": "418791",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS VARIOS OCULARISTA Concha escleral ambos ojos"
+ },
+ {
+  "codigo": "711420",
+  "nombre": "PROFESIONALES CONTRATRADOS MEDICOS Oftalmólogo"
+ },
+ {
+  "codigo": "103679 -",
+  "nombre": "Oftalmología procedimiento médico quirúrgico, glaucoma, trabeculectomía (filtrante) por ojo"
+ },
+ {
+  "codigo": "2953 - 3537",
+  "nombre": "Servicios oftalmológicos"
+ },
+ {
+  "codigo": "87350 - 103419",
+  "nombre": "Oftalmología procedimientos médico quirúrgico, faco emulsificación por ojo, más lente intraocular con anestesia local asistida"
+ },
+ {
+  "codigo": "87354 - 103423",
+  "nombre": "Oftalmología procedimiento médico quirúrgico, blefaroplastía superior párpado, ambos ojos con anestesia local asistida"
+ },
+ {
+  "codigo": "99917 - 116792",
+  "nombre": "Oftalmología procedimiento diagnóstico de tonometría ambos ojos"
+ },
+ {
+  "codigo": "416360",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS; Oftalmológica  General"
+ },
+ {
+  "codigo": "416361",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;  Consulta con Neuroftalmólogo"
+ },
+ {
+  "codigo": "416370",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;   Ocularista"
+ },
+ {
+  "codigo": "416390",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;   Subespecialista de Segmento Antrior"
+ },
+ {
+  "codigo": "416400",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;   Subespecialista de Retina/Vítreo"
+ },
+ {
+  "codigo": "416410",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;   Subespecialista de Glaucoma"
+ },
+ {
+  "codigo": "416420",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;   Oculoplástica"
+ },
+ {
+  "codigo": "416430",
+  "nombre": "OFTALMOLOGIA PROCEDIMIENTOS; CONSULTAS;   Subespecialista de Estrabismo"
+ }
+]

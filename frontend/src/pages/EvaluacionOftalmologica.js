@@ -93,7 +93,7 @@ const tieneDatosClinicos = (fd) => {
 };
 
 // Componente de Autocomplete reutilizable
-const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, className }) => {
+const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, className, testId }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -149,6 +149,7 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
         placeholder={placeholder}
         disabled={disabled}
         className={className}
+        data-testid={testId}
       />
       {showSuggestions && suggestions.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
@@ -161,8 +162,9 @@ const Autocomplete = ({ value, onChange, placeholder, fetchUrl, disabled, classN
                 setShowSuggestions(false);
               }}
             >
+              {item.codigo && <span className="text-emerald-600 font-mono mr-2">[{item.codigo}]</span>}
               {item.nombre || item.nombre_completo || item.name}
-              {item.usos && <span className="text-gray-400 ml-2">({item.usos} usos)</span>}
+              {item.usos ? <span className="text-gray-400 ml-2">({item.usos} usos)</span> : null}
             </div>
           ))}
         </div>
@@ -2356,14 +2358,17 @@ const EvaluacionOftalmologica = () => {
                     <div className="space-y-2">
                       {(formData.igss_med_proc?.medicamentos || []).map((item, idx) => (
                         <div key={idx} className="flex items-center gap-2">
-                          <Input
-                            value={item}
-                            onChange={(e) => updateNestedField(`igss_med_proc.medicamentos.${idx}`, e.target.value)}
-                            disabled={isReadOnly}
-                            placeholder="Escribe el medicamento..."
-                            className="input-teal h-8 text-sm"
-                            data-testid={`igss-medicamento-${idx}`}
-                          />
+                          <div className="flex-1">
+                            <Autocomplete
+                              value={item}
+                              onChange={(v) => updateNestedField(`igss_med_proc.medicamentos.${idx}`, v)}
+                              disabled={isReadOnly}
+                              placeholder="Escribe o busca el medicamento IGSS..."
+                              fetchUrl="/catalogos/igss-medicamentos"
+                              className="input-teal h-8 text-sm"
+                              testId={`igss-medicamento-${idx}`}
+                            />
+                          </div>
                           {!isReadOnly && (
                             <Button
                               type="button"
@@ -2407,14 +2412,17 @@ const EvaluacionOftalmologica = () => {
                     <div className="space-y-2">
                       {(formData.igss_med_proc?.estudios_procedimientos || []).map((item, idx) => (
                         <div key={idx} className="flex items-center gap-2">
-                          <Input
-                            value={item}
-                            onChange={(e) => updateNestedField(`igss_med_proc.estudios_procedimientos.${idx}`, e.target.value)}
-                            disabled={isReadOnly}
-                            placeholder="Escribe el estudio o procedimiento..."
-                            className="input-teal h-8 text-sm"
-                            data-testid={`igss-estudio-${idx}`}
-                          />
+                          <div className="flex-1">
+                            <Autocomplete
+                              value={item}
+                              onChange={(v) => updateNestedField(`igss_med_proc.estudios_procedimientos.${idx}`, v)}
+                              disabled={isReadOnly}
+                              placeholder="Escribe o busca el estudio/procedimiento IGSS..."
+                              fetchUrl="/catalogos/igss-procedimientos"
+                              className="input-teal h-8 text-sm"
+                              testId={`igss-estudio-${idx}`}
+                            />
+                          </div>
                           {!isReadOnly && (
                             <Button
                               type="button"

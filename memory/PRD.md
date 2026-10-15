@@ -786,3 +786,12 @@ Frontend (EvaluacionOftalmologica.js): evaluacionVacia.igss_med_proc {medicament
 Backend (models/evaluacion_oftalmologica.py): clase MedicamentosProcedimientosIGSS (medicamentos/estudios_procedimientos: List[str]) con field_validator que recorta y descarta renglones vacíos; campo igss_med_proc en EvaluacionOftalmologicaBase y Update. Evaluaciones antiguas sin el campo devuelven listas vacías.
 Verificación: curl round-trip (create+GET) OK; validador descarta vacíos/trim OK; iteration_79.json frontend 100% (ubicación/color, agregar/editar/eliminar, guardar+reabrir persistencia, vista de impresión con títulos y subtítulos).
 Fase 2 pendiente: autorelleno de ambas listas desde un Excel que proporcionará el usuario.
+
+## Evaluación IGSS Fase 2: autorelleno desde catálogos Excel (2026-06) — Implementado y verificado
+El usuario adjuntó 2 Excel: Medicamentos (33) y Procedimientos (611), cada uno con columnas Código IGSS + Descripción IGSS.
+- Datos persistidos como JSON en /app/backend/data/igss_medicamentos.json y igss_procedimientos.json (codigo, nombre).
+- Seed idempotente seed_catalogos_igss() en server.py (startup) -> colecciones catalogo_igss_medicamentos / catalogo_igss_procedimientos (id, codigo, nombre, usos, fecha_creacion). Para recargar tras actualizar los JSON: borrar la colección y reiniciar backend.
+- Endpoints (routes/evaluaciones.py, catalogos_router): GET /api/catalogos/igss-medicamentos y /api/catalogos/igss-procedimientos (?search=&limit=), buscan por nombre O codigo (regex i), orden por nombre.
+- Frontend (EvaluacionOftalmologica.js): los renglones de Medicamentos y de Estudios/Procedimientos usan el componente Autocomplete (nuevo prop testId) con fetchUrl a los endpoints IGSS. El dropdown muestra [codigo] en verde + descripción; al seleccionar rellena el renglón con la descripción (texto libre, se mantiene editable). data-testid de inputs: igss-medicamento-<idx>, igss-estudio-<idx>.
+Verificación: seed 33+611 OK; búsqueda por nombre y por código OK (curl); screenshot confirma sugerencia "[1228] Timolol maleato..." al escribir en el renglón de medicamentos.
+Nota: no se almacena el código por separado (plan Fase 1: una sola línea de texto libre); el código se muestra solo como pista en el dropdown.

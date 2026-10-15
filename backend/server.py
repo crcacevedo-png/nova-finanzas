@@ -1570,6 +1570,40 @@ async def seed_surgeries_data():
     print(f"Created {len(surgeries)} sample surgeries")
 
 
+async def seed_catalogos_igss():
+    """Seed de catálogos IGSS (medicamentos y procedimientos) desde /data JSON. Idempotente."""
+    import json as _json
+    base = os.path.join(os.path.dirname(__file__), "data")
+    now = datetime.now(timezone.utc).isoformat()
+    mapping = [
+        ("catalogo_igss_medicamentos", "igss_medicamentos.json"),
+        ("catalogo_igss_procedimientos", "igss_procedimientos.json"),
+    ]
+    for coll_name, filename in mapping:
+        coll = db[coll_name]
+        existing = await coll.count_documents({})
+        if existing > 0:
+            print(f"Catálogo IGSS '{coll_name}' ya existe ({existing}), saltando seed")
+            continue
+        path = os.path.join(base, filename)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+        except Exception as e:
+            print(f"No se pudo leer {path}: {e}")
+            continue
+        docs = [{
+            "id": str(uuid.uuid4()),
+            "codigo": item.get("codigo", ""),
+            "nombre": item.get("nombre", ""),
+            "usos": 0,
+            "fecha_creacion": now,
+        } for item in data if item.get("nombre")]
+        if docs:
+            await coll.insert_many(docs)
+        print(f"Catálogo IGSS '{coll_name}' sembrado: {len(docs)} registros")
+
+
 async def seed_catalogos_oftalmologicos():
     """Seed de catálogos oftalmológicos y evaluación de ejemplo"""
     # Verificar si ya existen datos
@@ -4331,6 +4365,7 @@ async def startup_event():
     
     # Seed de catálogos oftalmológicos
     await seed_catalogos_oftalmologicos()
+    await seed_catalogos_igss()
     
     # Índices de Inventario
     await db.bodegas_inventario.create_index([("codigo", 1)], unique=True)
