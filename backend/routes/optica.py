@@ -49,6 +49,7 @@ class DoctorResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     name: str
+    usuario_id: Optional[str] = None
     specialty: Optional[str] = ""
     phone: Optional[str] = ""
     email: Optional[str] = ""

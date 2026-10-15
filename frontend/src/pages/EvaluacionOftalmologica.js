@@ -239,6 +239,9 @@ const EvaluacionOftalmologica = () => {
   const preseleccionDoneRef = useRef(false);
   const [searchParams] = useSearchParams();
   const [evaluacionActual, setEvaluacionActual] = useState(null);
+  // Snapshot de la evaluación en curso (del día) para poder regresar tras ver el historial
+  const [viendoHistorial, setViendoHistorial] = useState(false);
+  const borradorRef = useRef(null);
   const [pacientes, setPacientes] = useState([]);
   const [medicos, setMedicos] = useState([]);
   const [searchPaciente, setSearchPaciente] = useState('');
@@ -425,6 +428,15 @@ const EvaluacionOftalmologica = () => {
       console.error('Error fetching médicos:', error);
     }
   }, []);
+
+  // Para usuarios con rol médico: autoseleccionar su propio médico asignado
+  useEffect(() => {
+    if (user?.role !== 'medico' || !medicos.length || formData.medico_id) return;
+    const mio = medicos.find(m => m.usuario_id === user.id);
+    if (mio) {
+      setFormData(prev => ({ ...prev, medico_id: mio.id, medico_nombre: mio.name }));
+    }
+  }, [medicos, user, formData.medico_id]);
 
   // Mantener sincronizado el ref del paciente actual (para acotar el Historial)
   useEffect(() => {
@@ -796,6 +808,11 @@ const EvaluacionOftalmologica = () => {
 
   // Cargar evaluación
   const cargarEvaluacion = async (evaluacion) => {
+    // Guardar un snapshot de la evaluación en curso (del día) para poder regresar a ella
+    if (!viendoHistorial) {
+      borradorRef.current = { formData, evaluacionActual, searchPaciente };
+    }
+    setViendoHistorial(true);
     setEvaluacionActual(evaluacion);
     
     // Resetear estado CRM al cargar nueva evaluación
@@ -883,9 +900,23 @@ const EvaluacionOftalmologica = () => {
     setAutoguardadoStatus('');
   };
 
+  // Regresar a la evaluación del día (en curso) tras haber abierto una del historial
+  const volverAEvaluacionActual = () => {
+    const b = borradorRef.current;
+    if (b) {
+      setEvaluacionActual(b.evaluacionActual);
+      setFormData(b.formData);
+      setSearchPaciente(b.searchPaciente || '');
+      setAutoguardadoStatus('');
+    }
+    setViendoHistorial(false);
+  };
+
   // Nueva evaluación
   const nuevaEvaluacion = () => {
     setEvaluacionActual(null);
+    setViendoHistorial(false);
+    borradorRef.current = null;
     setFormData(evaluacionVacia);
     setSearchPaciente('');
     setAutoguardadoStatus('');
@@ -1064,6 +1095,9 @@ const EvaluacionOftalmologica = () => {
     setShowPacienteList(false);
     // Acotar el Historial a las evaluaciones de ESTE paciente
     pacienteIdRef.current = paciente.id;
+    // Nuevo contexto de borrador para este paciente
+    borradorRef.current = null;
+    setViendoHistorial(false);
     fetchEvaluaciones(paciente.id);
     
     // Cargar historial médico del paciente (antecedentes y medicamentos)
@@ -1547,6 +1581,16 @@ const EvaluacionOftalmologica = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
+                  {viendoHistorial && borradorRef.current && (
+                    <DropdownMenuItem
+                      onClick={volverAEvaluacionActual}
+                      data-testid="historial-volver-actual"
+                      className="flex flex-col items-start py-2 cursor-pointer bg-teal-50 border-b border-teal-100"
+                    >
+                      <span className="font-semibold text-sm text-teal-700">← Volver a la evaluación del día</span>
+                      <span className="text-xs text-gray-500">Evaluación en curso (sin cerrar)</span>
+                    </DropdownMenuItem>
+                  )}
                   {evaluaciones.length === 0 ? (
                     <div className="px-3 py-4 text-center text-gray-500 text-sm">
                       {formData.paciente_id ? 'Este paciente no tiene evaluaciones registradas' : 'Selecciona un paciente para ver su historial'}
