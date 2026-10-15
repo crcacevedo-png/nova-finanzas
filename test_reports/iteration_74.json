@@ -1,0 +1,40 @@
+{
+  "summary": "Frontend testing del Flujo de llegada (completar expediente antes de marcar Presente) en /agenda, con superadmin. El flujo principal funciona end-to-end: abrir Marcar llegada desde el menu de 3 puntos de la tarjeta de cita (Pedro Incompleto, Dr. Carlos Mendez 10:00) abre el modal data-testid='completar-ficha-dialog' con los datos ya existentes precargados (first_name=Pedro, last_name=Incompleto, phone=55559999, gender=Masculino). La validacion de campos obligatorios funciona: con birth_date/dpi/address/institution vacios el modal NO se cierra. Tras completar birth_date, dpi (13 digitos), address y institution=Particular y guardar, el modal se cierra, aparece toast 'Expediente completado' y luego 'Estado cambiado a Presente', la tarjeta cambia a amarillo (Presente), y en la vista Tablero del Dia aparece 'Pedro Incompleto' bajo 'Pacientes Presentes en Clinica' > Dr. Carlos Mendez. El selector 'Tipo de cita' en Nueva Cita y en Walk-in incluye la opcion 'Procedimiento'. El dialog Walk-in abre correctamente desde Tablero del Dia. No se pudo validar directamente a nivel API la ausencia de duplicados ni los flujos de walk-in con ficha incompleta porque el superadmin recibio 403 en GET /api/patients/{id} y /api/agenda/citas/{id} (ver issue minor abajo).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/patients/{id} y GET /api/agenda/citas/{id}", "issue": "El rol superadmin recibe 403 Forbidden al hacer GET directo de un paciente por id o de una cita por id desde el frontend/XHR. La UI funciona porque usa el listado agregado, pero bloquea verificaciones de duplicados y estados por detalle."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CitaCard (Agenda.js L121-180)", "issue": "El item de menu 'Marcar llegada' (y Confirmar/Iniciar consulta/Marcar atendida/No asistio/Ver paciente/Editar cita) no tiene data-testid, lo que dificulta la automatizacion. Solo 'Nueva Evaluacion' y 'Eliminar' lo tienen.", "selector": "DropdownMenuItem 'Marcar llegada'", "priority": "LOW"},
+      {"component": "Nueva Cita / Walk-in dialog", "issue": "El SelectTrigger de 'Tipo de cita' no tiene data-testid (ni en Nueva Cita L2106 ni en Walk-in L2335). La review request pide un testid 'del select de tipo'. La opcion 'Procedimiento' SI aparece.", "selector": "button[role='combobox'] junto a label 'Tipo de cita'", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Guardar expediente desde Marcar llegada con DPI colisionando", "issue": "Al intentar guardar con DPI 1234567890123, el backend devolvio 400 'Ya existe un paciente con este DPI'. Es comportamiento esperado si otro paciente ya lo usa, pero el DPI sugerido en el enunciado puede quedar bloqueado en reruns. Usando un DPI aleatorio nuevo (2890996272894) el guardado funciono perfectamente.", "affected_selectors": ["cf-dpi", "cf-guardar"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Opcional) Agregar data-testid='marcar-llegada-cita-{id}' al DropdownMenuItem 'Marcar llegada' en CitaCard (Agenda.js ~L134) para facilitar automatizacion.",
+    "(Opcional) Agregar data-testid='cita-tipo-select' / 'walkin-tipo-select' al SelectTrigger de Tipo de cita en los dialogs Nueva Cita y Walk-in.",
+    "Verificar permisos de superadmin para GET /api/patients/{id} y GET /api/agenda/citas/{id}: deberian estar permitidos para debug/testing.",
+    "Considerar sembrar el paciente de prueba TEST-INCOMPLETO-PAC con un DPI vacio reproducible y liberar/limpiar el DPI 1234567890123 existente, o cambiar el DPI sugerido en el prompt a uno garantizadamente libre."
+  ],
+  "critical_code_review_comments": [
+    "Agenda.js tiene 2374 lineas: supera el umbral recomendado (>700). Deberia dividirse por vistas (DiaView, SemanaView, MesView, MiAgenda, TableroDia) y extraer dialogs (CompletarFichaDialog, WalkInDialog, NuevaCitaDialog) a archivos separados.",
+    "fichaIncompleta y buildCompletarForm son logica reutilizable - podrian vivir en src/lib o src/utils para ser reutilizados en otras pantallas donde haya que completar ficha.",
+    "handleWalkIn (L982) y handleMarcarLlegada (L698) duplican el patron 'getById -> fichaIncompleta -> set refs + abrir modal'. Se puede extraer un hook useCompletarFicha para DRY.",
+    "El modal reusa el mismo citaForm/paciente state - OK, pero al cerrar el modal con 'Cancelar' no se limpia completarAccionRef.current ni completarPidRef.current (quedan colgados hasta la proxima apertura)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skip)", "frontend": "100% de los flujos criticos probados exitosamente"},
+  "test_credentials": "superadmin / nova2024 (usado), medico_test / medico2024 (no usado - UI con superadmin fue suficiente)",
+  "seed_data_creation": "No se creo seed. Se ACTUALIZO el paciente de prueba TEST-INCOMPLETO-PAC con DPI real (2890996272894), birth_date 1980-05-15, address 'Zona 10 Guatemala', referral_institution 'particular' - ya no esta incompleto. Para reruns de la prueba hay que resetear este paciente o usar otro.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "El paciente TEST-INCOMPLETO-PAC ya quedo con ficha completa tras esta corrida, su cita TEST-LLEGADA-CITA quedo en estado Presente. Para re-correr el flujo de completar ficha, el main agent debe resembrar el paciente dejando campos vacios (birth_date/dpi/address/referral_institution) y la cita en estado Agendada/Confirmada. El DPI 1234567890123 esta tomado por otro paciente, usar otro para pruebas futuras.",
+  "rca of the issue": "N/A - no se encontraron bugs funcionales. Issues: (1) 403 en GET /api/patients/{id} con superadmin impidio verificacion por API; (2) DPI de ejemplo 1234567890123 ya existe en DB (choca con validacion de unicidad), lo que es correcto a nivel backend pero puede confundir en reruns."
+}

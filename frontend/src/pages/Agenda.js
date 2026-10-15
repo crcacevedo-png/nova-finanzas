@@ -131,7 +131,7 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
               </DropdownMenuItem>
             )}
             {['Agendada', 'Confirmada'].includes(cita.estado) && (
-              <DropdownMenuItem onClick={() => onMarcarLlegada ? onMarcarLlegada(cita) : onEstadoChange(cita.id, 'Presente')}>
+              <DropdownMenuItem data-testid={`marcar-llegada-cita-${cita.id}`} onClick={() => onMarcarLlegada ? onMarcarLlegada(cita) : onEstadoChange(cita.id, 'Presente')}>
                 <UserCheck className="w-4 h-4 mr-2" /> Marcar llegada
               </DropdownMenuItem>
             )}
@@ -2103,7 +2103,7 @@ const Agenda = () => {
                   value={citaForm.tipo_cita}
                   onValueChange={(value) => setCitaForm(prev => ({ ...prev, tipo_cita: value }))}
                 >
-                  <SelectTrigger className="input-teal">
+                  <SelectTrigger className="input-teal" data-testid="cita-tipo-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2164,7 +2164,10 @@ const Agenda = () => {
       
       {/* ==================== DIALOG: WALK-IN ==================== */}
       {/* Modal: Completar expediente al marcar llegada */}
-      <Dialog open={completarOpen} onOpenChange={setCompletarOpen}>
+      <Dialog open={completarOpen} onOpenChange={(o) => {
+        setCompletarOpen(o);
+        if (!o) { completarAccionRef.current = null; completarPidRef.current = null; }
+      }}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" data-testid="completar-ficha-dialog">
           <DialogHeader>
             <DialogTitle>Completar expediente del paciente</DialogTitle>
@@ -2328,7 +2331,7 @@ const Agenda = () => {
                 value={citaForm.tipo_cita}
                 onValueChange={(value) => setCitaForm(prev => ({ ...prev, tipo_cita: value }))}
               >
-                <SelectTrigger className="input-teal">
+                <SelectTrigger className="input-teal" data-testid="walkin-tipo-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

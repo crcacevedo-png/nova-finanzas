@@ -4,7 +4,19 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-10 (Sesión 31 — Auditoría Prompt 26)
+**Última actualización**: 2026-10 (Sesión 33 — Flujo de llegada)
+
+### Agenda: Flujo de llegada — completar expediente antes de pasar a Presente (2026-10 Sesión 33)
+- ✅ **Detección automática de ficha incompleta** (`fichaIncompleta` en `Agenda.js`): un paciente es "incompleto" si le falta nombre, apellido, sexo, fecha de nacimiento, teléfono, DPI, dirección o institución; si la institución es IGSS, también exige unidad IGSS. Aplica retroactivamente a pacientes ya existentes (incluye los agendados como "nuevo" solo con nombre/teléfono/sexo/edad).
+- ✅ **Modal al marcar llegada** (`completar-ficha-dialog`): al elegir "Marcar llegada" en una cita agendada con ficha incompleta se abre el formulario precargado con los datos existentes. El paciente **NO** pasa a "Presente" hasta guardar todos los obligatorios. Al guardar se hace `PUT /api/patients/{id}` sobre el **mismo expediente** (sin duplicar) y recién entonces `cambiarEstado→Presente`.
+- ✅ **Llegada directa** cuando la ficha ya está completa (sin modal), vinculada a su expediente existente.
+- ✅ **Walk-ins incluidos**: `handleWalkIn` aplica la misma validación antes de `createWalkIn`; si falta algún dato abre el mismo modal y registra la llegada solo al completar.
+- ✅ El paciente presente aparece en "Pacientes Presentes en Clínica" bajo su médico y queda disponible para evaluación con su expediente.
+- ✅ **"Procedimiento"** agregado a los tipos de consulta (`TIPOS_CITA` en `Agenda.js`), disponible en Nueva Cita y Walk-in. (Backend acepta `tipo_cita` como texto libre.)
+- ✅ data-testids: `completar-ficha-dialog`, `cf-first-name/last-name/gender/birth-date/phone/dpi/address/institution/igss-unit`, `cf-guardar`, `marcar-llegada-cita-{id}`, `cita-tipo-select`, `walkin-tipo-select`.
+- ✅ **Verificado**: testing agent `iteration_74.json` — flujo crítico 100% E2E (modal abre con datos precargados, validación de obligatorios bloquea guardar, guardar actualiza mismo expediente→Presente→aparece en Presentes; "Procedimiento" presente). Sin bugs funcionales.
+- **Pendiente Fase 2 (futuro)**: indicador visual en la agenda de citas con ficha incompleta antes de llegar; reporte de expedientes incompletos. **Fase 3**: capturar más datos al agendar; detección de duplicados por DPI al completar.
+
 
 ### POS: Médico obligatorio y autollenable tras seleccionar paciente (2026-10 Sesión 32)
 - ✅ En el POS de Clínica (`PuntoVenta.js`) y de Óptica (`OpticaPOS.js`/`POSCart.js`): al seleccionar un paciente aparece el campo "Médico *" con autocompletado desde la lista general de médicos (`GET /api/doctors/search?q=`).
