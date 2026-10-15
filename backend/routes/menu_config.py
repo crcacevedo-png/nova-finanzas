@@ -358,7 +358,7 @@ DEFAULT_MENU_CONFIG = {
         "pacientes", "unidades_igss"
     ],
     "medico": [
-        "pacientes", "agenda", "evaluacion_oftalmologica", "sala_operaciones"
+        "pacientes", "agenda", "evaluacion_oftalmologica"
     ]
 }
 

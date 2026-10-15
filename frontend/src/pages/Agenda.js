@@ -4,11 +4,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useAgendaWebSocket } from '../hooks/useWebSocket';
 import { 
   Calendar, Clock, Users, UserCheck, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, Search, Filter, MoreVertical, Play, CheckCircle, XCircle,
-  AlertCircle, Phone, Eye, EyeOff, GripVertical, SlidersHorizontal, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2
+  AlertCircle, Phone, Eye, EyeOff, GripVertical, SlidersHorizontal, Printer, Settings, User, CalendarDays, Wifi, WifiOff, RotateCcw, Trash2, Stethoscope
 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover';
 import { Button } from '../components/ui/button';
@@ -59,7 +60,7 @@ const ESTADOS_CITA = {
 };
 
 const TIPOS_CITA = [
-  'Primera vez', 'Subsecuente', 'Control post-operatorio', 'Estudio', 'Otro'
+  'Primera Consulta', 'Control', 'Control Post Operatorio', 'Lectura de estudios', 'Emergencia'
 ];
 
 // Helper para formatear fecha
@@ -87,7 +88,7 @@ const formatTime = (time) => {
 };
 
 // Componente de tarjeta de cita compacta
-const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, compact = false }) => {
+const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, compact = false }) => {
   const estadoConfig = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
   const IconoEstado = estadoConfig.icon;
   
@@ -147,6 +148,11 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
             <DropdownMenuItem onClick={() => onVerPaciente(cita.paciente_id)}>
               <Eye className="w-4 h-4 mr-2" /> Ver paciente
             </DropdownMenuItem>
+            {onNuevaEvaluacion && (
+              <DropdownMenuItem onClick={() => onNuevaEvaluacion(cita.paciente_id)} data-testid={`nueva-evaluacion-cita-${cita.id}`}>
+                <Stethoscope className="w-4 h-4 mr-2" /> Evaluación Oftalmológica
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onEdit(cita)}>
               <Calendar className="w-4 h-4 mr-2" /> Editar cita
             </DropdownMenuItem>
@@ -170,7 +176,7 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
 };
 
 // Componente de paciente presente
-const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvaluacion, onCancelarLlegada, medicos }) => {
+const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvaluacion, onNuevaEvaluacion, onCancelarLlegada, medicos }) => {
   const tiempoEspera = paciente.tiempo_espera_minutos;
   const colorEspera = tiempoEspera > 60 ? 'text-red-600' : tiempoEspera > 30 ? 'text-amber-600' : 'text-green-600';
   
@@ -217,6 +223,11 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
                 <DropdownMenuItem onClick={() => onVerEvaluacion(paciente.paciente_id)}>
                   <Eye className="w-4 h-4 mr-2" /> Ver evaluación
                 </DropdownMenuItem>
+                {onNuevaEvaluacion && (
+                  <DropdownMenuItem onClick={() => onNuevaEvaluacion(paciente.paciente_id)} data-testid={`nueva-evaluacion-presente-${paciente.cita_id}`}>
+                    <Stethoscope className="w-4 h-4 mr-2" /> Evaluación Oftalmológica
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onCancelarLlegada(paciente.cita_id)} data-testid={`cancelar-llegada-${paciente.cita_id}`}>
                   <RotateCcw className="w-4 h-4 mr-2" /> Cancelar llegada
@@ -236,6 +247,7 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
 // ==================== COMPONENTE PRINCIPAL ====================
 const Agenda = () => {
   const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(user?.role === 'medico' ? 'mi-agenda' : 'calendario');
   const [loading, setLoading] = useState(true);
   const [gcalOpen, setGcalOpen] = useState(false);
@@ -324,7 +336,7 @@ const Agenda = () => {
     medico_nombre: '',
     fecha: '',
     hora_inicio: '08:00',
-    tipo_cita: 'Subsecuente',
+    tipo_cita: 'Primera Consulta',
     duracion_minutos: 15,
     notas: '',
     // Campos para paciente nuevo
@@ -714,7 +726,7 @@ const Agenda = () => {
         medico_nombre: med?.name || '',
         fecha: prefill?.fecha || fechaSeleccionada,
         hora_inicio: prefill?.hora || '08:00',
-        tipo_cita: 'Subsecuente',
+        tipo_cita: 'Primera Consulta',
         duracion_minutos: 15,
         notas: '',
         es_paciente_nuevo: false,
@@ -917,6 +929,15 @@ const Agenda = () => {
   
   const handleVerEvaluacion = (pacienteId) => {
     window.open(`/evaluacion-oftalmologica?paciente=${pacienteId}`, '_blank');
+  };
+
+  // Abrir una hoja de evaluación NUEVA para el paciente (misma pantalla)
+  const handleNuevaEvaluacion = (pacienteId) => {
+    if (!pacienteId) {
+      toast.error('Esta cita no tiene un paciente vinculado');
+      return;
+    }
+    navigate(`/evaluacion-oftalmologica?paciente_id=${pacienteId}`);
   };
   
   const navegarFecha = (dias) => {
@@ -1251,6 +1272,7 @@ const Agenda = () => {
                                     onEliminar={handleEliminarCita}
                                     onEdit={handleOpenCitaDialog}
                                     onVerPaciente={handleVerPaciente}
+                                    onNuevaEvaluacion={handleNuevaEvaluacion}
                                   />
                                 </div>
                               ))}
@@ -1498,6 +1520,7 @@ const Agenda = () => {
                           onEstadoChange={handleCambiarEstado}
                           onEdit={handleOpenCitaDialog}
                           onVerPaciente={handleVerPaciente}
+                          onNuevaEvaluacion={handleNuevaEvaluacion}
                         />
                       ))
                   )}
@@ -1539,6 +1562,7 @@ const Agenda = () => {
                             paciente={{...paciente, medico_color: grupo.medico_color}}
                             onEstadoChange={handleCambiarEstado}
                             onVerEvaluacion={handleVerEvaluacion}
+                            onNuevaEvaluacion={handleNuevaEvaluacion}
                             onCancelarLlegada={handleCancelarLlegada}
                             medicos={medicos}
                           />
@@ -1691,6 +1715,7 @@ const Agenda = () => {
                             paciente={paciente}
                             onEstadoChange={handleCambiarEstado}
                             onVerEvaluacion={handleVerEvaluacion}
+                            onNuevaEvaluacion={handleNuevaEvaluacion}
                             onCancelarLlegada={handleCancelarLlegada}
                             medicos={medicos}
                           />
@@ -1719,6 +1744,7 @@ const Agenda = () => {
                             onEstadoChange={handleCambiarEstado}
                             onEdit={handleOpenCitaDialog}
                             onVerPaciente={handleVerPaciente}
+                            onNuevaEvaluacion={handleNuevaEvaluacion}
                           />
                         ))
                       )}
@@ -1979,6 +2005,9 @@ const Agenda = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    {citaForm.tipo_cita && !TIPOS_CITA.includes(citaForm.tipo_cita) && (
+                      <SelectItem value={citaForm.tipo_cita}>{citaForm.tipo_cita}</SelectItem>
+                    )}
                     {TIPOS_CITA.map(tipo => (
                       <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
                     ))}
@@ -2136,6 +2165,9 @@ const Agenda = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {citaForm.tipo_cita && !TIPOS_CITA.includes(citaForm.tipo_cita) && (
+                    <SelectItem value={citaForm.tipo_cita}>{citaForm.tipo_cita}</SelectItem>
+                  )}
                   {TIPOS_CITA.map(tipo => (
                     <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
                   ))}

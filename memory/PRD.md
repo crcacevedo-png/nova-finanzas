@@ -699,3 +699,20 @@ Ver `/app/memory/test_credentials.md`
 - También se alineó `routes/auth.py` (`/login` usa `await resolve_permissions`) y `config/permissions.py` por consistencia, aunque no son la ruta activa.
 - Verificación E2E (preview, simulando el override incompleto de producción en `db.roles`): `/auth/me` devuelve 34 permisos con clínicos en True; navegación headless Login→Pacientes, +reload, Agenda→/agenda, Sala→/sala-operaciones, Evaluación→/evaluacion-oftalmologica, todas correctas. Rol de simulación eliminado tras la prueba.
 - Requiere REDESPLIEGUE para que producción tome el fix de `server.py`.
+
+## Ajustes Agenda/Médico + fix 422 Pacientes (2026-06) — Implementado y verificado
+Contexto: tras implementar (y verificar por testing agent, iteration_73) las 4 mejoras (Sala configurable por rol, Ayudante en cirugía, modal paciente 900px, Tipo de Paciente IGSS), el usuario pidió ajustes adicionales.
+
+1) Tipos de cita (Agenda): se reemplazaron por: 'Primera Consulta', 'Control', 'Control Post Operatorio', 'Lectura de estudios', 'Emergencia'. Las citas antiguas conservan su etiqueta: el Select agrega un SelectItem extra con el valor actual si no está en la lista. Default nuevo: 'Primera Consulta'. Archivo: frontend/src/pages/Agenda.js (const TIPOS_CITA). Backend tipo_cita es str libre (no requiere cambio).
+
+2) Menú del rol Médico: orden Agenda → Pacientes → Evaluación Oftalmológica, y se quitó 'Sala de operaciones'. 
+   - frontend/src/components/Layout.js: si user.role==='medico' se reordena navItems por [agenda, pacientes, evaluacion].
+   - backend/routes/menu_config.py: DEFAULT_MENU_CONFIG['medico'] = ['pacientes','agenda','evaluacion_oftalmologica'] (sin sala_operaciones). El médico usa default (sin config almacenada). Solo aplica al rol médico; los demás roles no cambian.
+
+3) Acción 'Evaluación Oftalmológica' en el menú de 3 puntos de la Agenda (tanto en 'Mis Citas del Día'/CitaCard como en 'Mis Pacientes Presentes'/PacientePresenteCard): navega (misma pantalla) a /evaluacion-oftalmologica?paciente_id=<id>, que abre una hoja de evaluación NUEVA con el paciente ya cargado. 
+   - frontend/src/pages/Agenda.js: handleNuevaEvaluacion + useNavigate; prop onNuevaEvaluacion en ambas tarjetas; data-testid nueva-evaluacion-cita-{id} y nueva-evaluacion-presente-{citaId}. Icono Stethoscope.
+   - El mecanismo ?paciente_id= ya existía en EvaluacionOftalmologica.js (preselección + nueva evaluación).
+
+Fix adicional (bug HIGH de iteration_73): frontend/src/pages/Pacientes.js crasheaba al recibir error 422 (FastAPI detail como lista de objetos). Se agregó helper extractErrorMessage() que convierte detail (array/string) a texto legible; aplicado en los catch de crear/actualizar y desactivar paciente.
+
+Verificación: smoke tests headless OK — sidebar médico [Agenda, Pacientes, Evaluación] sin Sala; menú 3 puntos muestra 'Evaluación Oftalmológica' y al pulsar abre /evaluacion-oftalmologica?paciente_id=... con el paciente cargado en una evaluación nueva; cita muestra el nuevo tipo 'Primera Consulta'. Registros de prueba eliminados.

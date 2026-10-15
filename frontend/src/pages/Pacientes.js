@@ -66,6 +66,14 @@ import {
   getGuatemalaDate
 } from '../services/api';
 
+// Extrae un mensaje de error legible (FastAPI 422 devuelve detail como lista de objetos)
+const extractErrorMessage = (error, fallback) => {
+  const detail = error?.response?.data?.detail;
+  if (Array.isArray(detail)) return detail.map(d => d?.msg || (typeof d === 'string' ? d : JSON.stringify(d))).join(', ');
+  if (typeof detail === 'string') return detail;
+  return fallback;
+};
+
 const Pacientes = () => {
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
@@ -393,7 +401,7 @@ const Pacientes = () => {
       resetForm();
       fetchPatients();
     } catch (error) {
-      const message = error.response?.data?.detail || 'Error al guardar el paciente';
+      const message = extractErrorMessage(error, 'Error al guardar el paciente');
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -411,7 +419,7 @@ const Pacientes = () => {
       setSelectedPatient(null);
       fetchPatients();
     } catch (error) {
-      const message = error.response?.data?.detail || 'Error al desactivar el paciente';
+      const message = extractErrorMessage(error, 'Error al desactivar el paciente');
       toast.error(message);
     } finally {
       setSubmitting(false);

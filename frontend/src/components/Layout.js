@@ -129,6 +129,16 @@ const Layout = ({ children }) => {
     navItems.push({ path: '/agenda', icon: CalendarDays, label: 'Agenda', testId: 'nav-agenda' });
   }
 
+  // Orden específico para el rol Médico: Agenda, Pacientes, Evaluación Oftalmológica
+  if (user?.role === 'medico') {
+    const ordenMedico = ['/agenda', '/pacientes', '/evaluacion-oftalmologica'];
+    navItems.sort((a, b) => {
+      const ia = ordenMedico.indexOf(a.path);
+      const ib = ordenMedico.indexOf(b.path);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  }
+
   // Finanzas sub-items - Filtrados por configuración de menús
   const finanzasItems = [];
   if (user?.role !== 'optica') {

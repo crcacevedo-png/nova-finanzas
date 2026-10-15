@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend testing of 4 NovaVisión features: (1) Role-based access control for Sala de Operaciones via menu config, (2) Ayudante (assistant surgeon) field, (3) Wider patient modal (900px), (4) IGSS 'Tipo de Paciente' conditional field. All four features work as specified. Test data cleaned up and 'usuario' role left WITHOUT sala_operaciones (original state).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Pacientes.js (patient create/error handling)",
+        "issue": "When POST /api/patients returns 422 validation error (FastAPI's detail=[{type,loc,msg,input,ctx,url},...] array), the Pacientes page CRASHES with React error: 'Objects are not valid as a React child (found: object with keys {type, loc, msg, input, ctx, url})'. The whole Pacientes screen is replaced with the generic error boundary ('Algo salió mal'). Likely the error toast is doing something like toast.error(err.response.data.detail) which is an array of objects, not a string.",
+        "selector": "catch block in createPatient handler / toast.error call",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix Pacientes.js error handler to safely stringify FastAPI 422 validation errors (detail may be a list of objects). Suggested: if Array.isArray(err.response?.data?.detail) use detail.map(d => d.msg).join(', '); else use detail or err.message. Same defensive handling should be applied globally in all forms (surgeries, users, etc.) to prevent similar React render crashes."
+  ],
+  "critical_code_review_comments": [
+    "ProtectedRoute + requiredMenu + isMenuEnabled flow works correctly end-to-end.",
+    "menu_config.py AVAILABLE_MENUS correctly contains sala_operaciones. my-menus endpoint returns correct menu_ids after PUT.",
+    "Checkbox component emits console warning: 'Received false for a non-boolean attribute indeterminate' in Menús por Rol tab — minor React warning, should pass boolean to string or convert.",
+    "igss_tipo_paciente persists correctly in backend and is shown in detail view only when referral_institution=='igss'.",
+    "assistant_surgeon persists and is shown as 'Ayudante' in surgery detail view below Cirujano."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "95% (1 UI crash bug on 422 error)"},
+  "test_credentials": "superadmin/nova2024, usuario/user2024, medico_test/medico2024",
+  "seed_data_creation": "Created and deleted: 1 test patient (TEST_IGSS Paciente_CURL) and 1 test surgery. 'usuario' role left WITHOUT sala_operaciones menu (verified as original state).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 4 features work. The only bug is a HIGH priority UI crash: Pacientes page renders the raw FastAPI validation error array (detail: [{type,loc,msg,...}]) and crashes with React 'Objects are not valid as a React child'. To reproduce: open Nuevo Paciente, select IGSS, pick IGSS unit, fill required but leave something that causes 422 (e.g. invalid date), submit — the whole patient list screen replaces with 'Algo salió mal' error boundary. Fix in the error handler to stringify the detail array.",
+  "features_verified": {
+    "feature_1_rbac_sala_operaciones": "PASS - Enabling via Menús por Rol tab (or API) correctly adds nav-sala-operaciones to sidebar and allows /sala-operaciones; disabling removes it and redirects to /pacientes. medico_test has access by default. usuario does not by default and after revert.",
+    "feature_2_assistant_surgeon": "PASS - surgery-assistant data-testid present below surgery-surgeon, lists all doctors + 'Ninguno' option. assistant_surgeon persists and shows in detail as 'AYUDANTE: Dr. ...'",
+    "feature_3_wider_patient_modal": "PASS - Dialog bounding box width measured at exactly 900px.",
+    "feature_4_igss_tipo_paciente": "PASS - patient-igss-tipo-paciente input appears only when Institución Referente=IGSS, hidden when switched to other. Persists and shows in patient detail as 'Tipo de Paciente: Afiliado'."
+  }
+}
