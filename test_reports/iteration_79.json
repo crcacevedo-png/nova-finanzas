@@ -1,0 +1,36 @@
+{
+  "summary": "Frontend E2E for new 'Medicamentos y Procedimientos (EXCLUSIVO IGSS)' section in /evaluacion-oftalmologica (superadmin, patient Juan Perez Lopez via ?paciente_id). ALL requested flows PASS: section exists with emerald accent (header gradient from-emerald-50, border #34d399, icon emerald-600), ordered exactly after 'Diagnóstico y Plan' and before 'Candidato a Cirugía'; add/edit/remove rows in both lists works correctly (removing middle row of 3 keeps correct remaining texts); badge counts total rows (4); Guardar -> POST 200 returns igss_med_proc with both lists; reload + Historial -> reopen shows same 2 medicamentos + 2 estudios; printer icon in section header opens .print-area (printType igss) with title 'MEDICAMENTOS Y PROCEDIMIENTOS (EXCLUSIVO IGSS)', subtitles 'Medicamentos' and 'Estudios / Procedimientos', numbered items; window.print invoked; 'Cerrar Vista Previa' closes it. Quick backend sanity: PUT persists, GET of legacy evaluation without field returns empty lists (200). No page errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/evaluaciones", "issue": "Blank rows are persisted as empty strings (e.g. medicamentos ['TEST_X','']). Print view filters them, but DB keeps garbage entries; consider stripping empty items in frontend before save or in a Pydantic validator."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Evaluación Oftalmológica - IGSS section", "issues": [
+        "Section is collapsed by default (defaultOpen={false}); the data-testid igss-med-proc-section only exists after expanding. Fine if intended, but on reopen of an evaluation with IGSS data the user doesn't see it until clicking (badge does show count).",
+        "Header toggle button and print icon span lack data-testid (e.g. igss-section-toggle, igss-print-btn) - tests had to use text/title selectors.",
+        "Printing with both lists empty renders only the title with no 'sin registros' text."
+      ]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: filter out empty/whitespace-only rows from igss_med_proc before saving",
+    "Optional: add data-testid to IGSS section header toggle and print icon",
+    "Optional: consider auto-expanding IGSS section when it has items"
+  ],
+  "critical_code_review_comments": [
+    "EvaluacionOftalmologica.js is ~3440 lines - should be split (sections, print templates, CollapsibleSection) into separate modules.",
+    "IGSS medicamentos and estudios blocks are near-duplicate JSX (~50 lines each); extract a reusable FreeTextList component."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (sanity checks 100%)", "frontend": "100%"},
+  "seed_data_creation": "Created test evaluation e85403d8-7916-4b9d-b9e1-030f8ac6feee for Juan Perez Lopez; deleted afterwards (GET -> 404).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Load /evaluacion-oftalmologica?paciente_id=5ae39833-4321-40cb-b292-5f3c1bcd4ca7 to preselect patient. IGSS section collapsed by default: click button:has(span:text-is('Medicamentos y Procedimientos (EXCLUSIVO IGSS)')). Print icon = span[title='Imprimir receta'] inside that header; stub window.print via add_init_script; print overlay (.print-area fixed inset-0) intercepts clicks until 'Cerrar Vista Previa' is clicked. Reopen via historial-toggle-btn -> historial-item-<id>. Environment clock is 2026-10-15."
+}

@@ -1,7 +1,7 @@
 # /app/backend/models/evaluacion_oftalmologica.py
 # Modelos para Evaluación Oftalmológica
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -222,6 +222,13 @@ class MedicamentosProcedimientosIGSS(BaseModel):
     model_config = ConfigDict(extra="ignore")
     medicamentos: List[str] = Field(default_factory=list)
     estudios_procedimientos: List[str] = Field(default_factory=list)
+
+    @field_validator("medicamentos", "estudios_procedimientos", mode="before")
+    @classmethod
+    def _strip_empty(cls, v):
+        if not v:
+            return []
+        return [s.strip() for s in v if isinstance(s, str) and s.strip()]
 
 
 # ==================== PRÓXIMA CITA ====================
