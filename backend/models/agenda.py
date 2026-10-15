@@ -87,7 +87,7 @@ class CitaResponse(BaseModel):
     tipo_agenda: str = "pacientes"
     google_event_id: Optional[str] = None
     creado_por: str
-    creado_por_nombre: str
+    creado_por_nombre: Optional[str] = ""
     fecha_creacion: str
     actualizado_por: Optional[str] = None
     fecha_actualizacion: Optional[str] = None

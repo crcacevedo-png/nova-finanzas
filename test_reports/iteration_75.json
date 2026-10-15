@@ -1,0 +1,33 @@
+{
+  "summary": "E2E frontend test of the arrival flow fix for Google-Calendar-imported citas without paciente_id. All critical scenarios PASSED: PATH A (create new expediente from unlinked cita at 09:00 JUAN PEREZ), PATH B (link existing expediente from unlinked cita at 10:00 MARIA GOMEZ to 'Pedro Incompleto'), REGRESSION (click Marcar llegada on cita WITH linked incomplete patient opens 'Completar expediente' with precharged data), and 'Procedimiento' option is present in Tipo de cita selector in both Nueva Cita and Walk-in dialogs. All vincular-panel data-testids worked (vincular-panel, vincular-search, vincular-crear-nuevo, vincular-result-*, cf-first-name, cf-last-name, cf-gender, cf-birth-date, cf-phone, cf-dpi, cf-address, cf-institution, cf-guardar). Iniciar on the newly linked presente did not surface the 'Esta cita no tiene un paciente vinculado' error (toast 'Estado cambiado a En consulta').",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/agenda/mi-dia and /api/agenda/citas", "issue": "500 Internal Server Error because seeded TEST-UNLINKED-1/2/3 citas were inserted with creado_por_nombre=null, violating MiAgendaResponse Pydantic model (field required). Blocks the whole 'Mi Agenda' tab for the medico. Testing agent patched the DB to set creado_por_nombre='Google Calendar Import' so the UI test could proceed, but main agent must fix the seed script (and ideally relax the Pydantic model to Optional[str] for safety).", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Mi Agenda - Iniciar button", "issue": "Clicking 'Iniciar' on a presente paciente only changes the state to 'En consulta' (toast shown) but does NOT navigate to the evaluation page. Spec says it 'debe abrir la evaluación / navegar correctamente'. The paciente_id IS linked (no error toast), but the navigation side-effect is missing or broken.", "selector": "button:has-text('Iniciar')", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix seed script for TEST-UNLINKED-1/2/3 (and any other Google-Calendar-import simulated seeds) to set creado_por_nombre (e.g. 'Google Calendar Import') and creado_por_id. Alternative/complement: make creado_por_nombre Optional in MiAgendaResponse/CitaResponse models so legacy or externally-imported citas never 500 the whole agenda.",
+    "Verify/implement navigation to the oftalmo evaluation screen when clicking 'Iniciar' on a presente paciente (currently it only changes state to 'En consulta')."
+  ],
+  "critical_code_review_comments": [
+    "MiAgendaResponse requires creado_por_nombre as mandatory while routes/agenda.py line 1287 (ingreso via n8n) does set it, but any manual DB seed / older cita without that field will break the entire mi-dia endpoint. Prefer Optional[str] with a default or project the field server-side.",
+    "fichaIncompleta now requires 'address' (per spec) and address field was added to patient model — verified it round-trips correctly through the vincular-and-complete flow (existing patient 'Pedro Incompleto' had empty address, form showed empty, saving with address populated the record)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (backend testing skipped per request; one 500 found incidentally and worked around in DB)", "frontend": "95% (all requested flows passed; only observation is Iniciar does not navigate to evaluation)"},
+  "test_credentials": "medico_test / medico2024 (used); superadmin / nova2024 (not needed)",
+  "seed_data_creation": "Patched existing seed in Mongo: db.citas.update_many({id: /TEST-UNLINKED/, creado_por_nombre: null}, {$set: {creado_por_nombre: 'Google Calendar Import', creado_por_id: 'google_calendar'}}). PATH A created a NEW patient 'Juan Perez Lopez' DPI 7011223344556 linked to TEST-UNLINKED-1. PATH B linked existing patient 'Pedro Incompleto' (TEST-INC) to TEST-UNLINKED-2 and added address 'Zona 10 Guatemala'. TEST-UNLINKED-3 (11:00 CARLOS LOPEZ) remains unlinked and available for retests.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes the seed/model issue and the Iniciar navigation, re-run: (1) hard reload the agenda to ensure /api/agenda/mi-dia returns 200 without manual DB patch, (2) use the remaining TEST-UNLINKED-3 cita (11:00 CARLOS LOPEZ) to retest the arrival flow end-to-end, (3) click Iniciar on a presente paciente and verify navigation to the evaluation page without the 'Esta cita no tiene un paciente vinculado' error.",
+  "rca of the issue": "The main agent's fix on the frontend (vincular-panel + vincular/create flow) is correct and verified working. However the test seed for TEST-UNLINKED-* citas omitted the required creado_por_nombre field, which caused /api/agenda/mi-dia to raise a Pydantic ValidationError and return 500 — blocking Mi Agenda entirely for the médico before any UI test could even begin. Root cause: the simulated Google Calendar import seed uses a direct Mongo insert instead of insertar_cita() (routes/agenda.py line 217) which always sets creado_por_nombre; and the response model does not allow None for that field."
+}
