@@ -52,6 +52,7 @@ class SurgeryBase(BaseModel):
     patient_id: Optional[str] = None
     procedure: str
     surgeon: str
+    assistant_surgeon: Optional[str] = None
     eye: str  # OD, OI, AO
     anesthesia_type: str  # topica, local, local_asistida, general
     anesthesiologist: str
@@ -69,6 +70,7 @@ class SurgeryUpdate(BaseModel):
     patient_name: Optional[str] = None
     procedure: Optional[str] = None
     surgeon: Optional[str] = None
+    assistant_surgeon: Optional[str] = None
     eye: Optional[str] = None
     anesthesia_type: Optional[str] = None
     anesthesiologist: Optional[str] = None
@@ -89,6 +91,7 @@ class SurgeryResponse(BaseModel):
     patient_id: Optional[str] = None
     procedure: str
     surgeon: str
+    assistant_surgeon: Optional[str] = None
     eye: str
     anesthesia_type: str
     anesthesiologist: str
@@ -849,6 +852,7 @@ async def crear_nota_cirugia(surgery_doc: dict, user: dict):
         "time": surgery_doc.get("time"),
         "eye": surgery_doc.get("eye"),
         "surgeon": surgery_doc.get("surgeon"),
+        "assistant_surgeon": surgery_doc.get("assistant_surgeon"),
         "institution": surgery_doc.get("institution"),
         "contenido": "",
         "estado": "abierta",

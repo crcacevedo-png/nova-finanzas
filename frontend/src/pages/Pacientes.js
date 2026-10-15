@@ -245,6 +245,7 @@ const Pacientes = () => {
       igss_codigo: '',
       igss_tipo_compra: '',
       igss_nog: '',
+      igss_tipo_paciente: '',
       comments: ''
     });
     setEditingPatient(null);
@@ -276,6 +277,7 @@ const Pacientes = () => {
         igss_codigo: patient.igss_codigo || '',
         igss_tipo_compra: patient.igss_tipo_compra || '',
         igss_nog: patient.igss_nog || '',
+        igss_tipo_paciente: patient.igss_tipo_paciente || '',
         comments: patient.comments || ''
       });
     } else {
@@ -909,7 +911,7 @@ const Pacientes = () => {
 
         {/* Create/Edit Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--text-primary)' }}>
                 {editingPatient ? 'Editar Paciente' : 'Nuevo Paciente'}
@@ -1125,6 +1127,7 @@ const Pacientes = () => {
                         igss_codigo: value !== 'igss' ? '' : prev.igss_codigo,
                         igss_tipo_compra: value !== 'igss' ? '' : prev.igss_tipo_compra,
                         igss_nog: value !== 'igss' ? '' : prev.igss_nog,
+                        igss_tipo_paciente: value !== 'igss' ? '' : prev.igss_tipo_paciente,
                         insurance_name: value !== 'seguro_privado' ? '' : prev.insurance_name,
                         other_institution_name: value !== 'otra' ? '' : prev.other_institution_name
                       }))}
@@ -1227,6 +1230,16 @@ const Pacientes = () => {
                               <SelectItem value="convenio">Convenio</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Tipo de Paciente</Label>
+                          <Input
+                            value={formData.igss_tipo_paciente || ''}
+                            onChange={(e) => setFormData(prev => ({ ...prev, igss_tipo_paciente: e.target.value }))}
+                            className="input-teal"
+                            placeholder="Tipo de paciente"
+                            data-testid="patient-igss-tipo-paciente"
+                          />
                         </div>
                       </div>
                     </>
@@ -1363,6 +1376,12 @@ const Pacientes = () => {
                       {selectedPatient.other_institution_name && ` - ${selectedPatient.other_institution_name}`}
                     </p>
                   </div>
+                  {selectedPatient.referral_institution === 'igss' && selectedPatient.igss_tipo_paciente && (
+                    <div>
+                      <p style={{ color: 'var(--text-hint)' }}>Tipo de Paciente</p>
+                      <p style={{ color: 'var(--text-primary)' }}>{selectedPatient.igss_tipo_paciente}</p>
+                    </div>
+                  )}
                 </div>
 
                 {selectedPatient.emergency_contact_name && (

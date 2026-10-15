@@ -48,10 +48,12 @@ import PuntoVenta from './pages/PuntoVenta';
 import './App.css';
 
 // Protected Route Component
-const ProtectedRoute = ({ children, requiredPermission, requiredRole }) => {
-  const { isAuthenticated, loading, hasPermission, user } = useAuth();
+const ProtectedRoute = ({ children, requiredPermission, requiredRole, requiredMenu }) => {
+  const { isAuthenticated, loading, hasPermission, user, isMenuEnabled, menusLoaded } = useAuth();
 
-  if (loading) {
+  const waitingForMenus = requiredMenu && user?.role !== 'superadmin' && !menusLoaded;
+
+  if (loading || waitingForMenus) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
@@ -75,6 +77,11 @@ const ProtectedRoute = ({ children, requiredPermission, requiredRole }) => {
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
+    return <Navigate to={defaultPage} replace />;
+  }
+
+  // Acceso por módulo/menú habilitado para el rol (configurable desde Roles/Menús)
+  if (requiredMenu && !isMenuEnabled(requiredMenu)) {
     return <Navigate to={defaultPage} replace />;
   }
 
@@ -294,11 +301,11 @@ function AppRoutes() {
         } 
       />
 
-      {/* Sala de Operaciones - Todos los roles */}
+      {/* Sala de Operaciones - Acceso configurable por rol desde Roles/Menús */}
       <Route 
         path="/sala-operaciones" 
         element={
-          <ProtectedRoute requiredPermission="view_sala_operaciones">
+          <ProtectedRoute requiredMenu="sala_operaciones">
             <SalaOperaciones />
           </ProtectedRoute>
         } 

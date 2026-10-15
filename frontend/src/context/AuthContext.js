@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { menuConfigApi } from '../services/api';
 import { useInactivityTimeout } from '../hooks/useInactivityTimeout';
 import { InactivityWarning } from '../components/InactivityWarning';
 
@@ -17,6 +18,8 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState({});
+  const [enabledMenuIds, setEnabledMenuIds] = useState(null);
+  const [menusLoaded, setMenusLoaded] = useState(false);
   const [logoutReason, setLogoutReason] = useState(null);
 
   // Función de logout
@@ -36,6 +39,8 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setPermissions({});
+    setEnabledMenuIds(null);
+    setMenusLoaded(false);
     setLogoutReason(reason);
   }, [token]);
 
@@ -115,6 +120,40 @@ export const AuthProvider = ({ children }) => {
     return permissions[permission] === true;
   };
 
+  // Cargar menús habilitados del usuario (fuente única para menú y acceso por ruta)
+  useEffect(() => {
+    const loadMenus = async () => {
+      if (!user) {
+        setEnabledMenuIds(null);
+        setMenusLoaded(false);
+        return;
+      }
+      if (user.role === 'superadmin') {
+        setEnabledMenuIds(null); // null = todos los menús
+        setMenusLoaded(true);
+        return;
+      }
+      try {
+        const res = await menuConfigApi.getMyMenus();
+        setEnabledMenuIds(res.data.menu_ids || []);
+      } catch (error) {
+        console.error('Error loading user menus:', error);
+        setEnabledMenuIds(null); // fallback: mostrar todo
+      } finally {
+        setMenusLoaded(true);
+      }
+    };
+    loadMenus();
+  }, [user]);
+
+  // Verifica si un menú/módulo está habilitado para el usuario
+  const isMenuEnabled = (menuId) => {
+    if (user?.role === 'superadmin') return true;
+    if (!menusLoaded) return false;
+    if (enabledMenuIds === null) return true;
+    return enabledMenuIds.includes(menuId);
+  };
+
   const canCreateExpenses = () => hasPermission('create_expenses');
   const canEditExpenses = () => hasPermission('edit_expenses');
   const canDeleteExpenses = () => hasPermission('delete_expenses');
@@ -140,6 +179,9 @@ export const AuthProvider = ({ children }) => {
       token,
       loading,
       permissions,
+      enabledMenuIds,
+      menusLoaded,
+      isMenuEnabled,
       login,
       logout,
       changePassword,

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { menuConfigApi } from '../services/api';
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -58,7 +57,7 @@ const roleLabels = {
 };
 
 const Layout = ({ children }) => {
-  const { user, logout, canViewUserManagement, hasPermission } = useAuth();
+  const { user, logout, canViewUserManagement, hasPermission, isMenuEnabled } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -71,51 +70,11 @@ const Layout = ({ children }) => {
   const [igssOpen, setIgssOpen] = useState(location.pathname.startsWith('/igss'));
   
   // Estado para menús habilitados del usuario
-  const [enabledMenuIds, setEnabledMenuIds] = useState(null);
-  const [menusLoaded, setMenusLoaded] = useState(false);
   const [changePwdOpen, setChangePwdOpen] = useState(false);
 
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const canViewOptica = hasPermission('view_optica');
-
-  // Cargar menús habilitados para el usuario
-  useEffect(() => {
-    const loadUserMenus = async () => {
-      if (!user) return;
-      
-      // SuperAdmin siempre tiene todos los menús
-      if (user.role === 'superadmin') {
-        setEnabledMenuIds(null); // null = todos los menús
-        setMenusLoaded(true);
-        return;
-      }
-      
-      try {
-        const res = await menuConfigApi.getMyMenus();
-        setEnabledMenuIds(res.data.menu_ids || []);
-      } catch (error) {
-        console.error('Error loading user menus:', error);
-        // En caso de error, mostrar menús por defecto según rol
-        setEnabledMenuIds(null);
-      } finally {
-        setMenusLoaded(true);
-      }
-    };
-    
-    loadUserMenus();
-  }, [user]);
-
-  // Función helper para verificar si un menú está habilitado
-  const isMenuEnabled = (menuId) => {
-    // SuperAdmin siempre ve todo
-    if (isSuperAdmin) return true;
-    // Mientras cargan los menús del usuario, no mostrar nada (evita destello de menús no autorizados)
-    if (!menusLoaded) return false;
-    // Si hubo error al cargar, usar fallback: mostrar todo
-    if (enabledMenuIds === null) return true;
-    return enabledMenuIds.includes(menuId);
-  };
 
   const handleLogout = async () => {
     await logout();

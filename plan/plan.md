@@ -1,86 +1,50 @@
-# Acceso clínico configurable para el rol Médico
+# NovaVisión — Ajustes de Roles, Cirugías y Ficha de Paciente
 
-Permite que una cuenta de médico entre al sistema y trabaje su día: ver sus propias citas, atender pacientes y dejar registrada la consulta.
-Además, deja que el administrador controle, desde una sola pantalla, qué puede y qué no puede hacer el médico (y cualquier otro rol).
+Cuatro mejoras puntuales sobre el ERP: control del módulo Sala de Operaciones por rol, un médico ayudante en las cirugías, un formulario de paciente más ancho y un nuevo dato para pacientes del IGSS.
 
 ## Para quién es
-Clínica NovaVisión en Guatemala: los médicos que atienden consulta y cirugía, y el administrador que gestiona los usuarios y decide qué ve cada rol.
+Personal de la clínica NovaVisión (Guatemala): administradores que configuran accesos, personal que agenda y registra cirugías, y recepción que registra pacientes.
 
-## Qué se corrige y cómo se verá
+## Funcionalidades y experiencia
 
-Hoy la cuenta de médico solo puede entrar a "Pacientes". Con este cambio, el administrador podrá
-otorgarle (y quitarle) accesos clínicos, y el rol "médico" quedará listo para trabajar.
+**1. Sala de Operaciones configurable por rol**
+Hoy el acceso a "Sala de Operaciones" no se puede conceder o quitar de forma confiable a cualquier rol desde la configuración. Con el cambio, Sala de Operaciones quedará como una opción más que se activa o desactiva por rol (sistema y personalizados) desde la pantalla de configuración de roles/menús. Al activarla para un rol, los usuarios de ese rol verán el módulo en el menú y podrán entrar; al desactivarla, desaparece del menú y se bloquea el acceso.
 
-### 1. Permisos clínicos que se podrán activar/desactivar por rol
-En la pantalla de Roles aparecerá una nueva sección "Clínica" con interruptores para:
-- **Agenda** (ver y gestionar citas).
-- **Evaluación Oftalmológica** (ver y editar la evaluación del paciente).
-- **Recetas** (médicas y de lentes) dentro de la evaluación.
-- **Sala de Operaciones** (ver y editar la evaluación/registro quirúrgico).
-- **Pacientes**: crear y editar (sin eliminar).
+**2. Médico ayudante en la cirugía**
+Al agregar o editar una cirugía, además del "Cirujano" habrá un campo "Ayudante", justo debajo. El ayudante es otro médico que se elige de la lista de médicos ya registrados. Es un solo ayudante y es opcional (puede quedar vacío). El ayudante se guarda con la cirugía y se muestra junto al cirujano al ver el detalle y en la impresión/exportación de la cirugía.
 
-El administrador podrá combinarlos libremente para el rol médico o para cualquier rol que cree.
+**3. Modal de "Agregar/Editar Paciente" más ancho**
+La ventana para registrar o editar un paciente se mostrará más ancha, para que los campos se vean con más holgura y menos apretados. Mismo contenido y campos; solo cambia el ancho.
 
-### 2. El rol "Médico" queda listo de una vez
-El rol médico quedará configurado con todos estos accesos activados: su Agenda del día,
-edición de pacientes (sin borrarlos), evaluaciones oftalmológicas, sala de operaciones y recetas.
-El administrador podrá seguir ajustándolo cuando quiera.
-
-### 3. La Agenda del médico muestra solo lo suyo
-Cuando entra un médico, la Agenda abre en "su agenda del día": verá únicamente las citas
-asignadas a él, no las de toda la clínica.
-
-### 4. Cada cuenta de médico se liga a su ficha de médico
-En Gestión de Usuarios, al crear o editar una cuenta de médico, se podrá elegir a qué médico
-(ficha/doctor del sistema) corresponde esa cuenta. Ese vínculo es lo que permite mostrarle
-"sus propias citas". Si una cuenta de médico aún no tiene médico asignado, la Agenda se lo
-indicará con un mensaje claro en lugar de mostrar algo incorrecto.
+**4. "Tipo de Paciente" para pacientes del IGSS**
+Cuando la institución del paciente sea IGSS, aparecerá un campo adicional "Tipo de Paciente" (además de los datos IGSS que ya se piden). Es texto libre y opcional. Se guarda en la ficha del paciente y se muestra al ver o editar el paciente. Solo aparece cuando la institución es IGSS.
 
 ## Flujo de uso
+- Un administrador abre la configuración de roles, activa "Sala de Operaciones" para el rol que quiera; los usuarios de ese rol pasan a ver y usar el módulo.
+- Al registrar una cirugía, se elige el cirujano y, si aplica, el ayudante desde la lista de médicos.
+- Al registrar un paciente, el formulario aparece más ancho; si se marca IGSS, se muestra y captura el "Tipo de Paciente".
 
-**Administrador**
-1. Entra a Gestión de Usuarios → Roles y ve la nueva sección "Clínica" con los interruptores.
-2. El rol médico ya viene con los accesos activados; puede dejarlos así o ajustarlos.
-3. En Usuarios, al crear/editar una cuenta de médico, elige la ficha de médico que le corresponde.
-
-**Médico**
-1. Inicia sesión y en el menú ve: Pacientes, Agenda, Evaluación Oftalmológica y Sala de Operaciones.
-2. Abre la Agenda y ve solo sus citas del día.
-3. Abre un paciente, lo edita si hace falta, registra la evaluación oftalmológica o de sala de
-   operaciones y emite recetas médicas o de lentes.
-4. No puede eliminar pacientes ni entrar a las áreas que el administrador no le haya activado.
-
-## UI/UX feel
-Sin rediseño. Se reutiliza la pantalla actual de Roles (se añade la sección "Clínica") y la de
-Usuarios (se añade el selector de médico). Mensajes claros cuando falte un acceso o el vínculo
-con la ficha de médico. El médico ve un menú corto y enfocado en lo clínico.
+## Sensación de la interfaz
+Se mantiene el estilo actual del sistema (mismos colores, componentes y disposición). Los campos nuevos reutilizan los mismos controles ya usados (selector de médicos para el ayudante, campo de texto para "Tipo de Paciente"), para que todo se vea nativo y consistente.
 
 ## Fases de implementación
 
-**Fase 1 (lo que se construye ahora):**
-- Nuevos permisos clínicos activables por rol: Agenda, Evaluación Oftalmológica, Recetas,
-  Sala de Operaciones y edición de Pacientes (sin eliminar).
-- El rol "médico" queda configurado con todos esos accesos y con su menú clínico visible.
-- Agenda del médico filtrada a sus propias citas del día.
-- Selector de "médico asignado" en la cuenta de usuario, con aviso cuando no esté asignado.
+**Fase 1 (MVP, se construye ahora)**
+- Sala de Operaciones activable/desactivable por rol, con efecto real en menú y acceso.
+- Campo "Ayudante" (un médico, opcional) en alta y edición de cirugía, visible en detalle e impresión.
+- Modal de agregar/editar paciente más ancho.
+- Campo "Tipo de Paciente" (texto libre, opcional) para pacientes IGSS.
 
-**Fase 2 (después):**
-- Que el médico pueda ver sus citas de días anteriores/siguientes (no solo el día actual) y un
-  resumen semanal propio.
-- Permisos clínicos más finos (por ejemplo, ver evaluación sin poder editarla).
+**Fase 2 (futuro)**
+- Mostrar cirujano y ayudante en los reportes y listados de cirugías, y permitir filtrar por médico.
+- Reportes/estadísticas que incluyan el "Tipo de Paciente" IGSS.
 
-**Fase 3 (futuro):**
-- Que cada médico vea únicamente los expedientes de sus propios pacientes.
-- Firma del médico en recetas y registro de quién editó cada evaluación.
+**Fase 3 (futuro)**
+- Autocompletado de datos de pacientes IGSS recurrentes (quedó fuera por decisión del usuario; se podría retomar).
 
 ## Supuestos
-- "Eliminar" el acceso del médico a pacientes queda fuera: el médico crea y edita, pero no borra
-  expedientes.
-- "Agenda del día" = solo las citas del propio médico, del día en curso (hora de Guatemala).
-- Las recetas médicas y de lentes forman parte de la Evaluación Oftalmológica (se emiten desde ahí).
-- Cada cuenta de médico se vincula a una ficha de médico existente mediante un selector en
-  Gestión de Usuarios; si no está vinculada, la Agenda lo avisa en lugar de fallar.
-- El rol médico se deja preconfigurado con los accesos solicitados, pero todo sigue siendo editable
-  por el administrador desde la pantalla de Roles.
-- Estos nuevos permisos quedan disponibles para cualquier rol, no solo para el médico.
-- No se modifican los accesos de los roles existentes (superadmin, administrador, usuario, óptica).
+- "Configurar en los roles" (punto 1) se resuelve dentro de la pantalla de configuración de roles/menús ya existente; no se crea una pantalla nueva.
+- El "Ayudante" es un solo médico, opcional, elegido de la lista de médicos registrados; se guarda en el registro de la cirugía y aparece donde hoy aparece el cirujano.
+- "Tipo de Paciente" es texto libre, opcional, y solo se muestra cuando la institución del paciente es IGSS.
+- El punto 3 (autocompletar datos de pacientes IGSS previamente almacenados) queda excluido de este trabajo por indicación del usuario.
+- El idioma de toda la interfaz y los textos se mantiene en español.

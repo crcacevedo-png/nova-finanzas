@@ -168,6 +168,7 @@ const SalaOperaciones = () => {
     patient_id: null,
     procedure: '',
     surgeon: '',
+    assistant_surgeon: '',
     eye: '',
     anesthesia_type: '',
     anesthesiologist: '',
@@ -306,6 +307,7 @@ const SalaOperaciones = () => {
       patient_id: surgery.patient_id || null,
       procedure: surgery.procedure,
       surgeon: surgery.surgeon,
+      assistant_surgeon: surgery.assistant_surgeon || '',
       eye: surgery.eye,
       anesthesia_type: surgery.anesthesia_type,
       anesthesiologist: surgery.anesthesiologist,
@@ -1021,6 +1023,23 @@ const SalaOperaciones = () => {
                     </Select>
                   </div>
                   <div>
+                    <Label>Ayudante</Label>
+                    <Select value={formData.assistant_surgeon || '__none__'} onValueChange={(v) => setFormData({ ...formData, assistant_surgeon: v === '__none__' ? '' : v })}>
+                      <SelectTrigger data-testid="surgery-assistant">
+                        <SelectValue placeholder="Opcional" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Ninguno</SelectItem>
+                        {formData.assistant_surgeon && !doctorsList.some(d => d.name === formData.assistant_surgeon) && (
+                          <SelectItem value={formData.assistant_surgeon}>{formData.assistant_surgeon}</SelectItem>
+                        )}
+                        {doctorsList.map(d => (
+                          <SelectItem key={`asst-${d.id}`} value={d.name}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <Label>Ojo a operar *</Label>
                     <div className="flex gap-2 mt-1">
                       {['OD', 'OS', 'AO'].map(eye => (
@@ -1222,6 +1241,9 @@ const SalaOperaciones = () => {
                     <div><span className="text-xs uppercase text-slate-400">Paciente</span><p className="font-medium">{selectedSurgery.patient_name}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Procedimiento</span><p className="font-medium">{selectedSurgery.procedure}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Cirujano</span><p className="font-medium">{selectedSurgery.surgeon}</p></div>
+                    {selectedSurgery.assistant_surgeon && (
+                      <div><span className="text-xs uppercase text-slate-400">Ayudante</span><p className="font-medium">{selectedSurgery.assistant_surgeon}</p></div>
+                    )}
                     <div><span className="text-xs uppercase text-slate-400">Ojo</span><p>{getEyeBadge(selectedSurgery.eye)}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Tipo anestesia</span><p className="font-medium">{getAnesthesiaLabel(selectedSurgery.anesthesia_type)}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Anestesiólogo</span><p className="font-medium">{selectedSurgery.anesthesiologist}</p></div>
