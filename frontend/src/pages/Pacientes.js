@@ -1241,13 +1241,19 @@ const Pacientes = () => {
                         </div>
                         <div className="space-y-2">
                           <Label className="text-xs">Tipo de Paciente</Label>
-                          <Input
+                          <Select
                             value={formData.igss_tipo_paciente || ''}
-                            onChange={(e) => setFormData(prev => ({ ...prev, igss_tipo_paciente: e.target.value }))}
-                            className="input-teal"
-                            placeholder="Tipo de paciente"
-                            data-testid="patient-igss-tipo-paciente"
-                          />
+                            onValueChange={(value) => setFormData(prev => ({ ...prev, igss_tipo_paciente: value }))}
+                          >
+                            <SelectTrigger className="input-teal" data-testid="patient-igss-tipo-paciente">
+                              <SelectValue placeholder="Seleccionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {['Afiliado', 'Esposa', 'Beneficiario Hijo', 'Pensionado', 'Jubilado'].map((t) => (
+                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </>

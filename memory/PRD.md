@@ -799,3 +799,6 @@ Nota: no se almacena el código por separado (plan Fase 1: una sola línea de te
 ## IGSS autorelleno: ajustes (2026-06)
 1) Al seleccionar una sugerencia (medicamentos y estudios/procedimientos), el renglón ahora se rellena con "[código] nombre" (antes solo el nombre). En Autocomplete onClick: label = item.codigo ? `[${codigo}] ${nombre}` : nombre. Otros catálogos sin código quedan igual (solo nombre).
 2) El dropdown de "Estudios / Procedimientos" (último renglón) quedaba cortado por overflow-hidden de CollapsibleSection. Se agregó prop overflowVisible a CollapsibleSection (root sin overflow-hidden, header con rounded-t-lg) y la sección IGSS lo usa. Verificado por screenshot: cascada visible y valor "[416631] OFTALMOLOGIA..." tras seleccionar.
+
+## Pacientes: Tipo de Paciente IGSS como lista (2026-06)
+El campo "Tipo de Paciente" (seccion IGSS del formulario Nuevo/Editar Paciente, Pacientes.js) pasó de Input de texto libre a Select con 5 opciones: Afiliado, Esposa, Beneficiario Hijo, Pensionado, Jubilado. Guarda en igss_tipo_paciente. data-testid patient-igss-tipo-paciente. Verificado por screenshot.
