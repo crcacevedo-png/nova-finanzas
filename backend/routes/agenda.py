@@ -1070,6 +1070,100 @@ async def crear_proxima_cita(
     return CitaResponse(**cita_doc)
 
 
+@router.get("/horarios-disponibles")
+async def horarios_disponibles(
+    medico_id: str = Query(...),
+    fecha: str = Query(..., description="YYYY-MM-DD"),
+    duracion: int = Query(20, description="Duración de la cita en minutos"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Devuelve las horas libres de un médico para una fecha, considerando
+    su horario laboral, bloqueos y citas existentes (respeta el sobrecupo)."""
+    try:
+        dia_semana = datetime.strptime(fecha, "%Y-%m-%d").isoweekday()  # 1=Lun..7=Dom
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida")
+
+    config = await get_agenda_config()
+    paso = int(config.get("duracion_slot_minutos") or 15)
+    max_por_slot = int(config.get("max_citas_por_slot") or 1)
+
+    # 1) Determinar ventana de atención del médico
+    medico = await db.doctors.find_one({"id": medico_id}, {"_id": 0, "horario_semanal": 1})
+    win_ini, win_fin = None, None
+    horario = (medico or {}).get("horario_semanal")
+    if horario:
+        cfg = horario.get(str(dia_semana))
+        if not cfg or not cfg.get("activo"):
+            return {"disponible": False, "motivo": "El médico no atiende ese día", "slots": [], "duracion": duracion}
+        win_ini = cfg.get("hora_inicio") or config.get("hora_apertura", "07:00")
+        win_fin = cfg.get("hora_fin") or config.get("hora_cierre", "18:00")
+    else:
+        # Fallback: configuración general de la agenda
+        if dia_semana not in (config.get("dias_laborables") or [1, 2, 3, 4, 5, 6]):
+            return {"disponible": False, "motivo": "La clínica no atiende ese día", "slots": [], "duracion": duracion}
+        win_ini = config.get("hora_apertura", "07:00")
+        win_fin = config.get("hora_cierre", "18:00")
+
+    # 2) Bloqueos de día completo (clínica o médico)
+    clinica = await db.bloqueos_agenda.find_one({
+        "tipo": "clinica", "fecha_inicio": {"$lte": fecha}, "fecha_fin": {"$gte": fecha}
+    }, {"_id": 0})
+    if clinica:
+        return {"disponible": False, "motivo": clinica.get("motivo") or "Feriado/Vacaciones", "slots": [], "duracion": duracion}
+
+    franjas_bloqueadas = []
+    async for b in db.bloqueos_agenda.find({
+        "tipo": "medico", "medico_id": medico_id,
+        "fecha_inicio": {"$lte": fecha}, "fecha_fin": {"$gte": fecha}
+    }, {"_id": 0}):
+        if b.get("dia_completo"):
+            return {"disponible": False, "motivo": b.get("motivo") or "Horario bloqueado", "slots": [], "duracion": duracion}
+        if b.get("hora_inicio") and b.get("hora_fin"):
+            franjas_bloqueadas.append((b["hora_inicio"], b["hora_fin"]))
+
+    # 3) Citas existentes (para contar sobrecupo por hora de inicio)
+    citas = await db.citas.find({
+        "tipo_agenda": "pacientes", "medico_id": medico_id, "fecha": fecha,
+        "estado": {"$nin": [EstadoCita.CANCELADA.value, EstadoCita.NO_ASISTIO.value]}
+    }, {"_id": 0, "hora_inicio": 1}).to_list(2000)
+    conteo = {}
+    for c in citas:
+        hi = c.get("hora_inicio")
+        if hi:
+            conteo[hi] = conteo.get(hi, 0) + 1
+
+    # 4) Hora actual (para no ofrecer horas pasadas si la fecha es hoy)
+    ahora_hhmm = None
+    if fecha == today_str_gt():
+        ahora_hhmm = now_gt().strftime("%H:%M")
+
+    def to_min(hhmm):
+        h, m = hhmm.split(":")
+        return int(h) * 60 + int(m)
+
+    def to_hhmm(mins):
+        return f"{mins // 60:02d}:{mins % 60:02d}"
+
+    win_ini_m, win_fin_m = to_min(win_ini), to_min(win_fin)
+    slots = []
+    t = win_ini_m
+    while t + duracion <= win_fin_m:
+        slot = to_hhmm(t)
+        slot_fin = to_hhmm(t + duracion)
+        # franja bloqueada (solape)
+        bloqueado = any(slot < bf and slot_fin > bi for (bi, bf) in franjas_bloqueadas)
+        # hora pasada
+        pasada = ahora_hhmm is not None and slot <= ahora_hhmm
+        # lleno (sobrecupo)
+        lleno = conteo.get(slot, 0) >= max_por_slot
+        if not bloqueado and not pasada and not lleno:
+            slots.append(slot)
+        t += paso
+
+    motivo = None if slots else "No hay horarios disponibles ese día"
+    return {"disponible": bool(slots), "motivo": motivo, "slots": slots, "duracion": duracion}
+
 
 # ==================== BLOQUEOS DE AGENDA ====================
 

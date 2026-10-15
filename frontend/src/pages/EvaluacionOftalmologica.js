@@ -6,7 +6,7 @@ import {
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
   ChevronDown, ChevronUp, Lock, Clock, Calendar,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
-  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud, FileDown
+  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud, FileDown, AlertTriangle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -44,6 +44,12 @@ import { agendaApi } from '../services/agendaApi';
 import { getGuatemalaDate } from '../services/api';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Tipos de cita unificados con la pantalla "Nueva Cita" de la Agenda
+const TIPOS_CITA = [
+  'Primera Consulta', 'Control', 'Control Post Operatorio', 'Lectura de estudios', 'Procedimiento', 'Emergencia'
+];
+
 
 // Formatea una fecha (YYYY-MM-DD o ISO) a DD/MM/YYYY para el historial
 const formatFechaHistorial = (f) => {
@@ -261,6 +267,12 @@ const EvaluacionOftalmologica = () => {
   });
   const [tiposCirugia, setTiposCirugia] = useState([]);
   const [crmEnviado, setCrmEnviado] = useState(false); // Para mostrar si ya se envió al CRM
+
+  // Horarios disponibles para la próxima cita
+  const [horariosSlots, setHorariosSlots] = useState([]);
+  const [horariosMotivo, setHorariosMotivo] = useState('');
+  const [horariosLoading, setHorariosLoading] = useState(false);
+
   
   // Estado para índice de receta a imprimir
   const [printRecetaIndex, setPrintRecetaIndex] = useState(0);
@@ -332,7 +344,7 @@ const EvaluacionOftalmologica = () => {
       medico_nombre: '',
       fecha: '',
       hora: '',
-      tipo_cita: 'Subsecuente',
+      tipo_cita: 'Control',
       notas: ''
     },
     procedimientos: [],
@@ -442,6 +454,40 @@ const EvaluacionOftalmologica = () => {
   useEffect(() => {
     pacienteIdRef.current = formData.paciente_id || null;
   }, [formData.paciente_id]);
+
+  // Cargar horarios disponibles cuando cambian médico/fecha de la próxima cita
+  useEffect(() => {
+    const pc = formData.proxima_cita;
+    if (!pc?.agendar || !pc?.medico_id || !pc?.fecha) {
+      setHorariosSlots([]);
+      setHorariosMotivo('');
+      return;
+    }
+    let cancelado = false;
+    setHorariosLoading(true);
+    setHorariosMotivo('');
+    agendaApi.getHorariosDisponibles(pc.medico_id, pc.fecha, 20)
+      .then((res) => {
+        if (cancelado) return;
+        const data = res.data || {};
+        const slots = data.slots || [];
+        setHorariosSlots(slots);
+        setHorariosMotivo(data.motivo || '');
+        // Si la hora elegida ya no está disponible, limpiarla
+        if (pc.hora && !slots.includes(pc.hora)) {
+          updateNestedField('proxima_cita.hora', '');
+        }
+      })
+      .catch(() => {
+        if (cancelado) return;
+        setHorariosSlots([]);
+        setHorariosMotivo('No se pudo cargar la disponibilidad');
+      })
+      .finally(() => { if (!cancelado) setHorariosLoading(false); });
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.proxima_cita?.agendar, formData.proxima_cita?.medico_id, formData.proxima_cita?.fecha]);
+
 
   const buscarPacientes = useCallback(async (search) => {
     if (!search || search.length < 2) {
@@ -1052,15 +1098,20 @@ const EvaluacionOftalmologica = () => {
             medico_nombre: formData.proxima_cita.medico_nombre,
             fecha: formData.proxima_cita.fecha,
             hora_inicio: formData.proxima_cita.hora,
-            tipo_cita: formData.proxima_cita.tipo_cita || 'Subsecuente',
+            tipo_cita: formData.proxima_cita.tipo_cita || 'Control',
             notas: formData.proxima_cita.notas,
             evaluacion_id: evaluacionId
           });
           toast.success('Próxima cita agendada');
         } catch (citaError) {
-          if (citaError.response?.status === 400) {
+          const st = citaError.response?.status;
+          if (st === 400) {
             toast.info('Ya existe una cita para esa fecha y hora');
+          } else if (st === 409) {
+            const motivo = citaError.response?.data?.detail || 'horario no disponible';
+            toast.warning(`La evaluación se guardó, pero la cita no se agendó: ${motivo}`);
           } else {
+            toast.warning('La evaluación se guardó, pero la próxima cita no se pudo agendar');
             console.error('Error al crear cita:', citaError);
           }
         }
@@ -2465,18 +2516,17 @@ const EvaluacionOftalmologica = () => {
                       <div className="space-y-1">
                         <Label className="text-xs">Tipo de cita</Label>
                         <Select
-                          value={formData.proxima_cita?.tipo_cita || 'Subsecuente'}
+                          value={formData.proxima_cita?.tipo_cita || 'Control'}
                           onValueChange={(value) => updateNestedField('proxima_cita.tipo_cita', value)}
                           disabled={isReadOnly}
                         >
-                          <SelectTrigger className="input-teal h-8 text-xs">
+                          <SelectTrigger className="input-teal h-8 text-xs" data-testid="proxima-cita-tipo">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Subsecuente">Subsecuente</SelectItem>
-                            <SelectItem value="Control post-operatorio">Control post-operatorio</SelectItem>
-                            <SelectItem value="Estudio">Estudio</SelectItem>
-                            <SelectItem value="Otro">Otro</SelectItem>
+                            {TIPOS_CITA.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -2494,16 +2544,34 @@ const EvaluacionOftalmologica = () => {
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Hora</Label>
-                        <Input
-                          type="time"
+                        <Label className="text-xs">Hora disponible</Label>
+                        <Select
                           value={formData.proxima_cita?.hora || ''}
-                          onChange={(e) => updateNestedField('proxima_cita.hora', e.target.value)}
-                          disabled={isReadOnly}
-                          className="input-teal h-8 text-xs"
-                        />
+                          onValueChange={(value) => updateNestedField('proxima_cita.hora', value)}
+                          disabled={isReadOnly || !formData.proxima_cita?.fecha || !formData.proxima_cita?.medico_id || horariosLoading || horariosSlots.length === 0}
+                        >
+                          <SelectTrigger className="input-teal h-8 text-xs" data-testid="proxima-cita-hora">
+                            <SelectValue placeholder={
+                              horariosLoading ? 'Cargando…' :
+                              (!formData.proxima_cita?.medico_id || !formData.proxima_cita?.fecha) ? 'Elige médico y fecha' :
+                              horariosSlots.length === 0 ? 'Sin horarios' : 'Seleccionar hora'
+                            } />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {horariosSlots.map((h) => (
+                              <SelectItem key={h} value={h} data-testid={`proxima-cita-slot-${h}`}>{h}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+                    {formData.proxima_cita?.medico_id && formData.proxima_cita?.fecha && !horariosLoading && horariosSlots.length === 0 && horariosMotivo && (
+                      <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5" data-testid="proxima-cita-motivo">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{horariosMotivo}. Elige otra fecha u otro médico.</span>
+                      </div>
+                    )}
+
                     <div className="space-y-1">
                       <Label className="text-xs">Notas</Label>
                       <Input
