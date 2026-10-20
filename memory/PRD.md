@@ -4,10 +4,23 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-10 (Sesión 33 — Flujo de llegada)
+**Última actualización**: 2026-10 (Sesión 34 — Migración a producción + DPI/email opcionales)
+
+### Sesión 34 — Migración de datos a PRODUCCIÓN y validaciones DPI/email (2026-10)
+- ✅ **Email y DPI opcionales**: en `Pacientes.js` (`validateForm`) y backend `patients.py` (create+update). **DPI obligatorio SOLO para pacientes IGSS** (asterisco dinámico en etiqueta). Email solo valida formato si se ingresa. Mismo criterio en el flujo de Agenda (`fichaIncompleta`, `guardarCompletarFicha`, etiqueta `cf-dpi`): DPI ya no es obligatorio salvo IGSS.
+- ✅ **Migración preview → producción** (datos históricos de Access). Preview y producción usan **bases MongoDB SEPARADAS**; los datos importados a preview NO pasan solos a producción. No hay conectividad directa del pod de preview a Atlas (puerto 27017 bloqueado), así que la migración se hizo vía **API HTTPS** de la app desplegada.
+  - Pacientes: **17,753** reales (expediente numérico 1..N, sin datos de prueba) insertados vía `POST /api/patients/import/batch` (preserve_record_numbers=True). Se desactivaron los 8 pacientes demo `EXP-202604-000X`.
+  - Evaluaciones: **36,419** presentes en prod pero quedaron apuntando a `paciente_id` antiguos (ids de la migración del primer deploy) → **100% huérfanas**.
+  - Fix: nuevo endpoint de mantenimiento `POST /api/evaluaciones/admin/relink-por-expediente` (solo superadmin) re-vincula cada evaluación a su paciente por `paciente_expediente == patients.record_number`. Resultado prod: **36,418 actualizadas, 0 huérfanas, 0 sin expediente**.
+  - ✅ **Verificado**: conteos de evaluaciones por expediente preview==producción (exp 1=12, 2=9, 50=2, 100=7, 500=1, 1000=2, 5000=1, 9849=1, 17778=1); huérfanas ~0%; captura de producción muestra 17,753 pacientes con expedientes originales.
+  - Credenciales producción (superadmin): distintas a preview — ver `test_credentials.md`.
+  - Script de migración conservado: `/app/scripts/migrate_to_prod.py` (modos deldemo/patients/evals/verify).
+  - **Nota**: el endpoint `relink-por-expediente` quedó en el código; es seguro (superadmin, solo corrige paciente_id). Puede eliminarse en un deploy futuro de limpieza si se desea.
+
+### Sesión 33 — Flujo de llegada
 
 ### Agenda: Flujo de llegada — completar expediente antes de pasar a Presente (2026-10 Sesión 33)
-- ✅ **Detección automática de ficha incompleta** (`fichaIncompleta` en `Agenda.js`): un paciente es "incompleto" si le falta nombre, apellido, sexo, fecha de nacimiento, teléfono, DPI, dirección o institución; si la institución es IGSS, también exige unidad IGSS. Aplica retroactivamente a pacientes ya existentes (incluye los agendados como "nuevo" solo con nombre/teléfono/sexo/edad).
+- ✅ **Detección automática de ficha incompleta** (`fichaIncompleta` en `Agenda.js`): un paciente es "incompleto" si le falta nombre, apellido, sexo, fecha de nacimiento, teléfono, dirección o institución; **el DPI solo es obligatorio si la institución es IGSS** (que también exige unidad IGSS). Aplica retroactivamente a pacientes ya existentes (incluye los agendados como "nuevo" solo con nombre/teléfono/sexo/edad).
 - ✅ **Modal al marcar llegada** (`completar-ficha-dialog`): al elegir "Marcar llegada" en una cita agendada con ficha incompleta se abre el formulario precargado con los datos existentes. El paciente **NO** pasa a "Presente" hasta guardar todos los obligatorios. Al guardar se hace `PUT /api/patients/{id}` sobre el **mismo expediente** (sin duplicar) y recién entonces `cambiarEstado→Presente`.
 - ✅ **Llegada directa** cuando la ficha ya está completa (sin modal), vinculada a su expediente existente.
 - ✅ **Walk-ins incluidos**: `handleWalkIn` aplica la misma validación antes de `createWalkIn`; si falta algún dato abre el mismo modal y registra la llegada solo al completar.
