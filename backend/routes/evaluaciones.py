@@ -1074,6 +1074,73 @@ async def import_evaluaciones_batch(
     }
 
 
+@router.post("/admin/relink-por-expediente")
+async def relink_evaluaciones_por_expediente(
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Mantenimiento: re-vincula cada evaluación a su paciente usando el
+    número de expediente (paciente_expediente == patients.record_number).
+    Corrige evaluaciones cuyo paciente_id quedó apuntando a un id inexistente."""
+    from pymongo import UpdateOne
+
+    # Mapa record_number -> datos del paciente
+    mapa = {}
+    cursor = db.patients.find(
+        {"record_number": {"$ne": None}},
+        {"_id": 0, "id": 1, "record_number": 1, "first_name": 1,
+         "last_name": 1, "gender": 1, "birth_date": 1}
+    )
+    async for p in cursor:
+        rn = str(p.get("record_number"))
+        mapa[rn] = p
+
+    actualizadas = 0
+    sin_cambio = 0
+    sin_expediente = 0
+    no_enlazables = 0
+    ops = []
+
+    ev_cursor = db.evaluaciones_oftalmologicas.find(
+        {}, {"_id": 0, "id": 1, "paciente_id": 1, "paciente_expediente": 1}
+    )
+    async for ev in ev_cursor:
+        exp = str(ev.get("paciente_expediente") or "").strip()
+        if not exp:
+            sin_expediente += 1
+            continue
+        pac = mapa.get(exp)
+        if not pac:
+            no_enlazables += 1
+            continue
+        if ev.get("paciente_id") == pac["id"]:
+            sin_cambio += 1
+            continue
+        set_doc = {
+            "paciente_id": pac["id"],
+            "paciente_nombre": f"{pac.get('first_name', '')} {pac.get('last_name', '')}".strip(),
+            "paciente_sexo": pac.get("gender", ""),
+        }
+        if pac.get("birth_date"):
+            set_doc["paciente_edad"] = calcular_edad(pac["birth_date"])
+        ops.append(UpdateOne({"id": ev["id"]}, {"$set": set_doc}))
+        if len(ops) >= 1000:
+            res = await db.evaluaciones_oftalmologicas.bulk_write(ops, ordered=False)
+            actualizadas += res.modified_count
+            ops = []
+    if ops:
+        res = await db.evaluaciones_oftalmologicas.bulk_write(ops, ordered=False)
+        actualizadas += res.modified_count
+
+    return {
+        "actualizadas": actualizadas,
+        "sin_cambio": sin_cambio,
+        "sin_expediente": sin_expediente,
+        "no_enlazables": no_enlazables,
+        "pacientes_en_mapa": len(mapa),
+    }
+
+
+
 @router.put("/{evaluacion_id}", response_model=EvaluacionOftalmologicaResponse)
 async def update_evaluacion(
     evaluacion_id: str,
