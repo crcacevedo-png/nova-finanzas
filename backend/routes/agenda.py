@@ -318,6 +318,52 @@ async def listar_citas(
     return CitaListResponse(data=citas, total=len(citas))
 
 
+@router.post("/admin/relink-citas")
+async def relink_citas(current_user: dict = Depends(require_role("superadmin"))):
+    """Mantenimiento: re-vincula citas cuyo paciente_id ya no existe (p.ej. tras una
+    migración). Empareja por nombre completo del paciente; si el nombre identifica a un
+    único paciente activo lo re-vincula, de lo contrario deja la cita sin expediente
+    (paciente_id vacío) para vincularla manualmente."""
+    import unicodedata
+
+    def norm(s: str) -> str:
+        s = (s or "").strip().lower()
+        s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+        return " ".join(s.split())
+
+    # Ids de pacientes activos existentes + mapa nombre->ids
+    existing_ids = set()
+    nombre_map = {}
+    cursor = db.patients.find(
+        {"is_active": True},
+        {"_id": 0, "id": 1, "first_name": 1, "last_name": 1}
+    )
+    async for p in cursor:
+        existing_ids.add(p["id"])
+        full = norm(f"{p.get('first_name','')} {p.get('last_name','')}")
+        if full:
+            nombre_map.setdefault(full, []).append(p["id"])
+
+    revinculadas = 0
+    liberadas = 0
+    ok = 0
+    citas = db.citas.find({"paciente_id": {"$nin": [None, ""]}}, {"_id": 0, "id": 1, "paciente_id": 1, "paciente_nombre": 1})
+    async for c in citas:
+        if c["paciente_id"] in existing_ids:
+            ok += 1
+            continue
+        candidatos = nombre_map.get(norm(c.get("paciente_nombre", "")), [])
+        if len(candidatos) == 1:
+            await db.citas.update_one({"id": c["id"]}, {"$set": {"paciente_id": candidatos[0]}})
+            revinculadas += 1
+        else:
+            await db.citas.update_one({"id": c["id"]}, {"$set": {"paciente_id": ""}})
+            liberadas += 1
+
+    return {"revinculadas": revinculadas, "liberadas": liberadas, "ya_ok": ok}
+
+
+
 @router.get("/citas/rango", response_model=CitaListResponse)
 async def listar_citas_rango(
     desde: str = Query(..., description="Fecha inicio YYYY-MM-DD"),

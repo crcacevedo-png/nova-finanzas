@@ -813,7 +813,18 @@ const Agenda = () => {
         handleCambiarEstado(cita.id, 'Presente');
       }
     } catch (error) {
-      toast.error('No se pudo verificar el expediente del paciente');
+      // El expediente vinculado no existe (p.ej. id antiguo tras una migración) o no se pudo
+      // cargar. En vez de un error sin salida, abrimos el flujo para vincular/crear el expediente.
+      vincularCitaRef.current = { id: cita.id, nombre: cita.paciente_nombre || '' };
+      completarPidRef.current = null;
+      completarAccionRef.current = () => handleCambiarEstado(cita.id, 'Presente');
+      setCompletarEsNuevo(false);
+      setCompletarForm(null);
+      setPacienteSearch(cita.paciente_nombre || '');
+      setPacienteResults([]);
+      setCompletarModo('vincular');
+      setCompletarOpen(true);
+      toast.info('El expediente vinculado no se encontró. Vincula el paciente correcto para registrar la llegada.');
     }
   };
 
