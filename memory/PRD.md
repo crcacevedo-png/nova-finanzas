@@ -812,3 +812,21 @@ El campo "Tipo de Paciente" (seccion IGSS del formulario Nuevo/Editar Paciente, 
 - Borrado total de pacientes ELIMINADO: se quitó el botón/diálogo/handler/estados en Pacientes.js, el helper patientApi.deleteAll en api.js, y el endpoint DELETE /api/patients/all en backend (routes/patients.py). El endpoint ahora responde 404.
 - Importación masiva RETIRADA del frontend: se quitaron las entradas del sidebar "Importar Pacientes" y "Importar Evaluaciones" (Layout.js) y sus rutas /importar-pacientes e /importar-evaluaciones (App.js), además de los imports de ImportarPacientes/ImportarEvaluaciones. Los archivos de página permanecen en el repo pero son inaccesibles desde la UI. Los endpoints backend de import (import/validate, import/batch) siguen existiendo pero sin acceso desde el front.
 Verificado: compilación OK, backend sin errores, screenshot confirma ausencia de nav de importación y del botón de borrado total.
+
+## Carga histórica Access: pacientes + evaluaciones (2026-06) — COMPLETADA y verificada
+Destino: vista previa. Deduplicación por ID de Access (record_number). NO se tocaron citas/agenda/Google Calendar.
+
+### Pacientes (17,753)
+- Importados desde pacientes_001.json (10,000) + pacientes_002.json (7,753) directo a Mongo.
+- ID de Access preservado: patients.record_number = ID de Access (expediente visible); también en patients.access_id.
+- Género: M→masculino, F→femenino, vacío→otro (mapeo fiel al origen; algunos registros del origen traen género que no coincide con el nombre).
+- Institución: seguro_privado si traía aseguradora, otra si traía hospital de referencia, si no particular. Dirección extraída de comments; comentario original íntegro.
+- DPI: los JSON SÍ traen campo `dpi`. 3,941 (22%) con DPI válido de 13 dígitos; 13,812 sin DPI. Rellenados por bulk_write enlazando por access_id. 1 DPI duplicado en el origen (2 pacientes) — pendiente que el usuario decida.
+- Pacientes ahora buscables por expediente y por DPI (GET /api/patients?search=).
+
+### Evaluaciones (36,411) — 73 archivos de 500 (último 411)
+- Importadas vía endpoint backend POST /api/evaluaciones/import/batch (require_role admin/superadmin), skip_duplicates=true, batch_number por archivo (1..73).
+- Enlace al paciente por `expediente` (= record_number = ID de Access). 100% enlazadas: 36,411 con paciente_id, 0 huérfanas, 0 sin clave, 0 duplicadas.
+- Dedup por import_source_id (id_origen, ej. ACCESS-EVAL-<exp>-<fecha>). Cada eval marcada imported=True, import_batch=N.
+- 16,312 pacientes distintos con historial. Verificado: 16,312/16,312 paciente_id existen en patients; API GET /api/evaluaciones?paciente_id= devuelve el historial importado (expediente 1 → 12 evals).
+- La plantilla/esquema esperado está en GET /api/evaluaciones/import/template. El importador frontend (ImportarEvaluaciones.js) sigue oculto de la UI; la carga se hizo vía script+endpoint con credenciales superadmin.
