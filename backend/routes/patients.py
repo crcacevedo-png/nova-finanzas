@@ -517,6 +517,8 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
         raise HTTPException(status_code=400, detail="Formato de fecha de nacimiento inválido (YYYY-MM-DD)")
     
     if patient_data.referral_institution == "igss":
+        if not patient_data.dpi:
+            raise HTTPException(status_code=400, detail="El DPI es obligatorio para pacientes IGSS")
         if not patient_data.igss_unit_id:
             raise HTTPException(status_code=400, detail="Debe seleccionar una unidad IGSS")
         unit = await db.igss_units.find_one({"id": patient_data.igss_unit_id, "is_active": True})
@@ -611,6 +613,9 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
     
     referral = update_data.get("referral_institution", patient["referral_institution"])
     if referral == "igss":
+        dpi_val = update_data.get("dpi", patient.get("dpi"))
+        if not dpi_val:
+            raise HTTPException(status_code=400, detail="El DPI es obligatorio para pacientes IGSS")
         igss_unit = update_data.get("igss_unit_id", patient.get("igss_unit_id"))
         if not igss_unit:
             raise HTTPException(status_code=400, detail="Debe seleccionar una unidad IGSS")

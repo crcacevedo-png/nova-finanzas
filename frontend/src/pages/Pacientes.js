@@ -339,6 +339,11 @@ const Pacientes = () => {
       toast.error('Debe seleccionar una unidad IGSS');
       return false;
     }
+    // DPI obligatorio solo para pacientes IGSS
+    if (formData.referral_institution === 'igss' && !formData.dpi.trim()) {
+      toast.error('El DPI es obligatorio para pacientes IGSS');
+      return false;
+    }
     return true;
   };
 
@@ -1009,7 +1014,7 @@ const Pacientes = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="dpi">DPI (13 dígitos)</Label>
+                  <Label htmlFor="dpi">DPI (13 dígitos){formData.referral_institution === 'igss' ? ' *' : ''}</Label>
                   <Input
                     id="dpi"
                     value={formData.dpi}
