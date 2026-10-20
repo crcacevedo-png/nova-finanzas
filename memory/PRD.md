@@ -802,3 +802,8 @@ Nota: no se almacena el código por separado (plan Fase 1: una sola línea de te
 
 ## Pacientes: Tipo de Paciente IGSS como lista (2026-06)
 El campo "Tipo de Paciente" (seccion IGSS del formulario Nuevo/Editar Paciente, Pacientes.js) pasó de Input de texto libre a Select con 5 opciones: Afiliado, Esposa, Beneficiario Hijo, Pensionado, Jubilado. Guarda en igss_tipo_paciente. data-testid patient-igss-tipo-paciente. Verificado por screenshot.
+
+## Pacientes: borrado total + import 10k (2026-06)
+1) Borrado total de la base de pacientes (solo administrador). Backend: DELETE /api/patients/all?confirmacion=BORRAR%20TODO (require_role admin/superadmin), delete_many({}) sobre colección patients (hard delete, TODOS incl. inactivos). NO toca citas/agenda/Google Calendar. Valida confirmacion=='BORRAR TODO' (400 si no) y registra auditoría PATIENTS_BULK_DELETED. Ruta declarada ANTES de /{patient_id}. Frontend (Pacientes.js): botón admin-only "Borrar toda la base" (data-testid delete-all-patients-button) + Dialog de confirmación que exige escribir "BORRAR TODO" (delete-all-confirm-input, delete-all-confirm-button disabled hasta coincidir). patientApi.deleteAll(). Verificado: ruteo/auth/validación (curl 400/403), borrado real 57->0 y restaurado, UI (botón disabled->enabled al escribir).
+   NOTA: el usuario pidió esta función para limpiar una base importada por error; mencionó eliminarla después de usarla.
+2) Importación hasta 10,000 expedientes (JSON). El flujo ya soportaba miles vía lotes de 500 (BATCH_SIZE) en ImportarPacientes.js; se amplió la validación previa de muestra de 1000 a 10000 para que los conteos (Total/Válidos/Duplicados) reflejen el total real. Backend import/batch sin tope. Formato: JSON.

@@ -648,6 +648,32 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
     return PatientResponse(**enriched)
 
 
+@router.delete("/all")
+async def delete_all_patients(
+    confirmacion: str = Query(..., description="Debe ser exactamente 'BORRAR TODO'"),
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Borra TODOS los expedientes de pacientes (hard delete). No toca citas,
+    agenda ni nada relacionado con Google Calendar. Solo administradores y
+    requiere la confirmación exacta 'BORRAR TODO'."""
+    if confirmacion != "BORRAR TODO":
+        raise HTTPException(status_code=400, detail="Confirmación inválida. Escriba exactamente: BORRAR TODO")
+
+    total = await db.patients.count_documents({})
+    result = await db.patients.delete_many({})
+
+    await audit.log(
+        action="PATIENTS_BULK_DELETED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={"deleted_count": result.deleted_count, "total_antes": total}
+    )
+    return {
+        "message": f"Se eliminaron {result.deleted_count} expedientes de pacientes",
+        "deleted_count": result.deleted_count
+    }
+
+
 @router.delete("/{patient_id}")
 async def delete_patient(patient_id: str, current_user: dict = Depends(require_permission("delete_patients"))):
     """Desactivar paciente (soft delete)"""

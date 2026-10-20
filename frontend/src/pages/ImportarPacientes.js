@@ -159,8 +159,8 @@ export default function ImportarPacientes() {
     try {
       const token = localStorage.getItem('token');
       
-      // Validar solo una muestra (primeros 1000)
-      const sampleSize = Math.min(jsonData.length, 1000);
+      // Validar hasta 10,000 registros (soporte solicitado)
+      const sampleSize = Math.min(jsonData.length, 10000);
       const sample = jsonData.slice(0, sampleSize);
       
       const response = await axios.post(
