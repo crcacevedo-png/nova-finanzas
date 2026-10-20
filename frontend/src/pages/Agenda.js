@@ -70,9 +70,9 @@ const TIPOS_CITA = [
 // Un expediente se considera incompleto si falta algún dato obligatorio
 const fichaIncompleta = (p) => {
   if (!p) return true;
-  const req = [p.first_name, p.last_name, p.gender, p.birth_date, p.phone, p.dpi, p.address, p.referral_institution];
+  const req = [p.first_name, p.last_name, p.gender, p.birth_date, p.phone, p.address, p.referral_institution];
   if (req.some(v => !v || String(v).trim() === '')) return true;
-  if (p.referral_institution === 'igss' && !p.igss_unit_id) return true;
+  if (p.referral_institution === 'igss' && (!p.igss_unit_id || !p.dpi || String(p.dpi).trim() === '')) return true;
   return false;
 };
 
@@ -819,12 +819,16 @@ const Agenda = () => {
 
   const guardarCompletarFicha = async () => {
     const f = completarForm;
-    if (!f.first_name.trim() || !f.last_name.trim() || !f.gender || !f.birth_date || !f.phone.trim() || !f.dpi.trim() || !f.address.trim() || !f.referral_institution) {
+    if (!f.first_name.trim() || !f.last_name.trim() || !f.gender || !f.birth_date || !f.phone.trim() || !f.address.trim() || !f.referral_institution) {
       toast.error('Completa todos los campos obligatorios');
       return;
     }
     if (f.dpi && !/^\d{13}$/.test(f.dpi)) {
       toast.error('El DPI debe tener exactamente 13 dígitos');
+      return;
+    }
+    if (f.referral_institution === 'igss' && !f.dpi.trim()) {
+      toast.error('El DPI es obligatorio para pacientes IGSS');
       return;
     }
     if (f.referral_institution === 'igss' && !f.igss_unit_id) {
@@ -2385,7 +2389,7 @@ const Agenda = () => {
                 </div>
                 <div><Label className="text-xs">Fecha de nacimiento *</Label><Input type="date" value={completarForm.birth_date} max={getGuatemalaDate()} onChange={(e) => setCompletarForm(p => ({ ...p, birth_date: e.target.value }))} data-testid="cf-birth-date" /></div>
                 <div><Label className="text-xs">Teléfono *</Label><Input value={completarForm.phone} onChange={(e) => setCompletarForm(p => ({ ...p, phone: e.target.value }))} data-testid="cf-phone" /></div>
-                <div><Label className="text-xs">DPI *</Label><Input value={completarForm.dpi} maxLength={13} onChange={(e) => setCompletarForm(p => ({ ...p, dpi: e.target.value.replace(/\D/g, '') }))} data-testid="cf-dpi" /></div>
+                <div><Label className="text-xs">DPI{completarForm.referral_institution === 'igss' ? ' *' : ''}</Label><Input value={completarForm.dpi} maxLength={13} onChange={(e) => setCompletarForm(p => ({ ...p, dpi: e.target.value.replace(/\D/g, '') }))} data-testid="cf-dpi" /></div>
               </div>
               <div><Label className="text-xs">Dirección *</Label><Input value={completarForm.address} onChange={(e) => setCompletarForm(p => ({ ...p, address: e.target.value }))} data-testid="cf-address" /></div>
               <div>
