@@ -88,10 +88,6 @@ const Pacientes = () => {
   const [evaluacionesPatient, setEvaluacionesPatient] = useState(null);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
-  const [deleteAllText, setDeleteAllText] = useState('');
-  const [deletingAll, setDeletingAll] = useState(false);
-  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const [editingPatient, setEditingPatient] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [duplicateInfo, setDuplicateInfo] = useState(null);
@@ -146,23 +142,6 @@ const Pacientes = () => {
       console.error('Error fetching IGSS units:', error);
     }
   }, []);
-
-  const handleDeleteAll = async () => {
-    if (deleteAllText !== 'BORRAR TODO') return;
-    setDeletingAll(true);
-    try {
-      const res = await patientApi.deleteAll('BORRAR TODO');
-      toast.success(res.data?.message || 'Expedientes eliminados');
-      setDeleteAllOpen(false);
-      setDeleteAllText('');
-      fetchPatients();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al borrar los expedientes');
-    } finally {
-      setDeletingAll(false);
-    }
-  };
-
 
   const fetchPatients = useCallback(async () => {
     try {
@@ -567,17 +546,6 @@ const Pacientes = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Paciente
-              </Button>
-            )}
-            {isAdmin && (
-              <Button
-                variant="outline"
-                onClick={() => { setDeleteAllText(''); setDeleteAllOpen(true); }}
-                className="border-red-300 text-red-600 hover:bg-red-50"
-                data-testid="delete-all-patients-button"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Borrar toda la base
               </Button>
             )}
           </div>
@@ -1574,49 +1542,6 @@ const Pacientes = () => {
                 className="btn-primary"
               >
                 Cancelar registro
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={deleteAllOpen} onOpenChange={(o) => { setDeleteAllOpen(o); if (!o) setDeleteAllText(''); }}>
-          <DialogContent data-testid="delete-all-patients-dialog">
-            <DialogHeader>
-              <DialogTitle className="text-red-600 flex items-center gap-2">
-                <Trash2 className="w-5 h-5" />
-                Borrar toda la base de pacientes
-              </DialogTitle>
-              <DialogDescription>
-                Esta acción elimina <b>todos los expedientes de pacientes</b> de forma permanente e irreversible.
-                No afecta las citas, la agenda ni nada relacionado con Google Calendar.
-                Para confirmar, escribe <b>BORRAR TODO</b> en el campo.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-2">
-              <Input
-                value={deleteAllText}
-                onChange={(e) => setDeleteAllText(e.target.value)}
-                placeholder="Escribe: BORRAR TODO"
-                className="input-teal"
-                data-testid="delete-all-confirm-input"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => { setDeleteAllOpen(false); setDeleteAllText(''); }}
-                data-testid="delete-all-cancel-button"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleDeleteAll}
-                disabled={deleteAllText !== 'BORRAR TODO' || deletingAll}
-                className="bg-red-600 hover:bg-red-700 text-white"
-                data-testid="delete-all-confirm-button"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {deletingAll ? 'Borrando...' : 'Borrar definitivamente'}
               </Button>
             </DialogFooter>
           </DialogContent>

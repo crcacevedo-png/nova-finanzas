@@ -250,7 +250,6 @@ export const patientApi = {
   create: (data) => axios.post(`${API_URL}/patients`, data),
   update: (id, data) => axios.put(`${API_URL}/patients/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/patients/${id}`),
-  deleteAll: (confirmacion) => axios.delete(`${API_URL}/patients/all?confirmacion=${encodeURIComponent(confirmacion)}`),
   reactivate: (id) => axios.post(`${API_URL}/patients/${id}/reactivate`),
   search: (q, limit = 10) => axios.get(`${API_URL}/patients/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   checkDuplicate: (params) => axios.get(`${API_URL}/patients/check-duplicate`, { params }),

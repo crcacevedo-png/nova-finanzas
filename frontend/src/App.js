@@ -28,8 +28,6 @@ import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
-import ImportarPacientes from './pages/ImportarPacientes';
-import ImportarEvaluaciones from './pages/ImportarEvaluaciones';
 import LaboratorioPruebas from './pages/LaboratorioPruebas';
 import CuentasCobrarOptica from './pages/CuentasCobrarOptica';
 import CuentasCobrarFinanzas from './pages/CuentasCobrarFinanzas';
@@ -433,26 +431,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="manage_users">
             <Sociedades />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Importación Masiva de Pacientes */}
-      <Route 
-        path="/importar-pacientes" 
-        element={
-          <ProtectedRoute requiredPermission="import_patients">
-            <ImportarPacientes />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Importación Masiva de Evaluaciones */}
-      <Route 
-        path="/importar-evaluaciones" 
-        element={
-          <ProtectedRoute requiredPermission="import_patients">
-            <ImportarEvaluaciones />
           </ProtectedRoute>
         } 
       />
