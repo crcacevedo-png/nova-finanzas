@@ -42,7 +42,8 @@ import {
   Warehouse,
   Tag,
   PieChart,
-  KeyRound
+  KeyRound,
+  DatabaseBackup
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
@@ -416,6 +417,11 @@ const Layout = ({ children }) => {
           {/* 7.5. Laboratorio de Pruebas - Solo SuperAdmin (desarrollo) */}
           {isSuperAdmin && (
             <NavLink item={{ path: '/laboratorio-pruebas', icon: FlaskConical, label: 'Lab. Pruebas', testId: 'nav-laboratorio-pruebas' }} />
+          )}
+
+          {/* 7.6. Respaldos - Solo SuperAdmin */}
+          {isSuperAdmin && (
+            <NavLink item={{ path: '/respaldos', icon: DatabaseBackup, label: 'Respaldos', testId: 'nav-respaldos' }} />
           )}
           
           {/* 8. Configuration Section - Admin, SuperAdmin y Optica (si tiene items) */}

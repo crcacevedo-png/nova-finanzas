@@ -1,0 +1,9 @@
+crons:
+  - name: respaldo-semanal
+    description: "Respaldo automatico semanal de toda la base de datos (domingos 06:00 Guatemala)"
+    cron: "0 6 * * 0"
+    timezone: "America/Guatemala"
+    endpoint: "{{BASE_URL}}/api/cron/backup"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

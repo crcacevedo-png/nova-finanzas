@@ -24,6 +24,7 @@ import LentesContacto from './pages/LentesContacto';
 import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import SalaOperaciones from './pages/SalaOperaciones';
 import AuditLogs from './pages/AuditLogs';
+import Respaldos from './pages/Respaldos';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
 import Agenda from './pages/Agenda';
@@ -137,6 +138,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="superadmin">
             <DashboardFinanciero />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/respaldos" 
+        element={
+          <ProtectedRoute requiredRole="superadmin">
+            <Respaldos />
           </ProtectedRoute>
         } 
       />

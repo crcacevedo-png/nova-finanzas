@@ -4,7 +4,15 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-10 (Sesión 34 — Migración a producción + DPI/email opcionales)
+**Última actualización**: 2026-10 (Sesión 34 — Migración a producción + DPI/email + Respaldos semanales)
+
+### Sesión 34 — Respaldos automáticos semanales (2026-10)
+- ✅ Backend `routes/backups.py`: vuelca TODAS las colecciones a JSON gzip y lo sube al almacenamiento de objetos de Emergent (`INTEGRATION_PROXY_URL` + `EMERGENT_LLM_KEY`). Metadatos en colección `backups`. Endpoints solo superadmin: `GET /api/backups`, `POST /api/backups/run`, `GET /api/backups/{id}/download`, `DELETE /api/backups/{id}`. Webhook cron `POST /api/cron/backup` (auth `Bearer WEBHOOK_CRON_SECRET`, ack inmediato, trabajo en background).
+- ✅ Cron `/app/.emergent/crons.yml`: `respaldo-semanal`, `0 6 * * 0`, tz `America/Guatemala` (domingos 06:00).
+- ✅ Frontend `pages/Respaldos.js` + ruta `/respaldos` (superadmin) + nav `nav-respaldos`: lista, crear ahora, descargar (blob), eliminar; auto-refresco mientras hay en progreso. Conservar todos (sin borrado automático).
+- ✅ Env nuevas en `backend/.env`: `EMERGENT_LLM_KEY`, `WEBHOOK_CRON_SECRET`.
+- ✅ Verificado en preview: cron 401/200, respaldo completado (64 colecciones, 57,499 docs, ~9.3MB), descarga gzip válida, run manual, delete, crons.yml válido.
+- ⚠️ **Requiere REDEPLOY** para activar endpoints + env + cron semanal en producción.
 
 ### Sesión 34 — Migración de datos a PRODUCCIÓN y validaciones DPI/email (2026-10)
 - ✅ **Email y DPI opcionales**: en `Pacientes.js` (`validateForm`) y backend `patients.py` (create+update). **DPI obligatorio SOLO para pacientes IGSS** (asterisco dinámico en etiqueta). Email solo valida formato si se ingresa. Mismo criterio en el flujo de Agenda (`fichaIncompleta`, `guardarCompletarFicha`, etiqueta `cf-dpi`): DPI ya no es obligatorio salvo IGSS.

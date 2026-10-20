@@ -743,4 +743,13 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Respaldos (Backups) API
+export const backupApi = {
+  getAll: () => axios.get(`${API_URL}/backups`),
+  run: () => axios.post(`${API_URL}/backups/run`),
+  remove: (id) => axios.delete(`${API_URL}/backups/${id}`),
+  download: (id) => axios.get(`${API_URL}/backups/${id}/download`, { responseType: 'blob' }),
+};
+
+
 export default api;

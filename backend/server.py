@@ -2888,6 +2888,10 @@ api_router.include_router(dashboard_financiero_router, tags=["Dashboard Financie
 from routes.menu_config import router as menu_config_router
 api_router.include_router(menu_config_router, tags=["Configuración de Menús"])
 
+from routes.backups import router as backups_router, cron_router as backups_cron_router
+api_router.include_router(backups_router, tags=["Respaldos"])
+api_router.include_router(backups_cron_router, tags=["Cron"])
+
 # ==================== MÓDULO DE ROLES ====================
 from routes.roles import router as roles_router
 api_router.include_router(roles_router, tags=["Roles"])
