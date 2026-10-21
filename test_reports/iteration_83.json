@@ -1,0 +1,38 @@
+{
+  "summary": "Tested IGSS medications with 'frecuencia de uso' (backend + UI). Login for igss.admin works (goes to /pacientes). Clicking 'Agregar' in the IGSS section shows the medication autocomplete plus the frequency input. Both fields can be edited and are kept separate (nombre/frecuencia). Saving with Guardar (POST and PUT) stores {nombre, frecuencia} correctly. Reopening the evaluation from Historial loads both fields. Old evaluations with string medications load as {nombre, frecuencia:''}, the frequency can be added, and saving converts them to objects. One real problem: autosave (PATCH /autoguardar) does not save igss_med_proc, so changes saved only by autosave are silently lost even though the UI says 'Guardado a las HH:MM'.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PATCH /api/evaluaciones/{id}/autoguardar", "issue": "'igss_med_proc' is missing from the allowed_fields whitelist (routes/evaluaciones.py ~line 1321). Edits to IGSS medications/frequency/procedures on an existing evaluation are dropped by autosave while the UI shows 'Guardado a las ...'. Reproduced in the API test and in the UI: edited frequency, autosave ran, DB still had the old value. They only persist if the user clicks Guardar.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PATCH /api/evaluaciones/{id}/autoguardar", "issue": "It accepts a raw dict with no Pydantic validation. Once igss_med_proc is added to the whitelist, run it through MedicamentosProcedimientosIGSS so the data stays normalized (strings converted, empty names removed)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Autosave of IGSS section", "issue": "This is the backend whitelist problem above as the user experiences it: the status says saved but the IGSS changes are not saved.", "affected_selectors": ["igss-medicamento-frecuencia-{idx}", "igss-medicamento-{idx}"]}
+    ],
+    "design_issues": [
+      {"screen": "Evaluación > Medicamentos y Procedimientos (EXCLUSIVO IGSS)", "issues": ["The frequency input has only a placeholder and no label. Once filled, it looks the same as the medication name input above it. Consider a small 'Frecuencia' label/prefix or a different style."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_igss_medicamentos_frecuencia.py", "/app/test_reports/pytest/pytest_igss_freq.xml"],
+  "action_items": [
+    "Add 'igss_med_proc' to allowed_fields in PATCH /evaluaciones/{id}/autoguardar and validate/normalize it with MedicamentosProcedimientosIGSS (model_dump) before $set.",
+    "Optional: add a visible label to the frequency input."
+  ],
+  "critical_code_review_comments": [
+    "The backend validator silently drops medications with an empty nombre even if a frecuencia was typed. That is acceptable, but the UI gives no hint.",
+    "The section is not gated by the patient's IGSS institution (it shows for all patients). The review request says it 'only appears for IGSS patients'; check whether that is intended.",
+    "EvaluacionOftalmologica.js is over 3000 lines. It should be split (CollapsibleSection, Autocomplete, IGSS section, print templates)."
+  ],
+  "updated_files": ["/app/frontend/src/pages/EvaluacionOftalmologica.js (added data-testid='eval-guardar-btn' to the Guardar button only)", "/app/backend/tests/test_igss_medicamentos_frecuencia.py"],
+  "success_rate": {"backend": "80% (4/5; the autosave test fails)", "frontend": "100% for the requested flows (add, edit, Guardar, reopen, legacy); autosave persistence fails"},
+  "test_credentials": "superadmin/nova2024 (evaluations), igss.admin/IgssAdmin2024$ (login only; role administrador_igss cannot create evaluations via the API role check)",
+  "seed_data_creation": "Temporary evaluations for patient a2c78cdc-d230-420f-afd3-050101b89423 (AARON CERON ALFARO) were created and deleted afterwards. The pytest fixture cleans up its own data.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use /evaluacion-oftalmologica?paciente_id=<id>, then historial-toggle-btn and historial-item-{id} to reopen. The IGSS section is collapsed by default; open it with get_by_role('button', name='Medicamentos y Procedimientos (EXCLUSIVO IGSS)'). After the fix, rerun test_autoguardar_persists_igss.",
+  "rca of the issue": "The autoguardar endpoint filters the body by a hard-coded allowed_fields list that never included 'igss_med_proc' (or the newer fields). The frontend autosave sends the full formData, but the backend discards igss_med_proc and still returns 200, so the UI shows 'Guardado'. Fix: add 'igss_med_proc' to the list and normalize it through the Pydantic model."
+}

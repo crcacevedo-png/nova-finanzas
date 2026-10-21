@@ -1775,6 +1775,7 @@ const EvaluacionOftalmologica = () => {
                   onClick={guardarEvaluacion}
                   disabled={saving || !formData.paciente_id}
                   className="btn-primary"
+                  data-testid="eval-guardar-btn"
                 >
                   <Save className="w-4 h-4 mr-1" />
                   {saving ? 'Guardando...' : 'Guardar'}
@@ -2418,14 +2419,17 @@ const EvaluacionOftalmologica = () => {
                               className="input-teal h-8 text-sm"
                               testId={`igss-medicamento-${idx}`}
                             />
-                            <Input
-                              value={frecuencia}
-                              onChange={(e) => updateArrayItem('igss_med_proc.medicamentos', idx, 'frecuencia', e.target.value)}
-                              disabled={isReadOnly}
-                              placeholder="Frecuencia de uso (ej: 1 gota cada 8 horas)"
-                              className="input-teal h-8 text-sm"
-                              data-testid={`igss-medicamento-frecuencia-${idx}`}
-                            />
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">Frecuencia:</span>
+                              <Input
+                                value={frecuencia}
+                                onChange={(e) => updateArrayItem('igss_med_proc.medicamentos', idx, 'frecuencia', e.target.value)}
+                                disabled={isReadOnly}
+                                placeholder="ej: 1 gota cada 8 horas"
+                                className="input-teal h-8 text-sm"
+                                data-testid={`igss-medicamento-frecuencia-${idx}`}
+                              />
+                            </div>
                           </div>
                           {!isReadOnly && (
                             <Button

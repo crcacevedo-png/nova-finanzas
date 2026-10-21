@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="5" time="1.840" timestamp="2026-10-21T15:40:36.388381+00:00" hostname="agent-env-d1d73794-876b-4f26-b868-6eff195fc400"><testcase classname="tests.test_igss_medicamentos_frecuencia" name="test_igss_admin_login" time="0.580" /><testcase classname="tests.test_igss_medicamentos_frecuencia" name="test_create_with_frecuencia_and_get" time="0.742" /><testcase classname="tests.test_igss_medicamentos_frecuencia" name="test_put_updates_frecuencia" time="0.143" /><testcase classname="tests.test_igss_medicamentos_frecuencia" name="test_legacy_string_in_db_loads" time="0.169" /><testcase classname="tests.test_igss_medicamentos_frecuencia" name="test_autoguardar_persists_igss" time="0.146"><failure message="AssertionError: assert 'TEST_Latanoprost' == 'TEST_Autosave med'&#10;  &#10;  - TEST_Autosave med&#10;  + TEST_Latanoprost">tests/test_igss_medicamentos_frecuencia.py:104: in test_autoguardar_persists_igss
+    assert g["igss_med_proc"]["medicamentos"][0]["nombre"] == "TEST_Autosave med"
+E   AssertionError: assert 'TEST_Latanoprost' == 'TEST_Autosave med'
+E     
+E     - TEST_Autosave med
+E     + TEST_Latanoprost</failure></testcase></testsuite></testsuites>

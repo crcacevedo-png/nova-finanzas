@@ -19,7 +19,8 @@ from models.evaluacion_oftalmologica import (
     EvaluacionOftalmologicaUpdate,
     EvaluacionOftalmologicaResponse,
     EvaluacionOftalmologicaListResponse,
-    CatalogoItemResponse
+    CatalogoItemResponse,
+    MedicamentosProcedimientosIGSS
 )
 
 # PDF imports
@@ -1322,10 +1323,15 @@ async def autoguardar_evaluacion(
         "paciente_id", "paciente_nombre", "paciente_edad", "paciente_sexo", "paciente_expediente",
         "fecha", "medico_id", "medico_nombre", "motivo_consulta", "padecimiento_actual",
         "antecedentes", "medicamentos_actuales", "medicamentos_previos", "examen",
-        "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas"
+        "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas", "igss_med_proc"
     ]
     
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
+    # Normalizar sección IGSS (medicamentos {nombre, frecuencia} + estudios)
+    if "igss_med_proc" in update_data:
+        update_data["igss_med_proc"] = MedicamentosProcedimientosIGSS(
+            **(update_data["igss_med_proc"] or {})
+        ).model_dump()
     update_data["actualizado_por"] = current_user["id"]
     update_data["actualizado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
     update_data["fecha_actualizacion"] = now
