@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only validation of IGSS NOG fixes using igss.admin (administrador_igss). (1) Login OK -> lands on /pacientes; navigating to /igss/unidades renders data-testid='unidades-igss-page' with no redirect. (2) Opened NOG manager for unit 'Zona 11' (nogs-unit-18801a0e...), clicked Nuevo NOG, filled QA-UI-38804 / cantidad 5 / precio 100 / tipo 'Compra Directa' -> toast 'NOG creado', row listed with 0/5, 5 disp., Total Q500. (3) Created IGSS patient TEST_QA NogUI (DPI 9097912709371) from /pacientes selecting Zona 11 and NOG QA-UI-38804 (option showed '(5 disp.)') -> toast 'Paciente creado exitosamente'. Back in NOG manager the row showed 1/5, 4 disp.; unit header Acreditados 1 / Disponibles 57; expanding nog-expand showed patient EXP-202610-0013 TEST_QA NogUI in nog-pacientes-<id> with Anular action. Page stat card 'Servicios acreditados' also updated to 1.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Pacientes > Nuevo Paciente (IGSS)", "issues": ["Minor/UX suggestion: 'Tipo de Compra' in the patient form is not auto-filled from the selected NOG's tipo_compra (NOG already has it). Not a bug."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Production issue for point 1 was cached session permissions; consider refreshing permissions from /auth/me on app load (or on 403) so role permission changes take effect without re-login."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (frontend only)", "frontend": "100% (3/3 flows)"},
+  "test_credentials": "igss.admin / IgssAdmin2024$ (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created NOG QA-UI-38804 (id 8cb4eca7-721b-4450-b71c-10bfec77e483) on unit Zona 11 (18801a0e-2eb9-425f-8848-b511022c9027) and patient 'TEST_QA NogUI' EXP-202610-0013 DPI 9097912709371 assigned to it.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "NOG creation by administrador_igss and NOG discount on patient creation both verified in UI. Edit-patient no-double-discount and release-on-remove were not UI-tested here (backend verified by main agent)."
+}

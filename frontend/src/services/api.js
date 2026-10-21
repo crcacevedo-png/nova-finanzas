@@ -187,6 +187,7 @@ export const igssNogApi = {
   update: (nogId, data) => axios.put(`${API_URL}/igss-units/nogs/${nogId}`, data),
   delete: (nogId) => axios.delete(`${API_URL}/igss-units/nogs/${nogId}`),
   recalcular: (nogId) => axios.post(`${API_URL}/igss-units/nogs/${nogId}/recalcular`),
+  reconciliarTodo: () => axios.post(`${API_URL}/igss-units/nogs/reconciliar-todo`),
   getPacientes: (nogId) => axios.get(`${API_URL}/igss-units/nogs/${nogId}/pacientes`),
   anularAcreditacion: (nogId, acredId, motivo) =>
     axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/${acredId}/anular`, { motivo }),
