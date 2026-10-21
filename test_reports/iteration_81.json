@@ -1,0 +1,17 @@
+{
+  "summary": "Re-test of the IGSS NOG save bug (NogSelector fix `if (!val) return;`). I ran all 3 flows end-to-end through the UI with Playwright as superadmin on the preview URL. FLOW 1 (create with catalog NOG 12345678, unit Zona 11): the POST sent and returned igss_nog='12345678'. FLOW 2 (edit without changes): the edit form shows '12345678 — Cirugia de catarata (50 disp.)' instead of the empty placeholder. The PUT sent igss_nog='12345678' and got 200 back with igss_nog='12345678'. The view-patient-igss-nog detail shows '12345678'. I repeated the edit a second time with the same result. FLOW 3 (free text 'LIBRE-777' via patient-nog-option-libre): the create and the edit both keep 'LIBRE-777'. On edit the select shows 'Otro (escribir NOG)' and the input is filled in, and the detail shows 'LIBRE-777'. The bug is fixed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Because of `if (!val) return;`, the NOG can no longer be cleared from the Select. To clear it, the user must pick 'Otro' and empty the input. This is acceptable, but consider adding an explicit 'Sin NOG' option if needed.",
+    "DELETE /api/patients/{id} is a soft delete (deactivation). The test patients stay in the DB as inactive."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Created 2 test patients TESTNOGCAT1187 (6d7f51a9-65a4-403d-a5cf-1f6f6ad46f68) and TESTNOGLIB1187 (9698e1ce-c5cb-4280-85d3-d81defe8aecb). I deleted both via DELETE (soft delete, they are now inactive).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The NOG fix is verified. The Playwright flow is: login -> /pacientes -> add-patient-button -> fill fields + pick IGSS / Zona 11 -> patient-igss-nog-select option containing '12345678' -> submit-patient-button. Then search-patient -> edit-patient-{id} -> submit -> view-patient-{id} -> view-patient-igss-nog."
+}
