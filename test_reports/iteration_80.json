@@ -1,0 +1,36 @@
+{
+  "summary": "Ran the user's NOG bug ('el NOG no se guarda al ingresar al paciente') in the UI with network capture. CREATE works on both paths. On POST /api/patients, catalog path (a) sent igss_nog='12345678' and the response came back with igss_nog='12345678'. Free-text path (b) sent and saved igss_nog='NOG-LIBRE-999'. The bug is in EDIT. When an IGSS patient whose NOG is in the catalog is reopened with the edit (lápiz) button, the NOG dropdown shows 'Seleccionar NOG' (looks empty). Saving the edit, even with no changes, sends igss_nog='' in the PUT and the backend wipes the stored NOG. So the user sees the NOG empty when they reopen the patient, and any later edit really deletes it. A free-text NOG (not in the catalog) survives edit.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NogSelector (/app/frontend/src/components/NogSelector.js)", "issue": "In edit mode, a patient with a catalog NOG shows the placeholder 'Seleccionar NOG' and formData.igss_nog is set to ''. Saving the edit sends igss_nog:'' and the saved NOG is erased (reproduced: PUT response igss_nog='').", "selector": "[data-testid='patient-igss-nog-select']", "priority": "CRITICAL"},
+      {"component": "Agenda 'Completar ficha / Crear y marcar llegada' dialog (/app/frontend/src/pages/Agenda.js ~line 2418-2432)", "issue": "The IGSS section shows Unidad, Afiliación, SPS and Código but has no NOG field (no NogSelector). A patient created or completed from Agenda always ends up with igss_nog=''. Possible second cause of the report if the user registers patients from Agenda ('al ingresar').", "selector": "[data-testid='cf-igss-unit']", "priority": "HIGH"},
+      {"component": "Pacientes view dialog (Ver paciente)", "issue": "The patient detail dialog never shows igss_nog (only the IGSS unit and tipo_paciente), so the user cannot confirm the NOG was saved.", "selector": "[data-testid^='view-patient-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Edit IGSS patient -> save", "issue": "The PUT payload has igss_nog:'' even though the DB has '12345678'. The backend saves it as-is, so data is lost.", "affected_selectors": ["[data-testid='submit-patient-button']", "[data-testid='patient-igss-nog-select']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX NogSelector.handleSelect: ignore empty values from Radix Select, e.g. `if (!val) return;` at the top of handleSelect (only call onChange('') for the explicit LIBRE option). I verified this with a temporary change: the edit form then showed '12345678 — Cirugia de catarata (50 disp.)' and the PUT kept igss_nog='12345678'. I reverted the change, so it still needs to be applied.",
+    "Optionally make NogSelector less fragile: don't switch from <Input> to <Select> after the async fetch with a preset value (show a loading state until the NOGs are fetched), and/or give the Select a key so it mounts once the NOGs are loaded.",
+    "Add a NOG field (NogSelector) to the Agenda completar-ficha IGSS section so patients created there can get a NOG.",
+    "Show igss_nog in the patient view dialog (next to Unidad IGSS).",
+    "Consider a data repair: IGSS patients edited after the NOG catalog went live may have lost igss_nog (check the audit log campos_modificados with igss_nog)."
+  ],
+  "critical_code_review_comments": [
+    "NogSelector first renders <Input> while nogs=[] and then swaps to a Radix <Select> with a preset value. Radix Select v2 (@radix-ui/react-select ^2.2.2) calls onValueChange('') on mount in that case. handleSelect('') then runs onChange(''), which clears the parent formData.igss_nog.",
+    "The effect that sets libre (`if (!value) setLibre(false)`) can also hide the free-text input when the user deletes all the text, which is a minor usability problem.",
+    "Pacientes.js is about 1560 lines and Agenda.js about 2620 lines; both should be split into smaller modules."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (per request)", "frontend": "Create with NOG (catalog + free text): 100%. Edit keeps NOG: 0% for catalog NOGs."},
+  "test_credentials": "superadmin / nova2024 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created TESTNOGA (6dca4c52-1179-4318-8f42-151003dccdee) and TESTNOGB (d458382a-025b-4280-8532-3d8455e54e42); both soft-deleted with DELETE /api/patients/{id} (200).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Repro: login superadmin -> /pacientes -> add-patient-button -> IGSS + unit 'Zona 11' -> NOG '12345678' from patient-igss-nog-select -> submit (POST ok). Search for the patient -> edit-patient-* -> patient-igss-nog-select shows 'Seleccionar NOG' -> submit -> PUT body igss_nog:''. After the fix, confirm the edit shows the NOG and the PUT keeps it.",
+  "rca of the issue": "Create is fine (POST payload had igss_nog). On edit, formData.igss_nog='12345678' is set before the NOG catalog loads, so NogSelector first renders <Input>. When the fetch finishes it renders a Radix <Select value='12345678'>, and Radix fires onValueChange('') during that mount. handleSelect('') then calls onChange(''), so formData.igss_nog becomes ''. The UI shows the placeholder and the next save sends igss_nog:''; the backend update_patient stores '' (it only skips None). Mitigation: guard against empty values in handleSelect (verified to work)."
+}

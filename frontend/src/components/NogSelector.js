@@ -46,6 +46,11 @@ export const NogSelector = ({ unitId, value, onChange }) => {
   }, [value, nogs]);
 
   const handleSelect = (val) => {
+    // Radix Select v2 puede emitir onValueChange('') al montar con un valor
+    // preseleccionado (modo edición). Ignorar ese evento espurio para no borrar
+    // el NOG ya asignado. El borrado explícito se hace con la opción LIBRE o el
+    // input de texto libre.
+    if (!val) return;
     if (val === LIBRE) {
       setLibre(true);
       onChange('');

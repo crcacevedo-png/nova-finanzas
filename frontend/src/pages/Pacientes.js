@@ -1401,6 +1401,12 @@ const Pacientes = () => {
                       <p style={{ color: 'var(--text-primary)' }}>{selectedPatient.igss_tipo_paciente}</p>
                     </div>
                   )}
+                  {selectedPatient.referral_institution === 'igss' && selectedPatient.igss_nog && (
+                    <div>
+                      <p style={{ color: 'var(--text-hint)' }}>NOG</p>
+                      <p style={{ color: 'var(--text-primary)' }} data-testid="view-patient-igss-nog">{selectedPatient.igss_nog}</p>
+                    </div>
+                  )}
                 </div>
 
                 {selectedPatient.emergency_contact_name && (
