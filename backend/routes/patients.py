@@ -570,6 +570,10 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
     if "_id" in patient_doc:
         del patient_doc["_id"]
     
+    # Descontar 1 servicio del NOG asignado (si aplica)
+    from routes.igss_nogs import _reconciliar_nog_paciente
+    await _reconciliar_nog_paciente(patient_doc, current_user, origen="asignacion")
+    
     enriched = await enrich_patient(patient_doc)
     return PatientResponse(**enriched)
 
@@ -637,6 +641,10 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
     await db.patients.update_one({"id": patient_id}, {"$set": update_data})
     updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     
+    # Reconciliar consumo de NOG (reasignación / cambio de unidad / institución)
+    from routes.igss_nogs import _reconciliar_nog_paciente
+    await _reconciliar_nog_paciente(updated, current_user, origen="reasignacion")
+    
     # Auditoría: registrar qué usuario editó el expediente y qué campos cambió
     await audit.log(
         action="PATIENT_UPDATED",
@@ -668,6 +676,10 @@ async def delete_patient(patient_id: str, current_user: dict = Depends(require_p
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+    # Liberar el cupo del NOG al desactivar al paciente
+    from routes.igss_nogs import _reconciliar_nog_paciente
+    inactivo = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    await _reconciliar_nog_paciente(inactivo, current_user, origen="baja")
     return {"message": "Paciente desactivado correctamente"}
 
 
@@ -688,6 +700,9 @@ async def reactivate_patient(patient_id: str, current_user: dict = Depends(requi
     )
     
     updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    # Reconsumir el cupo del NOG al reactivar al paciente
+    from routes.igss_nogs import _reconciliar_nog_paciente
+    await _reconciliar_nog_paciente(updated, current_user, origen="reactivacion")
     enriched = await enrich_patient(updated)
     return PatientResponse(**enriched)
 

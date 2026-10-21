@@ -98,11 +98,14 @@ def _nog_con_derivados(nog: dict) -> dict:
 
 async def _crear_acreditacion(nog: dict, paciente: dict, evaluacion: dict, origen: str, user: dict):
     """Crea una acreditación (1 servicio) de forma atómica y sin sobregiro.
-    Devuelve (ok, motivo). Deduplica por (nog_id, evaluacion_id)."""
+    Devuelve (ok, motivo). Deduplica por (nog_id, paciente_id)."""
+    pac_id = (paciente or {}).get("id")
     eval_id = (evaluacion or {}).get("id")
-    if eval_id:
+    # Deduplicar por paciente: 1 servicio consumido por paciente por NOG
+    if pac_id:
         existe = await db.igss_nog_acreditaciones.find_one(
-            {"nog_id": nog["id"], "evaluacion_id": eval_id}, {"_id": 0, "id": 1}
+            {"nog_id": nog["id"], "paciente_id": pac_id, "anulada": {"$ne": True}},
+            {"_id": 0, "id": 1}
         )
         if existe:
             return False, "duplicada"
@@ -162,17 +165,78 @@ async def _sincronizar_acreditaciones(nog: dict, user: dict, origen: str = "retr
     for pac in pacientes:
         if acreditados >= cantidad:
             break
-        evs = await db.evaluaciones_oftalmologicas.find(
-            {"paciente_id": pac["id"]}, {"_id": 0, "id": 1}
-        ).sort("fecha_creacion", 1).to_list(None)
-        for ev in evs:
-            if acreditados >= cantidad:
-                break
-            ok, _ = await _crear_acreditacion(nog, pac, ev, origen, user)
-            if ok:
-                creadas += 1
-                acreditados += 1
+        # Vincular una evaluación existente si la hay (solo informativo); se acredita 1 por paciente
+        ev = await db.evaluaciones_oftalmologicas.find_one(
+            {"paciente_id": pac["id"]}, {"_id": 0, "id": 1}, sort=[("fecha_creacion", 1)]
+        )
+        ok, _ = await _crear_acreditacion(nog, pac, ev, origen, user)
+        if ok:
+            creadas += 1
+            acreditados += 1
     return creadas
+
+
+async def _anular_acreditacion_interna(acred: dict, user: dict, motivo: str):
+    """Anula una acreditación y libera el cupo del NOG (uso interno)."""
+    now = datetime.now(timezone.utc).isoformat()
+    await db.igss_nog_acreditaciones.update_one(
+        {"id": acred["id"]},
+        {"$set": {
+            "anulada": True,
+            "anulada_por": (user or {}).get("id"),
+            "anulada_por_nombre": (user or {}).get("name", (user or {}).get("username", "")),
+            "fecha_anulacion": now,
+            "motivo_anulacion": motivo,
+        }}
+    )
+    await db.igss_nogs.update_one(
+        {"id": acred["nog_id"], "acreditados": {"$gt": 0}},
+        {"$inc": {"acreditados": -1}}
+    )
+
+
+async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "asignacion"):
+    """Asegura que el paciente consuma exactamente 1 servicio del NOG asignado
+    (si está activo, es IGSS y tiene unidad + NOG del catálogo activo). Libera las
+    acreditaciones que ya no correspondan (cambio de NOG/unidad/institución o baja).
+    Hook llamado al crear/editar/desactivar/reactivar un paciente."""
+    if not paciente:
+        return
+    pac_id = paciente.get("id")
+    if not pac_id:
+        return
+
+    # NOG objetivo (si aplica)
+    target_nog = None
+    if (paciente.get("is_active", True)
+            and paciente.get("referral_institution") == "igss"
+            and paciente.get("igss_unit_id")
+            and (paciente.get("igss_nog") or "").strip()):
+        target_nog = await db.igss_nogs.find_one(
+            {"unidad_id": paciente["igss_unit_id"],
+             "numero": (paciente.get("igss_nog") or "").strip(),
+             "is_active": True},
+            {"_id": 0}
+        )
+    target_nog_id = target_nog["id"] if target_nog else None
+
+    # Acreditaciones vigentes del paciente
+    vigentes = await db.igss_nog_acreditaciones.find(
+        {"paciente_id": pac_id, "anulada": {"$ne": True}}, {"_id": 0}
+    ).to_list(None)
+
+    ya_tiene_target = False
+    for a in vigentes:
+        if target_nog_id and a.get("nog_id") == target_nog_id and not ya_tiene_target:
+            ya_tiene_target = True  # conservar exactamente una
+        else:
+            # No corresponde (otro NOG, duplicada, o ya no aplica) -> liberar cupo
+            motivo = "reasignacion_nog" if target_nog_id else "sin_nog"
+            await _anular_acreditacion_interna(a, user, motivo)
+
+    # Crear la acreditación objetivo si falta
+    if target_nog and not ya_tiene_target:
+        await _crear_acreditacion(target_nog, paciente, None, origen, user)
 
 
 async def _acreditar_evaluacion(paciente: dict, evaluacion: dict, user: dict):
@@ -373,6 +437,21 @@ async def eliminar_nog(
     await db.igss_nog_acreditaciones.delete_many({"nog_id": nog_id})
     await db.igss_nogs.delete_one({"id": nog_id})
     return {"message": "NOG eliminado correctamente"}
+
+
+@router.post("/nogs/reconciliar-todo")
+async def reconciliar_todo(
+    current_user: dict = Depends(require_permission("manage_igss_units"))
+):
+    """Backfill idempotente: recalcula el consumo de TODOS los NOG a partir de los
+    pacientes activos asignados (1 servicio por paciente). Corrige NOG de pacientes
+    ingresados antes de que la asignación descontara el cupo y elimina duplicados."""
+    pacientes = await db.patients.find({"is_active": True}, {"_id": 0}).to_list(None)
+    reconciliados = 0
+    for pac in pacientes:
+        await _reconciliar_nog_paciente(pac, current_user, origen="backfill")
+        reconciliados += 1
+    return {"pacientes_reconciliados": reconciliados}
 
 
 @router.post("/nogs/{nog_id}/recalcular")
