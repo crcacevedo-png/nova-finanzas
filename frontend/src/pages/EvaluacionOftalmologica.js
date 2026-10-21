@@ -1353,6 +1353,38 @@ const EvaluacionOftalmologica = () => {
     }
   };
 
+  // Imprimir evaluación completa (PDF) directamente
+  const handlePrintPDF = async () => {
+    if (!evaluacionActual?.id) {
+      toast.error('Debe guardar la evaluación antes de imprimir');
+      return;
+    }
+    try {
+      toast.loading('Preparando impresión...', { id: 'pdf-print' });
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/evaluaciones/${evaluacionActual.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const printWindow = window.open(url, '_blank');
+      if (printWindow) {
+        printWindow.addEventListener('load', () => {
+          printWindow.focus();
+          printWindow.print();
+        });
+      } else {
+        toast.error('Permita las ventanas emergentes para imprimir', { id: 'pdf-print' });
+        return;
+      }
+      toast.success('PDF listo para imprimir', { id: 'pdf-print' });
+    } catch (error) {
+      console.error('Error imprimiendo PDF:', error);
+      toast.error('Error al generar PDF para impresión', { id: 'pdf-print' });
+    }
+  };
+
   // Enviar a CRM de Cirugías
   const handleEnviarCRM = async () => {
     if (!crmForm.tipo_cirugia) {
@@ -1749,9 +1781,13 @@ const EvaluacionOftalmologica = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleExportPDF()}>
+                  <DropdownMenuItem onClick={() => handleExportPDF()} data-testid="export-pdf-download-btn">
                     <FileDown className="w-4 h-4 mr-2" />
-                    Exportar PDF Completo
+                    Descargar PDF Completo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handlePrintPDF()} data-testid="print-pdf-btn">
+                    <Printer className="w-4 h-4 mr-2" />
+                    Imprimir PDF Completo
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handlePrint('medicamentos')}>

@@ -27,8 +27,18 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+import os as _os
+
+LOGO_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "assets", "logo_nova.png")
+
+INSTITUTION_LABELS_PDF = {
+    "particular": "Particular",
+    "igss": "IGSS",
+    "seguro_privado": "Seguro Privado",
+    "otra": "Otra Institución",
+}
 
 router = APIRouter(prefix="/evaluaciones", tags=["Evaluaciones Oftalmológicas"])
 catalogos_router = APIRouter(prefix="/catalogos", tags=["Catálogos - Evaluaciones"])
@@ -380,7 +390,13 @@ async def get_evaluacion_pdf(
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
     
     # Obtener datos del paciente
-    paciente = await db.patients.find_one({"id": evaluacion.get("paciente_id")}, {"_id": 0})
+    paciente = await db.patients.find_one({"id": evaluacion.get("paciente_id")}, {"_id": 0}) or {}
+    
+    # Resolver nombre de unidad IGSS si aplica
+    igss_unit_name = ""
+    if paciente.get("igss_unit_id"):
+        unit = await db.igss_units.find_one({"id": paciente["igss_unit_id"]}, {"_id": 0, "name": 1})
+        igss_unit_name = unit["name"] if unit else ""
     
     # Crear PDF en memoria
     buffer = io.BytesIO()
@@ -394,12 +410,28 @@ async def get_evaluacion_pdf(
     styles.add(ParagraphStyle(name='FieldLabel', parent=styles['Normal'], fontSize=9, textColor=colors.grey))
     styles.add(ParagraphStyle(name='FieldValue', parent=styles['Normal'], fontSize=10, spaceBefore=2))
     styles.add(ParagraphStyle(name='SmallText', parent=styles['Normal'], fontSize=8, textColor=colors.grey))
+    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.grey))
+    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=9, fontName='Helvetica'))
     
     elements = []
     
-    # ===== ENCABEZADO =====
-    elements.append(Paragraph("EVALUACIÓN OFTALMOLÓGICA", styles['TitleCenter']))
-    elements.append(Paragraph("NovaVision - Clínica Oftalmológica", styles['SubtitleCenter']))
+    # ===== ENCABEZADO CON LOGO =====
+    titulo_cell = [
+        Paragraph("EVALUACIÓN OFTALMOLÓGICA", styles['TitleCenter']),
+        Paragraph("NovaVision - Clínica Oftalmológica", styles['SubtitleCenter']),
+    ]
+    if _os.path.exists(LOGO_PATH):
+        logo = RLImage(LOGO_PATH, width=0.67*inch, height=0.9*inch)
+        header_table = Table([[logo, titulo_cell]], colWidths=[1.1*inch, 5.9*inch])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        elements.append(header_table)
+    else:
+        elements.extend(titulo_cell)
     elements.append(Spacer(1, 10))
     
     # Línea divisoria
@@ -415,23 +447,96 @@ async def get_evaluacion_pdf(
         except Exception:
             pass
     
-    paciente_data = [
-        ['Paciente:', evaluacion.get("paciente_nombre", "N/A"), 'Expediente:', evaluacion.get("paciente_expediente", "N/A")],
-        ['Edad:', f'{evaluacion.get("paciente_edad", 0)} años', 'Sexo:', evaluacion.get("paciente_sexo", "N/A")],
-        ['Fecha:', fecha_eval, 'Médico:', evaluacion.get("medico_nombre", "N/A")],
+    # ===== DATOS DEL PACIENTE (completos) =====
+    def _calc_edad(bd):
+        try:
+            b = datetime.fromisoformat(str(bd))
+            today = datetime.now()
+            return today.year - b.year - ((today.month, today.day) < (b.month, b.day))
+        except Exception:
+            return None
+
+    gender_label = {"masculino": "Masculino", "femenino": "Femenino", "otro": "Otro"}
+    nombre = paciente.get("full_name") or f"{paciente.get('first_name','')} {paciente.get('last_name','')}".strip() or evaluacion.get("paciente_nombre", "N/A")
+    expediente = paciente.get("record_number") or evaluacion.get("paciente_expediente", "N/A")
+    edad_calc = _calc_edad(paciente.get("birth_date")) if paciente.get("birth_date") else evaluacion.get("paciente_edad")
+    edad_str = f"{edad_calc} años" if edad_calc is not None else "N/A"
+    sexo = gender_label.get(paciente.get("gender", ""), paciente.get("gender") or evaluacion.get("paciente_sexo", "N/A"))
+    inst_label = INSTITUTION_LABELS_PDF.get(paciente.get("referral_institution", ""), paciente.get("referral_institution", ""))
+
+    # Fecha de nacimiento formateada
+    fnac = paciente.get("birth_date", "")
+    if fnac:
+        try:
+            fnac = datetime.fromisoformat(str(fnac)).strftime("%d/%m/%Y")
+        except Exception:
+            pass
+
+    contacto_emerg = ""
+    if paciente.get("emergency_contact_name") or paciente.get("emergency_phone"):
+        partes = []
+        if paciente.get("emergency_contact_name"):
+            rel = f" ({paciente.get('emergency_contact_relationship')})" if paciente.get("emergency_contact_relationship") else ""
+            partes.append(f"{paciente.get('emergency_contact_name')}{rel}")
+        if paciente.get("emergency_phone"):
+            partes.append(paciente.get("emergency_phone"))
+        contacto_emerg = " - ".join(partes)
+
+    # Construir pares (label, value) solo con datos presentes
+    pares = [
+        ('Paciente:', nombre),
+        ('Expediente:', expediente),
+        ('Edad:', edad_str),
+        ('Sexo:', sexo),
+        ('Fecha Nac.:', fnac),
+        ('DPI:', paciente.get("dpi")),
+        ('Teléfono:', paciente.get("phone")),
+        ('Email:', paciente.get("email")),
+        ('Profesión:', paciente.get("profession")),
+        ('Dirección:', paciente.get("address")),
+        ('Contacto Emerg.:', contacto_emerg),
+        ('Institución:', inst_label),
     ]
-    
-    t = Table(paciente_data, colWidths=[1.2*inch, 2.3*inch, 1.2*inch, 2.3*inch])
-    t.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.grey),
-        ('TEXTCOLOR', (2, 0), (2, -1), colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(t)
+    if paciente.get("referral_institution") == "seguro_privado":
+        pares.append(('Seguro:', paciente.get("insurance_name")))
+    if paciente.get("referral_institution") == "otra":
+        pares.append(('Otra Institución:', paciente.get("other_institution_name")))
+    if paciente.get("referral_institution") == "igss":
+        pares.extend([
+            ('IGSS Unidad:', igss_unit_name),
+            ('IGSS Afiliación:', paciente.get("igss_afiliacion")),
+            ('IGSS No. SPS:', paciente.get("igss_no_sps")),
+            ('IGSS Código:', paciente.get("igss_codigo")),
+            ('IGSS Tipo Compra:', paciente.get("igss_tipo_compra")),
+            ('IGSS NOG:', paciente.get("igss_nog")),
+            ('IGSS Tipo Paciente:', paciente.get("igss_tipo_paciente")),
+        ])
+    pares.extend([
+        ('Fecha Evaluación:', fecha_eval),
+        ('Médico:', evaluacion.get("medico_nombre")),
+    ])
+
+    # Filtrar vacíos y armar filas de 2 pares (4 columnas), con celdas Paragraph para que el texto se ajuste
+    pares = [(l, str(v)) for l, v in pares if v not in (None, "", "N/A años") and str(v).strip() not in ("", "None")]
+    import html as _html
+    paciente_data = []
+    for i in range(0, len(pares), 2):
+        p1 = pares[i]
+        fila = [Paragraph(p1[0], styles['CellLabel']), Paragraph(_html.escape(p1[1]), styles['CellValue'])]
+        if i + 1 < len(pares):
+            p2 = pares[i + 1]
+            fila += [Paragraph(p2[0], styles['CellLabel']), Paragraph(_html.escape(p2[1]), styles['CellValue'])]
+        else:
+            fila += ['', '']
+        paciente_data.append(fila)
+
+    if paciente_data:
+        t = Table(paciente_data, colWidths=[1.3*inch, 2.2*inch, 1.3*inch, 2.2*inch])
+        t.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(t)
     elements.append(Spacer(1, 10))
     
     # ===== MOTIVO DE CONSULTA =====
@@ -612,23 +717,6 @@ async def get_evaluacion_pdf(
         if anteojos.get("uso"): extras.append(f"Uso: {anteojos.get('uso')}")
         if extras:
             elements.append(Paragraph(" | ".join(extras), styles['SmallText']))
-    
-    # ===== PIE DE PÁGINA =====
-    elements.append(Spacer(1, 20))
-    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey))
-    elements.append(Spacer(1, 10))
-    
-    sellado_text = "🔒 Expediente Sellado" if evaluacion.get("sellado") else "📝 Expediente Abierto"
-    fecha_creacion = evaluacion.get("fecha_creacion", "")
-    if fecha_creacion:
-        try:
-            fc = datetime.fromisoformat(fecha_creacion.replace("Z", "+00:00"))
-            fecha_creacion = fc.strftime("%d/%m/%Y %H:%M")
-        except Exception:
-            pass
-    
-    footer_text = f"{sellado_text} | Creado: {fecha_creacion} por {evaluacion.get('creado_por_nombre', 'N/A')}"
-    elements.append(Paragraph(footer_text, styles['SmallText']))
     
     # Generar PDF
     doc.build(elements)

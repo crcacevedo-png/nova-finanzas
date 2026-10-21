@@ -25,3 +25,10 @@
 
 ## Pendiente (de sesión previa, requiere despliegue a producción)
 - Fix de Agenda con `paciente_id` obsoletos (endpoint `POST /api/agenda/admin/relink-citas`) y backups automáticos: corregido en preview, pendiente desplegar a producción y ejecutar el relink de las citas obsoletas.
+
+## 2026-10-21 - PDF de Evaluación mejorado
+- Logo de la clínica incrustado en el encabezado del PDF (backend/assets/logo_nova.png).
+- Se agregan TODOS los datos del paciente del expediente (incluye DPI, teléfono, email, profesión, dirección, contacto de emergencia, institución y campos IGSS). Celdas con ajuste de texto (Paragraph) para evitar solapamientos.
+- Eliminado el pie de página administrativo (sellado/creado por).
+- Frontend: menú Imprimir ahora ofrece "Descargar PDF Completo" e "Imprimir PDF Completo" (abre el PDF y lanza el diálogo de impresión).
+- Verificado con curl + render visual (2 páginas, logo y datos correctos).
