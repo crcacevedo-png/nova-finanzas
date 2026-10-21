@@ -650,8 +650,8 @@ async def create_evaluacion(
     evaluacion: EvaluacionOftalmologicaCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Crear nueva evaluación (solo Admin y SuperAdmin)"""
-    if current_user["role"] not in ["superadmin", "admin", "usuario"]:
+    """Crear nueva evaluación (Admin, SuperAdmin, Usuario y Médico)"""
+    if current_user["role"] not in ["superadmin", "admin", "usuario", "medico"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para crear evaluaciones")
     
     # Obtener datos del paciente si existe
@@ -1147,13 +1147,17 @@ async def update_evaluacion(
     evaluacion: EvaluacionOftalmologicaUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Actualizar evaluación (solo Admin y SuperAdmin, solo si no está sellada)"""
-    if current_user["role"] not in ["superadmin", "admin", "usuario"]:
+    """Actualizar evaluación (Admin, SuperAdmin, Usuario y Médico; el médico solo las suyas; solo si no está sellada)"""
+    if current_user["role"] not in ["superadmin", "admin", "usuario", "medico"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para editar evaluaciones")
     
     existing = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # El médico solo puede editar las evaluaciones que él mismo creó
+    if current_user["role"] == "medico" and existing.get("creado_por") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Solo puede editar las evaluaciones que usted creó")
     
     # Verificar sellado
     debe_sellar, mensaje = verificar_sellado(existing)
@@ -1202,12 +1206,16 @@ async def autoguardar_evaluacion(
     current_user: dict = Depends(get_current_user)
 ):
     """Autoguardado parcial de evaluación (solo si no está sellada)"""
-    if current_user["role"] not in ["superadmin", "admin", "usuario"]:
+    if current_user["role"] not in ["superadmin", "admin", "usuario", "medico"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para editar evaluaciones")
     
     existing = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    
+    # El médico solo puede editar (autoguardar) las evaluaciones que él mismo creó
+    if current_user["role"] == "medico" and existing.get("creado_por") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Solo puede editar las evaluaciones que usted creó")
     
     # Verificar sellado
     debe_sellar, mensaje = verificar_sellado(existing)
@@ -1342,7 +1350,7 @@ async def update_historial_medico_paciente(
     Actualizar antecedentes y medicamentos del paciente.
     Estos datos persisten entre evaluaciones.
     """
-    if current_user["role"] not in ["superadmin", "admin", "usuario"]:
+    if current_user["role"] not in ["superadmin", "admin", "usuario", "medico"]:
         raise HTTPException(status_code=403, detail="No tiene permisos para actualizar historial médico")
     
     now = datetime.now(timezone.utc).isoformat()
@@ -1391,7 +1399,7 @@ async def agregar_medicamento_desde_receta(
     Agregar un medicamento de receta a los medicamentos actuales del paciente.
     Se llama automáticamente cuando se guarda una receta con medicamentos.
     """
-    if current_user["role"] not in ["superadmin", "admin", "usuario"]:
+    if current_user["role"] not in ["superadmin", "admin", "usuario", "medico"]:
         raise HTTPException(status_code=403, detail="No tiene permisos")
     
     now = datetime.now(timezone.utc).isoformat()
@@ -1450,7 +1458,7 @@ async def agregar_a_crm_cirugia(
     """
     Agregar paciente al CRM de cirugías desde una evaluación oftalmológica.
     """
-    if current_user["role"] not in ["superadmin", "admin", "usuario"]:
+    if current_user["role"] not in ["superadmin", "admin", "usuario", "medico"]:
         raise HTTPException(status_code=403, detail="No tiene permisos")
     
     # Obtener evaluación
