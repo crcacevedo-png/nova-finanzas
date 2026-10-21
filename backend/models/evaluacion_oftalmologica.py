@@ -217,13 +217,38 @@ class Recetas(BaseModel):
     lentes_contacto_lista: List[dict] = Field(default_factory=list)
 
 
-class MedicamentosProcedimientosIGSS(BaseModel):
-    """Listas de texto libre (EXCLUSIVO IGSS)."""
+class MedicamentoIGSS(BaseModel):
+    """Medicamento IGSS con su frecuencia de uso."""
     model_config = ConfigDict(extra="ignore")
-    medicamentos: List[str] = Field(default_factory=list)
+    nombre: str = ""
+    frecuencia: str = ""
+
+
+class MedicamentosProcedimientosIGSS(BaseModel):
+    """Listas (EXCLUSIVO IGSS). Medicamentos incluyen frecuencia de uso."""
+    model_config = ConfigDict(extra="ignore")
+    medicamentos: List[MedicamentoIGSS] = Field(default_factory=list)
     estudios_procedimientos: List[str] = Field(default_factory=list)
 
-    @field_validator("medicamentos", "estudios_procedimientos", mode="before")
+    @field_validator("medicamentos", mode="before")
+    @classmethod
+    def _norm_medicamentos(cls, v):
+        if not v:
+            return []
+        out = []
+        for item in v:
+            if isinstance(item, str):
+                nombre = item.strip()
+                if nombre:
+                    out.append({"nombre": nombre, "frecuencia": ""})
+            elif isinstance(item, dict):
+                nombre = str(item.get("nombre", "")).strip()
+                frecuencia = str(item.get("frecuencia", "")).strip()
+                if nombre:
+                    out.append({"nombre": nombre, "frecuencia": frecuencia})
+        return out
+
+    @field_validator("estudios_procedimientos", mode="before")
     @classmethod
     def _strip_empty(cls, v):
         if not v:

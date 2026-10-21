@@ -952,7 +952,15 @@ const EvaluacionOftalmologica = () => {
       examen: migratedExamen,
       lectura_examenes: evaluacion.lectura_examenes || '',
       recomendaciones: { ...evaluacionVacia.recomendaciones, ...evaluacion.recomendaciones },
-      igss_med_proc: { ...evaluacionVacia.igss_med_proc, ...evaluacion.igss_med_proc },
+      igss_med_proc: {
+        ...evaluacionVacia.igss_med_proc,
+        ...evaluacion.igss_med_proc,
+        medicamentos: (evaluacion.igss_med_proc?.medicamentos || []).map(m =>
+          typeof m === 'string'
+            ? { nombre: m, frecuencia: '' }
+            : { nombre: m?.nombre || '', frecuencia: m?.frecuencia || '' }
+        ),
+      },
       recetas: migratedRecetas
     });
     setSearchPaciente(evaluacion.paciente_nombre || '');
@@ -2384,7 +2392,7 @@ const EvaluacionOftalmologica = () => {
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                        onClick={() => addArrayItem('igss_med_proc.medicamentos', '')}
+                        onClick={() => addArrayItem('igss_med_proc.medicamentos', { nombre: '', frecuencia: '' })}
                         data-testid="igss-add-medicamento"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
@@ -2395,17 +2403,28 @@ const EvaluacionOftalmologica = () => {
                     <p className="text-xs text-gray-400 italic py-1">Sin medicamentos. Agrega el primero.</p>
                   ) : (
                     <div className="space-y-2">
-                      {(formData.igss_med_proc?.medicamentos || []).map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <div className="flex-1">
+                      {(formData.igss_med_proc?.medicamentos || []).map((item, idx) => {
+                        const nombre = typeof item === 'string' ? item : (item?.nombre || '');
+                        const frecuencia = typeof item === 'string' ? '' : (item?.frecuencia || '');
+                        return (
+                        <div key={idx} className="flex items-start gap-2">
+                          <div className="flex-1 space-y-1.5">
                             <Autocomplete
-                              value={item}
-                              onChange={(v) => updateNestedField(`igss_med_proc.medicamentos.${idx}`, v)}
+                              value={nombre}
+                              onChange={(v) => updateArrayItem('igss_med_proc.medicamentos', idx, 'nombre', v)}
                               disabled={isReadOnly}
                               placeholder="Escribe o busca el medicamento IGSS..."
                               fetchUrl="/catalogos/igss-medicamentos"
                               className="input-teal h-8 text-sm"
                               testId={`igss-medicamento-${idx}`}
+                            />
+                            <Input
+                              value={frecuencia}
+                              onChange={(e) => updateArrayItem('igss_med_proc.medicamentos', idx, 'frecuencia', e.target.value)}
+                              disabled={isReadOnly}
+                              placeholder="Frecuencia de uso (ej: 1 gota cada 8 horas)"
+                              className="input-teal h-8 text-sm"
+                              data-testid={`igss-medicamento-frecuencia-${idx}`}
                             />
                           </div>
                           {!isReadOnly && (
@@ -2421,7 +2440,8 @@ const EvaluacionOftalmologica = () => {
                             </Button>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -3268,13 +3288,20 @@ const EvaluacionOftalmologica = () => {
                 <h2 className="print-title text-sm font-bold mb-3 text-center uppercase tracking-wide" style={{ color: '#0F6E56' }}>
                   Medicamentos y Procedimientos (EXCLUSIVO IGSS)
                 </h2>
-                {(formData.igss_med_proc?.medicamentos || []).filter(m => (m || '').trim()).length > 0 && (
+                {(formData.igss_med_proc?.medicamentos || []).filter(m => (typeof m === 'string' ? m : m?.nombre || '').trim()).length > 0 && (
                   <div className="mb-3">
                     <h3 className="text-xs font-bold uppercase mb-1" style={{ color: '#0F6E56' }}>Medicamentos</h3>
                     <ol className="list-decimal list-inside text-xs space-y-0.5">
-                      {(formData.igss_med_proc?.medicamentos || []).filter(m => (m || '').trim()).map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
+                      {(formData.igss_med_proc?.medicamentos || []).filter(m => (typeof m === 'string' ? m : m?.nombre || '').trim()).map((item, idx) => {
+                        const nombre = typeof item === 'string' ? item : (item?.nombre || '');
+                        const frecuencia = typeof item === 'string' ? '' : (item?.frecuencia || '');
+                        return (
+                          <li key={idx}>
+                            {nombre}
+                            {frecuencia.trim() && <span className="text-gray-600"> — {frecuencia}</span>}
+                          </li>
+                        );
+                      })}
                     </ol>
                   </div>
                 )}
