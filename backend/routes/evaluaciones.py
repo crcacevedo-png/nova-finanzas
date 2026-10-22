@@ -437,8 +437,8 @@ async def get_evaluacion_pdf(
         Paragraph("Novavisión - Clínica Oftalmológica", styles['SubtitleCenter']),
     ]
     if _os.path.exists(LOGO_PATH):
-        logo = RLImage(LOGO_PATH, width=0.67*inch, height=0.9*inch)
-        header_table = Table([[logo, titulo_cell]], colWidths=[1.1*inch, 5.9*inch])
+        logo = RLImage(LOGO_PATH, width=1.0*inch, height=1.35*inch)
+        header_table = Table([[logo, titulo_cell]], colWidths=[1.5*inch, 5.5*inch])
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
@@ -473,7 +473,9 @@ async def get_evaluacion_pdf(
             return None
 
     gender_label = {"masculino": "Masculino", "femenino": "Femenino", "otro": "Otro"}
-    nombre = paciente.get("full_name") or f"{paciente.get('first_name','')} {paciente.get('last_name','')}".strip() or evaluacion.get("paciente_nombre", "N/A")
+    _apellidos = (paciente.get('last_name') or '').strip()
+    _nombres = (paciente.get('first_name') or '').strip()
+    nombre = f"{_apellidos} {_nombres}".strip() or paciente.get("full_name") or evaluacion.get("paciente_nombre", "N/A")
     expediente = paciente.get("record_number") or evaluacion.get("paciente_expediente", "N/A")
     edad_calc = _calc_edad(paciente.get("birth_date")) if paciente.get("birth_date") else evaluacion.get("paciente_edad")
     edad_str = f"{edad_calc} años" if edad_calc is not None else "N/A"
@@ -593,18 +595,19 @@ async def get_evaluacion_pdf(
         ['Presión Intraocular', examen.get("pio_od", "-"), examen.get("pio_os", examen.get("pio_oi", "-"))],
     ]
     
-    av_table = Table(av_data, colWidths=[2*inch, 2.2*inch, 2.2*inch])
+    av_table = Table(av_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch])
     av_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
         ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
     ]))
+    av_table.hAlign = 'LEFT'
     elements.append(av_table)
     elements.append(Spacer(1, 6))
     
@@ -724,6 +727,56 @@ async def get_evaluacion_pdf(
         if extras:
             elements.append(Paragraph(" | ".join(extras), styles['SmallText']))
     
+    # ===== MEDICAMENTOS Y ESTUDIOS / PROCEDIMIENTOS =====
+    igss_mp = evaluacion.get("igss_med_proc", {}) or {}
+    med_rows = []
+    for m in (igss_mp.get("medicamentos", []) or []):
+        if isinstance(m, str):
+            nom, frec = m.strip(), ""
+        else:
+            nom, frec = (m.get("nombre", "") or "").strip(), (m.get("frecuencia", "") or "").strip()
+        if nom:
+            med_rows.append((nom, frec))
+    est_rows = [str(e).strip() for e in (igss_mp.get("estudios_procedimientos", []) or []) if str(e).strip()]
+
+    if med_rows:
+        elements.append(Paragraph("MEDICAMENTOS", styles['SectionTitle']))
+        data = [['#', 'Medicamento', 'Frecuencia de uso']]
+        for i, (nom, frec) in enumerate(med_rows, 1):
+            data.append([str(i), Paragraph(_html.escape(nom), styles['CellValue']), Paragraph(_html.escape(frec or '-'), styles['CellValue'])])
+        med_tbl = Table(data, colWidths=[0.4*inch, 4.0*inch, 2.2*inch])
+        med_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+        ]))
+        elements.append(med_tbl)
+        elements.append(Spacer(1, 8))
+
+    if est_rows:
+        elements.append(Paragraph("ESTUDIOS / PROCEDIMIENTOS", styles['SectionTitle']))
+        data = [['#', 'Estudio / Procedimiento']]
+        for i, e in enumerate(est_rows, 1):
+            data.append([str(i), Paragraph(_html.escape(e), styles['CellValue'])])
+        est_tbl = Table(data, colWidths=[0.4*inch, 6.2*inch])
+        est_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+        ]))
+        elements.append(est_tbl)
+        elements.append(Spacer(1, 8))
+
     # ===== FIRMA Y SELLO DEL MÉDICO (al pie de la última página, misma hoja) =====
     medico_nombre = (medico.get("name") if medico else None) or evaluacion.get("medico_nombre", "") or ""
     colegiado = (medico.get("license_number") if medico else "") or ""
@@ -795,9 +848,8 @@ async def get_evaluacion_pdf(
                 ty -= 12
             self.setFont("Helvetica", 9)
             self.setFillColor(colors.grey)
-            if sig_info["especialidad"]:
-                self.drawCentredString(cx, ty, sig_info["especialidad"])
-                ty -= 11
+            self.drawCentredString(cx, ty, "Oftalmólogo")
+            ty -= 11
             if sig_info["colegiado"]:
                 self.drawCentredString(cx, ty, f"Colegiado No. {sig_info['colegiado']}")
             self.setFillColor(colors.black)

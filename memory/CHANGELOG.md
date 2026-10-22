@@ -78,3 +78,11 @@
 - Frontend: Login (footer + alt logo), Layout (alt logo), impresión de Evaluación Oftalmológica (título y pie), recibo POS.
 - Backend (títulos de documentos/PDF/Excel): Lista de Pacientes, Reporte de Cirugías, encabezado de Evaluación, Reporte Financiero (PDF y Excel), nombre por defecto en recibos de ventas, resumen y descripción de eventos de Google Calendar, nombre sembrado del usuario genérico.
 - NO modificado: el valor de institución de negocio "Novavision" (v minúscula) usado en comparaciones/BD de cirugías y sala de operaciones, para no romper la lógica ni los datos existentes.
+
+## 2026-06 — Ajustes PDF informe médico (evaluación)
+- Nombre del paciente: ahora apellidos primero, luego nombres (last_name + first_name).
+- Sello/firma del médico: ya no muestra la especialidad; muestra nombre + "Oftalmólogo" + "Colegiado No.".
+- Agregados cuadros (tablas) de MEDICAMENTOS (con columna Frecuencia de uso) y ESTUDIOS / PROCEDIMIENTOS, tomados de igss_med_proc.
+- Tabla de agudeza visual reducida (columnas más angostas, fuente 8, padding 2, alineada a la izquierda).
+- Logo del encabezado aumentado 1.5x (de 0.67x0.9 a 1.0x1.35 in).
+- Verificado renderizando PDF real de 2 páginas.
