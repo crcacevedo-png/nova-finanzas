@@ -86,3 +86,9 @@
 - Tabla de agudeza visual reducida (columnas más angostas, fuente 8, padding 2, alineada a la izquierda).
 - Logo del encabezado aumentado 1.5x (de 0.67x0.9 a 1.0x1.35 in).
 - Verificado renderizando PDF real de 2 páginas.
+
+## 2026-06 — PDF informe médico: encabezado, medicamentos y datos del paciente
+- Encabezado: menos margen superior (topMargin 50→24) y menos espacio antes de la línea divisoria (spacer 10→2); sin padding extra en la tabla de encabezado.
+- Medicamentos: ya no se muestran en cuadros/tabla; ahora es una lista compacta numerada "N. Medicamento — Frecuencia" para optimizar espacio. (Estudios/Procedimientos se mantienen en tabla).
+- Datos del paciente en el PDF: se ocultan Teléfono, Dirección, Profesión, Institución/Otra Institución, IGSS Tipo Compra, IGSS Tipo Paciente e IGSS NOG. Los datos NO se eliminan del expediente, solo no aparecen en el PDF. Se conservan Paciente, Expediente, Edad, Sexo, Fecha Nac., DPI, Email, IGSS Unidad/Afiliación/SPS/Código, Fecha Evaluación y Médico.
+- Verificado renderizando PDF real (2 páginas).

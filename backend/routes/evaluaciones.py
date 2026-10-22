@@ -416,7 +416,7 @@ async def get_evaluacion_pdf(
     
     # Crear PDF en memoria
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=160)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=24, bottomMargin=160)
     
     # Estilos
     styles = getSampleStyleSheet()
@@ -444,15 +444,17 @@ async def get_evaluacion_pdf(
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
             ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]))
         elements.append(header_table)
     else:
         elements.extend(titulo_cell)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 2))
     
     # Línea divisoria
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#0F6E56')))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
     
     # ===== DATOS DEL PACIENTE =====
     fecha_eval = evaluacion.get("fecha", "")
@@ -498,25 +500,14 @@ async def get_evaluacion_pdf(
         ('Sexo:', sexo),
         ('Fecha Nac.:', fnac),
         ('DPI:', paciente.get("dpi")),
-        ('Teléfono:', paciente.get("phone")),
         ('Email:', paciente.get("email")),
-        ('Profesión:', paciente.get("profession")),
-        ('Dirección:', paciente.get("address")),
-        ('Institución:', inst_label),
     ]
-    if paciente.get("referral_institution") == "seguro_privado":
-        pares.append(('Seguro:', paciente.get("insurance_name")))
-    if paciente.get("referral_institution") == "otra":
-        pares.append(('Otra Institución:', paciente.get("other_institution_name")))
     if paciente.get("referral_institution") == "igss":
         pares.extend([
             ('IGSS Unidad:', igss_unit_name),
             ('IGSS Afiliación:', paciente.get("igss_afiliacion")),
             ('IGSS No. SPS:', paciente.get("igss_no_sps")),
             ('IGSS Código:', paciente.get("igss_codigo")),
-            ('IGSS Tipo Compra:', paciente.get("igss_tipo_compra")),
-            ('IGSS NOG:', paciente.get("igss_nog")),
-            ('IGSS Tipo Paciente:', paciente.get("igss_tipo_paciente")),
         ])
     pares.extend([
         ('Fecha Evaluación:', fecha_eval),
@@ -741,21 +732,12 @@ async def get_evaluacion_pdf(
 
     if med_rows:
         elements.append(Paragraph("MEDICAMENTOS", styles['SectionTitle']))
-        data = [['#', 'Medicamento', 'Frecuencia de uso']]
+        med_style = ParagraphStyle('MedItem', parent=styles['Normal'], fontSize=9, leading=12, leftIndent=10)
         for i, (nom, frec) in enumerate(med_rows, 1):
-            data.append([str(i), Paragraph(_html.escape(nom), styles['CellValue']), Paragraph(_html.escape(frec or '-'), styles['CellValue'])])
-        med_tbl = Table(data, colWidths=[0.4*inch, 4.0*inch, 2.2*inch])
-        med_tbl.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-        ]))
-        elements.append(med_tbl)
+            txt = f"<b>{i}.</b> {_html.escape(nom)}"
+            if frec:
+                txt += f" <font color='#555555'>— {_html.escape(frec)}</font>"
+            elements.append(Paragraph(txt, med_style))
         elements.append(Spacer(1, 8))
 
     if est_rows:
