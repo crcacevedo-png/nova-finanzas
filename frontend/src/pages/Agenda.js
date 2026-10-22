@@ -583,6 +583,22 @@ const Agenda = () => {
     setLoading(false);
   }, [fetchMedicos, fetchPreferenciasMedicos, fetchCitas, fetchContadores, fetchPresentes, fetchConfig, fetchMiAgenda, fetchMiSemana, miAgendaVista, activeTab]);
   
+  const [reconciliando, setReconciliando] = useState(false);
+  const handleReconciliarAtendidos = async () => {
+    setReconciliando(true);
+    try {
+      const resp = await agendaApi.reconciliarAtendidos();
+      const n = resp?.data?.citas_reconciliadas ?? 0;
+      toast.success(`Reconciliación lista: ${n} paciente(s) marcados como Atendidos`);
+      await Promise.all([fetchContadores(), fetchPresentes(), fetchCitas()]);
+    } catch (e) {
+      toast.error('No se pudo reconciliar los atendidos');
+    } finally {
+      setReconciliando(false);
+    }
+  };
+
+  
   // Recargar semana del médico al cambiar de fecha o entrar a vista semana
   useEffect(() => {
     if (activeTab === 'mi-agenda' && miAgendaVista === 'semana') {
@@ -1712,7 +1728,22 @@ const Agenda = () => {
           <TabsContent value="tablero" className="mt-4">
             {/* Contadores */}
             {contadores && (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+              <>
+                {['superadmin', 'admin'].includes(user?.role) && (
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleReconciliarAtendidos}
+                      disabled={reconciliando}
+                      data-testid="reconciliar-atendidos-btn"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      {reconciliando ? 'Reconciliando…' : 'Reconciliar atendidos'}
+                    </Button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
                 <Card className="bg-slate-50">
                   <CardContent className="p-3 text-center">
                     <div className="text-2xl font-bold text-slate-700">{contadores.total_agendados}</div>
@@ -1756,6 +1787,7 @@ const Agenda = () => {
                   </CardContent>
                 </Card>
               </div>
+              </>
             )}
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

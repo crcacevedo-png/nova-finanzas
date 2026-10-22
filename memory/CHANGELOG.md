@@ -101,3 +101,9 @@
   - Nuevo helper `sincronizar_proxima_cita` que crea/actualiza la cita en la agenda de forma idempotente; se invoca en crear (POST), actualizar (PUT) y autoguardar (PATCH). No agenda fechas pasadas, evita duplicados y actualiza la cita si cambian fecha/hora/médico.
 - Fix frontend (`EvaluacionOftalmologica.js`): se eliminó la creación de cita desde el cliente (ahora la agenda el backend), evitando duplicados.
 - Verificado e2e en preview: autoguardado persiste la próxima cita y la agenda en el calendario del médico (estado Agendada); idempotente (2 autoguardados → 1 sola cita).
+
+## 2026-06 — FIX: contador "Atendidos" (pacientes se quedaban en "En consulta")
+- Causa: los pacientes se atendían (evaluación hecha) pero su cita nunca pasaba a "Atendida"; quedaban en "En consulta", por lo que "Atendidos" mostraba 0.
+- Fix backend (`routes/evaluaciones.py`): nuevo helper `marcar_cita_atendida_por_evaluacion`; al crear (POST) o actualizar (PUT) una evaluación, la cita del día del paciente (Presente/En consulta) pasa automáticamente a "Atendida" (asistio=True, hora_fin_consulta). NO se dispara en autoguardado-PATCH, pero sí en el POST de creación automática (que es como el autoguardado crea una evaluación nueva con contenido clínico).
+- Reconciliación histórica: nuevo endpoint `POST /api/agenda/reconciliar-atendidos` (admin/superadmin) que marca "Atendida" las citas atascadas en Presente/En consulta que ya tienen evaluación ese día (coincidencia de fecha tolerante a formatos legacy). Botón "Reconciliar atendidos" agregado en el Tablero del Día (`Agenda.js`) para ejecutarlo una vez en producción.
+- Verificado e2e: guardar evaluación marca la cita como Atendida; el endpoint de reconciliación responde 200 y respeta las citas sin evaluación.

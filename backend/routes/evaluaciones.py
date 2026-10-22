@@ -891,6 +891,11 @@ async def create_evaluacion(
         evaluacion_dict.get("paciente_id"), evaluacion_dict.get("paciente_nombre", ""), current_user
     )
     
+    # Marcar al paciente como Atendido en la agenda del día de la evaluación
+    await marcar_cita_atendida_por_evaluacion(
+        evaluacion_dict.get("paciente_id"), evaluacion_dict.get("fecha"), current_user
+    )
+    
     # Procesar catálogos
     await procesar_catalogos_evaluacion(evaluacion_dict)
     
@@ -983,6 +988,36 @@ async def sincronizar_proxima_cita(evaluacion_id: str, proxima_cita: dict, pacie
         return nuevo_cita_id
     except Exception:
         return None
+
+
+async def marcar_cita_atendida_por_evaluacion(paciente_id: str, fecha: str, current_user: dict):
+    """Marca como 'Atendida' la cita del día del paciente (si está Presente/En consulta)
+    cuando el médico guarda/completa su evaluación. No bloquea el guardado."""
+    try:
+        if not paciente_id:
+            return
+        fecha = (fecha or "")[:10]
+        if len(fecha) != 10:
+            fecha = today_str_gt()
+        now = datetime.now(timezone.utc).isoformat()
+        await db.citas.update_many(
+            {
+                "tipo_agenda": "pacientes",
+                "paciente_id": paciente_id,
+                "fecha": fecha,
+                "estado": {"$in": ["Presente", "En consulta"]},
+            },
+            {"$set": {
+                "estado": "Atendida",
+                "asistio": True,
+                "hora_fin_consulta": now,
+                "actualizado_por": current_user["id"],
+                "fecha_actualizacion": now,
+            }},
+        )
+    except Exception:
+        pass
+
 
 
 
@@ -1478,6 +1513,11 @@ async def update_evaluacion(
     await sincronizar_proxima_cita(
         evaluacion_id, merged_data.get("proxima_cita"),
         merged_data.get("paciente_id"), merged_data.get("paciente_nombre", ""), current_user
+    )
+    
+    # Marcar al paciente como Atendido en la agenda del día de la evaluación
+    await marcar_cita_atendida_por_evaluacion(
+        merged_data.get("paciente_id"), merged_data.get("fecha"), current_user
     )
     
     updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})

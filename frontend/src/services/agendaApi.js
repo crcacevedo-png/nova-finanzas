@@ -65,6 +65,9 @@ export const agendaApi = {
     return axios.get(`${API_URL}/api/agenda/contadores${params}`, getAuthHeaders());
   },
   
+  // Reconciliar pacientes atendidos (histórico) — marca Atendida las citas con evaluación
+  reconciliarAtendidos: () => axios.post(`${API_URL}/api/agenda/reconciliar-atendidos`, {}, getAuthHeaders()),
+  
   // Mi día (médico)
   getMiDia: (fecha) => axios.get(`${API_URL}/api/agenda/mi-dia${fecha ? `?fecha=${fecha}` : ''}`, getAuthHeaders()),
   getMiSemana: (desde, hasta) => axios.get(`${API_URL}/api/agenda/mi-semana?desde=${desde}&hasta=${hasta}`, getAuthHeaders()),

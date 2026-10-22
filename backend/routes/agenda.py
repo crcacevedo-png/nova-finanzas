@@ -784,6 +784,49 @@ async def obtener_contadores(
     )
 
 
+@router.post("/reconciliar-atendidos")
+async def reconciliar_atendidos(
+    current_user: dict = Depends(require_role(["superadmin", "admin"]))
+):
+    """Reconcilia citas atascadas en 'Presente'/'En consulta' que YA tienen una evaluación
+    hecha ese mismo día, marcándolas como 'Atendida'. Idempotente."""
+    citas = await db.citas.find({
+        "tipo_agenda": "pacientes",
+        "estado": {"$in": [EstadoCita.PRESENTE.value, EstadoCita.EN_CONSULTA.value]}
+    }, {"_id": 0, "id": 1, "paciente_id": 1, "fecha": 1}).to_list(10000)
+
+    actualizadas = 0
+    now = datetime.now(timezone.utc).isoformat()
+    for cita in citas:
+        pid = cita.get("paciente_id")
+        fecha = cita.get("fecha")
+        if not pid or not fecha:
+            continue
+        tiene_eval = await db.evaluaciones_oftalmologicas.find_one(
+            {
+                "paciente_id": pid,
+                "$or": [
+                    {"fecha": fecha},
+                    {"fecha": {"$regex": f"^{fecha}"}},
+                    {"fecha_creacion": {"$regex": f"^{fecha}"}},
+                ],
+            },
+            {"_id": 1}
+        )
+        if not tiene_eval:
+            continue
+        res = await db.citas.update_one(
+            {"id": cita["id"]},
+            {"$set": {
+                "estado": "Atendida", "asistio": True, "hora_fin_consulta": now,
+                "actualizado_por": current_user["id"], "fecha_actualizacion": now
+            }}
+        )
+        actualizadas += res.modified_count
+
+    return {"citas_reconciliadas": actualizadas, "citas_revisadas": len(citas)}
+
+
 # ==================== MI AGENDA (MÉDICO) ====================
 
 @router.get("/mi-dia", response_model=MiAgendaResponse)
