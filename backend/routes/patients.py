@@ -913,7 +913,7 @@ async def export_patients_pdf(
         
         title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=16,
                                      alignment=TA_CENTER, spaceAfter=20, textColor=colors.HexColor('#0F6E56'))
-        elements.append(Paragraph("NovaVision - Lista de Pacientes", title_style))
+        elements.append(Paragraph("Novavisión - Lista de Pacientes", title_style))
         elements.append(Paragraph(f"Generado: {now_gt().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
         elements.append(Spacer(1, 0.3*inch))
         

@@ -847,7 +847,7 @@ const PuntoVenta = () => {
         <body>
           <div class="ticket">
             <div class="header">
-              <div class="logo-text">NOVAVISION</div>
+              <div class="logo-text">NOVAVISIÓN</div>
               <div class="empresa-info">Clínica Oftalmológica</div>
               ${ticket.empresa.direccion ? `<div class="empresa-info">${ticket.empresa.direccion}</div>` : ''}
               ${ticket.empresa.nit ? `<div class="empresa-info">NIT: ${ticket.empresa.nit}</div>` : ''}

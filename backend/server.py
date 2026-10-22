@@ -968,7 +968,7 @@ async def seed_default_users():
     default_users = [
         {"username": "superadmin", "name": "Administrador General", "password": "Nova$2024Secure!", "role": "superadmin"},
         {"username": "admin", "name": "Administrador", "password": "Admin$2024Secure!", "role": "admin"},
-        {"username": "usuario", "name": "Usuario NovaVision", "password": "User$2024Secure!", "role": "usuario"}
+        {"username": "usuario", "name": "Usuario Novavisión", "password": "User$2024Secure!", "role": "usuario"}
     ]
     
     for user_data in default_users:

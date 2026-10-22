@@ -434,7 +434,7 @@ async def get_evaluacion_pdf(
     # ===== ENCABEZADO CON LOGO =====
     titulo_cell = [
         Paragraph("EVALUACIÓN OFTALMOLÓGICA", styles['TitleCenter']),
-        Paragraph("NovaVision - Clínica Oftalmológica", styles['SubtitleCenter']),
+        Paragraph("Novavisión - Clínica Oftalmológica", styles['SubtitleCenter']),
     ]
     if _os.path.exists(LOGO_PATH):
         logo = RLImage(LOGO_PATH, width=0.67*inch, height=0.9*inch)

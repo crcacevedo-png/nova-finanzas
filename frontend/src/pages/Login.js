@@ -98,7 +98,7 @@ const Login = () => {
         <div className="flex justify-center mb-8">
           <img 
             src={LOGO_URL}
-            alt="NovaVision"
+            alt="Novavisión"
             className="w-60 h-auto"
             data-testid="login-logo"
           />
@@ -197,7 +197,7 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-center text-[11px] text-[#94B0A8] mt-8">
-          © 2026 Novavision
+          © 2026 Novavisión
         </p>
       </div>
     </div>

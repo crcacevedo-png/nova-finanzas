@@ -1011,7 +1011,7 @@ async def obtener_ticket_venta(
     
     ticket_data = {
         "empresa": {
-            "nombre": empresa_config.get("nombre", "NovaVision - Clínica Oftalmológica"),
+            "nombre": empresa_config.get("nombre", "Novavisión - Clínica Oftalmológica"),
             "direccion": empresa_config.get("direccion", ""),
             "nit": empresa_config.get("nit", ""),
             "telefono": empresa_config.get("telefono", "")

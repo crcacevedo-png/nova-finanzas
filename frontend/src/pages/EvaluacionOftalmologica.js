@@ -3275,7 +3275,7 @@ const EvaluacionOftalmologica = () => {
                   className="h-12"
                 />
                 <div>
-                  <h1 className="print-title text-sm font-bold" style={{ color: '#0F6E56' }}>NovaVision</h1>
+                  <h1 className="print-title text-sm font-bold" style={{ color: '#0F6E56' }}>Novavisión</h1>
                   <p className="text-xs text-gray-500">Clínica Oftalmológica | Tel: (502) 2222-3333</p>
                 </div>
               </div>
@@ -3497,7 +3497,7 @@ const EvaluacionOftalmologica = () => {
             <div className="mt-4 pt-3 border-t" style={{ borderColor: '#0F6E56' }}>
               <div className="text-xs text-gray-600 text-center">
                 <p>Fecha de emisión: {new Date().toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' })}</p>
-                <p className="text-gray-400 mt-1">NovaVision © {new Date().getFullYear()}</p>
+                <p className="text-gray-400 mt-1">Novavisión © {new Date().getFullYear()}</p>
               </div>
             </div>
             

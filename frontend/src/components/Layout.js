@@ -255,7 +255,7 @@ const Layout = ({ children }) => {
           <Link to="/dashboard">
             <img 
               src={LOGO_URL}
-              alt="NovaVision"
+              alt="Novavisión"
               className="w-44 h-auto"
               data-testid="sidebar-logo"
             />
@@ -507,7 +507,7 @@ const Layout = ({ children }) => {
           <div className="flex-1 flex justify-center">
             <img 
               src={LOGO_URL}
-              alt="NovaVision"
+              alt="Novavisión"
               className="h-10 w-auto"
             />
           </div>

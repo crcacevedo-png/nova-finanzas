@@ -257,7 +257,7 @@ async def exportar_dashboard_financiero(
         currency_format = '"Q"#,##0.00'
         row = 1
         
-        ws.cell(row=row, column=1, value="REPORTE FINANCIERO - NOVAVISION").font = Font(bold=True, size=16)
+        ws.cell(row=row, column=1, value="REPORTE FINANCIERO - NOVAVISIÓN").font = Font(bold=True, size=16)
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=4)
         row += 1
         ws.cell(row=row, column=1, value=f"Período: {datos['periodo']['nombre']}")
@@ -331,7 +331,7 @@ async def exportar_dashboard_financiero(
         styles = getSampleStyleSheet()
         
         title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=1, spaceAfter=20)
-        elements.append(Paragraph("REPORTE FINANCIERO - NOVAVISION", title_style))
+        elements.append(Paragraph("REPORTE FINANCIERO - NOVAVISIÓN", title_style))
         elements.append(Paragraph(f"Período: {datos['periodo']['nombre']}", styles['Normal']))
         elements.append(Spacer(1, 20))
         

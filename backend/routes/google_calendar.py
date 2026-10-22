@@ -29,7 +29,7 @@ SCOPES = "https://www.googleapis.com/auth/calendar"
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 TZ_NAME = "America/Guatemala"
 TZ = ZoneInfo(TZ_NAME)
-CAL_SUMMARY = "NovaVision - Citas"
+CAL_SUMMARY = "Novavisión - Citas"
 
 
 # ==================== HELPERS OAUTH (bloqueantes -> usar en to_thread) ====================
@@ -133,7 +133,7 @@ def _event_body(cita: dict) -> dict:
     return {
         "summary": summary,
         "description": (
-            f"Cita NovaVision\n"
+            f"Cita Novavisión\n"
             f"Tipo: {cita.get('tipo_cita', '')}\n"
             f"Estado: {cita.get('estado', '')}\n"
             f"Notas: {cita.get('notas', '') or ''}"

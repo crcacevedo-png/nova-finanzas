@@ -707,7 +707,7 @@ async def export_surgeries(
                 textColor=colors.grey
             )
             
-            elements.append(Paragraph("NovaVision — Reporte de Cirugías", title_style))
+            elements.append(Paragraph("Novavisión — Reporte de Cirugías", title_style))
             
             generated_at = now_gt().strftime("%d/%m/%Y %H:%M")
             filters_text = []
