@@ -2635,20 +2635,6 @@ const EvaluacionOftalmologica = () => {
               </div>
             </CollapsibleSection>
 
-            {/* Recomendaciones Generales */}
-            <CollapsibleSection title="Recomendaciones" icon={FileText}>
-              <div>
-                <Label className="text-xs">Recomendaciones Generales</Label>
-                <Textarea
-                  value={formData.recomendaciones.recomendaciones_generales}
-                  onChange={(e) => updateNestedField('recomendaciones.recomendaciones_generales', e.target.value)}
-                  disabled={isReadOnly}
-                  placeholder="Indicaciones generales para el paciente..."
-                  className="input-teal min-h-[60px] text-sm"
-                />
-              </div>
-            </CollapsibleSection>
-
             {/* Próxima Cita */}
             <CollapsibleSection title="Próxima Cita" icon={Calendar}>
               <div className="space-y-3">
