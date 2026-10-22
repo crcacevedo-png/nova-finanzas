@@ -88,6 +88,11 @@ class ExamenOftalmologico(BaseModel):
     avcc_od: str = ""  # Con corrección OD
     avcc_os: str = ""  # Con corrección OS
     
+    # Lensometría / Autorefractómetro (identificador solo visual en pantalla)
+    tipo_lensometria: str = "Lensometria"  # "Lensometria" | "Autorefractometro"
+    lensometria_od: Optional[RefraccionOjo] = None
+    lensometria_os: Optional[RefraccionOjo] = None
+    
     # Refracción
     refraccion_od: RefraccionOjo = Field(default_factory=RefraccionOjo)
     refraccion_os: RefraccionOjo = Field(default_factory=RefraccionOjo)

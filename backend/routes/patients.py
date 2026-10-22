@@ -45,6 +45,7 @@ class PatientBase(BaseModel):
     igss_tipo_paciente: Optional[str] = ""
     address: Optional[str] = ""
     comments: Optional[str] = ""
+    nota_clinica: Optional[str] = ""
 
 
 class PatientCreate(PatientBase):
@@ -75,6 +76,7 @@ class PatientUpdate(BaseModel):
     igss_tipo_paciente: Optional[str] = None
     address: Optional[str] = None
     comments: Optional[str] = None
+    nota_clinica: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -109,6 +111,7 @@ class PatientResponse(BaseModel):
     igss_tipo_paciente: Optional[str] = ""
     address: Optional[str] = ""
     comments: Optional[str] = ""
+    nota_clinica: Optional[str] = ""
     is_active: bool = True
     created_by: Optional[str] = ""
     created_by_name: Optional[str] = ""
@@ -497,7 +500,33 @@ async def get_patient(patient_id: str, current_user: dict = Depends(require_perm
     return PatientResponse(**enriched)
 
 
-@router.post("", response_model=PatientResponse)
+class NotaClinicaRequest(BaseModel):
+    nota_clinica: str = ""
+
+
+@router.patch("/{patient_id}/nota-clinica", response_model=PatientResponse)
+async def update_patient_nota_clinica(
+    patient_id: str,
+    data: NotaClinicaRequest,
+    current_user: dict = Depends(require_permission("view_patients"))
+):
+    """Actualizar la nota clínica (nota de trabajo) de un paciente. Persiste entre consultas."""
+    patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.patients.update_one(
+        {"id": patient_id},
+        {"$set": {
+            "nota_clinica": data.nota_clinica or "",
+            "updated_by": current_user["id"],
+            "updated_by_name": current_user.get("name", current_user.get("username", "")),
+            "updated_at": now,
+        }}
+    )
+    updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    enriched = await enrich_patient(updated)
+    return PatientResponse(**enriched)
 async def create_patient(patient_data: PatientCreate, current_user: dict = Depends(require_permission("create_patients"))):
     """Crear nuevo paciente"""
     if not validate_phone(patient_data.phone):

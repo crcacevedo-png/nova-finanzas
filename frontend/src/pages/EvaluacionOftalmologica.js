@@ -6,7 +6,8 @@ import {
   Eye, Save, Plus, Trash2, RefreshCw, Search, Printer, 
   ChevronDown, ChevronUp, Lock, Clock, Calendar,
   User, FileText, Stethoscope, Pill, Activity, ClipboardList,
-  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud, FileDown, AlertTriangle
+  Glasses, Contact, CheckCircle, Wifi, WifiOff, CloudOff, Cloud, FileDown, AlertTriangle,
+  Copy, StickyNote
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -329,6 +330,7 @@ const EvaluacionOftalmologica = () => {
     examen: {
       avsc_od: '', avsc_os: '',
       avcc_od: '', avcc_os: '',
+      tipo_lensometria: 'Lensometria',
       lensometria_od: { esfera: '', cilindro: '', eje: '' },
       lensometria_os: { esfera: '', cilindro: '', eje: '' },
       refraccion_od: { esfera: '', cilindro: '', eje: '', adicion: '' },
@@ -414,6 +416,72 @@ const EvaluacionOftalmologica = () => {
   });
 
   const [formData, setFormData] = useState(evaluacionVacia);
+
+  // Nota clínica por paciente (persiste entre consultas)
+  const [notaPaciente, setNotaPaciente] = useState('');
+  const [guardandoNota, setGuardandoNota] = useState(false);
+
+  const cargarNotaPaciente = useCallback(async (pid) => {
+    if (!pid) { setNotaPaciente(''); return; }
+    try {
+      const token = localStorage.getItem('token');
+      const { data } = await axios.get(`${API_URL}/patients/${pid}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotaPaciente(data.nota_clinica || '');
+    } catch (e) {
+      // silencioso
+    }
+  }, []);
+
+  const guardarNotaPaciente = async () => {
+    const pid = pacienteIdRef.current || formData.paciente_id;
+    if (!pid) return;
+    try {
+      setGuardandoNota(true);
+      const token = localStorage.getItem('token');
+      await axios.patch(
+        `${API_URL}/patients/${pid}/nota-clinica`,
+        { nota_clinica: notaPaciente },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (e) {
+      toast.error('No se pudo guardar la nota del paciente');
+    } finally {
+      setGuardandoNota(false);
+    }
+  };
+
+  // Copiar refracción a la primera receta de anteojos (crea si no existe, sobrescribe si ya tiene)
+  const copiarRefraccionAReceta = () => {
+    if (isReadOnly) return;
+    const ex = formData.examen;
+    const od = {
+      esfera: ex.refraccion_od?.esfera || '', cilindro: ex.refraccion_od?.cilindro || '',
+      eje: ex.refraccion_od?.eje || '', adicion: ex.refraccion_od?.adicion || ''
+    };
+    const os = {
+      esfera: ex.refraccion_os?.esfera || '', cilindro: ex.refraccion_os?.cilindro || '',
+      eje: ex.refraccion_os?.eje || '', adicion: ex.refraccion_os?.adicion || ''
+    };
+    setFormData(prev => {
+      const lista = [...(prev.recetas.anteojos_lista || [])];
+      if (lista.length === 0) {
+        const nueva = nuevaRecetaAnteojos();
+        nueva.od = { ...nueva.od, ...od };
+        nueva.os = { ...nueva.os, ...os };
+        lista.push(nueva);
+      } else {
+        lista[0] = {
+          ...lista[0],
+          od: { ...lista[0].od, ...od },
+          os: { ...lista[0].os, ...os }
+        };
+      }
+      return { ...prev, recetas: { ...prev.recetas, anteojos_lista: lista } };
+    });
+    toast.success('Refracción copiada a la primera receta de anteojos');
+  };
 
   // Fetch del historial: SOLO evaluaciones del paciente actual, ordenadas por fecha clínica
   const fetchEvaluaciones = useCallback(async (pacienteIdArg = null) => {
@@ -892,6 +960,7 @@ const EvaluacionOftalmologica = () => {
       avsc_os: examenData.avsc_os || examenData.avsc_oi || '',
       avcc_od: examenData.avcc_od || '',
       avcc_os: examenData.avcc_os || examenData.avcc_oi || '',
+      tipo_lensometria: examenData.tipo_lensometria || 'Lensometria',
       lensometria_od: { ...evaluacionVacia.examen.lensometria_od, ...examenData.lensometria_od },
       lensometria_os: { ...evaluacionVacia.examen.lensometria_os, ...(examenData.lensometria_os || examenData.lensometria_oi) },
       refraccion_od: { ...evaluacionVacia.examen.refraccion_od, ...examenData.refraccion_od },
@@ -965,6 +1034,7 @@ const EvaluacionOftalmologica = () => {
     });
     setSearchPaciente(evaluacion.paciente_nombre || '');
     setAutoguardadoStatus('');
+    cargarNotaPaciente(evaluacion.paciente_id);
   };
 
   // Regresar a la evaluación del día (en curso) tras haber abierto una del historial
@@ -987,6 +1057,7 @@ const EvaluacionOftalmologica = () => {
     setFormData(evaluacionVacia);
     setSearchPaciente('');
     setAutoguardadoStatus('');
+    setNotaPaciente('');
     setTiempoRestante(null);
     // Limpiar el historial (no hay paciente seleccionado)
     pacienteIdRef.current = null;
@@ -1152,6 +1223,7 @@ const EvaluacionOftalmologica = () => {
     borradorRef.current = null;
     setViendoHistorial(false);
     fetchEvaluaciones(paciente.id);
+    cargarNotaPaciente(paciente.id);
     
     // Cargar historial médico del paciente (antecedentes y medicamentos)
     try {
@@ -2018,6 +2090,31 @@ const EvaluacionOftalmologica = () => {
                 </div>
               </div>
             </CollapsibleSection>
+
+            {/* Notas del Paciente (persiste entre consultas) */}
+            <CollapsibleSection title="Notas del Paciente" icon={StickyNote} defaultOpen={true}>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-gray-500">
+                    Nota de trabajo interna. Se mantiene en todas las consultas del paciente.
+                  </Label>
+                  {guardandoNota && (
+                    <span className="text-xs text-blue-600 flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Guardando...
+                    </span>
+                  )}
+                </div>
+                <Textarea
+                  data-testid="nota-paciente-textarea"
+                  value={notaPaciente}
+                  onChange={(e) => setNotaPaciente(e.target.value)}
+                  onBlur={guardarNotaPaciente}
+                  disabled={isReadOnly || !formData.paciente_id}
+                  placeholder={formData.paciente_id ? 'Escribe una nota del paciente...' : 'Selecciona un paciente primero'}
+                  className="input-teal min-h-[80px] text-sm"
+                />
+              </div>
+            </CollapsibleSection>
           </div>
 
           {/* COLUMNA CENTRAL: Examen Oftalmológico */}
@@ -2054,9 +2151,33 @@ const EvaluacionOftalmologica = () => {
                   />
                 </div>
                 
-                {/* Lensometría */}
+                {/* Lensometría / Autorefractómetro */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-blue-700">Lensometría</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs font-semibold text-blue-700">
+                      {formData.examen.tipo_lensometria === 'Autorefractometro' ? 'Autorefractómetro' : 'Lensometría'}
+                    </Label>
+                    <div className="flex rounded-md overflow-hidden border border-blue-200" data-testid="tipo-lensometria-toggle">
+                      <button
+                        type="button"
+                        data-testid="tipo-lensometria-lensometria"
+                        disabled={isReadOnly}
+                        onClick={() => updateNestedField('examen.tipo_lensometria', 'Lensometria')}
+                        className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${formData.examen.tipo_lensometria !== 'Autorefractometro' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 hover:bg-blue-50'}`}
+                      >
+                        Lensometría
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="tipo-lensometria-autorefractometro"
+                        disabled={isReadOnly}
+                        onClick={() => updateNestedField('examen.tipo_lensometria', 'Autorefractometro')}
+                        className={`px-2 py-0.5 text-[11px] font-medium transition-colors ${formData.examen.tipo_lensometria === 'Autorefractometro' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 hover:bg-blue-50'}`}
+                      >
+                        Autorefractómetro
+                      </button>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-4 gap-1 text-center text-xs">
                     <div></div>
                     <div className="text-gray-500">Esfera</div>
@@ -2091,7 +2212,21 @@ const EvaluacionOftalmologica = () => {
                 
                 {/* Refracción */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-blue-700">Refracción</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs font-semibold text-blue-700">Refracción</Label>
+                    {!isReadOnly && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-testid="copiar-refraccion-btn"
+                        onClick={copiarRefraccionAReceta}
+                        className="h-6 text-[11px] px-2 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                      >
+                        <Copy className="w-3 h-3 mr-1" /> Copiar a receta de anteojos
+                      </Button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-5 gap-1 text-center text-xs">
                     <div></div>
                     <div className="text-gray-500">Esfera</div>

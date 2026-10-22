@@ -112,3 +112,9 @@
 - Deshacer atendido: en el menú de cada cita (Citas del día), las citas en estado "Atendida" tienen la opción "Deshacer atendida", que las regresa a "En consulta". Backend: al pasar a "En consulta" se limpian hora_fin_consulta y asistio (deshace la marca de atención).
 - Resumen del día por médico: nueva tarjeta en el Tablero del Día que lista cada médico con sus pacientes atendidos (y total del día), ordenada por atendidos. Usa `contadores.por_medico` (ya existente en el backend).
 - Verificado e2e: revertir Atendida→En consulta (limpia campos) y el resumen por médico muestra el conteo correcto de atendidos.
+
+## 2026-06 — Notas por paciente + Lensometría/Autorefractómetro + Copiar refracción
+- Notas del paciente: campo `nota_clinica` a nivel de paciente, persistente entre consultas. Endpoint `PATCH /api/patients/{id}/nota-clinica`. Casilla "Notas del Paciente" bajo la columna de Medicamentos en la evaluación (no aparece en el PDF). Verificado por curl.
+- Lensometría/Autorefractómetro: toggle en el examen que cambia el título en pantalla; campo `tipo_lensometria` en el modelo ExamenOftalmologico. Persiste al guardar. Verificado por curl.
+- Copiar refracción: botón "Copiar a receta de anteojos" en el área de Refracción; copia esfera/cilindro/eje/adición OD/OS a la primera receta de anteojos (crea si no existe, sobrescribe si ya tiene).
+- Eliminado el recuadro "Recomendaciones Generales" de la hoja de evaluación.
