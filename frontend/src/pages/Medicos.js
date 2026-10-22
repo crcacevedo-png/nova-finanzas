@@ -9,7 +9,8 @@ import {
   Stethoscope,
   Search,
   Phone,
-  Mail
+  Mail,
+  Upload
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -79,6 +80,7 @@ const Medicos = () => {
     email: '',
     license_number: '',
     notes: '',
+    firma_digital: '',
     horario: buildHorario(null)
   });
 
@@ -135,6 +137,7 @@ const Medicos = () => {
         email: doctor.email || '',
         license_number: doctor.license_number || '',
         notes: doctor.notes || '',
+        firma_digital: doctor.firma_digital || '',
         horario: buildHorario(doctor.horario_semanal)
       });
     } else {
@@ -146,10 +149,40 @@ const Medicos = () => {
         email: '',
         license_number: '',
         notes: '',
+        firma_digital: '',
         horario: buildHorario(null)
       });
     }
     setDialogOpen(true);
+  };
+
+  const handleFirmaUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecciona un archivo de imagen');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 400;
+        let { width, height } = img;
+        const scale = Math.min(1, maxDim / Math.max(width, height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        setFormData(prev => ({ ...prev, firma_digital: canvas.toDataURL('image/png') }));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleSubmit = async (e) => {
@@ -168,6 +201,7 @@ const Medicos = () => {
       email: formData.email.trim(),
       license_number: formData.license_number.trim(),
       notes: formData.notes.trim(),
+      firma_digital: formData.firma_digital || '',
       horario_semanal: algunDiaActivo ? formData.horario : null
     };
 
@@ -515,6 +549,46 @@ const Medicos = () => {
                   })}
                 </div>
                 <p className="text-xs text-slate-500">Si no activas ningún día, el médico queda sin restricción de horario.</p>
+              </div>
+
+              {/* Firma digital del médico */}
+              <div className="space-y-2 rounded-lg border p-3" data-testid="doctor-firma-section">
+                <Label className="text-sm font-semibold">Firma digital</Label>
+                <p className="text-xs text-slate-500">Se incluirá en el expediente impreso (máx. 3 cm × 2 cm).</p>
+                {formData.firma_digital ? (
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={formData.firma_digital}
+                      alt="Firma del médico"
+                      className="h-16 border rounded bg-white object-contain px-2"
+                      data-testid="doctor-firma-preview"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="btn-outline"
+                      onClick={() => setFormData(prev => ({ ...prev, firma_digital: '' }))}
+                      data-testid="doctor-firma-remove"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" /> Quitar
+                    </Button>
+                  </div>
+                ) : (
+                  <label
+                    className="inline-flex items-center gap-2 cursor-pointer text-sm text-teal-700 border border-dashed border-teal-300 rounded px-3 py-2 hover:bg-teal-50 transition-colors"
+                    data-testid="doctor-firma-upload-label"
+                  >
+                    <Upload className="w-4 h-4" /> Subir imagen de firma
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFirmaUpload}
+                      data-testid="doctor-firma-input"
+                    />
+                  </label>
+                )}
               </div>
 
               <DialogFooter>

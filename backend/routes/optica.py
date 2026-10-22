@@ -28,6 +28,7 @@ class DoctorBase(BaseModel):
     email: Optional[str] = ""
     license_number: Optional[str] = ""
     notes: Optional[str] = ""
+    firma_digital: Optional[str] = ""
     # Horario laboral semanal: claves "1"(Lunes).."7"(Domingo),
     # cada día: {"activo": bool, "hora_inicio": "HH:MM", "hora_fin": "HH:MM"}
     horario_semanal: Optional[Dict[str, Any]] = None
@@ -42,6 +43,7 @@ class DoctorUpdate(BaseModel):
     email: Optional[str] = None
     license_number: Optional[str] = None
     notes: Optional[str] = None
+    firma_digital: Optional[str] = None
     is_active: Optional[bool] = None
     horario_semanal: Optional[Dict[str, Any]] = None
 
@@ -55,6 +57,7 @@ class DoctorResponse(BaseModel):
     email: Optional[str] = ""
     license_number: Optional[str] = ""
     notes: Optional[str] = ""
+    firma_digital: Optional[str] = ""
     is_active: bool = True
     horario_semanal: Optional[Dict[str, Any]] = None
     created_by: str
@@ -499,6 +502,7 @@ async def create_doctor(doctor_data: DoctorCreate, current_user: dict = Depends(
         "email": doctor_data.email or "",
         "license_number": doctor_data.license_number or "",
         "notes": doctor_data.notes or "",
+        "firma_digital": doctor_data.firma_digital or "",
         "is_active": True,
         "horario_semanal": doctor_data.horario_semanal or None,
         "created_by": current_user["id"],

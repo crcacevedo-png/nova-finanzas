@@ -27,9 +27,11 @@ from models.evaluacion_oftalmologica import (
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage
+from reportlab.lib.units import inch, cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.utils import ImageReader
+import base64 as _base64
 import os as _os
 
 LOGO_PATH = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "assets", "logo_nova.png")
@@ -399,6 +401,18 @@ async def get_evaluacion_pdf(
         unit = await db.igss_units.find_one({"id": paciente["igss_unit_id"]}, {"_id": 0, "name": 1})
         igss_unit_name = unit["name"] if unit else ""
     
+    # Obtener datos del médico (para firma, colegiado y especialidad)
+    medico = None
+    if evaluacion.get("medico_id"):
+        medico = await db.doctors.find_one({"id": evaluacion.get("medico_id")}, {"_id": 0})
+    if not medico and evaluacion.get("medico_nombre"):
+        medico = await db.doctors.find_one(
+            {"name": {"$regex": f"^{re.escape(evaluacion['medico_nombre'].strip())}$", "$options": "i"}, "is_active": True},
+            {"_id": 0}
+        )
+    if not medico and evaluacion.get("creado_por"):
+        medico = await db.doctors.find_one({"usuario_id": evaluacion.get("creado_por"), "is_active": True}, {"_id": 0})
+    
     # Crear PDF en memoria
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
@@ -709,6 +723,56 @@ async def get_evaluacion_pdf(
         if extras:
             elements.append(Paragraph(" | ".join(extras), styles['SmallText']))
     
+    # ===== FIRMA Y SELLO DEL MÉDICO =====
+    medico_nombre = (medico.get("name") if medico else None) or evaluacion.get("medico_nombre", "") or ""
+    colegiado = (medico.get("license_number") if medico else "") or ""
+    especialidad = (medico.get("specialty") if medico else "") or ""
+
+    # Firma digital (imagen base64) opcional, máx 3cm ancho x 2cm alto conservando proporción
+    firma_img = None
+    if medico and medico.get("firma_digital"):
+        try:
+            data = medico["firma_digital"]
+            if "," in data:
+                data = data.split(",", 1)[1]
+            img_bytes = _base64.b64decode(data)
+            iw, ih = ImageReader(io.BytesIO(img_bytes)).getSize()
+            max_w, max_h = 3 * cm, 2 * cm
+            ratio = min(max_w / iw, max_h / ih)
+            firma_img = RLImage(io.BytesIO(img_bytes), width=iw * ratio, height=ih * ratio)
+            firma_img.hAlign = 'CENTER'
+        except Exception:
+            firma_img = None
+
+    sig_center = ParagraphStyle('SigCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10)
+    sig_small = ParagraphStyle('SigSmall', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=colors.grey)
+
+    sig_parts = []
+    if firma_img:
+        sig_parts.append(firma_img)
+    else:
+        sig_parts.append(Spacer(1, 2 * cm))
+    sig_parts.append(HRFlowable(width="100%", thickness=0.8, color=colors.black, spaceBefore=2, spaceAfter=4))
+    if medico_nombre:
+        sig_parts.append(Paragraph(f"<b>{medico_nombre}</b>", sig_center))
+    if especialidad:
+        sig_parts.append(Paragraph(especialidad, sig_small))
+    if colegiado:
+        sig_parts.append(Paragraph(f"Colegiado No. {colegiado}", sig_small))
+
+    sig_table = Table([[sig_parts]], colWidths=[3.2 * inch])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    sig_table.hAlign = 'CENTER'
+    elements.append(Spacer(1, 28))
+    elements.append(KeepTogether(sig_table))
+
     # Generar PDF
     doc.build(elements)
     buffer.seek(0)
