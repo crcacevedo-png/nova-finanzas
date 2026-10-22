@@ -411,8 +411,8 @@ async def get_evaluacion_pdf(
     styles.add(ParagraphStyle(name='FieldLabel', parent=styles['Normal'], fontSize=9, textColor=colors.grey))
     styles.add(ParagraphStyle(name='FieldValue', parent=styles['Normal'], fontSize=10, spaceBefore=2))
     styles.add(ParagraphStyle(name='SmallText', parent=styles['Normal'], fontSize=8, textColor=colors.grey))
-    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=colors.grey))
-    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=9, fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica-Bold', textColor=colors.grey))
+    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica'))
     
     elements = []
     
@@ -473,16 +473,6 @@ async def get_evaluacion_pdf(
         except Exception:
             pass
 
-    contacto_emerg = ""
-    if paciente.get("emergency_contact_name") or paciente.get("emergency_phone"):
-        partes = []
-        if paciente.get("emergency_contact_name"):
-            rel = f" ({paciente.get('emergency_contact_relationship')})" if paciente.get("emergency_contact_relationship") else ""
-            partes.append(f"{paciente.get('emergency_contact_name')}{rel}")
-        if paciente.get("emergency_phone"):
-            partes.append(paciente.get("emergency_phone"))
-        contacto_emerg = " - ".join(partes)
-
     # Construir pares (label, value) solo con datos presentes
     pares = [
         ('Paciente:', nombre),
@@ -495,7 +485,6 @@ async def get_evaluacion_pdf(
         ('Email:', paciente.get("email")),
         ('Profesión:', paciente.get("profession")),
         ('Dirección:', paciente.get("address")),
-        ('Contacto Emerg.:', contacto_emerg),
         ('Institución:', inst_label),
     ]
     if paciente.get("referral_institution") == "seguro_privado":
@@ -535,10 +524,11 @@ async def get_evaluacion_pdf(
         t = Table(paciente_data, colWidths=[1.3*inch, 2.2*inch, 1.3*inch, 2.2*inch])
         t.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
         elements.append(t)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
     
     # ===== MOTIVO DE CONSULTA =====
     elements.append(Paragraph("MOTIVO DE CONSULTA", styles['SectionTitle']))
@@ -597,11 +587,11 @@ async def get_evaluacion_pdf(
         ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(av_table)
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 6))
     
     # Refracción
     ref_od = examen.get("refraccion_od", {})
