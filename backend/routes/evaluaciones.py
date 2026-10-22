@@ -440,7 +440,7 @@ async def get_evaluacion_pdf(
         logo = RLImage(LOGO_PATH, width=1.0*inch, height=1.35*inch)
         header_table = Table([[logo, titulo_cell]], colWidths=[1.5*inch, 5.5*inch])
         header_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
             ('RIGHTPADDING', (0, 0), (-1, -1), 0),
@@ -450,7 +450,7 @@ async def get_evaluacion_pdf(
         elements.append(header_table)
     else:
         elements.extend(titulo_cell)
-    elements.append(Spacer(1, 2))
+    elements.append(Spacer(1, 1))
     
     # Línea divisoria
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#0F6E56')))
@@ -742,21 +742,9 @@ async def get_evaluacion_pdf(
 
     if est_rows:
         elements.append(Paragraph("ESTUDIOS / PROCEDIMIENTOS", styles['SectionTitle']))
-        data = [['#', 'Estudio / Procedimiento']]
+        est_style = ParagraphStyle('EstItem', parent=styles['Normal'], fontSize=9, leading=12, leftIndent=10)
         for i, e in enumerate(est_rows, 1):
-            data.append([str(i), Paragraph(_html.escape(e), styles['CellValue'])])
-        est_tbl = Table(data, colWidths=[0.4*inch, 6.2*inch])
-        est_tbl.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-        ]))
-        elements.append(est_tbl)
+            elements.append(Paragraph(f"<b>{i}.</b> {_html.escape(e)}", est_style))
         elements.append(Spacer(1, 8))
 
     # ===== FIRMA Y SELLO DEL MÉDICO (al pie de la última página, misma hoja) =====
