@@ -250,9 +250,6 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => onVerEvaluacion(paciente.paciente_id)}>
-                  <Eye className="w-4 h-4 mr-2" /> Ver evaluación
-                </DropdownMenuItem>
                 {onNuevaEvaluacion && (
                   <DropdownMenuItem onClick={() => onNuevaEvaluacion(paciente.paciente_id)} data-testid={`nueva-evaluacion-presente-${paciente.cita_id}`}>
                     <Stethoscope className="w-4 h-4 mr-2" /> Evaluación Oftalmológica
