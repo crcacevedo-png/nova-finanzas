@@ -58,3 +58,8 @@
 - Resolución del médico en el PDF: por `medico_id`, si no, por coincidencia de `medico_nombre` con el nombre del médico, y si no, por el usuario que creó la evaluación (`doctors.usuario_id`).
 - Backend `optica.py`: `firma_digital` agregado a DoctorBase/Update/Response y a la creación.
 - Verificado: PUT de firma + colegiado, generación de PDF y render (firma dentro de límites, nombre/especialidad/colegiado correctos). Frontend compila sin errores.
+
+## 2026-06 — Contador de espera se congela al atender (Agenda/Tablero del día)
+- Bug: el tiempo de espera ("Espera: X min") seguía creciendo aunque el paciente ya estuviera en consulta/atendido, porque `calcular_tiempo_espera` siempre usaba la hora actual.
+- Fix (`routes/agenda.py`): la espera ahora se congela en `hora_inicio_consulta` (o `hora_fin_consulta` si aplica). Mientras el paciente sigue "Presente" el contador corre; al iniciar consulta / atender, se detiene. Aplicado en `/agenda/presentes` y `/agenda/mi-dia`.
+- Verificado: unitario (600→20 congelado) y e2e real vía `mi-dia` con cita En consulta retrodatada (devuelve 20, no 600).

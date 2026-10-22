@@ -77,12 +77,17 @@ async def es_medico_o_admin(current_user: dict):
     medico = await get_medico_vinculado(current_user["id"])
     return medico is not None, medico
 
-async def calcular_tiempo_espera(hora_llegada: str) -> int:
-    """Calcula minutos de espera desde hora de llegada"""
+async def calcular_tiempo_espera(hora_llegada: str, hora_fin: Optional[str] = None) -> int:
+    """Calcula minutos de espera desde la llegada.
+    Si se pasa hora_fin (inicio de consulta o atención), la espera se congela en ese momento;
+    de lo contrario se calcula hasta ahora (paciente aún esperando)."""
     try:
         llegada = datetime.fromisoformat(hora_llegada.replace('Z', '+00:00'))
-        ahora = datetime.now(timezone.utc)
-        return int((ahora - llegada).total_seconds() / 60)
+        if hora_fin:
+            referencia = datetime.fromisoformat(hora_fin.replace('Z', '+00:00'))
+        else:
+            referencia = datetime.now(timezone.utc)
+        return max(0, int((referencia - llegada).total_seconds() / 60))
     except (ValueError, TypeError):
         return 0
 
@@ -698,7 +703,10 @@ async def listar_presentes(
                 "total": 0
             }
         
-        tiempo_espera = await calcular_tiempo_espera(cita.get("hora_llegada", ""))
+        tiempo_espera = await calcular_tiempo_espera(
+            cita.get("hora_llegada", ""),
+            cita.get("hora_inicio_consulta") or cita.get("hora_fin_consulta")
+        )
         
         por_medico[medico_id]["pacientes"].append({
             "cita_id": cita["id"],
@@ -811,7 +819,10 @@ async def mi_agenda_del_dia(
     presentes = []
     for cita in citas:
         if cita["estado"] in [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA]:
-            tiempo_espera = await calcular_tiempo_espera(cita.get("hora_llegada", ""))
+            tiempo_espera = await calcular_tiempo_espera(
+                cita.get("hora_llegada", ""),
+                cita.get("hora_inicio_consulta") or cita.get("hora_fin_consulta")
+            )
             presentes.append({
                 "cita_id": cita["id"],
                 "paciente_id": cita["paciente_id"],
