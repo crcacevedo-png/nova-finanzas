@@ -92,3 +92,12 @@
 - Medicamentos: ya no se muestran en cuadros/tabla; ahora es una lista compacta numerada "N. Medicamento — Frecuencia" para optimizar espacio. (Estudios/Procedimientos se mantienen en tabla).
 - Datos del paciente en el PDF: se ocultan Teléfono, Dirección, Profesión, Institución/Otra Institución, IGSS Tipo Compra, IGSS Tipo Paciente e IGSS NOG. Los datos NO se eliminan del expediente, solo no aparecen en el PDF. Se conservan Paciente, Expediente, Edad, Sexo, Fecha Nac., DPI, Email, IGSS Unidad/Afiliación/SPS/Código, Fecha Evaluación y Médico.
 - Verificado renderizando PDF real (2 páginas).
+
+## 2026-06 — FIX: próxima cita no se guardaba ni se agendaba (producción)
+- Causa raíz: el autoguardado (camino de guardado más usado) descartaba `proxima_cita` porque no estaba en su whitelist, y la creación de la cita solo ocurría en el guardado manual explícito. Al confiar en el autoguardado, la próxima cita se perdía (aparecía vacía al reabrir) y no se agendaba en el calendario.
+- Fix backend (`routes/evaluaciones.py`): 
+  - `proxima_cita` agregado a la whitelist de `/autoguardar` (+ preserva `cita_id` existente).
+  - Nuevo campo `cita_id` en el modelo `ProximaCita` (idempotencia).
+  - Nuevo helper `sincronizar_proxima_cita` que crea/actualiza la cita en la agenda de forma idempotente; se invoca en crear (POST), actualizar (PUT) y autoguardar (PATCH). No agenda fechas pasadas, evita duplicados y actualiza la cita si cambian fecha/hora/médico.
+- Fix frontend (`EvaluacionOftalmologica.js`): se eliminó la creación de cita desde el cliente (ahora la agenda el backend), evitando duplicados.
+- Verificado e2e en preview: autoguardado persiste la próxima cita y la agenda en el calendario del médico (estado Agendada); idempotente (2 autoguardados → 1 sola cita).

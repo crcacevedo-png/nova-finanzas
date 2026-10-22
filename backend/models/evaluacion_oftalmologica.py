@@ -266,6 +266,7 @@ class ProximaCita(BaseModel):
     medico_nombre: str = ""
     tipo_cita: str = ""
     notas: str = ""
+    cita_id: Optional[str] = None
 
 
 # ==================== EVALUACIÓN COMPLETA ====================

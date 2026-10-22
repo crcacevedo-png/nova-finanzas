@@ -1109,33 +1109,13 @@ const EvaluacionOftalmologica = () => {
         }
       }
       
-      // Crear próxima cita si está habilitada (solo una vez; evita duplicados al re-guardar)
-      if (formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && formData.proxima_cita?.hora && formData.proxima_cita?.medico_id && !formData.proxima_cita?.cita_id) {
-        try {
-          const citaResp = await agendaApi.createProximaCita({
-            paciente_id: formData.paciente_id,
-            paciente_nombre: formData.paciente_nombre,
-            medico_id: formData.proxima_cita.medico_id,
-            medico_nombre: formData.proxima_cita.medico_nombre,
-            fecha: formData.proxima_cita.fecha,
-            hora_inicio: formData.proxima_cita.hora,
-            tipo_cita: formData.proxima_cita.tipo_cita || 'Control',
-            notas: formData.proxima_cita.notas,
-            evaluacion_id: evaluacionId
-          });
-          updateNestedField('proxima_cita.cita_id', citaResp?.data?.id || 'creada');
+      // La próxima cita se agenda/actualiza automáticamente en el backend al guardar
+      // la evaluación (idempotente, también vía autoguardado).
+      if (formData.proxima_cita?.agendar && formData.proxima_cita?.fecha && formData.proxima_cita?.hora && formData.proxima_cita?.medico_id) {
+        const cid = evaluacionActual?.proxima_cita?.cita_id;
+        if (cid) {
+          updateNestedField('proxima_cita.cita_id', cid);
           toast.success('Próxima cita agendada');
-        } catch (citaError) {
-          const st = citaError.response?.status;
-          if (st === 400) {
-            toast.info('Ya existe una cita para esa fecha y hora');
-          } else if (st === 409) {
-            const motivo = citaError.response?.data?.detail || 'horario no disponible';
-            toast.warning(`La evaluación se guardó, pero la cita no se agendó: ${motivo}`);
-          } else {
-            toast.warning('La evaluación se guardó, pero la próxima cita no se pudo agendar');
-            console.error('Error al crear cita:', citaError);
-          }
         }
       }
       

@@ -4,7 +4,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from utils.timezone import now_gt, today_str_gt
 from pydantic import BaseModel, ConfigDict
 import uuid
@@ -885,6 +885,12 @@ async def create_evaluacion(
     except Exception:
         pass
     
+    # Agendar próxima cita si corresponde (idempotente)
+    await sincronizar_proxima_cita(
+        evaluacion_dict["id"], evaluacion_dict.get("proxima_cita"),
+        evaluacion_dict.get("paciente_id"), evaluacion_dict.get("paciente_nombre", ""), current_user
+    )
+    
     # Procesar catálogos
     await procesar_catalogos_evaluacion(evaluacion_dict)
     
@@ -899,6 +905,85 @@ async def create_evaluacion(
     if "_id" in evaluacion_dict:
         del evaluacion_dict["_id"]
     return evaluacion_dict
+
+
+async def sincronizar_proxima_cita(evaluacion_id: str, proxima_cita: dict, paciente_id: str,
+                                   paciente_nombre: str, current_user: dict):
+    """Crea/actualiza la próxima cita en la agenda de forma idempotente a partir de la
+    sección 'Próxima Cita' de la evaluación. Funciona con guardado manual y autoguardado.
+    Nunca lanza excepción que rompa el guardado de la evaluación."""
+    try:
+        pc = proxima_cita or {}
+        if not pc.get("agendar"):
+            return
+        fecha = (pc.get("fecha") or "").strip()
+        hora = (pc.get("hora") or "").strip()
+        medico_id = (pc.get("medico_id") or "").strip()
+        if not (fecha and hora and medico_id):
+            return
+        # No agendar en el pasado
+        if fecha < today_str_gt():
+            return
+        try:
+            hora_fin = (datetime.strptime(hora, "%H:%M") + timedelta(minutes=20)).strftime("%H:%M")
+        except ValueError:
+            return
+        medico_nombre = pc.get("medico_nombre") or ""
+        tipo_cita = pc.get("tipo_cita") or "Control"
+        notas = pc.get("notas") or ""
+        cita_id = pc.get("cita_id")
+
+        estados_vivos = ["Cancelada", "No asistió"]
+        existente = await db.citas.find_one({"id": cita_id}) if cita_id else None
+        if existente:
+            cambios = (existente.get("fecha") != fecha or existente.get("hora_inicio") != hora
+                       or existente.get("medico_id") != medico_id or existente.get("tipo_cita") != tipo_cita
+                       or (existente.get("notas") or "") != notas)
+            if cambios and existente.get("estado") not in estados_vivos:
+                await db.citas.update_one({"id": cita_id}, {"$set": {
+                    "fecha": fecha, "hora_inicio": hora, "hora_fin": hora_fin,
+                    "medico_id": medico_id, "medico_nombre": medico_nombre,
+                    "asignado_a_medico_id": medico_id, "asignado_a_medico_nombre": medico_nombre,
+                    "tipo_cita": tipo_cita, "notas": notas,
+                    "fecha_actualizacion": datetime.now(timezone.utc).isoformat()
+                }})
+            return cita_id
+
+        # Evitar duplicado para el mismo paciente/fecha/hora
+        dup = await db.citas.find_one({
+            "tipo_agenda": "pacientes", "paciente_id": paciente_id,
+            "fecha": fecha, "hora_inicio": hora,
+            "estado": {"$nin": estados_vivos}
+        })
+        if dup:
+            nuevo_cita_id = dup["id"]
+        else:
+            now = datetime.now(timezone.utc).isoformat()
+            cita_doc = {
+                "id": str(uuid.uuid4()),
+                "paciente_id": paciente_id, "paciente_nombre": paciente_nombre,
+                "medico_id": medico_id, "medico_nombre": medico_nombre,
+                "fecha": fecha, "hora_inicio": hora, "hora_fin": hora_fin,
+                "duracion_minutos": 20, "tipo_cita": tipo_cita,
+                "estado": "Agendada", "asistio": None,
+                "hora_llegada": None, "hora_inicio_consulta": None, "hora_fin_consulta": None,
+                "asignado_a_medico_id": medico_id, "asignado_a_medico_nombre": medico_nombre,
+                "notas": notas, "tipo_agenda": "pacientes", "google_event_id": None,
+                "evaluacion_origen_id": evaluacion_id,
+                "creado_por": current_user["id"], "creado_por_nombre": current_user.get("name", ""),
+                "fecha_creacion": now, "actualizado_por": None, "fecha_actualizacion": None
+            }
+            await db.citas.insert_one(cita_doc)
+            nuevo_cita_id = cita_doc["id"]
+
+        # Guardar la referencia de la cita en la evaluación (idempotencia)
+        await db.evaluaciones_oftalmologicas.update_one(
+            {"id": evaluacion_id}, {"$set": {"proxima_cita.cita_id": nuevo_cita_id}}
+        )
+        return nuevo_cita_id
+    except Exception:
+        return None
+
 
 
 # ==================== LIMPIEZA DE EVALUACIONES VACÍAS ====================
@@ -1389,6 +1474,12 @@ async def update_evaluacion(
     merged_data = {**existing, **update_data}
     await procesar_catalogos_evaluacion(merged_data)
     
+    # Agendar/actualizar próxima cita si corresponde (idempotente)
+    await sincronizar_proxima_cita(
+        evaluacion_id, merged_data.get("proxima_cita"),
+        merged_data.get("paciente_id"), merged_data.get("paciente_nombre", ""), current_user
+    )
+    
     updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
     return updated
 
@@ -1428,7 +1519,8 @@ async def autoguardar_evaluacion(
         "paciente_id", "paciente_nombre", "paciente_edad", "paciente_sexo", "paciente_expediente",
         "fecha", "medico_id", "medico_nombre", "motivo_consulta", "padecimiento_actual",
         "antecedentes", "medicamentos_actuales", "medicamentos_previos", "examen",
-        "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas", "igss_med_proc"
+        "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas", "igss_med_proc",
+        "proxima_cita"
     ]
     
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
@@ -1437,6 +1529,12 @@ async def autoguardar_evaluacion(
         update_data["igss_med_proc"] = MedicamentosProcedimientosIGSS(
             **(update_data["igss_med_proc"] or {})
         ).model_dump()
+    # Preservar cita_id ya existente en proxima_cita (el frontend podría no enviarlo)
+    if "proxima_cita" in update_data and isinstance(update_data["proxima_cita"], dict):
+        if not update_data["proxima_cita"].get("cita_id"):
+            prev_cid = (existing.get("proxima_cita") or {}).get("cita_id")
+            if prev_cid:
+                update_data["proxima_cita"]["cita_id"] = prev_cid
     update_data["actualizado_por"] = current_user["id"]
     update_data["actualizado_por_nombre"] = current_user.get("name", current_user.get("username", ""))
     update_data["fecha_actualizacion"] = now
@@ -1450,6 +1548,12 @@ async def autoguardar_evaluacion(
     # Procesar catálogos
     merged_data = {**existing, **update_data}
     await procesar_catalogos_evaluacion(merged_data)
+    
+    # Agendar/actualizar próxima cita si corresponde (idempotente), también en autoguardado
+    await sincronizar_proxima_cita(
+        evaluacion_id, merged_data.get("proxima_cita"),
+        merged_data.get("paciente_id"), merged_data.get("paciente_nombre", ""), current_user
+    )
     
     updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
     return updated
