@@ -67,3 +67,8 @@
 ## 2026-06 — Ajustes evaluación en Agenda y Pacientes
 - Agenda (tarjeta de paciente presente): se eliminó la opción "Ver evaluación" del menú; queda solo "Evaluación Oftalmológica" (crear nueva, autocarga paciente).
 - Pacientes (tabla ACCIONES): el icono "Crear evaluación" (estetoscopio) ahora también se muestra para el rol `medico` (antes solo superadmin/admin/usuario). Al pulsarlo navega a `/evaluacion-oftalmologica?paciente_id=` y la pantalla autocarga los datos del paciente.
+
+## 2026-06 — Firma del médico en la misma hoja del expediente
+- Antes la firma podía saltar a una hoja nueva (se usaba KeepTogether + spacer). Ahora se dibuja al pie de la ÚLTIMA página del expediente mediante un canvas personalizado (SignatureCanvas), reservando margen inferior (bottomMargin=160) para que el contenido no la invada.
+- La firma (imagen máx 3×2 cm + línea + nombre + especialidad + "Colegiado No.") aparece solo en la última página, junto al contenido final del expediente; no genera hoja suelta.
+- Verificado renderizando PDF real (2 páginas): firma únicamente en la última, bajo el contenido.

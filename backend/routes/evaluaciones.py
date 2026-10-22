@@ -31,6 +31,7 @@ from reportlab.lib.units import inch, cm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as _pdfcanvas
 import base64 as _base64
 import os as _os
 
@@ -415,7 +416,7 @@ async def get_evaluacion_pdf(
     
     # Crear PDF en memoria
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=160)
     
     # Estilos
     styles = getSampleStyleSheet()
@@ -723,58 +724,86 @@ async def get_evaluacion_pdf(
         if extras:
             elements.append(Paragraph(" | ".join(extras), styles['SmallText']))
     
-    # ===== FIRMA Y SELLO DEL MÉDICO =====
+    # ===== FIRMA Y SELLO DEL MÉDICO (al pie de la última página, misma hoja) =====
     medico_nombre = (medico.get("name") if medico else None) or evaluacion.get("medico_nombre", "") or ""
     colegiado = (medico.get("license_number") if medico else "") or ""
     especialidad = (medico.get("specialty") if medico else "") or ""
 
-    # Firma digital (imagen base64) opcional, máx 3cm ancho x 2cm alto conservando proporción
-    firma_img = None
+    firma_bytes = None
+    firma_dims = None
     if medico and medico.get("firma_digital"):
         try:
             data = medico["firma_digital"]
             if "," in data:
                 data = data.split(",", 1)[1]
-            img_bytes = _base64.b64decode(data)
-            iw, ih = ImageReader(io.BytesIO(img_bytes)).getSize()
-            max_w, max_h = 3 * cm, 2 * cm
-            ratio = min(max_w / iw, max_h / ih)
-            firma_img = RLImage(io.BytesIO(img_bytes), width=iw * ratio, height=ih * ratio)
-            firma_img.hAlign = 'CENTER'
+            firma_bytes = _base64.b64decode(data)
+            firma_dims = ImageReader(io.BytesIO(firma_bytes)).getSize()
         except Exception:
-            firma_img = None
+            firma_bytes = None
+            firma_dims = None
 
-    sig_center = ParagraphStyle('SigCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10)
-    sig_small = ParagraphStyle('SigSmall', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=colors.grey)
+    sig_info = {
+        "nombre": medico_nombre,
+        "colegiado": colegiado,
+        "especialidad": especialidad,
+        "img_bytes": firma_bytes,
+        "img_dims": firma_dims,
+    }
 
-    sig_parts = []
-    if firma_img:
-        sig_parts.append(firma_img)
-    else:
-        sig_parts.append(Spacer(1, 2 * cm))
-    sig_parts.append(HRFlowable(width="100%", thickness=0.8, color=colors.black, spaceBefore=2, spaceAfter=4))
-    if medico_nombre:
-        sig_parts.append(Paragraph(f"<b>{medico_nombre}</b>", sig_center))
-    if especialidad:
-        sig_parts.append(Paragraph(especialidad, sig_small))
-    if colegiado:
-        sig_parts.append(Paragraph(f"Colegiado No. {colegiado}", sig_small))
+    class SignatureCanvas(_pdfcanvas.Canvas):
+        """Dibuja la firma en la banda inferior reservada, solo en la última página."""
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved_states = []
 
-    sig_table = Table([[sig_parts]], colWidths=[3.2 * inch])
-    sig_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    sig_table.hAlign = 'CENTER'
-    elements.append(Spacer(1, 28))
-    elements.append(KeepTogether(sig_table))
+        def showPage(self):
+            self._saved_states.append(dict(self.__dict__))
+            self._startPage()
 
-    # Generar PDF
-    doc.build(elements)
+        def save(self):
+            total = len(self._saved_states)
+            for idx, state in enumerate(self._saved_states):
+                self.__dict__.update(state)
+                if idx == total - 1:
+                    self._draw_signature()
+                _pdfcanvas.Canvas.showPage(self)
+            _pdfcanvas.Canvas.save(self)
+
+        def _draw_signature(self):
+            cx = letter[0] / 2.0
+            line_w = 3.2 * inch
+            line_y = 90
+            if sig_info["img_bytes"] and sig_info["img_dims"]:
+                iw, ih = sig_info["img_dims"]
+                ratio = min((3 * cm) / iw, (2 * cm) / ih)
+                w, h = iw * ratio, ih * ratio
+                try:
+                    self.drawImage(
+                        ImageReader(io.BytesIO(sig_info["img_bytes"])),
+                        cx - w / 2, line_y + 4, width=w, height=h, mask='auto'
+                    )
+                except Exception:
+                    pass
+            self.setStrokeColor(colors.black)
+            self.setLineWidth(0.8)
+            self.line(cx - line_w / 2, line_y, cx + line_w / 2, line_y)
+            ty = line_y - 13
+            if sig_info["nombre"]:
+                self.setFont("Helvetica-Bold", 10)
+                self.setFillColor(colors.black)
+                self.drawCentredString(cx, ty, sig_info["nombre"])
+                ty -= 12
+            self.setFont("Helvetica", 9)
+            self.setFillColor(colors.grey)
+            if sig_info["especialidad"]:
+                self.drawCentredString(cx, ty, sig_info["especialidad"])
+                ty -= 11
+            if sig_info["colegiado"]:
+                self.drawCentredString(cx, ty, f"Colegiado No. {sig_info['colegiado']}")
+            self.setFillColor(colors.black)
+
+    # Generar PDF (la firma se dibuja al pie de la última página)
+    doc.build(elements, canvasmaker=SignatureCanvas)
     buffer.seek(0)
     
     # Nombre del archivo
