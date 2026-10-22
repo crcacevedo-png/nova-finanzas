@@ -107,3 +107,8 @@
 - Fix backend (`routes/evaluaciones.py`): nuevo helper `marcar_cita_atendida_por_evaluacion`; al crear (POST) o actualizar (PUT) una evaluación, la cita del día del paciente (Presente/En consulta) pasa automáticamente a "Atendida" (asistio=True, hora_fin_consulta). NO se dispara en autoguardado-PATCH, pero sí en el POST de creación automática (que es como el autoguardado crea una evaluación nueva con contenido clínico).
 - Reconciliación histórica: nuevo endpoint `POST /api/agenda/reconciliar-atendidos` (admin/superadmin) que marca "Atendida" las citas atascadas en Presente/En consulta que ya tienen evaluación ese día (coincidencia de fecha tolerante a formatos legacy). Botón "Reconciliar atendidos" agregado en el Tablero del Día (`Agenda.js`) para ejecutarlo una vez en producción.
 - Verificado e2e: guardar evaluación marca la cita como Atendida; el endpoint de reconciliación responde 200 y respeta las citas sin evaluación.
+
+## 2026-06 — Deshacer atendido + Resumen del día por médico
+- Deshacer atendido: en el menú de cada cita (Citas del día), las citas en estado "Atendida" tienen la opción "Deshacer atendida", que las regresa a "En consulta". Backend: al pasar a "En consulta" se limpian hora_fin_consulta y asistio (deshace la marca de atención).
+- Resumen del día por médico: nueva tarjeta en el Tablero del Día que lista cada médico con sus pacientes atendidos (y total del día), ordenada por atendidos. Usa `contadores.por_medico` (ya existente en el backend).
+- Verificado e2e: revertir Atendida→En consulta (limpia campos) y el resumen por médico muestra el conteo correcto de atendidos.

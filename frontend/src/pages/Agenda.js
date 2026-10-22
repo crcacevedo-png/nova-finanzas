@@ -160,6 +160,11 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
                 <CheckCircle className="w-4 h-4 mr-2" /> Marcar atendida
               </DropdownMenuItem>
             )}
+            {cita.estado === 'Atendida' && (
+              <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'En consulta')} data-testid={`deshacer-atendida-cita-${cita.id}`}>
+                <RotateCcw className="w-4 h-4 mr-2" /> Deshacer atendida
+              </DropdownMenuItem>
+            )}
             {!['Atendida', 'No asistió', 'Cancelada'].includes(cita.estado) && (
               <>
                 <DropdownMenuSeparator />
@@ -1788,6 +1793,30 @@ const Agenda = () => {
                 </Card>
               </div>
               </>
+            )}
+            
+            {contadores && contadores.por_medico && contadores.por_medico.length > 0 && (
+              <Card className="mb-4" data-testid="resumen-dia-card">
+                <CardHeader className="py-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Resumen del día por médico
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-1.5">
+                    {[...contadores.por_medico].sort((a, b) => (b.atendidos || 0) - (a.atendidos || 0)).map((m) => (
+                      <div key={m.medico_id} className="flex items-center justify-between text-sm border-b border-slate-100 py-1.5 last:border-0" data-testid={`resumen-medico-${m.medico_id}`}>
+                        <span className="font-medium text-slate-700 truncate pr-2">{m.medico_nombre || 'Sin médico'}</span>
+                        <span className="flex items-center gap-3 shrink-0">
+                          <span className="text-green-700 font-semibold">{m.atendidos || 0} atendidos</span>
+                          <span className="text-slate-400">de {m.total || 0}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

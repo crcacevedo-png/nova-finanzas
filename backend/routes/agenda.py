@@ -534,6 +534,9 @@ async def cambiar_estado_cita(
             update_data["estado_previo"] = cita["estado"]
     elif estado_data.estado == EstadoCita.EN_CONSULTA:
         update_data["hora_inicio_consulta"] = now.isoformat()
+        # Si se revierte desde 'Atendida', deshacer la marca de atención
+        update_data["hora_fin_consulta"] = None
+        update_data["asistio"] = None
     elif estado_data.estado == EstadoCita.ATENDIDA:
         update_data["hora_fin_consulta"] = now.isoformat()
         update_data["asistio"] = True
