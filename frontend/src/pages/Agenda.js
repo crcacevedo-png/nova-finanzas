@@ -217,18 +217,28 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
 const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvaluacion, onNuevaEvaluacion, onCancelarLlegada, medicos }) => {
   const tiempoEspera = paciente.tiempo_espera_minutos;
   const colorEspera = tiempoEspera > 60 ? 'text-red-600' : tiempoEspera > 30 ? 'text-amber-600' : 'text-green-600';
+  const esAtendida = paciente.estado === 'Atendida';
   
   return (
-    <Card className="mb-2 border-l-4" style={{ borderLeftColor: paciente.medico_color || '#0F6E56' }}>
+    <Card className={`mb-2 border-l-4 ${esAtendida ? 'bg-green-50/60' : ''}`} style={{ borderLeftColor: paciente.medico_color || '#0F6E56' }} data-testid={`presente-card-${paciente.cita_id}`}>
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-semibold">{paciente.paciente_nombre}</div>
+            <div className="font-semibold flex items-center gap-2">
+              {paciente.paciente_nombre}
+              {esAtendida && (
+                <Badge className="bg-green-100 text-green-700 border border-green-300 text-[10px] px-1.5 py-0 h-auto" data-testid={`presente-atendida-badge-${paciente.cita_id}`}>
+                  <CheckCircle className="w-2.5 h-2.5 mr-0.5" /> Atendida
+                </Badge>
+              )}
+            </div>
             <div className="text-xs text-gray-500 flex items-center gap-2">
               <span>Llegó: {new Date(paciente.hora_llegada).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' })}</span>
-              <span className={`font-medium ${colorEspera}`}>
-                • Espera: {tiempoEspera} min
-              </span>
+              {!esAtendida && (
+                <span className={`font-medium ${colorEspera}`}>
+                  • Espera: {tiempoEspera} min
+                </span>
+              )}
             </div>
             <Badge variant="outline" className="mt-1 text-xs">{paciente.tipo_cita}</Badge>
             {paciente.notas && (
@@ -269,13 +279,24 @@ const PacientePresenteCard = ({ paciente, onEstadoChange, onAsignar, onVerEvalua
                     <Stethoscope className="w-4 h-4 mr-2" /> Evaluación Oftalmológica
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onCancelarLlegada(paciente.cita_id)} data-testid={`cancelar-llegada-${paciente.cita_id}`}>
-                  <RotateCcw className="w-4 h-4 mr-2" /> Cancelar llegada
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onEstadoChange(paciente.cita_id, 'No asistió')}>
-                  <XCircle className="w-4 h-4 mr-2" /> No asistió
-                </DropdownMenuItem>
+                {esAtendida ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onEstadoChange(paciente.cita_id, 'En consulta')} data-testid={`deshacer-atendida-presente-${paciente.cita_id}`}>
+                      <RotateCcw className="w-4 h-4 mr-2" /> Deshacer atendida
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onCancelarLlegada(paciente.cita_id)} data-testid={`cancelar-llegada-${paciente.cita_id}`}>
+                      <RotateCcw className="w-4 h-4 mr-2" /> Cancelar llegada
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEstadoChange(paciente.cita_id, 'No asistió')}>
+                      <XCircle className="w-4 h-4 mr-2" /> No asistió
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

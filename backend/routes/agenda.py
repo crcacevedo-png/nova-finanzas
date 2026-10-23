@@ -710,11 +710,12 @@ async def listar_presentes(
     if not fecha:
         fecha = today_str_gt()
     
-    # Obtener citas con estado Presente o En consulta
+    # Obtener citas con estado Presente, En consulta o Atendida
+    # (las Atendidas permanecen visibles en la lista del día, no se eliminan)
     citas = await db.citas.find({
         "tipo_agenda": "pacientes",
         "fecha": fecha,
-        "estado": {"$in": [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA]}
+        "estado": {"$in": [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA, EstadoCita.ATENDIDA]}
     }, {"_id": 0}).sort("hora_llegada", 1).to_list(500)
     
     # Obtener médicos para colores
@@ -891,10 +892,10 @@ async def mi_agenda_del_dia(
     citas = await db.citas.find(query, {"_id": 0}).sort("hora_inicio", 1).to_list(500)
     await _enriquecer_instituciones(citas)
     
-    # Separar presentes
+    # Separar presentes (incluye Atendida: permanecen visibles en la lista del día)
     presentes = []
     for cita in citas:
-        if cita["estado"] in [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA]:
+        if cita["estado"] in [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA, EstadoCita.ATENDIDA]:
             tiempo_espera = await calcular_tiempo_espera(
                 cita.get("hora_llegada", ""),
                 cita.get("hora_inicio_consulta") or cita.get("hora_fin_consulta")
