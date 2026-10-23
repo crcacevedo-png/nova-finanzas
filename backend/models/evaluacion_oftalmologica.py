@@ -87,6 +87,8 @@ class ExamenOftalmologico(BaseModel):
     avsc_os: str = ""  # Sin corrección OS
     avcc_od: str = ""  # Con corrección OD
     avcc_os: str = ""  # Con corrección OS
+    av_binocular: str = ""  # AV Binocular (texto libre, ej. 20/30)
+    av_cerca: str = ""  # AV Cerca (texto libre, ej. 20/30)
     
     # Lensometría / Autorefractómetro (identificador solo visual en pantalla)
     tipo_lensometria: str = "Lensometria"  # "Lensometria" | "Autorefractometro"

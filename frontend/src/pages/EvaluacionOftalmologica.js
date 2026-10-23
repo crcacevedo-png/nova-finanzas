@@ -336,6 +336,7 @@ const EvaluacionOftalmologica = () => {
     examen: {
       avsc_od: '', avsc_os: '',
       avcc_od: '', avcc_os: '',
+      av_binocular: '', av_cerca: '',
       tipo_lensometria: 'Lensometria',
       lensometria_od: { esfera: '', cilindro: '', eje: '' },
       lensometria_os: { esfera: '', cilindro: '', eje: '' },
@@ -1017,6 +1018,8 @@ const EvaluacionOftalmologica = () => {
       avsc_os: examenData.avsc_os || examenData.avsc_oi || '',
       avcc_od: examenData.avcc_od || '',
       avcc_os: examenData.avcc_os || examenData.avcc_oi || '',
+      av_binocular: examenData.av_binocular || '',
+      av_cerca: examenData.av_cerca || '',
       tipo_lensometria: examenData.tipo_lensometria || 'Lensometria',
       lensometria_od: { ...evaluacionVacia.examen.lensometria_od, ...examenData.lensometria_od },
       lensometria_os: { ...evaluacionVacia.examen.lensometria_os, ...(examenData.lensometria_os || examenData.lensometria_oi) },
@@ -2247,6 +2250,28 @@ const EvaluacionOftalmologica = () => {
                     disabled={isReadOnly}
                     placeholder="20/..."
                   />
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <Label className="text-xs text-right pr-2">AV Binocular</Label>
+                    <Input
+                      value={formData.examen.av_binocular}
+                      onChange={(e) => updateNestedField('examen.av_binocular', e.target.value)}
+                      disabled={isReadOnly}
+                      placeholder="20/..."
+                      className="input-teal text-sm h-8 col-span-2"
+                      data-testid="examen-av-binocular"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 items-center">
+                    <Label className="text-xs text-right pr-2">AV Cerca</Label>
+                    <Input
+                      value={formData.examen.av_cerca}
+                      onChange={(e) => updateNestedField('examen.av_cerca', e.target.value)}
+                      disabled={isReadOnly}
+                      placeholder="20/..."
+                      className="input-teal text-sm h-8 col-span-2"
+                      data-testid="examen-av-cerca"
+                    />
+                  </div>
                 </div>
                 
                 {/* Lensometría / Autorefractómetro */}

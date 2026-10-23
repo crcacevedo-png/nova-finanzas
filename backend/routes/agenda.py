@@ -718,6 +718,9 @@ async def listar_presentes(
         "estado": {"$in": [EstadoCita.PRESENTE, EstadoCita.EN_CONSULTA, EstadoCita.ATENDIDA]}
     }, {"_id": 0}).sort("hora_llegada", 1).to_list(500)
     
+    # Enriquecer con institución de referencia (igual que el Tablero del Día)
+    await _enriquecer_instituciones(citas)
+    
     # Obtener médicos para colores
     medicos = await db.doctors.find({"is_active": True}, {"_id": 0}).to_list(100)
     medicos_dict = {m["id"]: m for m in medicos}
@@ -753,7 +756,9 @@ async def listar_presentes(
             "medico_nombre": cita["medico_nombre"],
             "asignado_a_medico_id": cita.get("asignado_a_medico_id"),
             "asignado_a_medico_nombre": cita.get("asignado_a_medico_nombre"),
-            "notas": cita.get("notas", "")
+            "notas": cita.get("notas", ""),
+            "referral_institution": cita.get("referral_institution"),
+            "referral_institution_label": cita.get("referral_institution_label")
         })
         por_medico[medico_id]["total"] += 1
     
@@ -911,7 +916,9 @@ async def mi_agenda_del_dia(
                 "medico_id": cita["medico_id"],
                 "medico_nombre": cita["medico_nombre"],
                 "asignado_a_medico_id": cita.get("asignado_a_medico_id"),
-                "asignado_a_medico_nombre": cita.get("asignado_a_medico_nombre")
+                "asignado_a_medico_nombre": cita.get("asignado_a_medico_nombre"),
+                "referral_institution": cita.get("referral_institution"),
+                "referral_institution_label": cita.get("referral_institution_label")
             })
     
     # Contadores
