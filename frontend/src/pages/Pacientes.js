@@ -66,6 +66,14 @@ import {
   getGuatemalaDate
 } from '../services/api';
 
+const tipoCompraLabels = {
+  compra_directa: 'Compra Directa',
+  baja_cuantia: 'Baja Cuantía',
+  contrato: 'Contrato',
+  convenio: 'Convenio',
+};
+
+
 // Extrae un mensaje de error legible (FastAPI 422 devuelve detail como lista de objetos)
 const extractErrorMessage = (error, fallback) => {
   const detail = error?.response?.data?.detail;
@@ -1465,6 +1473,14 @@ const Pacientes = () => {
                     <div>
                       <p style={{ color: 'var(--text-hint)' }}>Tipo de Paciente</p>
                       <p style={{ color: 'var(--text-primary)' }}>{selectedPatient.igss_tipo_paciente}</p>
+                    </div>
+                  )}
+                  {selectedPatient.referral_institution === 'igss' && selectedPatient.igss_tipo_compra && (
+                    <div>
+                      <p style={{ color: 'var(--text-hint)' }}>Tipo de Compra</p>
+                      <p style={{ color: 'var(--text-primary)' }} data-testid="view-patient-igss-tipo-compra">
+                        {tipoCompraLabels[selectedPatient.igss_tipo_compra] || selectedPatient.igss_tipo_compra}
+                      </p>
                     </div>
                   )}
                   {selectedPatient.referral_institution === 'igss' && selectedPatient.igss_nog && (

@@ -4,7 +4,12 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 37 — Pacientes Atendidos permanecen en la lista del Tablero)
+**Última actualización**: 2026-06 (Sesión 38 — Tipo de Compra visible en el expediente IGSS)
+
+### Sesión 38 — "Tipo de Compra" aparece en el expediente del paciente IGSS (2026-06)
+- ✅ En la ficha/expediente del paciente (modal "ver" en Pacientes), para pacientes IGSS ahora se muestra el campo **"Tipo de Compra"** (`view-patient-igss-tipo-compra`) con etiqueta legible (Compra Directa / Baja Cuantía / Contrato / Convenio), junto a Tipo de Paciente y NOG. Antes no aparecía.
+- ✅ **Frontend** (`pages/Pacientes.js`): se agregó el bloque condicional en el `detailDialogOpen` y un mapa `tipoCompraLabels`. El dato ya venía en la respuesta de `GET /api/patients/{id}` (`igss_tipo_compra`); no hubo cambios de backend.
+- ✅ **Verificado**: curl confirma que el backend persiste/devuelve `igss_tipo_compra` (round-trip a 'compra_directa'); frontend compila sin errores. ⚠️ Requiere redespliegue.
 
 ### Sesión 37 — El paciente Atendido NO se elimina de la lista "Pacientes Presentes en Clínica" (2026-06)
 - ✅ Al marcar a un paciente como **Atendida** (Iniciar→En consulta→Atendida), la tarjeta **permanece visible** en el panel "Pacientes Presentes en Clínica" del Tablero del Día y de "Mi Agenda", en vez de desaparecer.
