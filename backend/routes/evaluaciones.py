@@ -508,12 +508,21 @@ async def get_evaluacion_pdf(
         _sps = (evaluacion.get("igss_no_sps") or paciente.get("igss_no_sps") or "")
         _cod = (evaluacion.get("igss_codigo") or paciente.get("igss_codigo") or "")
         _proc = (evaluacion.get("igss_procedimiento") or "")
+        _tipo_compra_labels = {
+            "compra_directa": "Compra Directa",
+            "baja_cuantia": "Baja Cuantía",
+            "contrato": "Contrato",
+            "convenio": "Convenio",
+        }
+        _tc_raw = (paciente.get("igss_tipo_compra") or "")
+        _tc = _tipo_compra_labels.get(_tc_raw, _tc_raw)
         pares.extend([
             ('IGSS Unidad:', igss_unit_name),
             ('IGSS Afiliación:', paciente.get("igss_afiliacion")),
             ('IGSS NOG:', _nog),
             ('IGSS No. SPS:', _sps),
             ('IGSS Código:', _cod),
+            ('IGSS Tipo de Compra:', _tc),
         ])
         if _proc:
             pares.append(('IGSS Procedimiento:', _proc))

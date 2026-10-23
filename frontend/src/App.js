@@ -328,11 +328,12 @@ function AppRoutes() {
         } 
       />
 
-      {/* Evaluación Oftalmológica - Admin y SuperAdmin pueden editar, Usuario solo lectura */}
+      {/* Evaluación Oftalmológica - acceso por menú (igual que Sala de Operaciones).
+          La edición depende del permiso view_evaluacion; sin él, la página es de solo lectura (revisión). */}
       <Route 
         path="/evaluacion-oftalmologica" 
         element={
-          <ProtectedRoute requiredPermission="view_evaluacion">
+          <ProtectedRoute requiredMenu="evaluacion_oftalmologica">
             <EvaluacionOftalmologica />
           </ProtectedRoute>
         } 
