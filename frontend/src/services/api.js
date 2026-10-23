@@ -193,6 +193,13 @@ export const igssNogApi = {
     axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/${acredId}/anular`, { motivo }),
   aplicarAcreditacion: (nogId, pacienteId) =>
     axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/aplicar`, { paciente_id: pacienteId }),
+  // Módulo de Producción IGSS
+  getProduccion: (params) => axios.get(`${API_URL}/igss-units/produccion`, { params }),
+  updateProduccion: (evaluacionId, data) => axios.patch(`${API_URL}/igss-units/produccion/${evaluacionId}`, data),
+  produccionExcelUrl: (params) => {
+    const qs = new URLSearchParams(Object.entries(params || {}).filter(([, v]) => v)).toString();
+    return `${API_URL}/igss-units/produccion/reporte/excel?${qs}`;
+  },
   exportExcel: (nogId) =>
     axios.get(`${API_URL}/igss-units/nogs/${nogId}/export/excel`, { responseType: 'blob' }),
   exportUnidadExcel: (unitId) =>

@@ -128,3 +128,13 @@
 - FIX de producción: una edición previa había eliminado el decorador @router.post("") de create_patient (POST /api/patients daba 405: creación de pacientes rota). Restaurado.
 - Bugs HIGH encontrados por testing y corregidos: (1) borrar todas las órdenes (igss_ordenes=[]) ahora limpia órdenes y libera descuentos (sin fallback legacy); (2) un descuento manual (origen='manual') ya no se cancela al editar el paciente.
 - Verificado por curl/API/DB: 2 órdenes→2 descuentos, quitar orden libera 1, aplicar (+1 y 400 duplicado), PDF por orden, descuento manual sobrevive a edición. Testing agent (iteration_84): flujos de UI 100%.
+
+## 2026-06 — Módulo de Producción IGSS (seguimiento y cierre por unidad)
+- Nueva pestaña "Producción" dentro de Unidades IGSS (/igss/unidades), restringida a superadmin/admin/administrador_igss (médico → 403).
+- Listado diario o por rango de servicios IGSS: una línea por evaluación (orden), con paciente, expediente, unidad, NOG, No. SPS, procedimiento, médico, fecha, costo y 4 estados. Agrupado por unidad y NOG con subtotales; barra de totales (servicios, producción, pagado, pendiente, facturado, enviado) en Q.
+- Costo precargado del precio del NOG, editable por registro (costo_override) sin tocar el catálogo.
+- 4 estados independientes (impreso/enviado/facturado/pagado) con toggle manual; imprimir el expediente desde el módulo marca "impreso" automáticamente.
+- Acciones por fila: abrir expediente (navega a la evaluación del paciente) e imprimir PDF.
+- Reporte exportable a Excel (detalle + totales por estado y por NOG). Cierre sin bloqueo (Fase 1).
+- Backend: GET /api/igss-units/produccion, PATCH /api/igss-units/produccion/{evaluacion_id}, GET /api/igss-units/produccion/reporte/excel. Colección igss_produccion (estados+costo por evaluacion_id); datos derivados de evaluaciones IGSS + precio del NOG.
+- Verificado por API/curl: listado con totales, PATCH de estado y costo reflejados en totales, rol médico 403, endpoint Excel. Frontend compila sin errores. PENDIENTE: verificación interactiva de UI (el harness de screenshot no mantuvo la sesión); recomendable prueba manual o testing agent.

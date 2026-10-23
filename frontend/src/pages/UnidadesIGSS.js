@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Users,
   FileBarChart,
+  FileText,
   ClipboardList,
   Download,
   FileStack,
@@ -41,6 +42,7 @@ import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { igssUnitApi, igssNogApi } from '../services/api';
+import { ProduccionIGSS } from '../components/ProduccionIGSS';
 import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
 import { NogAlertasBanner } from '../components/NogAlertasBanner';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -413,6 +415,9 @@ const UnidadesIGSS = () => {
             <TabsTrigger value="reporte" data-testid="tab-reporte" onClick={fetchReporte}>
               <FileBarChart className="w-4 h-4 mr-2" />Reporte
             </TabsTrigger>
+            <TabsTrigger value="produccion" data-testid="tab-produccion">
+              <FileText className="w-4 h-4 mr-2" />Producción
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="catalogo" className="space-y-6 mt-4">
@@ -583,6 +588,9 @@ const UnidadesIGSS = () => {
 
           <TabsContent value="reporte" className="mt-4">
             <ReporteIGSS data={reporte} loading={loadingReporte} onRefresh={fetchReporte} />
+          </TabsContent>
+          <TabsContent value="produccion" className="mt-4">
+            <ProduccionIGSS />
           </TabsContent>
         </Tabs>
 

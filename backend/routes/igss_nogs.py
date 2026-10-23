@@ -11,7 +11,8 @@ import uuid
 import io
 
 from config.database import db
-from routes.auth import get_current_user, require_permission
+from routes.auth import get_current_user, require_permission, require_role
+from utils.timezone import today_str_gt
 
 router = APIRouter(prefix="/igss-units", tags=["Unidades IGSS - NOG"])
 
@@ -847,4 +848,207 @@ async def export_unidad_excel(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+# ==================== MÓDULO DE PRODUCCIÓN IGSS ====================
+
+PRODUCCION_ROLES = ["superadmin", "admin", "administrador_igss"]
+
+
+class ProduccionUpdate(BaseModel):
+    impreso: Optional[bool] = None
+    enviado: Optional[bool] = None
+    facturado: Optional[bool] = None
+    pagado: Optional[bool] = None
+    costo_override: Optional[float] = None
+
+
+async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
+    q = {}
+    if fecha:
+        q["fecha"] = fecha
+    else:
+        rango = {}
+        if desde:
+            rango["$gte"] = desde
+        if hasta:
+            rango["$lte"] = hasta
+        if rango:
+            q["fecha"] = rango
+    evals = await db.evaluaciones_oftalmologicas.find(q, {"_id": 0}).to_list(None)
+    pac_cache, unit_cache, nog_cache = {}, {}, {}
+    rows = []
+    for ev in evals:
+        pid = ev.get("paciente_id")
+        if pid not in pac_cache:
+            pac_cache[pid] = await db.patients.find_one({"id": pid}, {"_id": 0})
+        pac = pac_cache[pid]
+        if not pac or pac.get("referral_institution") != "igss":
+            continue
+        uid = pac.get("igss_unit_id")
+        if unidad_id and uid != unidad_id:
+            continue
+        numero = (ev.get("igss_nog") or "").strip()
+        no_sps = ev.get("igss_no_sps") or ""
+        codigo = ev.get("igss_codigo") or ""
+        proc = ev.get("igss_procedimiento") or ""
+        if not numero:
+            ords = pac.get("igss_ordenes") or []
+            if ords:
+                numero = (ords[0].get("nog") or "").strip()
+                no_sps = no_sps or ords[0].get("no_sps", "")
+                codigo = codigo or ords[0].get("codigo", "")
+                proc = proc or ords[0].get("procedimiento", "")
+        if nog and numero != nog:
+            continue
+        if uid not in unit_cache:
+            unit_cache[uid] = await db.igss_units.find_one({"id": uid}, {"_id": 0, "name": 1}) if uid else None
+        unit = unit_cache[uid]
+        key = (uid, numero)
+        if key not in nog_cache:
+            nog_cache[key] = await db.igss_nogs.find_one({"unidad_id": uid, "numero": numero}, {"_id": 0, "precio": 1}) if (uid and numero) else None
+        precio = float((nog_cache[key] or {}).get("precio") or 0)
+        est = await db.igss_produccion.find_one({"evaluacion_id": ev["id"]}, {"_id": 0})
+        costo = est.get("costo_override") if (est and est.get("costo_override") is not None) else precio
+        rows.append({
+            "evaluacion_id": ev["id"],
+            "paciente_id": pid,
+            "paciente_nombre": ev.get("paciente_nombre") or f"{(pac.get('first_name') or '')} {(pac.get('last_name') or '')}".strip(),
+            "expediente": ev.get("paciente_expediente") or pac.get("record_number", ""),
+            "unidad_id": uid or "",
+            "unidad_nombre": (unit or {}).get("name", ""),
+            "nog": numero, "no_sps": no_sps, "codigo": codigo, "procedimiento": proc,
+            "medico_nombre": ev.get("medico_nombre", ""),
+            "fecha": ev.get("fecha", ""),
+            "precio_nog": precio,
+            "costo": float(costo or 0),
+            "costo_editado": bool(est and est.get("costo_override") is not None),
+            "impreso": bool(est and est.get("impreso")),
+            "enviado": bool(est and est.get("enviado")),
+            "facturado": bool(est and est.get("facturado")),
+            "pagado": bool(est and est.get("pagado")),
+        })
+    rows.sort(key=lambda r: (r["unidad_nombre"], r["nog"], r["paciente_nombre"]))
+    return rows
+
+
+def _produccion_totales(rows):
+    tot_costo = sum(r["costo"] for r in rows)
+    por_estado = {e: {"cantidad": 0, "monto": 0.0} for e in ["impreso", "enviado", "facturado", "pagado"]}
+    por_nog = {}
+    for r in rows:
+        for e in por_estado:
+            if r[e]:
+                por_estado[e]["cantidad"] += 1
+                por_estado[e]["monto"] = round(por_estado[e]["monto"] + r["costo"], 2)
+        k = r["nog"] or "—"
+        pn = por_nog.setdefault(k, {"nog": k, "unidad_nombre": r["unidad_nombre"], "cantidad": 0, "monto": 0.0})
+        pn["cantidad"] += 1
+        pn["monto"] = round(pn["monto"] + r["costo"], 2)
+    pagado = por_estado["pagado"]["monto"]
+    return {
+        "servicios": len(rows),
+        "total_costo": round(tot_costo, 2),
+        "por_estado": por_estado,
+        "por_nog": sorted(por_nog.values(), key=lambda x: (x["unidad_nombre"], x["nog"])),
+        "total_pagado": round(pagado, 2),
+        "total_pendiente": round(tot_costo - pagado, 2),
+    }
+
+
+@router.get("/produccion")
+async def listar_produccion(
+    fecha: Optional[str] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    unidad_id: Optional[str] = None,
+    nog: Optional[str] = None,
+    current_user: dict = Depends(require_role(PRODUCCION_ROLES))
+):
+    """Listado de producción IGSS: una línea por evaluación (orden) con costo y estados."""
+    if not (fecha or desde or hasta):
+        fecha = today_str_gt()
+    rows = await _build_produccion_rows(fecha, desde, hasta, unidad_id, nog)
+    return {
+        "data": rows,
+        "totales": _produccion_totales(rows),
+        "filtro": {"fecha": fecha, "desde": desde, "hasta": hasta, "unidad_id": unidad_id, "nog": nog},
+    }
+
+
+@router.patch("/produccion/{evaluacion_id}")
+async def actualizar_produccion(
+    evaluacion_id: str,
+    data: ProduccionUpdate,
+    current_user: dict = Depends(require_role(PRODUCCION_ROLES))
+):
+    """Marca estados (impreso/enviado/facturado/pagado) y/o ajusta el costo de un registro."""
+    ev = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0, "id": 1})
+    if not ev:
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
+    upd = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not upd:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    upd["updated_at"] = datetime.now(timezone.utc).isoformat()
+    upd["updated_by"] = current_user["id"]
+    await db.igss_produccion.update_one(
+        {"evaluacion_id": evaluacion_id},
+        {"$set": upd, "$setOnInsert": {"evaluacion_id": evaluacion_id}},
+        upsert=True
+    )
+    fresh = await db.igss_produccion.find_one({"evaluacion_id": evaluacion_id}, {"_id": 0})
+    return fresh
+
+
+@router.get("/produccion/reporte/excel")
+async def exportar_produccion_excel(
+    fecha: Optional[str] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    unidad_id: Optional[str] = None,
+    nog: Optional[str] = None,
+    current_user: dict = Depends(require_role(PRODUCCION_ROLES))
+):
+    """Exporta el reporte de producción (detalle + totales) a Excel."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    if not (fecha or desde or hasta):
+        fecha = today_str_gt()
+    rows = await _build_produccion_rows(fecha, desde, hasta, unidad_id, nog)
+    tot = _produccion_totales(rows)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Produccion"
+    hf = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+    bold = Font(color="FFFFFF", bold=True)
+    headers = ["Fecha", "Unidad", "NOG", "No. SPS", "Paciente", "Expediente", "Procedimiento", "Médico", "Costo (Q)", "Impreso", "Enviado", "Facturado", "Pagado"]
+    ws.append(headers)
+    for c in ws[1]:
+        c.fill = hf
+        c.font = bold
+    si = lambda b: "Sí" if b else "No"
+    for r in rows:
+        ws.append([r["fecha"], r["unidad_nombre"], r["nog"], r["no_sps"], r["paciente_nombre"], r["expediente"], r["procedimiento"], r["medico_nombre"], r["costo"], si(r["impreso"]), si(r["enviado"]), si(r["facturado"]), si(r["pagado"])])
+    ws.append([])
+    ws.append(["TOTALES", "", "", "", "", "", "", "", tot["total_costo"]])
+    ws.append(["Servicios", tot["servicios"]])
+    ws.append(["Total pagado (Q)", tot["total_pagado"]])
+    ws.append(["Total pendiente (Q)", tot["total_pendiente"]])
+    ws.append([])
+    ws.append(["Por estado", "Cantidad", "Monto (Q)"])
+    for e in ["impreso", "enviado", "facturado", "pagado"]:
+        ws.append([e.capitalize(), tot["por_estado"][e]["cantidad"], tot["por_estado"][e]["monto"]])
+    ws.append([])
+    ws.append(["Por NOG", "Unidad", "Cantidad", "Monto (Q)"])
+    for pn in tot["por_nog"]:
+        ws.append([pn["nog"], pn["unidad_nombre"], pn["cantidad"], pn["monto"]])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    periodo = fecha or f"{desde or ''}_{hasta or ''}"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="produccion_igss_{periodo}.xlsx"'}
     )
