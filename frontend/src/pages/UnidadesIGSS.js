@@ -412,9 +412,6 @@ const UnidadesIGSS = () => {
             <TabsTrigger value="catalogo" data-testid="tab-catalogo">
               <Building className="w-4 h-4 mr-2" />Catálogo
             </TabsTrigger>
-            <TabsTrigger value="reporte" data-testid="tab-reporte" onClick={fetchReporte}>
-              <FileBarChart className="w-4 h-4 mr-2" />Reporte
-            </TabsTrigger>
             <TabsTrigger value="produccion" data-testid="tab-produccion">
               <FileText className="w-4 h-4 mr-2" />Producción
             </TabsTrigger>
@@ -586,9 +583,6 @@ const UnidadesIGSS = () => {
         </Card>
           </TabsContent>
 
-          <TabsContent value="reporte" className="mt-4">
-            <ReporteIGSS data={reporte} loading={loadingReporte} onRefresh={fetchReporte} />
-          </TabsContent>
           <TabsContent value="produccion" className="mt-4">
             <ProduccionIGSS />
           </TabsContent>
