@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 39 — Administrador IGSS puede revisar expedientes oftalmológicos + Tipo de Compra en PDF)
+**Última actualización**: 2026-06 (Sesión 40 — Administrador IGSS crea/edita evaluaciones + ícono en Pacientes)
+
+### Sesión 40 — Edición de evaluaciones para Administrador IGSS + ícono de evaluación en Pacientes (2026-06)
+- ✅ **El Administrador IGSS ahora puede CREAR/EDITAR evaluaciones oftalmológicas** (no solo revisar). Se otorgó el permiso `view_evaluacion` al rol `administrador_igss` (`server.py`: añadido al seed + **migración idempotente** que actualiza el rol existente en cada arranque → aplica también en producción). Además se corrigió `routes/evaluaciones.py`: las **6 verificaciones de rol hardcodeadas** (crear, editar, autoguardado, antecedentes/medicamentos, agregar medicamento de receta, agregar a CRM cirugías) ahora incluyen `administrador_igss` (antes devolvían 403 al guardar).
+- ✅ **Ícono de evaluación visible en Pacientes para el rol IGSS** (`Pacientes.js`): `canCreateEvaluacion` pasó de una lista de roles fija a `hasPermission('view_evaluacion')` (equivalente para admin/usuario/medico, y ahora incluye administrador_igss).
+- ✅ **Tipo de Compra en el PDF confirmado con foto**: el reporte de pacientes IGSS muestra "IGSS Tipo de Compra: Compra Directa" en los datos del paciente, en 1 página.
+- ✅ **Verificado**: testing agent `iteration_90.json` 100% (igss.admin crea/edita/guarda sin 403; ícono visible; regresión medico/superadmin OK) + curl (POST/PUT 200) + pypdf/foto del PDF. Sin bugs.
+- ⚠️ Requiere redespliegue; la migración de permiso aplica automáticamente al rol existente en producción.
 
 ### Sesión 39 — Acceso del Administrador IGSS a Evaluación Oftalmológica (solo lectura) + Tipo de Compra en el PDF (2026-06)
 - ✅ **Bug: el rol Administrador IGSS no podía revisar expedientes oftalmológicos** pese a tener el menú "Evaluación Oftalmológica" habilitado. Causa raíz: la ruta `/evaluacion-oftalmologica` estaba protegida por `requiredPermission="view_evaluacion"` (permiso que el rol no tiene), mientras que módulos equivalentes como Sala de Operaciones usan `requiredMenu`. **Fix** (`App.js`): la ruta ahora usa `<ProtectedRoute requiredMenu="evaluacion_oftalmologica">`, por lo que habilitar el menú concede acceso. Como el rol carece de `view_evaluacion`, la página queda en **solo lectura** (puede revisar historial, abrir evaluaciones y descargar PDF, pero no crear/editar). Regresión OK: superadmin y médico mantienen acceso de edición.

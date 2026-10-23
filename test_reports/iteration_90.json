@@ -1,0 +1,19 @@
+{
+  "summary": "Frontend-only retest after the backend role fix in routes/evaluaciones.py. igss.admin can now EDIT and CREATE ophthalmology evaluations from the UI: the toast 'Evaluación guardada correctamente' appears, and every POST /evaluaciones, PUT /evaluaciones/{id}, PATCH /autoguardar and PUT /paciente/{id}/historial-medico call returns 200 with no 403. The Stethoscope icon shows in Pacientes (20 icons). Regression for medico_test and superadmin also PASSES: same flows, all 200, success toast shown.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [
+    "Update /app/memory/test_credentials.md: it still says igss.admin has READ-ONLY access to Evaluación Oftalmológica. It can now create and edit."
+  ],
+  "critical_code_review_comments": [
+    "routes/evaluaciones.py still uses 6 copies of a hardcoded role list (['superadmin','admin','usuario','medico','administrador_igss']) while the frontend gates by the permission 'view_evaluacion'. This drift caused the previous 403. Consider one helper that checks the role's view_evaluacion permission, so frontend and backend stay in sync.",
+    "Expected UX: the 'Nueva' button clears the selected patient, and Guardar stays disabled until a patient is picked again via search. This works by design, but users may not expect it."
+  ],
+  "updated_files": ["/app/test_reports/iteration_90.json"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "TEST evaluations were created and edited for patient 4ceb89de-628f-4aa9-a545-fe6c4f4affc5 by igss.admin, medico_test and superadmin (motivo prefixed 'TEST ...'). They were not deleted; the requester said it does not matter if they stay.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Opening /evaluacion-oftalmologica?paciente_id=X auto-creates a draft (POST). To test 'Nueva': click it, fill [data-testid='search-paciente'], click [data-testid='eval-paciente-option-{id}'], fill the motivo textarea (placeholder 'Motivo principal de la consulta...'), then click [data-testid='eval-guardar-btn']. Pacientes icon: [data-testid^='crear-evaluacion-patient-']."
+}
