@@ -426,8 +426,8 @@ async def get_evaluacion_pdf(
     styles.add(ParagraphStyle(name='FieldLabel', parent=styles['Normal'], fontSize=7.5, textColor=colors.grey))
     styles.add(ParagraphStyle(name='FieldValue', parent=styles['Normal'], fontSize=8, spaceBefore=1))
     styles.add(ParagraphStyle(name='SmallText', parent=styles['Normal'], fontSize=7, textColor=colors.grey))
-    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=7.5, leading=9, fontName='Helvetica-Bold', textColor=colors.grey))
-    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=7.5, leading=9, fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=8.25, leading=10, fontName='Helvetica-Bold', textColor=colors.grey))
+    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=8.25, leading=10, fontName='Helvetica'))
     
     elements = []
     
@@ -437,8 +437,8 @@ async def get_evaluacion_pdf(
         Paragraph("Novavisión - Clínica Oftalmológica", styles['SubtitleCenter']),
     ]
     if _os.path.exists(LOGO_PATH):
-        logo = RLImage(LOGO_PATH, width=0.75*inch, height=1.0*inch)
-        header_table = Table([[logo, titulo_cell]], colWidths=[1.2*inch, 5.8*inch])
+        logo = RLImage(LOGO_PATH, width=1.125*inch, height=1.5*inch)
+        header_table = Table([[logo, titulo_cell]], colWidths=[1.6*inch, 5.4*inch])
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
