@@ -237,6 +237,8 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
         nid = a.get("nog_id")
         if nid in target_ids and nid not in ya_tiene:
             ya_tiene.add(nid)  # conservar exactamente una por NOG objetivo
+        elif a.get("origen") == "manual":
+            continue  # conservar descuentos aplicados manualmente (corrección puntual)
         else:
             motivo = "reasignacion_nog" if target_ids else "sin_nog"
             await _anular_acreditacion_interna(a, user, motivo)
@@ -474,6 +476,11 @@ async def recalcular_nog(
     Útil tras importar evaluaciones o pacientes. Respeta las anulaciones."""
     nog = await _get_nog_or_404(nog_id)
     creadas = await _sincronizar_acreditaciones(nog, current_user, origen="recalculo")
+    # Corregir cualquier desajuste del contador: acreditados = acreditaciones vigentes
+    activos = await db.igss_nog_acreditaciones.count_documents(
+        {"nog_id": nog_id, "anulada": {"$ne": True}}
+    )
+    await db.igss_nogs.update_one({"id": nog_id}, {"$set": {"acreditados": activos}})
     fresh = await db.igss_nogs.find_one({"id": nog_id}, {"_id": 0})
     result = _nog_con_derivados(fresh)
     result["acreditaciones_nuevas"] = creadas
@@ -583,6 +590,11 @@ async def listar_pacientes_nog(
         p = pacientes.get(a.get("paciente_id"))
         if not p:
             continue  # paciente inactivo o eliminado -> no se lista
+        # Mostrar el SPS/código de la orden que corresponde a ESTE NOG (no el legacy)
+        _ordenes = p.get("igss_ordenes") or []
+        _match = next((o for o in _ordenes if str(o.get("nog", "") or "").strip() == a.get("numero_nog", "")), None)
+        _sps = (_match or {}).get("no_sps") if _match else p.get("igss_no_sps", "")
+        _cod = (_match or {}).get("codigo") if _match else p.get("igss_codigo", "")
         filas.append({
             "acreditacion_id": a["id"],
             "evaluacion_id": a.get("evaluacion_id", ""),
@@ -593,8 +605,8 @@ async def listar_pacientes_nog(
             "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
             "dpi": p.get("dpi", ""),
             "igss_afiliacion": p.get("igss_afiliacion", ""),
-            "igss_no_sps": p.get("igss_no_sps", ""),
-            "igss_codigo": p.get("igss_codigo", ""),
+            "igss_no_sps": _sps or "",
+            "igss_codigo": _cod or "",
             "igss_tipo_compra": p.get("igss_tipo_compra", ""),
             "phone": p.get("phone", ""),
             "edad": _calcular_edad(p.get("birth_date", "")),
@@ -650,6 +662,8 @@ async def aplicar_acreditacion_manual(
     paciente = await db.patients.find_one({"id": paciente_id, "is_active": True}, {"_id": 0})
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado o inactivo")
+    if paciente.get("referral_institution") != "igss" or paciente.get("igss_unit_id") != nog.get("unidad_id"):
+        raise HTTPException(status_code=400, detail="El paciente no pertenece a la unidad de este NOG")
     ok, motivo = await _crear_acreditacion(nog, paciente, None, "manual", current_user)
     if not ok:
         if motivo == "duplicada":

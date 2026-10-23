@@ -118,3 +118,13 @@
 - Lensometría/Autorefractómetro: toggle en el examen que cambia el título en pantalla; campo `tipo_lensometria` en el modelo ExamenOftalmologico. Persiste al guardar. Verificado por curl.
 - Copiar refracción: botón "Copiar a receta de anteojos" en el área de Refracción; copia esfera/cilindro/eje/adición OD/OS a la primera receta de anteojos (crea si no existe, sobrescribe si ya tiene).
 - Eliminado el recuadro "Recomendaciones Generales" de la hoja de evaluación.
+
+## 2026-06 — Órdenes IGSS múltiples por paciente (dos consultas el mismo día)
+- Pacientes: cada paciente IGSS ahora tiene una lista de ÓRDENES (NOG, No. SPS, código, procedimiento) en lugar de un solo NOG/SPS. Migración lazy + script (scripts/migrar_ordenes_igss.py) convirtió el NOG/SPS actual en la 1ª orden. Afiliación, Tipo de Compra y Tipo de Paciente siguen a nivel de paciente.
+- Descuento de NOG por orden: cada orden descuenta 1 servicio del NOG de la unidad; 2 órdenes con NOG distintos = 2 descuentos; no se duplica el mismo NOG. Reconciliación (_reconciliar_nog_paciente) itera las órdenes.
+- Dos consultas el mismo día: la cita y la evaluación guardan la orden elegida (igss_orden_id + NOG/SPS/procedimiento). Dos citas el mismo día = dos atenciones. Selector de orden en Agenda (nueva cita) y en la pantalla de Evaluación (auto-selecciona la primera).
+- Un informe por consulta: el PDF de cada evaluación muestra el NOG y No. SPS de SU orden (verificado extrayendo el PDF).
+- Unidades IGSS: nuevo endpoint y UI para APLICAR un descuento de un NOG a un paciente individual (buscar + aplicar); la LIBERACIÓN (anular) por acreditación ya existía. Recalcular ahora también corrige sobre-conteos del contador.
+- FIX de producción: una edición previa había eliminado el decorador @router.post("") de create_patient (POST /api/patients daba 405: creación de pacientes rota). Restaurado.
+- Bugs HIGH encontrados por testing y corregidos: (1) borrar todas las órdenes (igss_ordenes=[]) ahora limpia órdenes y libera descuentos (sin fallback legacy); (2) un descuento manual (origen='manual') ya no se cancela al editar el paciente.
+- Verificado por curl/API/DB: 2 órdenes→2 descuentos, quitar orden libera 1, aplicar (+1 y 400 duplicado), PDF por orden, descuento manual sobrevive a edición. Testing agent (iteration_84): flujos de UI 100%.

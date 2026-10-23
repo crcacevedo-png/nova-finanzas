@@ -14,7 +14,7 @@ const LIBRE = '__libre__';
 // Selector de NOG para la ficha del paciente: elige un NOG del catálogo de la
 // unidad o escribe uno libre (compatibilidad). Los NOG completados no se pueden
 // elegir para pacientes nuevos, salvo que ya sea el valor actual del paciente.
-export const NogSelector = ({ unitId, value, onChange }) => {
+export const NogSelector = ({ unitId, value, onChange, idSuffix = '' }) => {
   const [nogs, setNogs] = useState([]);
   const [libre, setLibre] = useState(false);
 
@@ -68,7 +68,7 @@ export const NogSelector = ({ unitId, value, onChange }) => {
         onChange={(e) => onChange(e.target.value)}
         className="input-teal"
         placeholder="No. Orden Gestión"
-        data-testid="patient-igss-nog"
+        data-testid={`patient-igss-nog${idSuffix}`}
       />
     );
   }
@@ -78,7 +78,7 @@ export const NogSelector = ({ unitId, value, onChange }) => {
   return (
     <div className="space-y-2">
       <Select value={selectValue} onValueChange={handleSelect}>
-        <SelectTrigger className="input-teal" data-testid="patient-igss-nog-select">
+        <SelectTrigger className="input-teal" data-testid={`patient-igss-nog-select${idSuffix}`}>
           <SelectValue placeholder="Seleccionar NOG" />
         </SelectTrigger>
         <SelectContent>
@@ -108,7 +108,7 @@ export const NogSelector = ({ unitId, value, onChange }) => {
           onChange={(e) => onChange(e.target.value)}
           className="input-teal"
           placeholder="No. Orden Gestión (texto libre)"
-          data-testid="patient-igss-nog"
+          data-testid={`patient-igss-nog${idSuffix}`}
         />
       )}
     </div>

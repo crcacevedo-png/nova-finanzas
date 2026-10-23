@@ -226,6 +226,7 @@ const PacientesNog = ({ nogId, onAnulada }) => {
       toast.error(err.response?.data?.detail || 'No se pudo aplicar el descuento');
     } finally {
       setAplicandoId(null);
+      setSearch(''); setResultados([]);
     }
   };
 

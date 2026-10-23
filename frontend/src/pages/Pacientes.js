@@ -1284,6 +1284,7 @@ const Pacientes = () => {
                                 unitId={formData.igss_unit_id}
                                 value={orden.nog}
                                 onChange={(val) => updateOrdenIgss(idx, 'nog', val)}
+                                idSuffix={`-${idx}`}
                               />
                             </div>
                             <div className="md:col-span-2 space-y-1">

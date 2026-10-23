@@ -727,19 +727,20 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
     # Órdenes IGSS: normalizar y sincronizar los campos legacy con la primera orden
     if referral == "igss":
         if "igss_ordenes" in update_data:
+            # El cliente envió la lista explícita (puede ser vacía -> sin órdenes)
             ordenes = _normalizar_ordenes_igss(update_data["igss_ordenes"])
         else:
+            # No se envió: conservar las actuales o derivar de legacy si no hay
             ordenes = _normalizar_ordenes_igss(patient.get("igss_ordenes"))
-        # Fallback: derivar de los campos legacy si aún no hay órdenes
-        if not ordenes:
-            leg_nog = update_data.get("igss_nog", patient.get("igss_nog"))
-            leg_sps = update_data.get("igss_no_sps", patient.get("igss_no_sps"))
-            leg_cod = update_data.get("igss_codigo", patient.get("igss_codigo"))
-            if leg_nog or leg_sps or leg_cod:
-                ordenes = _normalizar_ordenes_igss([{
-                    "nog": leg_nog or "", "no_sps": leg_sps or "",
-                    "codigo": leg_cod or "", "procedimiento": "",
-                }])
+            if not ordenes:
+                leg_nog = update_data.get("igss_nog", patient.get("igss_nog"))
+                leg_sps = update_data.get("igss_no_sps", patient.get("igss_no_sps"))
+                leg_cod = update_data.get("igss_codigo", patient.get("igss_codigo"))
+                if leg_nog or leg_sps or leg_cod:
+                    ordenes = _normalizar_ordenes_igss([{
+                        "nog": leg_nog or "", "no_sps": leg_sps or "",
+                        "codigo": leg_cod or "", "procedimiento": "",
+                    }])
         update_data["igss_ordenes"] = ordenes
         primera = ordenes[0] if ordenes else {}
         update_data["igss_nog"] = primera.get("nog", "")

@@ -1,0 +1,47 @@
+{
+  "summary": "Tested multiple IGSS orders per patient end to end (backend pytest with 14 tests plus Playwright UI). Working: POST /api/patients (the 405 is fixed); creating a patient with 2 different NOGs takes 2 discounts, and the same NOG twice takes only 1; removing one order with PUT frees 1 discount and adding it back takes it again; GET returns igss_ordenes; the lazy migration of legacy NOG/SPS/código shows up in the edit form; manual 'aplicar' gives +1, a duplicate returns 400 and an unknown patient returns 404; 'anular' frees the discount; an evaluation stores its order, autosave changing the order is saved, and the PDF returns 200; agenda appointments store the order, and two appointments for the same patient on the same day with different orders were created. UI: the Órdenes IGSS section shows only for IGSS patients, 'Agregar orden' is disabled until a unit is chosen, rows can be added and removed, and orders are kept after create and edit; the evaluation order card auto-selects the first order and autosaves when it changes; the agenda order selector creates 2 separate appointments; the NOG 'aplicar' box searches (needs at least 2 characters), applies, refreshes the list, shows an error toast on duplicates, and 'Anular' works. Two backend logic bugs found.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PUT /api/patients/{id}", "issue": "Removing ALL orders (igss_ordenes: []) does not work. update_patient sees an empty list and falls back to the patient's stored legacy igss_nog/igss_no_sps/igss_codigo (still those of the old first order), so it rebuilds 1 order and keeps the discount. In the UI, a user who deletes every order row and saves gets the first order back. Fix: only use the legacy fallback when 'igss_ordenes' is NOT in update_data (or also clear the legacy fields when the list is explicitly empty).", "priority": "HIGH"},
+      {"endpoint": "POST /api/igss-units/nogs/{nog_id}/acreditaciones/aplicar + _reconciliar_nog_paciente", "issue": "A manual discount is silently cancelled the next time the patient is edited (even an unrelated field such as comments). Reconciliation cancels every active acreditación whose nog_id is not among the patient's orders, and a manual one (origen='manual') is never among them. Either exclude origen='manual' from the cancellation in reconciliation, or have 'aplicar' also add an order with that NOG to the patient.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/igss-units/nogs/{nog_id}/acreditaciones/aplicar", "issue": "Does not check that the patient is IGSS or belongs to the NOG's unit. A particular patient, or one from another unit, can be discounted (the UI search lists all patients)."},
+      {"endpoint": "GET /api/igss-units/nogs/{nog_id}/pacientes and Excel export", "issue": "Rows show the patient's legacy igss_no_sps/igss_codigo (first order) instead of the SPS/código of the order that matches this NOG. Wrong for the second and later orders."},
+      {"endpoint": "igss_nogs counter", "issue": "Pre-existing drift in Zona 11: NOG 12345678 has acreditados=3 but only 1 active acreditación document, and QA-UI-38804 has 3 vs 2. This was already there before my tests, which left net zero; it is probably from earlier test cleanups that hard-deleted documents. 'recalcular' only creates missing acreditaciones and never lowers the counter."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NogSelector inside order rows", "issue": "Every order row uses the same data-testid patient-igss-nog-select / patient-igss-nog, so they are not unique per row. Suggest patient-orden-nog-{idx}.", "selector": "[data-testid=patient-igss-nog-select]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Edit patient -> delete all orders -> save", "issue": "The first order comes back after saving (backend fallback bug above).", "affected_selectors": ["patient-orden-remove-0", "submit-patient-button"]}
+    ],
+    "design_issues": [
+      {"screen": "NogsUnidadDialog aplicar box", "issues": ["Applying uses up a service with a single click and no confirmation.", "After the duplicate-error toast the result list stays open.", "The search has no debounce, so out-of-order responses can show stale results."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_igss_ordenes_multiples.py", "/app/test_reports/pytest/pytest_igss_ordenes.xml"],
+  "action_items": [
+    "Fix update_patient so an explicit igss_ordenes=[] clears the orders (no legacy fallback) and frees the discounts",
+    "Keep manual (origen='manual') acreditaciones during _reconciliar_nog_paciente, or add the NOG as an order to the patient in 'aplicar'",
+    "Validate in 'aplicar' that the patient is IGSS and belongs to nog.unidad_id",
+    "Show the SPS/código of the order matching the NOG in the NOG patient list and Excel export",
+    "Optional: unique testids for the NOG select in each order row; confirmation before a manual discount"
+  ],
+  "critical_code_review_comments": [
+    "update_patient: the 'if not ordenes' legacy fallback cannot tell 'never had orders' apart from 'user removed all orders'",
+    "_reconciliar_nog_paciente treats every acreditación outside the target NOGs as stale, including manual and evaluation ones",
+    "Legacy lazy order id '<patientId>_ord1' exists only in responses; evaluations or appointments that reference it before the patient is saved keep an id that stays consistent once saved (normalize keeps ids), so this is fine",
+    "Pacientes.js (1631 lines), EvaluacionOftalmologica.js (3686 lines) and Agenda.js (2736 lines) are well over 700 lines and should be split"
+  ],
+  "updated_files": ["/app/backend/tests/test_igss_ordenes_multiples.py"],
+  "success_rate": {"backend": "86% (12/14; 2 failures are real bugs; the lazy-migration API test skipped because no legacy patient with a NOG exists, so it was checked in the UI with a temporary seeded document)", "frontend": "100% of the requested flows"},
+  "test_credentials": "superadmin/nova2024 and igss.admin/IgssAdmin2024$ both worked",
+  "seed_data_creation": "All temporary data was removed: TEST_Orden*, TEST_UIOrden Multi, TEST_Legacy (inserted directly into Mongo), their evaluations, appointments and acreditaciones. Discount counters were restored (net zero). A patient 'Carlos Lopez' (EXP-202610-0025, 2 orders) was created by someone else during the test and was left untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Zona 11 unit id is 18801a0e-2eb9-425f-8848-b511022c9027. NOGs: 12345678 (b184bbe9...), QA-UI-38804 (8cb4eca7...), TEST-17800 (b847195d...). Dr. Carlos Méndez a8bb541a-7fcb-49ab-bd20-32788f57acb5 is available on 2026-10-26. Patient form needs gender + birth date. NOG dialog: /igss/unidades -> nogs-unit-{unitId} -> nog-expand-{nogId}. After the fixes, rerun test_put_remove_all_orders and test_manual_discount_survives_patient_edit.",
+  "rca of the issue": "Bug 1: in routes/patients.py update_patient (~line 729-742), when igss_ordenes=[] the list normalizes to empty and the code then falls back to leg_nog = patient.get('igss_nog') (the stored value from the old first order), recreating the order. Bug 2: in routes/igss_nogs.py _reconciliar_nog_paciente, target_ids comes only from the orders, and the loop over 'vigentes' cancels everything outside target_ids, which includes manual acreditaciones. Reproduce both with tests/test_igss_ordenes_multiples.py."
+}
