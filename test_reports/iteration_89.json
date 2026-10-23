@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend test of igss.admin evaluation create/edit + regression for medico_test and superadmin. igss.admin UI is now editable (Stethoscope icon shown in Pacientes, Nueva/Guardar enabled, textareas editable) BUT SAVE FAILS: backend returns 403 'No tiene permisos para crear evaluaciones' because routes/evaluaciones.py checks a hardcoded role list instead of the view_evaluacion permission. Medico and superadmin regression PASS (icon shown, POST/PUT/PATCH 200, toast 'Evaluación guardada correctamente').",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/evaluaciones (routes/evaluaciones.py:879)", "issue": "403 for igss.admin: `if current_user['role'] not in ['superadmin','admin','usuario','medico']`. The role list is hardcoded and does not include administrador_igss, and the view_evaluacion permission is never checked.", "priority": "CRITICAL"},
+      {"endpoint": "PUT /api/evaluaciones/{id} (1496), PATCH /{id}/autoguardar (1565), PUT /paciente/{id}/historial-medico (1728), POST /paciente/{id}/agregar-medicamento-receta (1777), POST /{id}/agregar-crm-cirugia (1836)", "issue": "These use the same hardcoded role list, so igss.admin will also get 403 when editing, autosaving, saving the medical history, adding a prescribed medication or adding a CRM surgery entry.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "igss.admin opens Evaluación Oftalmológica", "issue": "When the page loads it automatically creates a draft (POST /api/evaluaciones). For igss.admin this POST returns 403, and the request goes into the offline pending queue: the badge shows '1 pendiente(s)' and 'Guardado offline', so the user is led to think the work was saved. Clicking Guardar shows the error toast 'No tiene permisos para crear evaluaciones'. The change was not saved: after a reload the motivo was still 'Retina'.", "affected_selectors": ["[data-testid='eval-guardar-btn']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "In backend/routes/evaluaciones.py, replace the hardcoded role check at all 6 places (lines 879, 1496, 1565, 1728, 1777, 1836) with a permission-based check: allow the user if their role is in the existing list OR their permissions include view_evaluacion. Keep the existing medico-only-own-evaluations rule.",
+    "Frontend offline queue: a 4xx error (403 or 400) should not be queued as 'pendiente offline'. Only queue network failures.",
+    "Update /app/memory/test_credentials.md: it still says igss.admin is read-only and has no view_evaluacion."
+  ],
+  "critical_code_review_comments": [
+    "Authorization in evaluaciones.py is role-based while the frontend uses permission-based checks (hasPermission('view_evaluacion')). The two are out of sync, so a permission granted to a role in the UI is not enforced the same way on the server. Centralise this in a single helper such as can_edit_evaluacion(user)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "67% (igss.admin icon + editable UI pass; igss.admin save FAIL; medico + superadmin regression PASS)"},
+  "seed_data_creation": "Regression saves created evaluations bb38bc6e-eb7f-4edb-8df3-becd349410b9 and 8809ea45-c65c-4220-9524-ffcc3c042fe6 for patient 4ceb89de-628f-4aa9-a545-fe6c4f4affc5. Both were deleted from Mongo afterwards.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Opening /evaluacion-oftalmologica?paciente_id=X auto-creates a draft evaluation (POST) on load. The motivo field is pre-filled from the IGSS order ('Retina'). Guardar = [data-testid='eval-guardar-btn']. The motivo textarea has placeholder 'Motivo principal de la consulta...'. Delete test-created evaluations afterwards. After the backend fix, retest igss.admin save and check that the POST/PUT/PATCH calls return 200.",
+  "rca of the issue": "Repro: log in as igss.admin, open the evaluation for patient 4ceb89de..., edit motivo, click Guardar. Result: 403 toast; backend log shows 'POST /api/evaluaciones 403'. Root cause: the hardcoded role list in routes/evaluaciones.py excludes administrador_igss, and the newly granted view_evaluacion permission is never consulted. Mitigation: add a permission-based check on the server."
+}
