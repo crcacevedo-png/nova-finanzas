@@ -861,7 +861,7 @@ class ProduccionUpdate(BaseModel):
     enviado: Optional[bool] = None
     facturado: Optional[bool] = None
     pagado: Optional[bool] = None
-    costo_override: Optional[float] = None
+    costo_override: Optional[float] = Field(None, ge=0)
 
 
 async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
@@ -877,15 +877,25 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
         if rango:
             q["fecha"] = rango
     evals = await db.evaluaciones_oftalmologicas.find(q, {"_id": 0}).to_list(None)
-    pac_cache, unit_cache, nog_cache = {}, {}, {}
+    if not evals:
+        return []
+    # Carga por lotes (evita N+1)
+    pac_ids = list({e.get("paciente_id") for e in evals if e.get("paciente_id")})
+    ev_ids = [e["id"] for e in evals]
+    pac_list = await db.patients.find({"id": {"$in": pac_ids}, "referral_institution": "igss"}, {"_id": 0}).to_list(None)
+    pac_map = {p["id"]: p for p in pac_list}
+    prod_list = await db.igss_produccion.find({"evaluacion_id": {"$in": ev_ids}}, {"_id": 0}).to_list(None)
+    prod_map = {p["evaluacion_id"]: p for p in prod_list}
+    unit_ids = list({p.get("igss_unit_id") for p in pac_list if p.get("igss_unit_id")})
+    unit_list = await db.igss_units.find({"id": {"$in": unit_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)
+    unit_map = {u["id"]: u for u in unit_list}
+    nog_list = await db.igss_nogs.find({"unidad_id": {"$in": unit_ids}}, {"_id": 0, "unidad_id": 1, "numero": 1, "precio": 1}).to_list(None)
+    nog_map = {(n["unidad_id"], n["numero"]): n for n in nog_list}
     rows = []
     for ev in evals:
-        pid = ev.get("paciente_id")
-        if pid not in pac_cache:
-            pac_cache[pid] = await db.patients.find_one({"id": pid}, {"_id": 0})
-        pac = pac_cache[pid]
-        if not pac or pac.get("referral_institution") != "igss":
-            continue
+        pac = pac_map.get(ev.get("paciente_id"))
+        if not pac:
+            continue  # no IGSS o inexistente
         uid = pac.get("igss_unit_id")
         if unidad_id and uid != unidad_id:
             continue
@@ -902,18 +912,13 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
                 proc = proc or ords[0].get("procedimiento", "")
         if nog and numero != nog:
             continue
-        if uid not in unit_cache:
-            unit_cache[uid] = await db.igss_units.find_one({"id": uid}, {"_id": 0, "name": 1}) if uid else None
-        unit = unit_cache[uid]
-        key = (uid, numero)
-        if key not in nog_cache:
-            nog_cache[key] = await db.igss_nogs.find_one({"unidad_id": uid, "numero": numero}, {"_id": 0, "precio": 1}) if (uid and numero) else None
-        precio = float((nog_cache[key] or {}).get("precio") or 0)
-        est = await db.igss_produccion.find_one({"evaluacion_id": ev["id"]}, {"_id": 0})
+        unit = unit_map.get(uid)
+        precio = float((nog_map.get((uid, numero)) or {}).get("precio") or 0)
+        est = prod_map.get(ev["id"])
         costo = est.get("costo_override") if (est and est.get("costo_override") is not None) else precio
         rows.append({
             "evaluacion_id": ev["id"],
-            "paciente_id": pid,
+            "paciente_id": ev.get("paciente_id"),
             "paciente_nombre": ev.get("paciente_nombre") or f"{(pac.get('first_name') or '')} {(pac.get('last_name') or '')}".strip(),
             "expediente": ev.get("paciente_expediente") or pac.get("record_number", ""),
             "unidad_id": uid or "",
@@ -983,19 +988,26 @@ async def actualizar_produccion(
     data: ProduccionUpdate,
     current_user: dict = Depends(require_role(PRODUCCION_ROLES))
 ):
-    """Marca estados (impreso/enviado/facturado/pagado) y/o ajusta el costo de un registro."""
-    ev = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0, "id": 1})
+    """Marca estados (impreso/enviado/facturado/pagado) y/o ajusta el costo de un registro.
+    Enviar costo_override=null restablece el costo al precio del NOG."""
+    ev = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0, "id": 1, "paciente_id": 1})
     if not ev:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
-    upd = {k: v for k, v in data.model_dump().items() if v is not None}
-    if not upd:
+    pac = await db.patients.find_one({"id": ev.get("paciente_id")}, {"_id": 0, "referral_institution": 1})
+    if not pac or pac.get("referral_institution") != "igss":
+        raise HTTPException(status_code=400, detail="La evaluación no pertenece a un paciente IGSS")
+    provided = data.model_dump(exclude_unset=True)
+    if not provided:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
-    upd["updated_at"] = datetime.now(timezone.utc).isoformat()
-    upd["updated_by"] = current_user["id"]
+    set_fields = {k: v for k, v in provided.items() if v is not None}
+    unset_fields = {k: "" for k, v in provided.items() if v is None}
+    set_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    set_fields["updated_by"] = current_user["id"]
+    update_doc = {"$set": set_fields, "$setOnInsert": {"evaluacion_id": evaluacion_id}}
+    if unset_fields:
+        update_doc["$unset"] = unset_fields
     await db.igss_produccion.update_one(
-        {"evaluacion_id": evaluacion_id},
-        {"$set": upd, "$setOnInsert": {"evaluacion_id": evaluacion_id}},
-        upsert=True
+        {"evaluacion_id": evaluacion_id}, update_doc, upsert=True
     )
     fresh = await db.igss_produccion.find_one({"evaluacion_id": evaluacion_id}, {"_id": 0})
     return fresh

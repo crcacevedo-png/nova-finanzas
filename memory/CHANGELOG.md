@@ -138,3 +138,7 @@
 - Reporte exportable a Excel (detalle + totales por estado y por NOG). Cierre sin bloqueo (Fase 1).
 - Backend: GET /api/igss-units/produccion, PATCH /api/igss-units/produccion/{evaluacion_id}, GET /api/igss-units/produccion/reporte/excel. Colección igss_produccion (estados+costo por evaluacion_id); datos derivados de evaluaciones IGSS + precio del NOG.
 - Verificado por API/curl: listado con totales, PATCH de estado y costo reflejados en totales, rol médico 403, endpoint Excel. Frontend compila sin errores. PENDIENTE: verificación interactiva de UI (el harness de screenshot no mantuvo la sesión); recomendable prueba manual o testing agent.
+
+## 2026-06 — Producción IGSS: verificación testing agent (iteration_85) + fixes
+- Testing agent: backend 92% (único fallo: validación de costo negativo), frontend 100% tras corregir la ruta de "abrir expediente" (/evaluacion-oftalmologica). Retest no requerido.
+- Fixes aplicados: costo_override ahora Field(ge=0) (negativo → 422); costo_override=null restablece al precio del NOG ($unset); PATCH valida que la evaluación sea de paciente IGSS; listado optimizado (carga por lotes, de ~2-5s a ~0.15s); fecha por defecto usa hora de Guatemala; debounce (350ms) en filtros; input de costo se refresca al cambiar el valor del servidor.

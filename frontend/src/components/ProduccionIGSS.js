@@ -27,7 +27,7 @@ const ESTADOS = [
 export const ProduccionIGSS = () => {
   const navigate = useNavigate();
   const [modo, setModo] = useState('dia');
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
   const [fecha, setFecha] = useState(hoy);
   const [desde, setDesde] = useState(hoy);
   const [hasta, setHasta] = useState(hoy);
@@ -65,7 +65,10 @@ export const ProduccionIGSS = () => {
     }
   }, [params]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const t = setTimeout(() => { fetchData(); }, 350);
+    return () => clearTimeout(t);
+  }, [fetchData]);
 
   const toggleEstado = async (row, key) => {
     const nuevo = !row[key];
@@ -92,7 +95,7 @@ export const ProduccionIGSS = () => {
     }
   };
 
-  const abrirExpediente = (row) => navigate(`/evaluaciones?paciente_id=${row.paciente_id}`);
+  const abrirExpediente = (row) => navigate(`/evaluacion-oftalmologica?paciente_id=${row.paciente_id}`);
 
   const imprimirExpediente = async (row) => {
     try {
@@ -246,7 +249,8 @@ export const ProduccionIGSS = () => {
                             <TableCell className="text-xs">{r.fecha}</TableCell>
                             <TableCell>
                               <Input
-                                type="number" step="0.01" defaultValue={r.costo}
+                                key={`${r.evaluacion_id}-${r.costo}`}
+                                type="number" step="0.01" min="0" defaultValue={r.costo}
                                 onBlur={(e) => guardarCosto(r, e.target.value)}
                                 className={`input-teal h-8 w-24 text-xs ${r.costo_editado ? 'border-amber-300' : ''}`}
                                 data-testid={`prod-costo-${r.evaluacion_id}`}

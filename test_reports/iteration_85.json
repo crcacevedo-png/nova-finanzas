@@ -1,0 +1,44 @@
+{
+  "summary": "Producción IGSS module tested end-to-end (backend pytest 12/13 + Playwright UI as superadmin). Tab, filtros (Día/Rango, Unidad, NOG), agrupación unidad/NOG con subtotales, toggles de 4 estados con toast y totales, costo editable on blur, exportar xlsx, imprimir (abre PDF y marca impreso) all work. Found and FIXED one bug: 'Abrir expediente' navigated to non-existent /evaluaciones route (redirected to /dashboard); changed to /evaluacion-oftalmologica?paciente_id=... and re-verified. Médico gets 403 on GET/PATCH/Excel. igss_produccion collection was empty before testing and has been cleaned back to empty.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/igss-units/produccion/{id}", "issue": "costo_override accepts negative values (e.g. -50 returns 200). Add Field(ge=0)."},
+      {"endpoint": "PATCH /api/igss-units/produccion/{id}", "issue": "costo_override cannot be reset to the NOG price: None values get filtered out, so once a cost is edited there is no way to go back to the default price."},
+      {"endpoint": "PATCH /api/igss-units/produccion/{id}", "issue": "Does not check that the evaluation belongs to an IGSS patient, so any evaluation id gets an igss_produccion row."},
+      {"endpoint": "GET /api/igss-units/produccion", "issue": "Slow (~2-5s per call). It loads all evaluations in the date range and then runs one find_one per evaluation on igss_produccion and patients (N+1 queries). Filter by IGSS patients in the query and batch-load igss_produccion with $in."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProduccionIGSS abrir expediente", "issue": "Navigated to /evaluaciones (no such route), which redirected to /dashboard. FIXED by testing agent to /evaluacion-oftalmologica.", "selector": "[data-testid^='prod-abrir-']", "priority": "HIGH (fixed)"}
+    ],
+    "integration_issues": [
+      {"flow": "Filters", "issue": "A fetch goes out on every keystroke in NOG and on every partial date change. There is no debounce and no request cancel, so slow responses that arrive out of order can show stale data. While a request is loading the totals bar keeps showing the previous numbers.", "affected_selectors": ["[data-testid='prod-nog']", "[data-testid='prod-totales']"]},
+      {"flow": "Costo input", "issue": "Uses defaultValue keyed only by evaluacion_id. If the cost changes from the server (for example a later reset), the input will not refresh.", "affected_selectors": ["[data-testid^='prod-costo-']"]}
+    ],
+    "design_issues": [
+      {"screen": "Producción", "issues": ["Rows with no unidad/NOG are grouped as 'Sin unidad' / 'NOG —' with Q0.00 cost (2 SAHYLY evaluations). Expected given the data, but consider flagging them.", "The default 'hoy' date uses new Date().toISOString() (UTC), so after 18:00 Guatemala time the Día view defaults to tomorrow. Use local GT date."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_produccion_igss.py", "/app/test_reports/pytest/pytest_produccion.xml"],
+  "action_items": [
+    "Validate costo_override >= 0 and allow resetting the override (e.g. explicit null or a reset flag)",
+    "Fix the default date in ProduccionIGSS to use the Guatemala local date instead of UTC",
+    "Debounce the NOG filter and ignore stale responses; show a loading state on totals",
+    "Optimize _build_produccion_rows (filter IGSS patients, batch igss_produccion lookup)",
+    "Optionally restrict PATCH to IGSS-patient evaluations"
+  ],
+  "critical_code_review_comments": [
+    "igss_nogs.py is 1054 lines; split the produccion endpoints into their own module",
+    "N+1 queries in _build_produccion_rows",
+    "Frontend Q formatting and grouping are fine; the PDF blob URL is never revoked (minor memory leak)"
+  ],
+  "updated_files": ["/app/frontend/src/components/ProduccionIGSS.js (abrir route fix)", "/app/backend/tests/test_produccion_igss.py"],
+  "success_rate": {"backend": "92% (12/13; the failure is negative-cost validation)", "frontend": "100% after the abrir-route fix"},
+  "test_credentials": "superadmin/nova2024, medico_test/medico2024 (403 verified), igss.admin/IgssAdmin2024$ (200 verified)",
+  "seed_data_creation": "None. igss_produccion was empty before testing and was cleaned to empty after.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use Rango 2026-01-01..2026-12-31: 4 rows (2 Sin unidad, 2 Zona 11; NOG 12345678 eval b052271c... costs Q1500). The API is slow, so wait 5-6s after filter changes. Login testids: login-username-input / login-password-input."
+}
