@@ -416,18 +416,18 @@ async def get_evaluacion_pdf(
     
     # Crear PDF en memoria
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=24, bottomMargin=160)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=20, bottomMargin=150)
     
     # Estilos
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TitleCenter', parent=styles['Heading1'], alignment=TA_CENTER, fontSize=16, spaceAfter=6))
-    styles.add(ParagraphStyle(name='SubtitleCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10, textColor=colors.grey))
-    styles.add(ParagraphStyle(name='SectionTitle', parent=styles['Heading2'], fontSize=12, spaceBefore=12, spaceAfter=6, textColor=colors.HexColor('#0F6E56')))
-    styles.add(ParagraphStyle(name='FieldLabel', parent=styles['Normal'], fontSize=9, textColor=colors.grey))
-    styles.add(ParagraphStyle(name='FieldValue', parent=styles['Normal'], fontSize=10, spaceBefore=2))
-    styles.add(ParagraphStyle(name='SmallText', parent=styles['Normal'], fontSize=8, textColor=colors.grey))
-    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica-Bold', textColor=colors.grey))
-    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=8, leading=9.5, fontName='Helvetica'))
+    styles.add(ParagraphStyle(name='TitleCenter', parent=styles['Heading1'], alignment=TA_CENTER, fontSize=13, spaceAfter=2))
+    styles.add(ParagraphStyle(name='SubtitleCenter', parent=styles['Normal'], alignment=TA_CENTER, fontSize=8, textColor=colors.grey))
+    styles.add(ParagraphStyle(name='SectionTitle', parent=styles['Heading2'], fontSize=9.5, spaceBefore=5, spaceAfter=2, textColor=colors.HexColor('#0F6E56')))
+    styles.add(ParagraphStyle(name='FieldLabel', parent=styles['Normal'], fontSize=7.5, textColor=colors.grey))
+    styles.add(ParagraphStyle(name='FieldValue', parent=styles['Normal'], fontSize=8, spaceBefore=1))
+    styles.add(ParagraphStyle(name='SmallText', parent=styles['Normal'], fontSize=7, textColor=colors.grey))
+    styles.add(ParagraphStyle(name='CellLabel', parent=styles['Normal'], fontSize=7.5, leading=9, fontName='Helvetica-Bold', textColor=colors.grey))
+    styles.add(ParagraphStyle(name='CellValue', parent=styles['Normal'], fontSize=7.5, leading=9, fontName='Helvetica'))
     
     elements = []
     
@@ -437,8 +437,8 @@ async def get_evaluacion_pdf(
         Paragraph("Novavisión - Clínica Oftalmológica", styles['SubtitleCenter']),
     ]
     if _os.path.exists(LOGO_PATH):
-        logo = RLImage(LOGO_PATH, width=1.0*inch, height=1.35*inch)
-        header_table = Table([[logo, titulo_cell]], colWidths=[1.5*inch, 5.5*inch])
+        logo = RLImage(LOGO_PATH, width=0.75*inch, height=1.0*inch)
+        header_table = Table([[logo, titulo_cell]], colWidths=[1.2*inch, 5.8*inch])
         header_table.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
@@ -454,7 +454,7 @@ async def get_evaluacion_pdf(
     
     # Línea divisoria
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#0F6E56')))
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 4))
     
     # ===== DATOS DEL PACIENTE =====
     fecha_eval = evaluacion.get("fecha", "")
@@ -544,7 +544,7 @@ async def get_evaluacion_pdf(
             ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
         elements.append(t)
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 4))
     
     # ===== MOTIVO DE CONSULTA =====
     elements.append(Paragraph("MOTIVO DE CONSULTA", styles['SectionTitle']))
@@ -594,21 +594,21 @@ async def get_evaluacion_pdf(
         ['Presión Intraocular', examen.get("pio_od", "-"), examen.get("pio_os", examen.get("pio_oi", "-"))],
     ]
     
-    av_table = Table(av_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch])
+    av_table = Table(av_data, colWidths=[1.4*inch, 1.4*inch, 1.4*inch])
     av_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTSIZE', (0, 0), (-1, -1), 7.5),
         ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ('TOPPADDING', (0, 0), (-1, -1), 1),
     ]))
     av_table.hAlign = 'LEFT'
     elements.append(av_table)
-    elements.append(Spacer(1, 6))
+    elements.append(Spacer(1, 3))
     
     # Refracción
     ref_od = examen.get("refraccion_od", {})
@@ -621,19 +621,21 @@ async def get_evaluacion_pdf(
             ['OS', ref_os.get("esfera", "-"), ref_os.get("cilindro", "-"), ref_os.get("eje", "-"), ref_os.get("adicion", "-")],
         ]
         
-        ref_table = Table(ref_data, colWidths=[1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
+        ref_table = Table(ref_data, colWidths=[0.85*inch, 0.6*inch, 0.6*inch, 0.5*inch, 0.6*inch])
         ref_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f9f6')),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
             ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
         ]))
+        ref_table.hAlign = 'LEFT'
         elements.append(Paragraph("<b>Refracción:</b>", styles['FieldValue']))
         elements.append(ref_table)
-        elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 4))
     
     # Segmento anterior y posterior
     if examen.get("segmento_anterior"):
@@ -706,16 +708,18 @@ async def get_evaluacion_pdf(
             ['OS', ant_os.get("esfera", "-"), ant_os.get("cilindro", "-"), ant_os.get("eje", "-"), ant_os.get("adicion", "-")],
         ]
         
-        ant_table = Table(ant_data, colWidths=[1*inch, 1.2*inch, 1.2*inch, 1*inch, 1*inch])
+        ant_table = Table(ant_data, colWidths=[0.6*inch, 0.7*inch, 0.7*inch, 0.6*inch, 0.6*inch])
         ant_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#fff9e6')),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
             ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
         ]))
+        ant_table.hAlign = 'LEFT'
         elements.append(ant_table)
         
         extras = []
@@ -736,24 +740,34 @@ async def get_evaluacion_pdf(
             nom, frec = (m.get("nombre", "") or "").strip(), (m.get("frecuencia", "") or "").strip()
         if nom:
             med_rows.append((nom, frec))
-    est_rows = [str(e).strip() for e in (igss_mp.get("estudios_procedimientos", []) or []) if str(e).strip()]
+    est_rows = []
+    for e in (igss_mp.get("estudios_procedimientos", []) or []):
+        if isinstance(e, str):
+            nom, ind = e.strip(), ""
+        else:
+            nom, ind = (e.get("nombre", "") or "").strip(), (e.get("indicaciones", "") or "").strip()
+        if nom:
+            est_rows.append((nom, ind))
 
     if med_rows:
         elements.append(Paragraph("MEDICAMENTOS", styles['SectionTitle']))
-        med_style = ParagraphStyle('MedItem', parent=styles['Normal'], fontSize=9, leading=12, leftIndent=10)
+        med_style = ParagraphStyle('MedItem', parent=styles['Normal'], fontSize=8, leading=10, leftIndent=10)
         for i, (nom, frec) in enumerate(med_rows, 1):
             txt = f"<b>{i}.</b> {_html.escape(nom)}"
             if frec:
                 txt += f" <font color='#555555'>— {_html.escape(frec)}</font>"
             elements.append(Paragraph(txt, med_style))
-        elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 4))
 
     if est_rows:
         elements.append(Paragraph("ESTUDIOS / PROCEDIMIENTOS", styles['SectionTitle']))
-        est_style = ParagraphStyle('EstItem', parent=styles['Normal'], fontSize=9, leading=12, leftIndent=10)
-        for i, e in enumerate(est_rows, 1):
-            elements.append(Paragraph(f"<b>{i}.</b> {_html.escape(e)}", est_style))
-        elements.append(Spacer(1, 8))
+        est_style = ParagraphStyle('EstItem', parent=styles['Normal'], fontSize=8, leading=10, leftIndent=10)
+        est_ind_style = ParagraphStyle('EstInd', parent=styles['Normal'], fontSize=7.5, leading=9.5, leftIndent=22, textColor=colors.HexColor('#555555'))
+        for i, (nom, ind) in enumerate(est_rows, 1):
+            elements.append(Paragraph(f"<b>{i}.</b> {_html.escape(nom)}", est_style))
+            if ind:
+                elements.append(Paragraph(f"<i>Indicaciones: {_html.escape(ind)}</i>", est_ind_style))
+        elements.append(Spacer(1, 4))
 
     # ===== FIRMA Y SELLO DEL MÉDICO (al pie de la última página, misma hoja) =====
     medico_nombre = (medico.get("name") if medico else None) or evaluacion.get("medico_nombre", "") or ""

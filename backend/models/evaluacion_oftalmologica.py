@@ -229,11 +229,18 @@ class MedicamentoIGSS(BaseModel):
     frecuencia: str = ""
 
 
+class EstudioProcedimientoIGSS(BaseModel):
+    """Estudio/procedimiento IGSS con indicaciones de texto libre."""
+    model_config = ConfigDict(extra="ignore")
+    nombre: str = ""
+    indicaciones: str = ""
+
+
 class MedicamentosProcedimientosIGSS(BaseModel):
     """Listas (EXCLUSIVO IGSS). Medicamentos incluyen frecuencia de uso."""
     model_config = ConfigDict(extra="ignore")
     medicamentos: List[MedicamentoIGSS] = Field(default_factory=list)
-    estudios_procedimientos: List[str] = Field(default_factory=list)
+    estudios_procedimientos: List[EstudioProcedimientoIGSS] = Field(default_factory=list)
 
     @field_validator("medicamentos", mode="before")
     @classmethod
@@ -255,10 +262,21 @@ class MedicamentosProcedimientosIGSS(BaseModel):
 
     @field_validator("estudios_procedimientos", mode="before")
     @classmethod
-    def _strip_empty(cls, v):
+    def _norm_estudios(cls, v):
         if not v:
             return []
-        return [s.strip() for s in v if isinstance(s, str) and s.strip()]
+        out = []
+        for item in v:
+            if isinstance(item, str):
+                nombre = item.strip()
+                if nombre:
+                    out.append({"nombre": nombre, "indicaciones": ""})
+            elif isinstance(item, dict):
+                nombre = str(item.get("nombre", "")).strip()
+                indicaciones = str(item.get("indicaciones", "")).strip()
+                if nombre:
+                    out.append({"nombre": nombre, "indicaciones": indicaciones})
+        return out
 
 
 # ==================== PRÓXIMA CITA ====================

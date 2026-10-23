@@ -1086,6 +1086,11 @@ const EvaluacionOftalmologica = () => {
             ? { nombre: m, frecuencia: '' }
             : { nombre: m?.nombre || '', frecuencia: m?.frecuencia || '' }
         ),
+        estudios_procedimientos: (evaluacion.igss_med_proc?.estudios_procedimientos || []).map(e =>
+          typeof e === 'string'
+            ? { nombre: e, indicaciones: '' }
+            : { nombre: e?.nombre || '', indicaciones: e?.indicaciones || '' }
+        ),
       },
       recetas: migratedRecetas
     });
@@ -2670,7 +2675,7 @@ const EvaluacionOftalmologica = () => {
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                        onClick={() => addArrayItem('igss_med_proc.estudios_procedimientos', '')}
+                        onClick={() => addArrayItem('igss_med_proc.estudios_procedimientos', { nombre: '', indicaciones: '' })}
                         data-testid="igss-add-estudio"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
@@ -2680,34 +2685,48 @@ const EvaluacionOftalmologica = () => {
                   {(formData.igss_med_proc?.estudios_procedimientos || []).length === 0 ? (
                     <p className="text-xs text-gray-400 italic py-1">Sin estudios/procedimientos. Agrega el primero.</p>
                   ) : (
-                    <div className="space-y-2">
-                      {(formData.igss_med_proc?.estudios_procedimientos || []).map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <Autocomplete
-                              value={item}
-                              onChange={(v) => updateNestedField(`igss_med_proc.estudios_procedimientos.${idx}`, v)}
+                    <div className="space-y-3">
+                      {(formData.igss_med_proc?.estudios_procedimientos || []).map((item, idx) => {
+                        const nombre = typeof item === 'string' ? item : (item?.nombre || '');
+                        const indicaciones = typeof item === 'string' ? '' : (item?.indicaciones || '');
+                        return (
+                          <div key={idx} className="rounded-lg border border-emerald-100 bg-emerald-50/30 p-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                <Autocomplete
+                                  value={nombre}
+                                  onChange={(v) => updateArrayItem('igss_med_proc.estudios_procedimientos', idx, 'nombre', v)}
+                                  disabled={isReadOnly}
+                                  placeholder="Escribe o busca el estudio/procedimiento IGSS..."
+                                  fetchUrl="/catalogos/igss-procedimientos"
+                                  className="input-teal h-8 text-sm"
+                                  testId={`igss-estudio-${idx}`}
+                                />
+                              </div>
+                              {!isReadOnly && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
+                                  onClick={() => removeArrayItem('igss_med_proc.estudios_procedimientos', idx)}
+                                  data-testid={`igss-remove-estudio-${idx}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                            <Textarea
+                              value={indicaciones}
+                              onChange={(e) => updateArrayItem('igss_med_proc.estudios_procedimientos', idx, 'indicaciones', e.target.value)}
                               disabled={isReadOnly}
-                              placeholder="Escribe o busca el estudio/procedimiento IGSS..."
-                              fetchUrl="/catalogos/igss-procedimientos"
-                              className="input-teal h-8 text-sm"
-                              testId={`igss-estudio-${idx}`}
+                              placeholder="Indicaciones del estudio/procedimiento (texto libre)..."
+                              className="input-teal text-sm min-h-[60px]"
+                              data-testid={`igss-estudio-indicaciones-${idx}`}
                             />
                           </div>
-                          {!isReadOnly && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 text-red-500 hover:bg-red-50"
-                              onClick={() => removeArrayItem('igss_med_proc.estudios_procedimientos', idx)}
-                              data-testid={`igss-remove-estudio-${idx}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -3503,13 +3522,20 @@ const EvaluacionOftalmologica = () => {
                     </ol>
                   </div>
                 )}
-                {(formData.igss_med_proc?.estudios_procedimientos || []).filter(m => (m || '').trim()).length > 0 && (
+                {(formData.igss_med_proc?.estudios_procedimientos || []).filter(m => (typeof m === 'string' ? m : m?.nombre || '').trim()).length > 0 && (
                   <div className="mb-3">
                     <h3 className="text-xs font-bold uppercase mb-1" style={{ color: '#0F6E56' }}>Estudios / Procedimientos</h3>
-                    <ol className="list-decimal list-inside text-xs space-y-0.5">
-                      {(formData.igss_med_proc?.estudios_procedimientos || []).filter(m => (m || '').trim()).map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
+                    <ol className="list-decimal list-inside text-xs space-y-1">
+                      {(formData.igss_med_proc?.estudios_procedimientos || []).filter(m => (typeof m === 'string' ? m : m?.nombre || '').trim()).map((item, idx) => {
+                        const nombre = typeof item === 'string' ? item : (item?.nombre || '');
+                        const indicaciones = typeof item === 'string' ? '' : (item?.indicaciones || '');
+                        return (
+                          <li key={idx}>
+                            {nombre}
+                            {indicaciones.trim() && <div className="text-gray-600 italic ml-4">Indicaciones: {indicaciones}</div>}
+                          </li>
+                        );
+                      })}
                     </ol>
                   </div>
                 )}
