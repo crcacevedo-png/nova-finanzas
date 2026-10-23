@@ -191,6 +191,8 @@ export const igssNogApi = {
   getPacientes: (nogId) => axios.get(`${API_URL}/igss-units/nogs/${nogId}/pacientes`),
   anularAcreditacion: (nogId, acredId, motivo) =>
     axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/${acredId}/anular`, { motivo }),
+  aplicarAcreditacion: (nogId, pacienteId) =>
+    axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/aplicar`, { paciente_id: pacienteId }),
   exportExcel: (nogId) =>
     axios.get(`${API_URL}/igss-units/nogs/${nogId}/export/excel`, { responseType: 'blob' }),
   exportUnidadExcel: (unitId) =>

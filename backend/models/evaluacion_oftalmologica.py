@@ -290,6 +290,13 @@ class EvaluacionOftalmologicaBase(BaseModel):
     motivo_consulta: str = ""
     padecimiento_actual: str = ""
     
+    # Orden IGSS vinculada a esta consulta (para expediente/informe por orden)
+    igss_orden_id: Optional[str] = None
+    igss_nog: Optional[str] = ""
+    igss_no_sps: Optional[str] = ""
+    igss_codigo: Optional[str] = ""
+    igss_procedimiento: Optional[str] = ""
+    
     # Antecedentes
     antecedentes: Antecedentes = Field(default_factory=Antecedentes)
     
@@ -336,6 +343,11 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
     medico_nombre: Optional[str] = None
     motivo_consulta: Optional[str] = None
     padecimiento_actual: Optional[str] = None
+    igss_orden_id: Optional[str] = None
+    igss_nog: Optional[str] = None
+    igss_no_sps: Optional[str] = None
+    igss_codigo: Optional[str] = None
+    igss_procedimiento: Optional[str] = None
     antecedentes: Optional[Antecedentes] = None
     medicamentos_actuales: Optional[List[MedicamentoActual]] = None
     medicamentos_previos: Optional[List[MedicamentoPrevio]] = None

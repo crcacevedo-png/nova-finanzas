@@ -42,6 +42,11 @@ class CitaBase(BaseModel):
     duracion_minutos: int = 20
     tipo_cita: str = TipoCita.SUBSECUENTE
     notas: Optional[str] = None
+    # Orden IGSS vinculada a la consulta (opcional)
+    igss_orden_id: Optional[str] = None
+    igss_nog: Optional[str] = None
+    igss_no_sps: Optional[str] = None
+    igss_procedimiento: Optional[str] = None
 
 class CitaCreate(CitaBase):
     pass
@@ -57,6 +62,10 @@ class CitaUpdate(BaseModel):
     duracion_minutos: Optional[int] = None
     tipo_cita: Optional[str] = None
     notas: Optional[str] = None
+    igss_orden_id: Optional[str] = None
+    igss_nog: Optional[str] = None
+    igss_no_sps: Optional[str] = None
+    igss_procedimiento: Optional[str] = None
 
 class CitaEstadoUpdate(BaseModel):
     estado: EstadoCita
@@ -86,6 +95,10 @@ class CitaResponse(BaseModel):
     notas: Optional[str] = None
     tipo_agenda: str = "pacientes"
     google_event_id: Optional[str] = None
+    igss_orden_id: Optional[str] = None
+    igss_nog: Optional[str] = None
+    igss_no_sps: Optional[str] = None
+    igss_procedimiento: Optional[str] = None
     creado_por: str
     creado_por_nombre: Optional[str] = ""
     fecha_creacion: str

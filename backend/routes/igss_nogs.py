@@ -157,7 +157,8 @@ async def _sincronizar_acreditaciones(nog: dict, user: dict, origen: str = "retr
         return 0
 
     pacientes = await db.patients.find(
-        {"is_active": True, "igss_unit_id": unidad_id, "igss_nog": numero},
+        {"is_active": True, "igss_unit_id": unidad_id,
+         "$or": [{"igss_nog": numero}, {"igss_ordenes.nog": numero}]},
         {"_id": 0}
     ).to_list(None)
 
@@ -196,9 +197,9 @@ async def _anular_acreditacion_interna(acred: dict, user: dict, motivo: str):
 
 
 async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "asignacion"):
-    """Asegura que el paciente consuma exactamente 1 servicio del NOG asignado
-    (si está activo, es IGSS y tiene unidad + NOG del catálogo activo). Libera las
-    acreditaciones que ya no correspondan (cambio de NOG/unidad/institución o baja).
+    """Asegura que el paciente consuma 1 servicio por cada NOG distinto de sus
+    órdenes IGSS (unidad activa + NOG del catálogo activo). Libera las acreditaciones
+    que ya no correspondan. Soporta múltiples órdenes (varios NOG) por paciente.
     Hook llamado al crear/editar/desactivar/reactivar un paciente."""
     if not paciente:
         return
@@ -206,48 +207,58 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
     if not pac_id:
         return
 
-    # NOG objetivo (si aplica)
-    target_nog = None
+    # NOGs objetivo a partir de las órdenes del paciente (o legacy igss_nog)
+    target_nogs = {}  # nog_id -> doc
     if (paciente.get("is_active", True)
             and paciente.get("referral_institution") == "igss"
-            and paciente.get("igss_unit_id")
-            and (paciente.get("igss_nog") or "").strip()):
-        target_nog = await db.igss_nogs.find_one(
-            {"unidad_id": paciente["igss_unit_id"],
-             "numero": (paciente.get("igss_nog") or "").strip(),
-             "is_active": True},
-            {"_id": 0}
-        )
-    target_nog_id = target_nog["id"] if target_nog else None
+            and paciente.get("igss_unit_id")):
+        ordenes = paciente.get("igss_ordenes") or []
+        numeros = [str(o.get("nog", "") or "").strip() for o in ordenes if str(o.get("nog", "") or "").strip()]
+        if not numeros:
+            leg = (paciente.get("igss_nog") or "").strip()
+            if leg:
+                numeros = [leg]
+        for numero in set(numeros):
+            nog = await db.igss_nogs.find_one(
+                {"unidad_id": paciente["igss_unit_id"], "numero": numero, "is_active": True},
+                {"_id": 0}
+            )
+            if nog:
+                target_nogs[nog["id"]] = nog
+    target_ids = set(target_nogs.keys())
 
     # Acreditaciones vigentes del paciente
     vigentes = await db.igss_nog_acreditaciones.find(
         {"paciente_id": pac_id, "anulada": {"$ne": True}}, {"_id": 0}
     ).to_list(None)
 
-    ya_tiene_target = False
+    ya_tiene = set()
     for a in vigentes:
-        if target_nog_id and a.get("nog_id") == target_nog_id and not ya_tiene_target:
-            ya_tiene_target = True  # conservar exactamente una
+        nid = a.get("nog_id")
+        if nid in target_ids and nid not in ya_tiene:
+            ya_tiene.add(nid)  # conservar exactamente una por NOG objetivo
         else:
-            # No corresponde (otro NOG, duplicada, o ya no aplica) -> liberar cupo
-            motivo = "reasignacion_nog" if target_nog_id else "sin_nog"
+            motivo = "reasignacion_nog" if target_ids else "sin_nog"
             await _anular_acreditacion_interna(a, user, motivo)
 
-    # Crear la acreditación objetivo si falta
-    if target_nog and not ya_tiene_target:
-        await _crear_acreditacion(target_nog, paciente, None, origen, user)
+    # Crear las acreditaciones objetivo que falten
+    for nid, nog in target_nogs.items():
+        if nid not in ya_tiene:
+            await _crear_acreditacion(nog, paciente, None, origen, user)
 
 
 async def _acreditar_evaluacion(paciente: dict, evaluacion: dict, user: dict):
     """Hook llamado al crear una Evaluación Oftalmológica.
-    Acredita 1 servicio si el paciente tiene un NOG del catálogo con cupo."""
+    Acredita 1 servicio al NOG de la orden de la evaluación (o al NOG del paciente)
+    si tiene cupo. Deduplicado por (nog_id, paciente_id)."""
     if not paciente:
         return
     if paciente.get("referral_institution") != "igss":
         return
     unidad_id = paciente.get("igss_unit_id")
-    numero = (paciente.get("igss_nog") or "").strip()
+    # Preferir el NOG de la orden vinculada a la evaluación; si no, el legacy del paciente
+    numero = (((evaluacion or {}).get("igss_nog") or "").strip()
+              or (paciente.get("igss_nog") or "").strip())
     if not unidad_id or not numero:
         return
     nog = await db.igss_nogs.find_one(
@@ -625,6 +636,27 @@ async def anular_acreditacion(
     )
     fresh = await db.igss_nogs.find_one({"id": nog_id}, {"_id": 0})
     return {"message": "Acreditación anulada", "nog": _nog_con_derivados(fresh)}
+
+
+@router.post("/nogs/{nog_id}/acreditaciones/aplicar")
+async def aplicar_acreditacion_manual(
+    nog_id: str,
+    paciente_id: str = Body(..., embed=True),
+    current_user: dict = Depends(require_permission("manage_igss_units"))
+):
+    """Aplica manualmente 1 descuento de este NOG a un paciente (corrección puntual).
+    Respeta el cupo y evita duplicar el mismo NOG para el mismo paciente."""
+    nog = await _get_nog_or_404(nog_id)
+    paciente = await db.patients.find_one({"id": paciente_id, "is_active": True}, {"_id": 0})
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado o inactivo")
+    ok, motivo = await _crear_acreditacion(nog, paciente, None, "manual", current_user)
+    if not ok:
+        if motivo == "duplicada":
+            raise HTTPException(status_code=400, detail="Este paciente ya tiene este NOG descontado")
+        raise HTTPException(status_code=400, detail="El NOG ya no tiene cupo disponible")
+    fresh = await db.igss_nogs.find_one({"id": nog_id}, {"_id": 0})
+    return {"message": "Descuento aplicado", "nog": _nog_con_derivados(fresh)}
 
 
 # ==================== EXPORTACIÓN A EXCEL ====================

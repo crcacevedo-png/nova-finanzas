@@ -503,12 +503,20 @@ async def get_evaluacion_pdf(
         ('Email:', paciente.get("email")),
     ]
     if paciente.get("referral_institution") == "igss":
+        # Preferir el snapshot de la orden vinculada a la evaluación; fallback al paciente
+        _nog = (evaluacion.get("igss_nog") or paciente.get("igss_nog") or "")
+        _sps = (evaluacion.get("igss_no_sps") or paciente.get("igss_no_sps") or "")
+        _cod = (evaluacion.get("igss_codigo") or paciente.get("igss_codigo") or "")
+        _proc = (evaluacion.get("igss_procedimiento") or "")
         pares.extend([
             ('IGSS Unidad:', igss_unit_name),
             ('IGSS Afiliación:', paciente.get("igss_afiliacion")),
-            ('IGSS No. SPS:', paciente.get("igss_no_sps")),
-            ('IGSS Código:', paciente.get("igss_codigo")),
+            ('IGSS NOG:', _nog),
+            ('IGSS No. SPS:', _sps),
+            ('IGSS Código:', _cod),
         ])
+        if _proc:
+            pares.append(('IGSS Procedimiento:', _proc))
     pares.extend([
         ('Fecha Evaluación:', fecha_eval),
         ('Médico:', evaluacion.get("medico_nombre")),
@@ -1560,7 +1568,8 @@ async def autoguardar_evaluacion(
         "fecha", "medico_id", "medico_nombre", "motivo_consulta", "padecimiento_actual",
         "antecedentes", "medicamentos_actuales", "medicamentos_previos", "examen",
         "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas", "igss_med_proc",
-        "proxima_cita"
+        "proxima_cita",
+        "igss_orden_id", "igss_nog", "igss_no_sps", "igss_codigo", "igss_procedimiento"
     ]
     
     update_data = {k: v for k, v in data.items() if k in allowed_fields}

@@ -312,6 +312,11 @@ const EvaluacionOftalmologica = () => {
     medico_nombre: '',
     motivo_consulta: '',
     padecimiento_actual: '',
+    igss_orden_id: '',
+    igss_nog: '',
+    igss_no_sps: '',
+    igss_codigo: '',
+    igss_procedimiento: '',
     antecedentes: {
       personales_patologicos: '',
       diabetes: false,
@@ -420,19 +425,46 @@ const EvaluacionOftalmologica = () => {
   // Nota clínica por paciente (persiste entre consultas)
   const [notaPaciente, setNotaPaciente] = useState('');
   const [guardandoNota, setGuardandoNota] = useState(false);
+  // Órdenes IGSS del paciente (para elegir la orden de esta consulta)
+  const [pacienteOrdenes, setPacienteOrdenes] = useState([]);
+  const [pacienteEsIgss, setPacienteEsIgss] = useState(false);
 
   const cargarNotaPaciente = useCallback(async (pid) => {
-    if (!pid) { setNotaPaciente(''); return; }
+    if (!pid) { setNotaPaciente(''); setPacienteOrdenes([]); setPacienteEsIgss(false); return; }
     try {
       const token = localStorage.getItem('token');
       const { data } = await axios.get(`${API_URL}/patients/${pid}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotaPaciente(data.nota_clinica || '');
+      setPacienteEsIgss(data.referral_institution === 'igss');
+      setPacienteOrdenes(data.igss_ordenes || []);
     } catch (e) {
       // silencioso
     }
   }, []);
+
+  // Selección de orden IGSS para la consulta (fija el snapshot NOG/SPS en la evaluación)
+  const seleccionarOrdenIgss = (ordenId) => {
+    const orden = (pacienteOrdenes || []).find(o => (o.id || '') === ordenId);
+    setFormData(prev => ({
+      ...prev,
+      igss_orden_id: ordenId,
+      igss_nog: orden?.nog || '',
+      igss_no_sps: orden?.no_sps || '',
+      igss_codigo: orden?.codigo || '',
+      igss_procedimiento: orden?.procedimiento || '',
+    }));
+  };
+
+  // Autoseleccionar la primera orden si el paciente es IGSS y la evaluación aún no tiene orden
+  useEffect(() => {
+    if (!pacienteEsIgss || !pacienteOrdenes || pacienteOrdenes.length === 0) return;
+    if (formData.igss_orden_id) return;
+    const first = pacienteOrdenes[0];
+    seleccionarOrdenIgss(first.id || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacienteOrdenes, pacienteEsIgss]);
 
   const guardarNotaPaciente = async () => {
     const pid = pacienteIdRef.current || formData.paciente_id;
@@ -1874,6 +1906,41 @@ const EvaluacionOftalmologica = () => {
           
           {/* COLUMNA IZQUIERDA: Antecedentes y Medicamentos */}
           <div className="space-y-4">
+            {/* Orden IGSS de esta consulta */}
+            {pacienteEsIgss && pacienteOrdenes.length > 0 && (
+              <Card className="card-teal border-blue-200" data-testid="evaluacion-orden-igss">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-600" />
+                    Orden IGSS de esta consulta
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={formData.igss_orden_id || ''}
+                    onValueChange={seleccionarOrdenIgss}
+                    disabled={isReadOnly}
+                  >
+                    <SelectTrigger className="input-teal" data-testid="evaluacion-orden-select">
+                      <SelectValue placeholder="Seleccionar orden" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pacienteOrdenes.map((o, i) => (
+                        <SelectItem key={o.id || i} value={o.id || `ord_${i}`} data-testid={`evaluacion-orden-option-${i}`}>
+                          {`NOG ${o.nog || '—'}`}{o.no_sps ? ` · SPS ${o.no_sps}` : ''}{o.procedimiento ? ` · ${o.procedimiento}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.igss_orden_id && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      El informe de esta consulta mostrará el NOG y No. SPS de la orden seleccionada.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Motivo de Consulta */}
             <Card className="card-teal">
               <CardHeader className="pb-2">

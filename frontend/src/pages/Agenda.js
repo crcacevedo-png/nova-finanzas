@@ -388,6 +388,36 @@ const Agenda = () => {
   const [pacienteResults, setPacienteResults] = useState([]);
   const [searchingPaciente, setSearchingPaciente] = useState(false);
   const [creandoPaciente, setCreandoPaciente] = useState(false);
+  // Órdenes IGSS del paciente seleccionado (para elegir la orden de la cita)
+  const [citaOrdenes, setCitaOrdenes] = useState([]);
+
+  useEffect(() => {
+    const pid = citaForm.paciente_id;
+    if (!pid || citaForm.es_paciente_nuevo) { setCitaOrdenes([]); return; }
+    let cancel = false;
+    (async () => {
+      try {
+        const { data: p } = await patientApi.getById(pid);
+        if (cancel) return;
+        if (p.referral_institution === 'igss' && (p.igss_ordenes || []).length > 0) {
+          setCitaOrdenes(p.igss_ordenes);
+          setCitaForm(prev => {
+            if (prev.igss_orden_id) return prev;
+            const o = p.igss_ordenes[0];
+            return { ...prev, igss_orden_id: o.id || '', igss_nog: o.nog || '', igss_no_sps: o.no_sps || '', igss_procedimiento: o.procedimiento || '' };
+          });
+        } else {
+          setCitaOrdenes([]);
+        }
+      } catch (e) { if (!cancel) setCitaOrdenes([]); }
+    })();
+    return () => { cancel = true; };
+  }, [citaForm.paciente_id, citaForm.es_paciente_nuevo]);
+
+  const seleccionarOrdenCita = (ordenId) => {
+    const o = (citaOrdenes || []).find(x => (x.id || '') === ordenId);
+    setCitaForm(prev => ({ ...prev, igss_orden_id: ordenId, igss_nog: o?.nog || '', igss_no_sps: o?.no_sps || '', igss_procedimiento: o?.procedimiento || '' }));
+  };
   
   // Walk-in dialog
   const [walkInDialogOpen, setWalkInDialogOpen] = useState(false);
@@ -943,7 +973,11 @@ const Agenda = () => {
         notas: cita.notas || '',
         es_paciente_nuevo: false,
         nuevo_paciente_telefono: '',
-        nuevo_paciente_edad: ''
+        nuevo_paciente_edad: '',
+        igss_orden_id: cita.igss_orden_id || '',
+        igss_nog: cita.igss_nog || '',
+        igss_no_sps: cita.igss_no_sps || '',
+        igss_procedimiento: cita.igss_procedimiento || ''
       });
     } else {
       const med = prefill?.medicoId ? medicos.find(m => m.id === prefill.medicoId) : medicos[0];
@@ -960,7 +994,11 @@ const Agenda = () => {
         notas: '',
         es_paciente_nuevo: false,
         nuevo_paciente_telefono: '',
-        nuevo_paciente_edad: ''
+        nuevo_paciente_edad: '',
+        igss_orden_id: '',
+        igss_nog: '',
+        igss_no_sps: '',
+        igss_procedimiento: ''
       });
     }
     setPacienteSearch('');
@@ -2116,6 +2154,7 @@ const Agenda = () => {
             <div className="space-y-2">
               <Label>Paciente *</Label>
               {citaForm.paciente_id && !citaForm.es_paciente_nuevo ? (
+                <>
                 <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border border-blue-200">
                   <User className="w-4 h-4 text-blue-600" />
                   <span className="flex-1">{citaForm.paciente_nombre}</span>
@@ -2126,12 +2165,31 @@ const Agenda = () => {
                       ...prev, 
                       paciente_id: '', 
                       paciente_nombre: '',
-                      es_paciente_nuevo: false 
+                      es_paciente_nuevo: false,
+                      igss_orden_id: '', igss_nog: '', igss_no_sps: '', igss_procedimiento: ''
                     }))}
                   >
                     Cambiar
                   </Button>
                 </div>
+                {citaOrdenes.length > 0 && (
+                  <div className="mt-2 space-y-1" data-testid="cita-orden-igss">
+                    <Label className="text-xs text-blue-700">Orden IGSS de esta cita</Label>
+                    <Select value={citaForm.igss_orden_id || ''} onValueChange={seleccionarOrdenCita}>
+                      <SelectTrigger className="input-teal h-9" data-testid="cita-orden-select">
+                        <SelectValue placeholder="Seleccionar orden" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {citaOrdenes.map((o, i) => (
+                          <SelectItem key={o.id || i} value={o.id || `ord_${i}`} data-testid={`cita-orden-option-${i}`}>
+                            {`NOG ${o.nog || '—'}`}{o.no_sps ? ` · SPS ${o.no_sps}` : ''}{o.procedimiento ? ` · ${o.procedimiento}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                </>
               ) : citaForm.es_paciente_nuevo ? (
                 <div className="space-y-3 p-3 bg-amber-50 rounded border border-amber-200">
                   <div className="flex items-center justify-between">

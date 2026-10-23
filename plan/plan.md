@@ -1,62 +1,71 @@
-# Mejoras a la Evaluación Oftalmológica: Notas, Lensometría/Autorefractómetro y Copiar Refracción
+# Órdenes IGSS múltiples por paciente (dos consultas el mismo día)
 
-Tres mejoras a la pantalla de evaluación oftalmológica: una nota por paciente que se mantiene entre consultas, un identificador para el área de Lensometría/Autorefractómetro, y un botón para copiar la refracción a la receta de anteojos.
-El objetivo es agilizar la carga clínica y evitar reescribir datos que ya existen en el examen.
+Permite registrar más de una orden IGSS (cada una con su propio NOG y No. SPS) para un mismo paciente y atender ambas el mismo día como dos consultas distintas.
+Cada orden se guarda en el paciente, descuenta del saldo de su unidad IGSS y genera su propio expediente/informe.
 
 ## Para quién es
-Médicos oftalmólogos y personal clínico de Novavisión que registran evaluaciones en el expediente del paciente.
+Recepción y personal clínico que ingresa pacientes IGSS, y administradores IGSS que controlan el saldo de NOG por unidad.
 
 ## Funciones principales y experiencia
 
-### 1. Notas por paciente (constante en todas las consultas)
-- Se agrega una casilla de **Notas** debajo de la columna de Medicamentos.
-- La nota pertenece al paciente: el texto escrito aparece en todas sus consultas, actuales y futuras.
-- Es editable en cualquier consulta; al guardar, siempre se muestra el último texto ingresado para ese paciente.
-- No forma parte del informe PDF (es una nota de trabajo interna), salvo que se pida lo contrario más adelante.
+### 1. Lista de órdenes IGSS en el paciente
+- En la ficha del paciente IGSS se agrega una sección de **Órdenes** (en lugar de un solo NOG/SPS).
+- Cada orden contiene: **NOG**, **No. SPS**, **código IGSS**, y el **procedimiento/estudio** al que corresponde.
+- La **unidad IGSS** de todas las órdenes es la misma unidad asignada al paciente.
+- Un paciente puede tener varias órdenes (por ejemplo, dos para el mismo día, cada una para un procedimiento distinto).
+- La orden IGSS que hoy tiene el paciente (NOG/SPS actuales) se conserva y pasa a ser su primera orden, sin perder datos.
 
-### 2. Identificador Lensometría / Autorefractómetro
-- En el área que hoy se llama "Lensometría" se agrega un botón para marcar si esos valores corresponden a **Lensometría** o a **Autorefractómetro**.
-- El título visible del área cambia según la opción elegida.
-- La selección se guarda con la evaluación.
-- El PDF del informe conserva su título actual (la etiqueta elegida solo se ve en pantalla).
+### 2. Dos consultas el mismo día
+- Al atender/agendar, se elige **cuál orden** aplica a esa consulta.
+- Se permite crear una **segunda cita el mismo día** para el mismo paciente, vinculada a otra orden.
+- Las dos consultas aparecen como **dos citas separadas** en la agenda y **cuentan como dos pacientes atendidos**.
+- Cada consulta queda ligada a su orden (NOG/SPS), de modo que no se mezclan los datos de una con la otra.
 
-### 3. Copiar Refracción a la primera receta de anteojos
-- En el área de **Refracción** se agrega un botón para copiar los valores de refracción (esfera, cilindro, eje y adición de OD y OS) a la **primera receta de anteojos**.
-- La receta solo se crea/llena cuando se presiona el botón; no ocurre de forma automática.
-- Si todavía no existe una receta de anteojos, se crea la primera con esos valores.
-- Si la primera receta ya tiene datos, **se sobrescribe** con los valores de la refracción.
+### 3. Descuento de NOG con control individual
+- Cada orden **descuenta 1 servicio** del saldo de la unidad IGSS del paciente (dos órdenes distintas = dos descuentos).
+- Se mantiene el comportamiento actual de descontar al asignar la orden y de no duplicar el descuento del mismo NOG.
+- Se agrega, en el área de unidades IGSS, la posibilidad de **aplicar o liberar el descuento de cada NOG de forma individual** (además del recálculo masivo que ya existe), para corregir casos puntuales a mano.
+
+### 4. Un informe por consulta
+- Cada consulta genera su **propio expediente/informe PDF**, mostrando el **NOG y No. SPS de la orden** que le corresponde.
+- No se combinan ambas consultas en un solo PDF.
 
 ## Flujo de uso
-1. El médico abre la evaluación del paciente.
-2. Escribe o consulta la nota del paciente en la casilla de Notas (aparece el texto de consultas previas si ya existía).
-3. En el área de mediciones, marca si es Lensometría o Autorefractómetro y captura los valores.
-4. Captura la refracción; si desea, presiona "Copiar a receta de anteojos" para trasladar los valores a la primera receta.
-5. Guarda la evaluación; la nota queda disponible para la próxima consulta del paciente.
+1. Se ingresa o edita al paciente IGSS y se agregan sus órdenes (una o varias), cada una con su NOG, SPS, código y procedimiento.
+2. Al asignar cada orden, el sistema descuenta 1 del saldo de la unidad IGSS del paciente.
+3. Se agenda/atiende la primera consulta eligiendo la primera orden.
+4. Para el mismo día, se crea una segunda cita eligiendo la segunda orden.
+5. Se completa cada evaluación por separado; cada una genera su informe con su NOG/SPS.
+6. El administrador IGSS puede revisar el saldo de la unidad y, si hace falta, aplicar o liberar el descuento de un NOG puntual.
 
 ## Sensación de UI/UX
-- Consistente con el estilo actual del formulario (secciones colapsables, campos OD/OS, acentos azul/esmeralda).
-- Los botones nuevos son discretos, con íconos claros y texto corto, ubicados dentro de su sección correspondiente.
-- La acción de copiar muestra una confirmación breve (toast) indicando que los valores se copiaron.
+- Consistente con el estilo actual del sistema (acentos azul/esmeralda, secciones claras, formularios compactos).
+- La sección de Órdenes se ve como una lista con botón "Agregar orden", cada fila con sus campos y opción de eliminar.
+- La selección de orden al agendar/atender es un selector corto y claro.
+- El control individual de descuento en la unidad IGSS muestra, por NOG, si está descontado y botones discretos para aplicar/liberar, con confirmación breve.
 
 ## Fases de implementación
 
 ### Fase 1 (MVP — se construye ahora)
-- Casilla de Notas por paciente, persistente entre consultas.
-- Botón e identificador Lensometría/Autorefractómetro (solo en pantalla).
-- Botón para copiar refracción a la primera receta de anteojos (sobrescribe si ya tiene datos).
+- Sección de órdenes IGSS por paciente (NOG, SPS, código, procedimiento), con migración de la orden actual a la primera orden.
+- Dos citas el mismo día para el mismo paciente, cada una vinculada a una orden, contando como dos atenciones.
+- Descuento de NOG por orden, con control para aplicar/liberar el descuento de cada NOG de forma individual en la unidad IGSS.
+- Un informe/expediente por consulta, con el NOG y SPS de su orden.
 
 ### Fase 2 (futuro)
-- Historial/versionado de la nota del paciente (ver quién y cuándo la modificó).
-- Opción de incluir la nota en el PDF cuando el médico lo decida.
+- Reporte de órdenes por unidad y por fecha, y alertas de saldo bajo de la unidad IGSS.
+- Validaciones adicionales (por ejemplo, avisar si un NOG ya fue usado o si una orden quedó sin consulta).
+- Estado de cada orden (pendiente, atendida, anulada) con su historial.
 
 ### Fase 3 (futuro)
-- Plantillas de notas rápidas reutilizables.
-- Copiar refracción también a lentes de contacto y a recetas adicionales seleccionables.
+- Adjuntar la orden escaneada (PDF/imagen) a cada orden del paciente.
+- Flujo de aprobación/anulación de órdenes con registro de quién y cuándo.
 
 ## Supuestos
-- La nota se guarda a nivel del paciente y siempre muestra el último texto; editar en una consulta posterior actualiza la nota para todas (no se mantiene una copia distinta por consulta).
-- La nota es texto libre, sin límite estricto de longitud, y no aparece en el informe PDF.
-- El identificador Lensometría/Autorefractómetro aplica a ambos ojos (OD y OS) del área; no se separan en dos mediciones distintas.
-- "Primera receta de anteojos" es la primera de la lista de recetas de anteojos de esa evaluación.
-- Copiar refracción traslada esfera, cilindro, eje y adición para OD y OS; no modifica otros campos de la receta (material, tipo de lente, distancia pupilar, etc.).
-- Estas funciones aplican solo a evaluaciones editables (no selladas/bloqueadas).
+- Las dos órdenes del mismo día pertenecen siempre a la **misma unidad IGSS** del paciente (según lo indicado).
+- Cada orden descuenta **1 servicio**; dos órdenes con NOG distintos generan dos descuentos. No se vuelve a descontar el mismo NOG ya consumido.
+- El NOG y No. SPS dejan de manejarse como un único valor fijo del paciente y pasan a vivir dentro de cada orden; los datos actuales del paciente se conservan migrándolos a su primera orden.
+- El informe por consulta **sí muestra** el NOG y No. SPS de su orden (esto aplica al expediente de pacientes IGSS con orden).
+- Las órdenes y su selección aplican a pacientes IGSS; los pacientes particulares/otros no se ven afectados.
+- No hay límite estricto de órdenes por paciente, aunque el caso típico es una o dos.
+- La nota clínica, la agenda y demás funciones existentes siguen operando igual.

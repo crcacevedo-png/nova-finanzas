@@ -20,7 +20,7 @@ import { Progress } from './ui/progress';
 import { Skeleton } from './ui/skeleton';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { igssNogApi } from '../services/api';
+import { igssNogApi, patientApi } from '../services/api';
 
 const TIPO_COMPRA_OPTIONS = [
   { value: 'compra_directa', label: 'Compra Directa' },
@@ -194,6 +194,40 @@ const PacientesNog = ({ nogId, onAnulada }) => {
   const [anularTarget, setAnularTarget] = useState(null);
   const [motivo, setMotivo] = useState('');
   const [anulando, setAnulando] = useState(false);
+  // Aplicar descuento manual a un paciente
+  const [search, setSearch] = useState('');
+  const [resultados, setResultados] = useState([]);
+  const [buscando, setBuscando] = useState(false);
+  const [aplicandoId, setAplicandoId] = useState(null);
+
+  const buscarPacientes = async (q) => {
+    setSearch(q);
+    if (!q || q.trim().length < 2) { setResultados([]); return; }
+    try {
+      setBuscando(true);
+      const res = await patientApi.search(q.trim(), 6);
+      setResultados(res.data || []);
+    } catch (e) {
+      setResultados([]);
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const aplicarDescuento = async (pacienteId) => {
+    setAplicandoId(pacienteId);
+    try {
+      await igssNogApi.aplicarAcreditacion(nogId, pacienteId);
+      toast.success('Descuento aplicado al paciente.');
+      setSearch(''); setResultados([]);
+      fetch();
+      onAnulada && onAnulada();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'No se pudo aplicar el descuento');
+    } finally {
+      setAplicandoId(null);
+    }
+  };
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -227,10 +261,47 @@ const PacientesNog = ({ nogId, onAnulada }) => {
   };
 
   if (loading) return <div className="p-4"><Skeleton className="h-24 w-full" /></div>;
-  if (rows.length === 0) return <div className="p-4 text-sm text-gray-500">No hay pacientes acreditados en este NOG.</div>;
 
   return (
     <div className="p-3 bg-gray-50 rounded-lg" data-testid={`nog-pacientes-${nogId}`}>
+      {/* Aplicar descuento manual a un paciente (corrección puntual) */}
+      <div className="mb-3 p-2 bg-white rounded-lg border border-emerald-100" data-testid={`nog-aplicar-box-${nogId}`}>
+        <Label className="text-xs font-semibold text-emerald-700">Aplicar descuento a un paciente</Label>
+        <div className="relative mt-1">
+          <Input
+            value={search}
+            onChange={(e) => buscarPacientes(e.target.value)}
+            placeholder="Buscar por nombre, expediente o DPI..."
+            className="input-teal h-8 text-sm"
+            data-testid={`nog-aplicar-search-${nogId}`}
+          />
+          {(resultados.length > 0 || buscando) && (
+            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+              {buscando && <div className="p-2 text-xs text-gray-400">Buscando...</div>}
+              {resultados.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => aplicarDescuento(p.id)}
+                  disabled={aplicandoId === p.id}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-emerald-50 flex items-center justify-between"
+                  data-testid={`nog-aplicar-option-${p.id}`}
+                >
+                  <span>{p.full_name} <span className="text-xs text-gray-400">· {p.record_number || p.dpi || ''}</span></span>
+                  <span className="text-xs text-emerald-700">{aplicandoId === p.id ? 'Aplicando...' : 'Aplicar'}</span>
+                </button>
+              ))}
+              {!buscando && resultados.length === 0 && search.trim().length >= 2 && (
+                <div className="p-2 text-xs text-gray-400">Sin resultados</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="p-2 text-sm text-gray-500">No hay pacientes con descuento en este NOG.</div>
+      ) : (
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -262,6 +333,7 @@ const PacientesNog = ({ nogId, onAnulada }) => {
           </TableBody>
         </Table>
       </div>
+      )}
 
       <Dialog open={!!anularTarget} onOpenChange={(o) => { if (!o) { setAnularTarget(null); setMotivo(''); } }}>
         <DialogContent className="sm:max-w-[420px]">

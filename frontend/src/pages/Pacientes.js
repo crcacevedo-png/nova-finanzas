@@ -254,6 +254,7 @@ const Pacientes = () => {
       igss_tipo_compra: '',
       igss_nog: '',
       igss_tipo_paciente: '',
+      igss_ordenes: [],
       comments: ''
     });
     setEditingPatient(null);
@@ -286,6 +287,9 @@ const Pacientes = () => {
         igss_tipo_compra: patient.igss_tipo_compra || '',
         igss_nog: patient.igss_nog || '',
         igss_tipo_paciente: patient.igss_tipo_paciente || '',
+        igss_ordenes: (patient.igss_ordenes && patient.igss_ordenes.length > 0)
+          ? patient.igss_ordenes.map(o => ({ ...o }))
+          : [],
         comments: patient.comments || ''
       });
     } else {
@@ -293,6 +297,21 @@ const Pacientes = () => {
     }
     setDialogOpen(true);
   };
+
+  // Gestión de órdenes IGSS (múltiples NOG/SPS por paciente)
+  const addOrdenIgss = () => setFormData(prev => ({
+    ...prev,
+    igss_ordenes: [...(prev.igss_ordenes || []), { id: `ord_${Date.now()}`, nog: '', no_sps: '', codigo: '', procedimiento: '' }]
+  }));
+  const removeOrdenIgss = (idx) => setFormData(prev => ({
+    ...prev,
+    igss_ordenes: (prev.igss_ordenes || []).filter((_, i) => i !== idx)
+  }));
+  const updateOrdenIgss = (idx, field, value) => setFormData(prev => {
+    const arr = [...(prev.igss_ordenes || [])];
+    arr[idx] = { ...arr[idx], [field]: value };
+    return { ...prev, igss_ordenes: arr };
+  });
 
   const validateForm = () => {
     if (!formData.first_name.trim()) {
@@ -387,6 +406,7 @@ const Pacientes = () => {
       // Limpiar campos condicionales
       if (payload.referral_institution !== 'igss') {
         payload.igss_unit_id = '';
+        payload.igss_ordenes = [];
       }
       if (payload.referral_institution !== 'seguro_privado') {
         payload.insurance_name = '';
@@ -1188,7 +1208,7 @@ const Pacientes = () => {
                   {/* Campos adicionales IGSS */}
                   {formData.referral_institution === 'igss' && (
                     <>
-                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
+                      <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                         <div className="space-y-2">
                           <Label className="text-xs">Afiliación</Label>
                           <Input
@@ -1197,34 +1217,6 @@ const Pacientes = () => {
                             className="input-teal"
                             placeholder="No. Afiliación"
                             data-testid="patient-igss-afiliacion"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">No. SPS</Label>
-                          <Input
-                            value={formData.igss_no_sps}
-                            onChange={(e) => setFormData(prev => ({ ...prev, igss_no_sps: e.target.value }))}
-                            className="input-teal"
-                            placeholder="No. SPS"
-                            data-testid="patient-igss-sps"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Código</Label>
-                          <Input
-                            value={formData.igss_codigo}
-                            onChange={(e) => setFormData(prev => ({ ...prev, igss_codigo: e.target.value }))}
-                            className="input-teal"
-                            placeholder="Código"
-                            data-testid="patient-igss-codigo"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">NOG</Label>
-                          <NogSelector
-                            unitId={formData.igss_unit_id}
-                            value={formData.igss_nog}
-                            onChange={(val) => setFormData(prev => ({ ...prev, igss_nog: val }))}
                           />
                         </div>
                         <div className="space-y-2">
@@ -1260,6 +1252,79 @@ const Pacientes = () => {
                             </SelectContent>
                           </Select>
                         </div>
+                      </div>
+
+                      {/* Órdenes IGSS (una o varias por paciente) */}
+                      <div className="md:col-span-2 space-y-2 pt-2" data-testid="patient-igss-ordenes">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-semibold text-blue-700">Órdenes IGSS</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addOrdenIgss}
+                            disabled={!formData.igss_unit_id}
+                            className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                            data-testid="patient-add-orden"
+                          >
+                            <Plus className="w-3 h-3 mr-1" /> Agregar orden
+                          </Button>
+                        </div>
+                        {!formData.igss_unit_id && (
+                          <p className="text-xs text-gray-500">Selecciona una unidad IGSS para agregar órdenes.</p>
+                        )}
+                        {(formData.igss_ordenes || []).length === 0 && formData.igss_unit_id && (
+                          <p className="text-xs text-gray-500">Sin órdenes. Agrega al menos una con su NOG y No. SPS.</p>
+                        )}
+                        {(formData.igss_ordenes || []).map((orden, idx) => (
+                          <div key={orden.id || idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-2 bg-gray-50" data-testid={`patient-orden-row-${idx}`}>
+                            <div className="md:col-span-3 space-y-1">
+                              <Label className="text-xs">NOG {idx + 1}</Label>
+                              <NogSelector
+                                unitId={formData.igss_unit_id}
+                                value={orden.nog}
+                                onChange={(val) => updateOrdenIgss(idx, 'nog', val)}
+                              />
+                            </div>
+                            <div className="md:col-span-2 space-y-1">
+                              <Label className="text-xs">No. SPS</Label>
+                              <Input
+                                value={orden.no_sps || ''}
+                                onChange={(e) => updateOrdenIgss(idx, 'no_sps', e.target.value)}
+                                className="input-teal" placeholder="No. SPS"
+                                data-testid={`patient-orden-sps-${idx}`}
+                              />
+                            </div>
+                            <div className="md:col-span-2 space-y-1">
+                              <Label className="text-xs">Código</Label>
+                              <Input
+                                value={orden.codigo || ''}
+                                onChange={(e) => updateOrdenIgss(idx, 'codigo', e.target.value)}
+                                className="input-teal" placeholder="Código"
+                                data-testid={`patient-orden-codigo-${idx}`}
+                              />
+                            </div>
+                            <div className="md:col-span-4 space-y-1">
+                              <Label className="text-xs">Procedimiento / Estudio</Label>
+                              <Input
+                                value={orden.procedimiento || ''}
+                                onChange={(e) => updateOrdenIgss(idx, 'procedimiento', e.target.value)}
+                                className="input-teal" placeholder="Ej: Catarata OD"
+                                data-testid={`patient-orden-proc-${idx}`}
+                              />
+                            </div>
+                            <div className="md:col-span-1 flex justify-end">
+                              <Button
+                                type="button" variant="ghost" size="sm"
+                                onClick={() => removeOrdenIgss(idx)}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                                data-testid={`patient-orden-remove-${idx}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </>
                   )}

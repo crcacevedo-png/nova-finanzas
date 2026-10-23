@@ -46,6 +46,7 @@ class PatientBase(BaseModel):
     address: Optional[str] = ""
     comments: Optional[str] = ""
     nota_clinica: Optional[str] = ""
+    igss_ordenes: Optional[List[dict]] = None  # [{id, nog, no_sps, codigo, procedimiento}]
 
 
 class PatientCreate(PatientBase):
@@ -77,6 +78,7 @@ class PatientUpdate(BaseModel):
     address: Optional[str] = None
     comments: Optional[str] = None
     nota_clinica: Optional[str] = None
+    igss_ordenes: Optional[List[dict]] = None
     is_active: Optional[bool] = None
 
 
@@ -112,6 +114,7 @@ class PatientResponse(BaseModel):
     address: Optional[str] = ""
     comments: Optional[str] = ""
     nota_clinica: Optional[str] = ""
+    igss_ordenes: List[dict] = []
     is_active: bool = True
     created_by: Optional[str] = ""
     created_by_name: Optional[str] = ""
@@ -236,11 +239,47 @@ async def get_next_record_number() -> str:
     return candidate
 
 
+def _normalizar_ordenes_igss(ordenes) -> list:
+    """Normaliza la lista de órdenes IGSS: cada orden con id, nog, no_sps, codigo, procedimiento."""
+    out = []
+    for o in (ordenes or []):
+        if not isinstance(o, dict):
+            continue
+        nog = str(o.get("nog", "") or "").strip()
+        no_sps = str(o.get("no_sps", "") or "").strip()
+        codigo = str(o.get("codigo", "") or "").strip()
+        proc = str(o.get("procedimiento", "") or "").strip()
+        if not (nog or no_sps or codigo or proc):
+            continue
+        out.append({
+            "id": str(o.get("id") or uuid.uuid4()),
+            "nog": nog,
+            "no_sps": no_sps,
+            "codigo": codigo,
+            "procedimiento": proc,
+        })
+    return out
+
+
 async def enrich_patient(patient: dict) -> dict:
     """Enriquecer paciente con datos calculados y relaciones"""
     patient["full_name"] = f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip()
     patient["age"] = calcular_edad(patient.get("birth_date", ""))
     patient["referral_institution_label"] = INSTITUTION_LABELS.get(patient.get("referral_institution", ""), "")
+
+    # Migración lazy: si es IGSS y no tiene órdenes pero sí NOG/SPS/código legacy,
+    # exponer una primera orden derivada de esos campos (solo para la respuesta).
+    if patient.get("referral_institution") == "igss" and not patient.get("igss_ordenes"):
+        if patient.get("igss_nog") or patient.get("igss_no_sps") or patient.get("igss_codigo"):
+            patient["igss_ordenes"] = [{
+                "id": patient.get("id", "") + "_ord1",
+                "nog": patient.get("igss_nog", "") or "",
+                "no_sps": patient.get("igss_no_sps", "") or "",
+                "codigo": patient.get("igss_codigo", "") or "",
+                "procedimiento": "",
+            }]
+    if not patient.get("igss_ordenes"):
+        patient["igss_ordenes"] = []
     
     # Obtener nombre de unidad IGSS
     if patient.get("igss_unit_id"):
@@ -527,6 +566,9 @@ async def update_patient_nota_clinica(
     updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     enriched = await enrich_patient(updated)
     return PatientResponse(**enriched)
+
+
+@router.post("", response_model=PatientResponse)
 async def create_patient(patient_data: PatientCreate, current_user: dict = Depends(require_permission("create_patients"))):
     """Crear nuevo paciente"""
     if not validate_phone(patient_data.phone):
@@ -594,6 +636,24 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
         "updated_by": "",
         "updated_at": now
     }
+    
+    # Órdenes IGSS (múltiples NOG/SPS por paciente). Migra el NOG/SPS actual a la 1ª orden.
+    if patient_data.referral_institution == "igss":
+        ordenes = _normalizar_ordenes_igss(patient_data.igss_ordenes)
+        if not ordenes and (patient_data.igss_nog or patient_data.igss_no_sps or patient_data.igss_codigo):
+            ordenes = _normalizar_ordenes_igss([{
+                "nog": patient_data.igss_nog or "",
+                "no_sps": patient_data.igss_no_sps or "",
+                "codigo": patient_data.igss_codigo or "",
+                "procedimiento": "",
+            }])
+        patient_doc["igss_ordenes"] = ordenes
+        primera = ordenes[0] if ordenes else {}
+        patient_doc["igss_nog"] = primera.get("nog", "")
+        patient_doc["igss_no_sps"] = primera.get("no_sps", "")
+        patient_doc["igss_codigo"] = primera.get("codigo", "")
+    else:
+        patient_doc["igss_ordenes"] = []
     
     await db.patients.insert_one(patient_doc)
     if "_id" in patient_doc:
@@ -663,6 +723,30 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
             update_data["insurance_name"] = ""
         if update_data["referral_institution"] != "otra":
             update_data["other_institution_name"] = ""
+    
+    # Órdenes IGSS: normalizar y sincronizar los campos legacy con la primera orden
+    if referral == "igss":
+        if "igss_ordenes" in update_data:
+            ordenes = _normalizar_ordenes_igss(update_data["igss_ordenes"])
+        else:
+            ordenes = _normalizar_ordenes_igss(patient.get("igss_ordenes"))
+        # Fallback: derivar de los campos legacy si aún no hay órdenes
+        if not ordenes:
+            leg_nog = update_data.get("igss_nog", patient.get("igss_nog"))
+            leg_sps = update_data.get("igss_no_sps", patient.get("igss_no_sps"))
+            leg_cod = update_data.get("igss_codigo", patient.get("igss_codigo"))
+            if leg_nog or leg_sps or leg_cod:
+                ordenes = _normalizar_ordenes_igss([{
+                    "nog": leg_nog or "", "no_sps": leg_sps or "",
+                    "codigo": leg_cod or "", "procedimiento": "",
+                }])
+        update_data["igss_ordenes"] = ordenes
+        primera = ordenes[0] if ordenes else {}
+        update_data["igss_nog"] = primera.get("nog", "")
+        update_data["igss_no_sps"] = primera.get("no_sps", "")
+        update_data["igss_codigo"] = primera.get("codigo", "")
+    elif "referral_institution" in update_data:
+        update_data["igss_ordenes"] = []
     
     update_data["updated_by"] = current_user["id"]
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
