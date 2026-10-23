@@ -2250,27 +2250,29 @@ const EvaluacionOftalmologica = () => {
                     disabled={isReadOnly}
                     placeholder="20/..."
                   />
-                  <div className="grid grid-cols-3 gap-2 items-center">
-                    <Label className="text-xs text-right pr-2">AV Binocular</Label>
-                    <Input
-                      value={formData.examen.av_binocular}
-                      onChange={(e) => updateNestedField('examen.av_binocular', e.target.value)}
-                      disabled={isReadOnly}
-                      placeholder="20/..."
-                      className="input-teal text-sm h-8 col-span-2"
-                      data-testid="examen-av-binocular"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 items-center">
-                    <Label className="text-xs text-right pr-2">AV Cerca</Label>
-                    <Input
-                      value={formData.examen.av_cerca}
-                      onChange={(e) => updateNestedField('examen.av_cerca', e.target.value)}
-                      disabled={isReadOnly}
-                      placeholder="20/..."
-                      className="input-teal text-sm h-8 col-span-2"
-                      data-testid="examen-av-cerca"
-                    />
+                  <div className="grid grid-cols-2 gap-3 items-center">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">AV Binocular</Label>
+                      <Input
+                        value={formData.examen.av_binocular}
+                        onChange={(e) => updateNestedField('examen.av_binocular', e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="20/..."
+                        className="input-teal text-sm h-8"
+                        data-testid="examen-av-binocular"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">AV Cerca</Label>
+                      <Input
+                        value={formData.examen.av_cerca}
+                        onChange={(e) => updateNestedField('examen.av_cerca', e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="20/..."
+                        className="input-teal text-sm h-8"
+                        data-testid="examen-av-cerca"
+                      />
+                    </div>
                   </div>
                 </div>
                 
