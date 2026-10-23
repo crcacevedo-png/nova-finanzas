@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 38 — Tipo de Compra visible en el expediente IGSS)
+**Última actualización**: 2026-06 (Sesión 39 — Administrador IGSS puede revisar expedientes oftalmológicos + Tipo de Compra en PDF)
+
+### Sesión 39 — Acceso del Administrador IGSS a Evaluación Oftalmológica (solo lectura) + Tipo de Compra en el PDF (2026-06)
+- ✅ **Bug: el rol Administrador IGSS no podía revisar expedientes oftalmológicos** pese a tener el menú "Evaluación Oftalmológica" habilitado. Causa raíz: la ruta `/evaluacion-oftalmologica` estaba protegida por `requiredPermission="view_evaluacion"` (permiso que el rol no tiene), mientras que módulos equivalentes como Sala de Operaciones usan `requiredMenu`. **Fix** (`App.js`): la ruta ahora usa `<ProtectedRoute requiredMenu="evaluacion_oftalmologica">`, por lo que habilitar el menú concede acceso. Como el rol carece de `view_evaluacion`, la página queda en **solo lectura** (puede revisar historial, abrir evaluaciones y descargar PDF, pero no crear/editar). Regresión OK: superadmin y médico mantienen acceso de edición.
+- ✅ **Tipo de Compra en el PDF del reporte** (`routes/evaluaciones.py`): en el bloque "Datos del Paciente" de pacientes IGSS ahora aparece "IGSS Tipo de Compra:" con etiqueta legible (Compra Directa / Baja Cuantía / Contrato / Convenio). Aplica a todos los reportes de pacientes IGSS. El PDF sigue en 1 página.
+- ✅ **Verificado**: testing agent frontend `iteration_88.json` 100% (igss.admin entra y revisa en solo lectura; superadmin/medico editan) + curl/pypdf confirma "Compra Directa" en el PDF. Sin bugs.
+- **Nota preview**: se replicó la config de menús de producción para `administrador_igss` en preview (pacientes, unidades_igss, evaluacion_oftalmologica, sala_operaciones, agenda). En producción el rol ya tiene estos menús habilitados.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 38 — "Tipo de Compra" aparece en el expediente del paciente IGSS (2026-06)
 - ✅ En la ficha/expediente del paciente (modal "ver" en Pacientes), para pacientes IGSS ahora se muestra el campo **"Tipo de Compra"** (`view-patient-igss-tipo-compra`) con etiqueta legible (Compra Directa / Baja Cuantía / Contrato / Convenio), junto a Tipo de Paciente y NOG. Antes no aparecía.

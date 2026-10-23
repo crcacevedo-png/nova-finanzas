@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only test of the route guard change on /evaluacion-oftalmologica (requiredMenu='evaluacion_oftalmologica'). igss.admin can now open Evaluación Oftalmológica from the sidebar (nav-evaluacion). There is no redirect, the page does not crash, and it is read-only: Nueva is disabled, Guardar/Limpiar vacías are hidden, and 0/14 textareas and 0/23 inputs are enabled. With ?paciente_id=4ceb89de... the patient Paciente110 Demo U5 loads. The Historial dropdown lists 5 evaluations, and choosing one fills the form read-only (motivo 'Retina'). From Pacientes, the evaluaciones-patient-{id} dialog lists 5 evaluations, 'Ver' opens the detail view and 'PDF' downloads evaluacion_EXP-202610-0241_23-10-2026.pdf. Regression checks pass: superadmin and medico_test both reach the page, and both get an editable form with Nueva enabled, Guardar shown and enabled, and 14 editable textareas.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EvaluacionOftalmologica patient search", "issue": "The search input is disabled when isReadOnly (line ~1647), so read-only roles (igss.admin) cannot search or pick a patient from inside the page. They can only get one via ?paciente_id= or the Pacientes list. Since the role exists to review records, search should be gated on something other than isReadOnly (for example, keep it enabled always).", "selector": "[data-testid='search-paciente']", "priority": "MEDIUM"},
+      {"component": "EvaluacionOftalmologica preselect toast", "issue": "Read-only users opening ?paciente_id= see the toast 'Paciente cargado para nueva evaluación', which is misleading because they cannot create one. Show a different message in read-only mode.", "selector": "toast", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Allow search-paciente for read-only roles: replace disabled={isReadOnly} with a check that does not block viewing.",
+    "Use a read-only toast text when canEdit=false.",
+    "(Pre-existing, optional) Opening ?paciente_id= as an editor starts autosave right away ('1 pendiente(s)/Cambios sin guardar'). This may be why Paciente110 has several empty 'Sin diagnóstico registrado' evaluations."
+  ],
+  "critical_code_review_comments": [
+    "The ProtectedRoute requiredMenu guard is correct and waits for menusLoaded for non-superadmin users.",
+    "The canEdit/isReadOnly split is applied consistently to form fields."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped per request)", "frontend": "100% of requested flows pass; 1 medium usability issue"},
+  "test_credentials": "igss.admin/IgssAdmin2024$, superadmin/nova2024, medico_test/medico2024 (from /app/memory/test_credentials.md) - all work",
+  "seed_data_creation": "None. Note: visiting ?paciente_id= as superadmin/medico may have triggered an autosave draft for Paciente110.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Historial dropdown: click [data-testid=historial-toggle-btn] without force and wait about 2s before counting [data-testid^=historial-item-]. The Pacientes search input is input[placeholder*=Buscar]."
+}
