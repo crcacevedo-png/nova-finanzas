@@ -4,7 +4,16 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-10 (Sesión 34 — Migración a producción + DPI/email + Respaldos semanales)
+**Última actualización**: 2026-06 (Sesión 35 — Identificación IGSS en Tablero del Día + Motivo auto desde NOG)
+
+### Sesión 35 — IGSS: badge de institución en el Tablero + Motivo de consulta automático desde el NOG (2026-06)
+- ✅ **Badge de institución en cada tarjeta de cita** (`CitaCard` en `Agenda.js`): pacientes IGSS muestran un badge verde "IGSS"; otras instituciones muestran su etiqueta (`referral_institution_label`), o "Sin institución". data-testid `institucion-badge-{cita.id}`. Aplica a Tablero del Día, vista Día y Mi Agenda.
+- ✅ **Backend** (`routes/agenda.py` `/mi-dia`): citas enriquecidas con `referral_institution`, `referral_institution_label` y `orden_id` del paciente/orden vinculada.
+- ✅ **Motivo de consulta automático** (`EvaluacionOftalmologica.js` `cargarNotaPaciente`): al abrir una NUEVA evaluación de un paciente IGSS, se resuelve el NOG (preferido el de la cita, si no el primero) vía `GET /igss-units/{unit_id}/nogs-activos` y se autollena `motivo_consulta` con la descripción del servicio (`nombre_servicio`). Usa `setFormData` → el textarea es controlado (`value={formData.motivo_consulta}`), por lo que el valor queda en el estado y se guarda al enviar.
+- ✅ **Decisión del usuario**: si el NOG del paciente IGSS NO tiene descripción, el motivo se **deja vacío** para que el médico lo escriba (ya implementado con `if (desc)`). No se agregaron más elementos al Tablero por ahora (el usuario respondió "Ninguna").
+- ✅ **Verificado**: screenshots previos (badges "IGSS" en el Tablero + "Retina" autollenado en el textarea) + revisión de código (binding de estado controlado correcto). App carga sin errores.
+- **Pendiente Fase 2 (futuro, no solicitado aún)**: filtrar/ordenar el Tablero por institución; mostrar NOG/No. SPS junto al nombre en la tarjeta. **Fase 3**: resumen del día por institución (conteo IGSS vs otros) en las tarjetas superiores.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 34 — Respaldos automáticos semanales (2026-10)
 - ✅ Backend `routes/backups.py`: vuelca TODAS las colecciones a JSON gzip y lo sube al almacenamiento de objetos de Emergent (`INTEGRATION_PROXY_URL` + `EMERGENT_LLM_KEY`). Metadatos en colección `backups`. Endpoints solo superadmin: `GET /api/backups`, `POST /api/backups/run`, `GET /api/backups/{id}/download`, `DELETE /api/backups/{id}`. Webhook cron `POST /api/cron/backup` (auth `Bearer WEBHOOK_CRON_SECRET`, ack inmediato, trabajo en background).

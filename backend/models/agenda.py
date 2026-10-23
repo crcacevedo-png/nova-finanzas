@@ -99,6 +99,8 @@ class CitaResponse(BaseModel):
     igss_nog: Optional[str] = None
     igss_no_sps: Optional[str] = None
     igss_procedimiento: Optional[str] = None
+    referral_institution: Optional[str] = None
+    referral_institution_label: Optional[str] = None
     creado_por: str
     creado_por_nombre: Optional[str] = ""
     fecha_creacion: str

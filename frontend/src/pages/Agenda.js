@@ -120,6 +120,15 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
             <Clock className="w-3 h-3" />
             {formatTime(cita.hora_inicio)}
             {cita.tipo_cita && <span className="ml-1">• {cita.tipo_cita}</span>}
+            {cita.referral_institution === 'igss' ? (
+              <Badge className="ml-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] px-1.5 py-0 h-auto font-semibold" data-testid={`institucion-badge-${cita.id}`}>
+                IGSS
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="ml-1 bg-slate-100 text-slate-600 border border-slate-300 text-[10px] px-1.5 py-0 h-auto" data-testid={`institucion-badge-${cita.id}`}>
+                {cita.referral_institution_label || 'Sin institución'}
+              </Badge>
+            )}
             {sobrecupo && (
               <Badge className="ml-1 bg-amber-100 text-amber-800 border border-amber-300 text-[10px] px-1.5 py-0 h-auto" data-testid={`sobrecupo-badge-${cita.id}`}>
                 Sobrecupo
@@ -178,7 +187,7 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
               <Eye className="w-4 h-4 mr-2" /> Ver paciente
             </DropdownMenuItem>
             {onNuevaEvaluacion && (
-              <DropdownMenuItem onClick={() => onNuevaEvaluacion(cita.paciente_id)} data-testid={`nueva-evaluacion-cita-${cita.id}`}>
+              <DropdownMenuItem onClick={() => onNuevaEvaluacion(cita.paciente_id, cita.igss_orden_id)} data-testid={`nueva-evaluacion-cita-${cita.id}`}>
                 <Stethoscope className="w-4 h-4 mr-2" /> Evaluación Oftalmológica
               </DropdownMenuItem>
             )}
@@ -1246,12 +1255,13 @@ const Agenda = () => {
   };
 
   // Abrir una hoja de evaluación NUEVA para el paciente (misma pantalla)
-  const handleNuevaEvaluacion = (pacienteId) => {
+  const handleNuevaEvaluacion = (pacienteId, igssOrdenId) => {
     if (!pacienteId) {
       toast.error('Esta cita no tiene un paciente vinculado');
       return;
     }
-    navigate(`/evaluacion-oftalmologica?paciente_id=${pacienteId}`);
+    const q = igssOrdenId ? `&igss_orden_id=${encodeURIComponent(igssOrdenId)}` : '';
+    navigate(`/evaluacion-oftalmologica?paciente_id=${pacienteId}${q}`);
   };
   
   const navegarFecha = (dias) => {

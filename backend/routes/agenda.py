@@ -24,6 +24,30 @@ from routes.auth import get_current_user, require_permission, require_role
 import os
 from fastapi import Header
 
+INSTITUTION_LABELS = {
+    "particular": "Particular",
+    "igss": "IGSS",
+    "seguro_privado": "Seguro Privado",
+    "otra": "Otra Institución",
+}
+
+
+async def _enriquecer_instituciones(citas: list) -> list:
+    """Agrega referral_institution y su etiqueta a cada cita, tomados de la ficha
+    del paciente (para mostrar el origen en el Tablero del Día)."""
+    pac_ids = list({c.get("paciente_id") for c in citas if c.get("paciente_id")})
+    inst_map = {}
+    if pac_ids:
+        async for p in db.patients.find(
+            {"id": {"$in": pac_ids}}, {"_id": 0, "id": 1, "referral_institution": 1}
+        ):
+            inst_map[p["id"]] = p.get("referral_institution")
+    for c in citas:
+        inst = inst_map.get(c.get("paciente_id"))
+        c["referral_institution"] = inst or None
+        c["referral_institution_label"] = INSTITUTION_LABELS.get(inst, "") if inst else ""
+    return citas
+
 # Routers
 router = APIRouter(prefix="/agenda", tags=["Agenda"])
 medicos_agenda_router = APIRouter(prefix="/medicos-agenda", tags=["Médicos Agenda"])
@@ -324,6 +348,7 @@ async def listar_citas(
         query["estado"] = {"$ne": EstadoCita.CANCELADA.value}
     
     citas = await db.citas.find(query, {"_id": 0}).sort([("hora_inicio", 1)]).to_list(500)
+    await _enriquecer_instituciones(citas)
     return CitaListResponse(data=citas, total=len(citas))
 
 
@@ -864,6 +889,7 @@ async def mi_agenda_del_dia(
         ]
     
     citas = await db.citas.find(query, {"_id": 0}).sort("hora_inicio", 1).to_list(500)
+    await _enriquecer_instituciones(citas)
     
     # Separar presentes
     presentes = []

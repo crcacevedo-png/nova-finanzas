@@ -252,6 +252,7 @@ const EvaluacionOftalmologica = () => {
   // Ref con el id del paciente actual (para acotar el Historial a ese paciente)
   const pacienteIdRef = useRef(null);
   const preseleccionDoneRef = useRef(false);
+  const preferredOrdenIdRef = useRef(null);
   const [searchParams] = useSearchParams();
   const [evaluacionActual, setEvaluacionActual] = useState(null);
   // Snapshot de la evaluación en curso (del día) para poder regresar tras ver el historial
@@ -429,7 +430,7 @@ const EvaluacionOftalmologica = () => {
   const [pacienteOrdenes, setPacienteOrdenes] = useState([]);
   const [pacienteEsIgss, setPacienteEsIgss] = useState(false);
 
-  const cargarNotaPaciente = useCallback(async (pid) => {
+  const cargarNotaPaciente = useCallback(async (pid, autofillMotivo = false) => {
     if (!pid) { setNotaPaciente(''); setPacienteOrdenes([]); setPacienteEsIgss(false); return; }
     try {
       const token = localStorage.getItem('token');
@@ -439,6 +440,28 @@ const EvaluacionOftalmologica = () => {
       setNotaPaciente(data.nota_clinica || '');
       setPacienteEsIgss(data.referral_institution === 'igss');
       setPacienteOrdenes(data.igss_ordenes || []);
+      // Motivo de consulta automático desde la descripción del NOG (solo pacientes IGSS, al abrir nueva evaluación)
+      if (autofillMotivo && data.referral_institution === 'igss' && data.igss_unit_id) {
+        const ordenes = data.igss_ordenes || [];
+        const pref = preferredOrdenIdRef.current;
+        const orden = ordenes.find(o => (o.id || '') === pref) || ordenes[0];
+        const numeroNog = (orden?.nog || '').trim();
+        if (numeroNog) {
+          try {
+            const { data: nogs } = await axios.get(
+              `${API_URL}/igss-units/${data.igss_unit_id}/nogs-activos`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const nog = (nogs || []).find(n => (n.numero || '').trim() === numeroNog);
+            const desc = (nog?.nombre_servicio || '').trim();
+            if (desc) {
+              setFormData(prev => ({ ...prev, motivo_consulta: desc }));
+            }
+          } catch (e) {
+            // silencioso: si no se puede resolver el NOG, se deja el motivo como está
+          }
+        }
+      }
     } catch (e) {
       // silencioso
     }
@@ -457,12 +480,14 @@ const EvaluacionOftalmologica = () => {
     }));
   };
 
-  // Autoseleccionar la primera orden si el paciente es IGSS y la evaluación aún no tiene orden
+  // Autoseleccionar la orden si el paciente es IGSS y la evaluación aún no tiene orden.
+  // Prefiere la orden vinculada a la cita (preferredOrdenIdRef); si no, la primera.
   useEffect(() => {
     if (!pacienteEsIgss || !pacienteOrdenes || pacienteOrdenes.length === 0) return;
     if (formData.igss_orden_id) return;
-    const first = pacienteOrdenes[0];
-    seleccionarOrdenIgss(first.id || '');
+    const pref = preferredOrdenIdRef.current;
+    const chosen = pacienteOrdenes.find(o => (o.id || '') === pref) || pacienteOrdenes[0];
+    seleccionarOrdenIgss(chosen.id || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pacienteOrdenes, pacienteEsIgss]);
 
@@ -1255,7 +1280,7 @@ const EvaluacionOftalmologica = () => {
     borradorRef.current = null;
     setViendoHistorial(false);
     fetchEvaluaciones(paciente.id);
-    cargarNotaPaciente(paciente.id);
+    cargarNotaPaciente(paciente.id, true);
     
     // Cargar historial médico del paciente (antecedentes y medicamentos)
     try {
@@ -1289,6 +1314,7 @@ const EvaluacionOftalmologica = () => {
     const pid = searchParams.get('paciente_id');
     if (!pid || preseleccionDoneRef.current || loading) return;
     preseleccionDoneRef.current = true;
+    preferredOrdenIdRef.current = searchParams.get('igss_orden_id') || null;
     (async () => {
       try {
         const token = localStorage.getItem('token');
