@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only validation of 'Pacientes Presentes en Clínica' panel (Agenda > Tablero del Día, fecha 2026-10-22) for Atendida persistence. Flow run via UI on cita 6f3b5383 (Carlos Lopez, Dra. Ana García): Marcar llegada -> Presente (Iniciar button shown) -> Iniciar -> En consulta (Atendida button shown) -> Atendida. Card remains visible with green badge presente-atendida-badge-{id}, Iniciar/Atendida buttons hidden, wait time hidden; persists after page reload. Dropdown for Atendida shows only 'Evaluación Oftalmológica' + 'Deshacer atendida' (cancelar-llegada and 'No asistió' hidden). Deshacer atendida -> card stays visible in 'En consulta' with Atendida button and dropdown again shows Cancelar llegada / No asistió. All 3 requested features PASS.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Tablero del Día", "issues": ["Panel header badge 'Pacientes Presentes en Clínica' shows 1 (total_presentes now includes Atendida) while the top 'Presentes' counter shows 0 — consider renaming or showing 'X presentes / Y atendidas' to avoid confusion"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: add data-testid to 'Iniciar' and 'Atendida' buttons and the dropdown trigger in PacientePresenteCard (currently none) for test robustness",
+    "Optional: clarify total_presentes count vs. 'Presentes' KPI now that Atendida patients are included"
+  ],
+  "critical_code_review_comments": [
+    "Agenda.js is ~2767 lines; should be split into modules",
+    "backend /presentes total_presentes counts Atendida too — semantic mismatch with KPI 'Presentes'"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None. Test cita 6f3b5383-37cd-400d-95a9-bab5792bb9ef reverted to pre-arrival state via PATCH revertir-llegada after testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use fecha 2026-10-22 in Agenda (agenda-fecha-input). Panel is in 'Tablero del Día' tab. Mi Agenda panel ('Mis Pacientes Presentes') uses same PacientePresenteCard component but was not separately exercised (superadmin not linked to a doctor; use medico_test/medico2024 for that)."
+}

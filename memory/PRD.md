@@ -4,7 +4,13 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 36 — PDF evaluación en 1 página + indicaciones de estudios/procedimientos IGSS)
+**Última actualización**: 2026-06 (Sesión 37 — Pacientes Atendidos permanecen en la lista del Tablero)
+
+### Sesión 37 — El paciente Atendido NO se elimina de la lista "Pacientes Presentes en Clínica" (2026-06)
+- ✅ Al marcar a un paciente como **Atendida** (Iniciar→En consulta→Atendida), la tarjeta **permanece visible** en el panel "Pacientes Presentes en Clínica" del Tablero del Día y de "Mi Agenda", en vez de desaparecer.
+- ✅ **Backend** (`routes/agenda.py`): el filtro de `GET /api/agenda/presentes` y la lista `pacientes_presentes` de `GET /api/agenda/mi-dia` ahora incluyen `EstadoCita.ATENDIDA` además de Presente y En consulta.
+- ✅ **Frontend** (`Agenda.js` `PacientePresenteCard`): para estado "Atendida" la tarjeta muestra un **badge verde "Atendida"** (`presente-atendida-badge-{cita_id}`), oculta los botones Iniciar/Atendida y el tiempo de espera, y en el menú (…) ofrece **"Deshacer atendida"** (`deshacer-atendida-presente-{cita_id}`) que la regresa a "En consulta". Para Atendida se ocultan "Cancelar llegada" y "No asistió".
+- ✅ **Verificado**: curl backend + testing agent frontend `iteration_87.json` 100% (flujo completo, persiste tras recargar, deshacer funciona). Sin bugs. ⚠️ Requiere redespliegue.
 
 ### Sesión 36 — PDF de evaluación en 1 página + Indicaciones por estudio/procedimiento IGSS (2026-06)
 - ✅ **PDF de reporte en 1 sola página** (`routes/evaluaciones.py` `GET /{id}/pdf`): se redujeron los tamaños de letra (Título 16→13, Secciones 12→9.5, cuerpo 10→8, celdas 8→7.5) y los espaciados. **Cuadro de refracción reducido a ~la mitad** (colWidths 5×1.2" ≈ 6" → [0.85,0.6,0.6,0.5,0.6]" ≈ 3.15", fuente 9→7.5). También se redujeron la tabla de Agudeza Visual y la de Anteojos, el logo (1.0×1.35"→0.75×1.0") y el `bottomMargin` 160→150. **Verificado**: evaluación de prueba con agudeza visual + refracción + 2 estudios → PDF de **1 página** (pypdf) y render visual correcto.
