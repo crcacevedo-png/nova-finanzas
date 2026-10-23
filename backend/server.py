@@ -4152,6 +4152,7 @@ async def startup_event():
                 "import_patients": True,
                 "export_patients": True,
                 "manage_igss_units": True,
+                "view_evaluacion": True,
             },
             "color": "teal",
             "is_active": True,
@@ -4159,6 +4160,12 @@ async def startup_event():
             "updated_at": _now_igss,
             "created_by": "system",
         })
+    else:
+        # Migración idempotente: asegurar que el rol existente pueda crear/editar/revisar evaluaciones
+        await db.roles.update_one(
+            {"name": "administrador_igss", "permissions.view_evaluacion": {"$ne": True}},
+            {"$set": {"permissions.view_evaluacion": True, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
     # Índice único por token de la blacklist

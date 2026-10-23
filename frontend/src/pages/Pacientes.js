@@ -139,8 +139,8 @@ const Pacientes = () => {
   const canEdit = hasPermission('edit_patients');
   const canDelete = hasPermission('delete_patients');
   const canExport = hasPermission('export_patients');
-  // Roles con permiso de crear/editar evaluaciones (coherente con el backend y EvaluacionOftalmologica)
-  const canCreateEvaluacion = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'usuario' || user?.role === 'medico';
+  // Mostrar ícono de evaluación a cualquier rol con permiso view_evaluacion (incluye Administrador IGSS)
+  const canCreateEvaluacion = hasPermission('view_evaluacion');
 
   const fetchIgssUnits = useCallback(async () => {
     try {
