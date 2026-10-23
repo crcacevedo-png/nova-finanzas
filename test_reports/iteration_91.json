@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only test of (1) the new AV Binocular / AV Cerca fields in Evaluación Oftalmológica and (2) the institution badge on Pacientes Presentes cards. Both features pass. Eval 3b315ec0 (IGSS patient 4ceb89de), logged in as superadmin: both fields show up as single boxes under 'Con Corrección' and are editable. Saved 20/30 + J3, re-navigated, reopened from Historial: values were still there. Then restored 20/25 + J2 and checked those persisted too. Tablero del Día, date 2026-10-22: the Carlos Lopez card shows a green (emerald) 'IGSS' badge next to 'Primera Consulta'. Regression flow passed: Iniciar -> 'Atendida' button -> Atendida badge shown, institution badge still there -> menu shows Evaluación Oftalmológica + Deshacer atendida -> Deshacer works. While Presente, the menu shows Cancelar llegada / No asistió. No layout breakage.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Agenda.js PacientePresenteCard: the Iniciar/Atendida buttons and the 3-dot menu trigger have no data-testid. Consider adding presente-iniciar-{id}, presente-atendida-btn-{id} and presente-menu-{id}.",
+    "Mi Agenda ('Mis Pacientes Presentes') uses the same PacientePresenteCard, and /mi-dia includes referral_institution fields (routes/agenda.py ~l.920). medico_test (Dr. Carlos Méndez) has no present patients on 2026-10-22, so the badge was checked in the browser only on the Tablero del Día; for Mi Agenda it was confirmed from the code.",
+    "The grey 'Sin institución' / non-IGSS label branch was not seen in the UI because no non-IGSS present patient exists in the test data."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (frontend only)", "frontend": "100%"},
+  "seed_data_creation": "None created. Side effect: during the regression test, cita 6f3b5383-37cd-400d-95a9-bab5792bb9ef (Carlos Lopez, 2026-10-22, Dra. Ana García) went Presente -> En consulta -> Atendida -> Deshacer and is now in 'En consulta' (was 'Presente'). Eval 3b315ec0 was restored to av_binocular='20/25', av_cerca='J2'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Tablero del Día: set [data-testid=agenda-fecha-input] to 2026-10-22, then click tab 'Tablero del Día'. Eval: /evaluacion-oftalmologica?paciente_id=4ceb89de-628f-4aa9-a545-fe6c4f4affc5, click historial-toggle-btn, then historial-item-3b315ec0-6001-4391-bf63-f88c40db1b6f. Save button: eval-guardar-btn. The browser clock in this environment is 2026-10-23."
+}

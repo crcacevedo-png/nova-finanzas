@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 40 — Administrador IGSS crea/edita evaluaciones + ícono en Pacientes)
+**Última actualización**: 2026-06 (Sesión 41 — AV Binocular/Cerca en evaluación + institución en Pacientes Presentes)
+
+### Sesión 41 — Campos AV Binocular / AV Cerca + Institución en "Pacientes Presentes" (2026-06)
+- ✅ **AV Binocular y AV Cerca** (`EvaluacionOftalmologica.js` + `models/evaluacion_oftalmologica.py`): debajo de "Agudeza Visual" (filas Sin/Con Corrección) se agregaron dos campos de texto libre de un solo cuadro cada uno — `examen-av-binocular` y `examen-av-cerca` (ej. "20/25", "J2"). Nuevos campos de modelo `av_binocular`, `av_cerca`. Persisten al guardar/recargar.
+- ✅ **Institución en "Mis Pacientes Presentes"** (`Agenda.js` `PacientePresenteCard` + backend `/presentes` y `/mi-dia`): cada tarjeta de paciente presente ahora muestra el badge de institución (verde "IGSS" u otra etiqueta / "Sin institución") junto al tipo de cita, igual que el Tablero del Día. `PacientePresenteResponse` incluye `referral_institution` y `referral_institution_label`; `/presentes` ahora llama `_enriquecer_instituciones`. data-testid `presente-institucion-badge-{cita_id}`.
+- ✅ **Verificado**: testing agent `iteration_91.json` 100% (ambos campos persisten; badge IGSS en tarjetas presentes; sin regresión en flujo Iniciar/Atendida/Deshacer) + curl (round-trip AV y /presentes con institución). Sin bugs.
+- **Nota**: AV Binocular/Cerca aún NO se incluyen en el PDF del reporte (no solicitado); posible mejora futura.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 40 — Edición de evaluaciones para Administrador IGSS + ícono de evaluación en Pacientes (2026-06)
 - ✅ **El Administrador IGSS ahora puede CREAR/EDITAR evaluaciones oftalmológicas** (no solo revisar). Se otorgó el permiso `view_evaluacion` al rol `administrador_igss` (`server.py`: añadido al seed + **migración idempotente** que actualiza el rol existente en cada arranque → aplica también en producción). Además se corrigió `routes/evaluaciones.py`: las **6 verificaciones de rol hardcodeadas** (crear, editar, autoguardado, antecedentes/medicamentos, agregar medicamento de receta, agregar a CRM cirugías) ahora incluyen `administrador_igss` (antes devolvían 403 al guardar).
