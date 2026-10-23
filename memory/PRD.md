@@ -4,7 +4,13 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 35 — Identificación IGSS en Tablero del Día + Motivo auto desde NOG)
+**Última actualización**: 2026-06 (Sesión 36 — PDF evaluación en 1 página + indicaciones de estudios/procedimientos IGSS)
+
+### Sesión 36 — PDF de evaluación en 1 página + Indicaciones por estudio/procedimiento IGSS (2026-06)
+- ✅ **PDF de reporte en 1 sola página** (`routes/evaluaciones.py` `GET /{id}/pdf`): se redujeron los tamaños de letra (Título 16→13, Secciones 12→9.5, cuerpo 10→8, celdas 8→7.5) y los espaciados. **Cuadro de refracción reducido a ~la mitad** (colWidths 5×1.2" ≈ 6" → [0.85,0.6,0.6,0.5,0.6]" ≈ 3.15", fuente 9→7.5). También se redujeron la tabla de Agudeza Visual y la de Anteojos, el logo (1.0×1.35"→0.75×1.0") y el `bottomMargin` 160→150. **Verificado**: evaluación de prueba con agudeza visual + refracción + 2 estudios → PDF de **1 página** (pypdf) y render visual correcto.
+- ✅ **Indicaciones de texto libre por estudio/procedimiento IGSS**: el modelo `estudios_procedimientos` pasó de `List[str]` a `List[EstudioProcedimientoIGSS]` = `{nombre, indicaciones}` (`models/evaluacion_oftalmologica.py`, validator acepta strings legacy y dicts → retrocompatible). En la UI (`EvaluacionOftalmologica.js`, sección "Medicamentos y Procedimientos (EXCLUSIVO IGSS)") cada estudio ahora tiene su `Autocomplete` de nombre (`igss-estudio-{idx}`) + un `Textarea` de indicaciones debajo (`igss-estudio-indicaciones-{idx}`). El PDF y la vista de impresión muestran "Indicaciones: ..." debajo de cada estudio.
+- ✅ **Verificado**: backend por curl (PUT guarda/GET devuelve objetos {nombre, indicaciones}; PDF 1 página con indicaciones) + testing agent frontend `iteration_86.json` 100% (agregar/editar/persistir/eliminar estudios con indicaciones independientes, persistencia tras recargar). Sin bugs.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 35 — IGSS: badge de institución en el Tablero + Motivo de consulta automático desde el NOG (2026-06)
 - ✅ **Badge de institución en cada tarjeta de cita** (`CitaCard` en `Agenda.js`): pacientes IGSS muestran un badge verde "IGSS"; otras instituciones muestran su etiqueta (`referral_institution_label`), o "Sin institución". data-testid `institucion-badge-{cita.id}`. Aplica a Tablero del Día, vista Día y Mi Agenda.

@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only test of the IGSS 'Estudios / Procedimientos' free-text indicaciones feature in Evaluación Oftalmológica (superadmin, IGSS patient 4ceb89de-628f-4aa9-a545-fe6c4f4affc5). All requested flows PASS: clicking Add (igss-add-estudio) shows the name Autocomplete (igss-estudio-N) with the indicaciones Textarea (igss-estudio-indicaciones-N) directly below it. Three studies were added, each with its own indicaciones, and they stayed independent. Removing the middle one (igss-remove-estudio-1) removed the correct row, and the remaining rows kept the correct name and indicaciones. After saving (POST, then PUT /api/evaluaciones/7e7a4c39-127f-4583-87ad-7579e0a25b9c, 200), the GET response returned the objects {nombre, indicaciones}. After a page reload, reopening the evaluation from Historial showed both studies with the correct indicaciones. Editing indicaciones, saving and reloading also kept the edit. Backend and PDF were not retested, as requested.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Estudios rows use key={idx}. It works today because Autocomplete/Textarea are fully controlled. A stable id would be safer if the rows ever hold internal state.",
+    "Reloading /evaluacion-oftalmologica?paciente_id=... opens a NEW blank evaluation and does not auto-load the same-day evaluation, so the user has to use Historial. This is existing behavior, not a regression, but it may leave empty autosave drafts."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped as requested)", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created evaluation 7e7a4c39-127f-4583-87ad-7579e0a25b9c (fecha 2026-10-23) for IGSS patient 4ceb89de-628f-4aa9-a545-fe6c4f4affc5 with estudios [OCT macular / 'Realizar en ayuno, traer estudio previo', Topografia / 'Suspender lentes de contacto 2 semanas'].",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "To reopen a saved evaluation: open the page with ?paciente_id, click historial-toggle-btn, then click historial-item-{id}. The IGSS section starts collapsed; click the text 'Medicamentos y Procedimientos (EXCLUSIVO IGSS)'."
+}
