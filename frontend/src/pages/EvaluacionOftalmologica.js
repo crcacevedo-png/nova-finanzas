@@ -2252,7 +2252,7 @@ const EvaluacionOftalmologica = () => {
                   />
                   <div className="grid grid-cols-2 gap-3 items-center">
                     <div className="flex items-center gap-2">
-                      <Label className="text-xs whitespace-nowrap">AV Binocular</Label>
+                      <Label className="text-xs whitespace-nowrap">Binocular</Label>
                       <Input
                         value={formData.examen.av_binocular}
                         onChange={(e) => updateNestedField('examen.av_binocular', e.target.value)}
@@ -2263,7 +2263,7 @@ const EvaluacionOftalmologica = () => {
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <Label className="text-xs whitespace-nowrap">AV Cerca</Label>
+                      <Label className="text-xs whitespace-nowrap">Cerca</Label>
                       <Input
                         value={formData.examen.av_cerca}
                         onChange={(e) => updateNestedField('examen.av_cerca', e.target.value)}
