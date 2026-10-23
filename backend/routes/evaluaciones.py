@@ -28,7 +28,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage, KeepTogether, KeepInFrame
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as _pdfcanvas
@@ -855,8 +855,14 @@ async def get_evaluacion_pdf(
                 self.drawCentredString(cx, ty, f"Colegiado No. {sig_info['colegiado']}")
             self.setFillColor(colors.black)
 
+    # Garantizar que el reporte entre en 1 sola página: KeepInFrame encoge el
+    # contenido proporcionalmente solo cuando excede el área disponible.
+    avail_w = letter[0] - doc.leftMargin - doc.rightMargin
+    avail_h = letter[1] - doc.topMargin - doc.bottomMargin
+    story = [KeepInFrame(avail_w, avail_h, elements, mode='shrink', hAlign='LEFT', vAlign='TOP')]
+
     # Generar PDF (la firma se dibuja al pie de la última página)
-    doc.build(elements, canvasmaker=SignatureCanvas)
+    doc.build(story, canvasmaker=SignatureCanvas)
     buffer.seek(0)
     
     # Nombre del archivo

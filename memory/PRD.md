@@ -4,7 +4,12 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 41 — AV Binocular/Cerca en evaluación + institución en Pacientes Presentes)
+**Última actualización**: 2026-06 (Sesión 42 — Reporte PDF SIEMPRE en 1 página + etiquetas Binocular/Cerca)
+
+### Sesión 42 — El reporte PDF entra siempre en 1 sola página + etiquetas Binocular/Cerca (2026-06)
+- ✅ **Reporte PDF garantizado en 1 página** (`routes/evaluaciones.py`): se envolvió toda la historia del PDF en `KeepInFrame(mode='shrink')` dimensionado al área disponible. Si el contenido excede una página se **encoge proporcionalmente** para caber; si es poco, se mantiene a tamaño normal. Reproducido el bug con una evaluación con TODOS los campos llenos (desbordaba a 2 páginas) → ahora 1 página, legible, con firma al pie. Verificado con pypdf (PAGES=1) + captura visual.
+- ✅ **Etiquetas "Binocular" y "Cerca"** (`EvaluacionOftalmologica.js`): se quitó el prefijo "AV" de las etiquetas de los dos campos de texto libre (siguen en la misma línea).
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 41 — Campos AV Binocular / AV Cerca + Institución en "Pacientes Presentes" (2026-06)
 - ✅ **AV Binocular y AV Cerca** (`EvaluacionOftalmologica.js` + `models/evaluacion_oftalmologica.py`): debajo de "Agudeza Visual" (filas Sin/Con Corrección) se agregaron dos campos de texto libre de un solo cuadro cada uno — `examen-av-binocular` y `examen-av-cerca` (ej. "20/25", "J2"). Nuevos campos de modelo `av_binocular`, `av_cerca`. Persisten al guardar/recargar.
