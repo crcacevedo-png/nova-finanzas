@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 42 — Reporte PDF SIEMPRE en 1 página + etiquetas Binocular/Cerca)
+**Última actualización**: 2026-06 (Sesión 43 — Sellado automático de expedientes a 24h DESACTIVADO temporalmente)
+
+### Sesión 43 — Sellado automático de expedientes a las 24h DESACTIVADO (temporal) (2026-06)
+- ✅ **Se desactivó el sellado automático de expedientes a las 24 horas** a petición del usuario (se reactivará después). El mecanismo activo estaba en el **frontend** (`EvaluacionOftalmologica.js`): un `useEffect` calculaba una cuenta regresiva ("Se sella en Xh Ym") y marcaba `sellado=true` localmente al cumplirse 24h desde `fecha_creacion`, dejando el expediente en solo lectura.
+- ✅ **Implementación**: se agregó la bandera `const SELLADO_24H_ACTIVO = false;` que corta el `useEffect` (no muestra cuenta regresiva ni auto-sella). **No se borró código de backend** ni la lógica: para reactivar basta poner la bandera en `true`.
+- ✅ El **sellado MANUAL** (`sellado=true` en BD) sigue funcionando normalmente e independiente del cambio. El backend (`verificar_sellado`) ya no aplicaba el límite de 24h (era no-op), por lo que no requirió cambios.
+- ✅ Verificado: el frontend compila sin errores; solo 3 evaluaciones con `sellado=true` en BD (seals manuales, no automáticos — el frontend nunca persistía el auto-sello).
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 42 — El reporte PDF entra siempre en 1 sola página + etiquetas Binocular/Cerca (2026-06)
 - ✅ **Reporte PDF garantizado en 1 página** (`routes/evaluaciones.py`): se envolvió toda la historia del PDF en `KeepInFrame(mode='shrink')` dimensionado al área disponible. Si el contenido excede una página se **encoge proporcionalmente** para caber; si es poco, se mantiene a tamaño normal. Reproducido el bug con una evaluación con TODOS los campos llenos (desbordaba a 2 páginas) → ahora 1 página, legible, con firma al pie. Verificado con pypdf (PAGES=1) + captura visual.

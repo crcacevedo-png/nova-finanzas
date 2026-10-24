@@ -51,6 +51,10 @@ const TIPOS_CITA = [
   'Primera Consulta', 'Control', 'Control Post Operatorio', 'Lectura de estudios', 'Procedimiento', 'Emergencia'
 ];
 
+// Sellado automático de expedientes a las 24h: DESACTIVADO temporalmente a
+// petición del usuario (se volverá a activar poniéndolo en true).
+const SELLADO_24H_ACTIVO = false;
+
 
 // Formatea una fecha (YYYY-MM-DD o ISO) a DD/MM/YYYY para el historial
 const formatFechaHistorial = (f) => {
@@ -855,6 +859,11 @@ const EvaluacionOftalmologica = () => {
 
   // Calcular tiempo restante para sellado
   useEffect(() => {
+    // Sellado automático a 24h desactivado: no mostrar cuenta regresiva ni auto-sellar.
+    if (!SELLADO_24H_ACTIVO) {
+      setTiempoRestante(null);
+      return;
+    }
     // No mostrar tiempo si no hay evaluación, está sellada, o es offline/nueva
     if (!evaluacionActual || evaluacionActual.sellado || !evaluacionActual.fecha_creacion || String(evaluacionActual.id).startsWith('offline_')) {
       setTiempoRestante(null);
