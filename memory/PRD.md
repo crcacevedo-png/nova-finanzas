@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 45 — Buscador de pacientes en la Agenda (citas futuras))
+**Última actualización**: 2026-06 (Sesión 46 — Fix: código IGSS corregido no se reflejaba en el PDF)
+
+### Sesión 46 — Fix: el código IGSS corregido ahora se refleja en el PDF (2026-06)
+- 🐛 **Bug**: al corregir el Código IGSS (y NOG/No. SPS/Procedimiento) en la orden del paciente, el cambio se veía en el modal de editar paciente pero el PDF del reporte seguía mostrando el valor anterior.
+- 🔎 **Causa**: el PDF leía el *snapshot* IGSS guardado en la evaluación (`evaluacion.igss_codigo`, etc.) en vez de la orden actual del paciente.
+- ✅ **Fix** (`routes/evaluaciones.py`, bloque IGSS del PDF): ahora, si la evaluación tiene `igss_orden_id`, el PDF toma los datos ACTUALES de esa orden en `paciente.igss_ordenes` (nog, no_sps, codigo, procedimiento); si no, usa el snapshot de la evaluación y, por último, los campos legacy del paciente. Así las correcciones a la orden se reflejan en el informe.
+- ✅ **Verificado**: curl/pypdf con un registro real — tras corregir el código de la orden, el PDF muestra el valor corregido (ya no el anterior). Backend-only; sin cambios de frontend.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 45 — Buscador de pacientes en la Agenda · próximas citas (Fase 1) (2026-06)
 - ✅ **Buscador de pacientes en la Agenda**: botón "Buscar paciente" (`buscar-paciente-agenda-btn`) abre un diálogo donde se escribe nombre/apellido (coincidencia parcial, sin acentos/mayúsculas vía `patientApi.search`). Al elegir un paciente se listan sus **citas futuras** (de hoy en adelante, zona Guatemala), ordenadas de la más próxima a la más lejana, con fecha, hora, médico, tipo y badge de estado. Incluye **Canceladas** y **"No asistió"** marcadas con su estado. Tocar una cita abre su detalle/edición (`handleOpenCitaDialog`). Mensajes claros "Sin citas próximas" y "Sin resultados".

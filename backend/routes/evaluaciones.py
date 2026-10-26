@@ -503,11 +503,19 @@ async def get_evaluacion_pdf(
         ('Email:', paciente.get("email")),
     ]
     if paciente.get("referral_institution") == "igss":
-        # Preferir el snapshot de la orden vinculada a la evaluación; fallback al paciente
-        _nog = (evaluacion.get("igss_nog") or paciente.get("igss_nog") or "")
-        _sps = (evaluacion.get("igss_no_sps") or paciente.get("igss_no_sps") or "")
-        _cod = (evaluacion.get("igss_codigo") or paciente.get("igss_codigo") or "")
-        _proc = (evaluacion.get("igss_procedimiento") or "")
+        # Preferir los datos ACTUALES de la orden vinculada (para reflejar correcciones),
+        # luego el snapshot guardado en la evaluación y por último los campos legacy del paciente.
+        _orden_actual = {}
+        _orden_id = evaluacion.get("igss_orden_id")
+        if _orden_id:
+            for _o in (paciente.get("igss_ordenes") or []):
+                if _o.get("id") == _orden_id:
+                    _orden_actual = _o
+                    break
+        _nog = (_orden_actual.get("nog") or evaluacion.get("igss_nog") or paciente.get("igss_nog") or "")
+        _sps = (_orden_actual.get("no_sps") or evaluacion.get("igss_no_sps") or paciente.get("igss_no_sps") or "")
+        _cod = (_orden_actual.get("codigo") or evaluacion.get("igss_codigo") or paciente.get("igss_codigo") or "")
+        _proc = (_orden_actual.get("procedimiento") or evaluacion.get("igss_procedimiento") or "")
         _tipo_compra_labels = {
             "compra_directa": "Compra Directa",
             "baja_cuantia": "Baja Cuantía",
