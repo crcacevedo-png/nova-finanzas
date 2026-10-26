@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend retest (superadmin) of patient 4ceb89de. (A) Prior-day read-only fix PASSED: opening 2026-10-23 eval 545ddda3 from Historial shows 'Solo lectura (día anterior)' badge, all 40 inputs/textareas are disabled, the autoguardado status badge is not shown, and no PATCH/PUT/POST to /api/evaluaciones was sent. GET fecha_actualizacion stayed at 2026-10-23T17:12:47 before and after. '← Volver a la evaluación del día' goes back to today's eval a0c71e69, which is editable and has no badge. (B) Receta de Medicamentos Observaciones PASSED: textarea is there and editable on today's eval; typed text autosaved ('Guardado a las 09:15'), stayed after reload, and was confirmed via API. (C) Regression PASSED: reloading reopened the SAME today eval a0c71e69 with no duplicate. 'Nueva' kept the patient, cleared the form, and created a new eval via POST on first edit. That TEST eval was deleted afterwards.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Open today's eval", "issue": "Simply opening/reloading today's (editable) eval fires one PATCH /autoguardar without any user change, bumping fecha_actualizacion. Harmless for today's eval but is a needless write.", "affected_selectors": ["[data-testid=\"autoguardado-status\"]"]}
+    ],
+    "design_issues": [
+      {"screen": "Evaluación header", "issues": ["Fecha field uses native browser date input (mm/dd/yyyy) instead of shadcn calendar; pre-existing."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": ["Optional: skip the initial autosave on load when formData equals the loaded snapshot (lastSavedRef) to avoid no-op writes."],
+  "critical_code_review_comments": ["EvaluacionOftalmologica.js is very large (>3000 lines); consider splitting sections into components."],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Set observaciones='Suspender si hay irritación TEST' on today's eval a0c71e69. Created and then deleted TEST eval b0ea9d50.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Today GT = 2026-10-26. Patient 4ceb89de has 2 evals today (a0c71e69 newest, 7f68a258). Prior-day eval 545ddda3 (2026-10-23) has fecha_actualizacion 2026-10-23T17:12:47.611647 and must stay that way. Evals 224d4a7c and 3b315ec0 were modified by the earlier bug (pre-fix)."
+}

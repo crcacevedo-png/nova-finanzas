@@ -4,7 +4,17 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 43 — Sellado automático de expedientes a 24h DESACTIVADO temporalmente)
+**Última actualización**: 2026-06 (Sesión 44 — Una evaluación por paciente por día + Observaciones en receta de medicamentos)
+
+### Sesión 44 — Una sola evaluación por paciente por día + Observaciones en receta de medicamentos (2026-06)
+- ✅ **Una evaluación por paciente por día (Fase 1 del plan aprobado)** (`EvaluacionOftalmologica.js`): al abrir el expediente de un paciente, si ya existe una evaluación de HOY (zona Guatemala, `fecha === today_str_gt`) se **continúa** esa misma (se carga como evaluación en curso vía `cargarEvaluacion(evalHoy, false)` → el autoguardado hace PATCH, no POST). Si no hay de hoy, formulario en blanco que se registra como la del día al primer guardado. Compartida entre médicos (toma la más reciente de hoy). `fetchEvaluaciones` ahora retorna la lista.
+- ✅ **Botón "Nueva" ajustado**: mantiene el paciente seleccionado y limpia solo lo clínico, para crear una evaluación ADICIONAL el mismo día de forma explícita (antes deseleccionaba al paciente, lo que impedía crear adicionales con el auto-continuar).
+- ✅ **Evaluaciones de días anteriores = SOLO LECTURA**: `isReadOnly` ahora incluye `esEvalDiaAnterior` (fecha ≠ hoy). Al abrir una evaluación previa desde el Historial ya NO se le envía autoguardado (antes cambiaba su `fecha_actualizacion`). Se muestra badge "Solo lectura (día anterior)" y el botón "Volver a la evaluación del día" regresa a la editable.
+- ✅ **Observaciones en Receta de Medicamentos**: nuevo campo de texto libre (`receta-medicamentos-observaciones`) para toda la receta. Modelo `RecetaMedicamentos.observaciones`; se muestra en el PDF ("Observaciones:") y persiste. El PDF sigue en 1 página.
+- ✅ **Verificado**: testing agent `iteration_93.json` (Flujo 1 y 2) + `iteration_94.json` 100% (solo-lectura día anterior sin PATCH, observaciones persiste, sin duplicados, "Nueva" funciona) + curl (persistencia + PDF).
+- **Futuro (Fases 2-3)**: aviso de quién inició la evaluación del día; herramienta para fusionar duplicados previos; control de edición simultánea.
+- **Nota**: NO existe integración ni cron con Google Calendar (consulta del plan respondida).
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 43 — Sellado automático de expedientes a las 24h DESACTIVADO (temporal) (2026-06)
 - ✅ **Se desactivó el sellado automático de expedientes a las 24 horas** a petición del usuario (se reactivará después). El mecanismo activo estaba en el **frontend** (`EvaluacionOftalmologica.js`): un `useEffect` calculaba una cuenta regresiva ("Se sella en Xh Ym") y marcaba `sellado=true` localmente al cumplirse 24h desde `fecha_creacion`, dejando el expediente en solo lectura.
