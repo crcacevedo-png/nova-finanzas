@@ -303,7 +303,10 @@ const EvaluacionOftalmologica = () => {
   const OFFLINE_STORAGE_KEY = 'novavision_evaluaciones_offline';
   
   const canEdit = hasPermission('view_evaluacion');
-  const isReadOnly = !canEdit || evaluacionActual?.sellado;
+  // Las evaluaciones de días anteriores son solo de lectura (no se modifican, solo revisión).
+  const hoyGtStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
+  const esEvalDiaAnterior = !!(evaluacionActual?.id && evaluacionActual?.fecha && evaluacionActual.fecha !== hoyGtStr);
+  const isReadOnly = !canEdit || evaluacionActual?.sellado || esEvalDiaAnterior;
 
   // Estado inicial de evaluación
   const evaluacionVacia = {
@@ -374,7 +377,7 @@ const EvaluacionOftalmologica = () => {
     },
     procedimientos: [],
     recetas: {
-      medicamentos: { items: [] },
+      medicamentos: { items: [], observaciones: '' },
       // Arrays de múltiples recetas
       anteojos_lista: [],
       lentes_contacto_lista: [],
@@ -1082,7 +1085,7 @@ const EvaluacionOftalmologica = () => {
     }
     
     const migratedRecetas = {
-      medicamentos: { items: recetasData.medicamentos?.items || [] },
+      medicamentos: { items: recetasData.medicamentos?.items || [], observaciones: recetasData.medicamentos?.observaciones || '' },
       anteojos_lista: anteojosLista,
       lentes_contacto_lista: lentesLista,
       anteojos: anteojosLegacy,
@@ -1798,7 +1801,7 @@ const EvaluacionOftalmologica = () => {
               
               {/* Estado de guardado */}
               {autoguardadoStatus && (
-                <Badge className={`text-xs ${
+                <Badge data-testid="autoguardado-status" className={`text-xs ${
                   autoguardadoStatus.includes('Guardado') ? 'bg-green-100 text-green-700' :
                   autoguardadoStatus.includes('Guardando') || autoguardadoStatus.includes('localmente') ? 'bg-blue-100 text-blue-700' :
                   autoguardadoStatus.includes('offline') ? 'bg-amber-100 text-amber-700' :
@@ -1821,6 +1824,14 @@ const EvaluacionOftalmologica = () => {
                 <Badge className="bg-red-100 text-red-700 text-xs">
                   <Lock className="w-3 h-3 mr-1" />
                   Expediente sellado
+                </Badge>
+              )}
+
+              {/* Indicador de solo lectura para evaluaciones de días anteriores */}
+              {esEvalDiaAnterior && !evaluacionActual?.sellado && (
+                <Badge className="bg-slate-100 text-slate-600 text-xs" data-testid="eval-solo-lectura-dia-anterior">
+                  <Lock className="w-3 h-3 mr-1" />
+                  Solo lectura (día anterior)
                 </Badge>
               )}
               
@@ -1898,6 +1909,7 @@ const EvaluacionOftalmologica = () => {
                 onClick={nuevaEvaluacion}
                 className="btn-outline"
                 disabled={!canEdit}
+                data-testid="nueva-evaluacion-btn"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Nueva
@@ -2018,6 +2030,7 @@ const EvaluacionOftalmologica = () => {
                   value={formData.motivo_consulta}
                   onChange={(e) => updateNestedField('motivo_consulta', e.target.value)}
                   disabled={isReadOnly}
+                  data-testid="motivo-consulta-input"
                   placeholder="Motivo principal de la consulta..."
                   className="input-teal min-h-[60px]"
                 />
@@ -3126,9 +3139,18 @@ const EvaluacionOftalmologica = () => {
                   </div>
                 ))}
               </div>
+              <div className="mt-2">
+                <Label className="text-xs font-semibold">Observaciones</Label>
+                <Textarea
+                  value={formData.recetas.medicamentos.observaciones || ''}
+                  onChange={(e) => updateNestedField('recetas.medicamentos.observaciones', e.target.value)}
+                  placeholder="Observaciones de la receta (texto libre)..."
+                  disabled={isReadOnly}
+                  className="input-teal text-sm min-h-[70px] mt-1"
+                  data-testid="receta-medicamentos-observaciones"
+                />
+              </div>
             </CollapsibleSection>
-
-            {/* Recetas de Anteojos - Lista Múltiple */}
             <CollapsibleSection 
               title="Recetas de Anteojos" 
               icon={Glasses} 

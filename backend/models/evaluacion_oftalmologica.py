@@ -176,6 +176,7 @@ class RecetaMedicamentoItem(BaseModel):
 
 class RecetaMedicamentos(BaseModel):
     items: List[RecetaMedicamentoItem] = Field(default_factory=list)
+    observaciones: str = ""
 
 
 class RecetaAnteojosOjo(BaseModel):

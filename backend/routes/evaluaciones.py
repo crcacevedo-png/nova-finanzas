@@ -702,6 +702,9 @@ async def get_evaluacion_pdf(
             elements.append(Paragraph(med_line, styles['FieldValue']))
             if med.get("indicaciones"):
                 elements.append(Paragraph(f"   <i>Indicaciones: {med.get('indicaciones')}</i>", styles['SmallText']))
+        _obs_med = (recetas.get("medicamentos", {}).get("observaciones", "") or "").strip()
+        if _obs_med:
+            elements.append(Paragraph(f"<b>Observaciones:</b> {_html.escape(_obs_med)}", styles['FieldValue']))
     
     # Receta de Anteojos
     anteojos = recetas.get("anteojos", {})

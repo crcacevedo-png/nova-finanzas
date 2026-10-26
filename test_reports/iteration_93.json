@@ -1,0 +1,37 @@
+{
+  "summary": "Frontend E2E (Playwright, superadmin) of 'one evaluation per patient per day' on /evaluacion-oftalmologica?paciente_id=4ceb89de... (Paciente110 Demo U5). FLOW 1 PASS: first open shows a new form. The patient had 15 evaluations, all from earlier days. Reopening loaded the SAME evaluation 7f68a258 with 'Control retina hoy', showed the toast 'Se continúa la evaluación de hoy de este paciente', and created no duplicate: the history stayed at 16 with only one dated today. FLOW 2 PASS: 'Nueva' kept the patient (name and record number still shown), cleared the clinical form and the IGSS order. Autosave sent a POST and the patient then had exactly 2 evaluations for today (a0c71e69 'Segunda consulta tarde' + 7f68a258). FLOW 3 PARTIAL: opening the 2026-10-23 evaluation from Historial loads its data and shows '← Volver a la evaluación del día', and Volver works. BUT just opening the old evaluation sends PATCH /autoguardar to it with no user edit: its fecha_actualizacion went from 2026-10-23T17:12:59 to 2026-10-26T15:09:39 (confirmed via API), and its fields stay editable. Previous-day evaluations are therefore altered.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PATCH /api/evaluaciones/{id}/autoguardar", "issue": "A 'medico' can only edit evaluations they created (403 'Solo puede editar las evaluaciones que usted creó', verified with medico_test on 7f68a258 created by superadmin). This contradicts the rule that today's evaluation is shared between doctors. When doctor B opens the patient, seleccionarPaciente continues doctor A's evaluation, B's edits get 403, and the frontend's non-423 catch branch silently saves offline ('Guardado offline'). Data never reaches the server.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Historial > open previous-day evaluation (cargarEvaluacion comoHistorial=true)", "issue": "The autosave effect fires on the formData change and PATCHes the old evaluation without any user edit. This changes fecha_actualizacion, actualizado_por and ultimo_autoguardado, re-runs procesar_catalogos (usage counters go up) and sincronizar_proxima_cita. Fields stay editable, so any keystroke also overwrites the historical record. The autosave badge then shows 'Guardado a las HH:MM' for the old evaluation.", "selector": "[data-testid^=historial-item-]", "priority": "HIGH"},
+      {"component": "seleccionarPaciente -> cargarEvaluacion(evalHoy,false)", "issue": "Reopening the patient sends a PATCH /autoguardar on today's evaluation even when nothing changed. There is no data loss, but it is an extra write.", "selector": "[data-testid=autoguardado-status]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Evaluación - modo historial", "issues": ["Apart from the 'Volver' item inside the Historial dropdown, nothing shows that you are reviewing a past evaluation: no banner and no read-only fields. The only clue is the date field (10/23/2026)."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Skip autosave when loading data programmatically: no PATCH right after cargarEvaluacion or volverAEvaluacionActual. For example, set a 'skipNextAutosave' ref, or compare against a snapshot of the last saved formData.",
+    "In modo historial (viendoHistorial=true) for evaluations from earlier days: make the form read-only (or require an explicit 'Editar') and turn off autosave, so past evaluations are never modified. Add a visible 'Revisando evaluación del DD/MM/YYYY' banner.",
+    "Align the backend with 'evaluación del día compartida entre médicos': allow role medico to autosave/PUT an evaluation with fecha == today_str_gt() even if another user created it. Otherwise, in the frontend, do not continue another doctor's evaluation for a medico. Also, in the autosave catch block, do not fall back to offline save on 403; show the error instead."
+  ],
+  "critical_code_review_comments": [
+    "EvaluacionOftalmologica.js has 3795 lines and should be split (header/historial, autosave hook, clinical sections).",
+    "The autosave useEffect depends on formData identity, so every programmatic setFormData (load, volver, IGSS NOG prefill, historial-medico prefill) counts as a user edit. Use a dirty flag instead.",
+    "With IGSS orders, the 'blank' form is pre-filled with motivo 'Retina' from the NOG. That counts as clinical data, so the day's evaluation is POSTed on open, before the user types anything. This is expected under the new rule but worth knowing.",
+    "When the patient already has 2 evaluations today, the one continued on reopen is the most recently created (sorted by fecha_creacion desc). This is reasonable but should be documented."
+  ],
+  "updated_files": ["/app/frontend/src/pages/EvaluacionOftalmologica.js (added data-testid: nueva-evaluacion-btn, motivo-consulta-input, autoguardado-status)"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "80% (Flow1 PASS, Flow2 PASS, Flow3 partial: previous-day evaluation is modified when opened)"},
+  "seed_data_creation": "Patient 4ceb89de now has two evaluations dated 2026-10-26: 7f68a258 ('Control retina hoy') and a0c71e69 ('Segunda consulta tarde'). Evaluation 224d4a7c (2026-10-23) had fecha_actualizacion bumped by the bug.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Today (Guatemala) is 2026-10-26. Useful testids: nueva-evaluacion-btn, motivo-consulta-input, autoguardado-status, historial-toggle-btn, historial-item-{id}, historial-volver-actual. To detect unwanted writes, listen for PATCH /api/evaluaciones/*/autoguardar requests and compare fecha_actualizacion via GET /api/evaluaciones?paciente_id=... Patient 4ceb89de already has 2 evaluations today, so use a different patient to re-test Flow 1 from a blank state."
+}
