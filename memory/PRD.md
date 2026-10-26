@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 44 — Una evaluación por paciente por día + Observaciones en receta de medicamentos)
+**Última actualización**: 2026-06 (Sesión 45 — Buscador de pacientes en la Agenda (citas futuras))
+
+### Sesión 45 — Buscador de pacientes en la Agenda · próximas citas (Fase 1) (2026-06)
+- ✅ **Buscador de pacientes en la Agenda**: botón "Buscar paciente" (`buscar-paciente-agenda-btn`) abre un diálogo donde se escribe nombre/apellido (coincidencia parcial, sin acentos/mayúsculas vía `patientApi.search`). Al elegir un paciente se listan sus **citas futuras** (de hoy en adelante, zona Guatemala), ordenadas de la más próxima a la más lejana, con fecha, hora, médico, tipo y badge de estado. Incluye **Canceladas** y **"No asistió"** marcadas con su estado. Tocar una cita abre su detalle/edición (`handleOpenCitaDialog`). Mensajes claros "Sin citas próximas" y "Sin resultados".
+- ✅ **Backend** (`routes/agenda.py`): nuevo `GET /api/agenda/paciente/{paciente_id}/citas-futuras` → citas con `fecha >= today_str_gt()` (todos los estados), ordenadas por fecha+hora, enriquecidas con institución. `agendaApi.getCitasFuturasPaciente`.
+- ✅ **Verificado**: testing agent `iteration_95.json` 100% (5 flujos: búsqueda parcial/acentos, listado ordenado con estados, abrir detalle, "Sin citas próximas", "Sin resultados") + curl.
+- **Futuro (Fases 2-3)**: filtros por médico/fecha/estado; agendar desde el resultado; historial de citas pasadas; búsqueda por expediente/DPI/teléfono.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 44 — Una sola evaluación por paciente por día + Observaciones en receta de medicamentos (2026-06)
 - ✅ **Una evaluación por paciente por día (Fase 1 del plan aprobado)** (`EvaluacionOftalmologica.js`): al abrir el expediente de un paciente, si ya existe una evaluación de HOY (zona Guatemala, `fecha === today_str_gt`) se **continúa** esa misma (se carga como evaluación en curso vía `cargarEvaluacion(evalHoy, false)` → el autoguardado hace PATCH, no POST). Si no hay de hoy, formulario en blanco que se registra como la del día al primer guardado. Compartida entre médicos (toma la más reciente de hoy). `fetchEvaluaciones` ahora retorna la lista.

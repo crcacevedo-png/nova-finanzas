@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend-only test of the Agenda 'Buscar paciente' (future appointments) feature, logged in as superadmin at 1920x1080. All 5 requested flows pass. (1) The button opens the dialog and the input gets focus. Typing 'mendoza' lists 'Carlos Mendoza Flores' first, and 'MENDOZA' and 'carlos mend' also match. (2) Selecting the patient lists 5 appointments in ascending order: 26-oct 08:30, 09:30 and 10:30 (Cancelada), 28-oct 09:00 (Agendada), 03-nov 11:00 (No asistió). Each row shows date, time, doctor (Dr. Carlos Méndez), appointment type and a status badge. (3) Clicking an appointment closes the search dialog and opens 'Editar Cita' with the right data: patient, doctor, date 2026-10-28, time 09:00, type Subsecuente. The 'No asistió' appointment also opens correctly (2026-11-03 11:00). (4) 'Otra búsqueda' resets the input; Paciente110 Demo U5 shows 'Sin citas próximas'. (5) 'zzzznoexiste' shows 'Sin resultados', and typing 1 letter shows the 'Escribe al menos 2 letras' hint.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/patients/search (generate_accent_regex in routes/patients.py)", "issue": "Accent-insensitivity only works one way. A query without accents ('mendez') matches 'Méndez', but a query WITH accents ('Mendóza', 'méndez') does not match names stored without accents. 'Mendóza' returned only 1 result (REYES MENDÓZA) instead of all the MENDOZA patients. Cause: accent_map keys are unaccented letters only, so typed 'é'/'ó' are copied literally into the regex. Fix: strip diacritics from the query first (unicodedata NFD) before building the regex."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Agenda buscador dialog", "issue": "State is kept after you click an appointment. abrirCitaDesdeBuscador calls setBuscadorOpen(false) directly and onOpenChange does not fire, so limpiarBuscador never runs. Reopening 'Buscar paciente' shows the previous patient and appointments instead of an empty search. This may be intended as a convenience, but it is not consistent with closing via X/Esc, which resets the dialog.", "selector": "[data-testid=buscar-paciente-agenda-btn]", "priority": "LOW"},
+      {"component": "Agenda buscador results", "issue": "'Sin resultados' flashes for up to 300ms while the user types. During the debounce window buscadorBuscando is false and the results are empty, so the message appears before the search request starts. Earlier requests are not cancelled, so a slow older response could overwrite newer results.", "selector": "[data-testid=buscador-sin-resultados]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Buscador cita rows", "issues": ["The appointment type shows the raw value 'primera_vez' for some appointments, while others show 'Subsecuente'. The label should be mapped to readable text."]},
+      {"screen": "Editar Cita opened from buscador", "issues": ["The 'Duración' select is empty for appointment fe817b6e (28-oct). It looks like duracion_minutos is missing on that record; a default of 30 would avoid the empty select."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "LOW: Make accent-insensitive search work both ways by normalizing the query (removing diacritics) before generate_accent_regex.",
+    "LOW: Call limpiarBuscador() inside abrirCitaDesdeBuscador if a clean search is wanted on reopen (or keep the current behavior if it is intended).",
+    "LOW: Prevent the 'Sin resultados' flash during the debounce, e.g. set buscadorBuscando=true when the query changes, or track the last query that was actually searched.",
+    "LOW: Map tipo_cita 'primera_vez' to a readable label in the buscador rows."
+  ],
+  "critical_code_review_comments": [
+    "Agenda.js is about 2942 lines; the buscador (states, functions and dialog) should be extracted into a component such as BuscadorPacienteCitasDialog.",
+    "seleccionarPacienteBuscador errors are only logged to the console; there is no toast or error state in the UI.",
+    "Patient search results are limited to 20 and not sorted by relevance."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped as requested)", "frontend": "100% of requested flows (5/5)"},
+  "seed_data_creation": "None. No appointments were modified (the edit dialogs were closed with Cancelar).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Buscador testids: buscar-paciente-agenda-btn, buscador-paciente-dialog, buscador-paciente-input, buscador-paciente-result-{id}, buscador-cita-{id}, buscador-cambiar-paciente-btn, buscador-sin-citas, buscador-sin-resultados. Carlos Mendoza Flores = 93d83ba3-b447-4950-8a97-1e3df0a5a165 (5 future appointments). Paciente110 = 4ceb89de-628f-4aa9-a545-fe6c4f4affc5 (none). Today in the preview environment is 2026-10-26."
+}
