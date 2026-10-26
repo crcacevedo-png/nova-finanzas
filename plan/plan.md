@@ -1,53 +1,52 @@
-# Identificación IGSS en el Tablero del Día y motivo de consulta automático
+# Expediente oftalmológico: una sola evaluación por paciente por día
 
-Dos mejoras para el flujo IGSS: ver de un vistazo qué paciente viene por el IGSS y cuál por otra institución en el Tablero del Día, y que al abrir la evaluación de un paciente IGSS su motivo de consulta ya traiga la descripción del servicio (NOG).
+Al abrir el expediente de un paciente, el sistema debe continuar la evaluación que ya se inició hoy para ese paciente en lugar de crear una nueva cada vez. Así se mantiene una única "sesión" de evaluación por paciente durante todo el día.
 
 ## Para quién es
-Personal de la clínica que opera la agenda y los médicos que atienden pacientes IGSS y de otras instituciones (particulares, seguros, convenios), donde hoy no se distingue el origen del paciente en la lista del día ni se repite manualmente el servicio IGSS como motivo.
+Médicos oftalmólogos y personal con acceso a evaluaciones (incluye el rol Administrador IGSS) que abren el expediente del mismo paciente varias veces en un día.
 
-## Funciones y experiencia
+## Problema actual
+Hoy, cada vez que se abre el expediente de un paciente y se empieza a escribir (o se autollena el motivo), se crea un registro de evaluación nuevo. Resultado: múltiples evaluaciones duplicadas del mismo paciente en el mismo día.
 
-### 1. Etiqueta de institución en el Tablero del Día
-- Cada cita de la lista "Citas del día" muestra una etiqueta que indica el origen del paciente:
-  - **IGSS**: etiqueta distintiva (verde) con el texto "IGSS".
-  - **Otra institución**: etiqueta con el nombre de la institución registrada en la ficha del paciente (p. ej. "Particular", "Visualiza", el seguro o convenio correspondiente).
-- Si el paciente no tiene institución registrada, la etiqueta muestra un texto neutro ("Sin institución").
-- La etiqueta es solo informativa (no cambia el comportamiento de la cita).
+## Qué cambia (experiencia)
+- Al abrir el expediente de un paciente, si ya existe una evaluación de ese paciente con fecha de **hoy**, el expediente la abre y la continúa (misma nota, se sigue editando sobre ella).
+- La evaluación del día es **compartida**: si otro médico la inició hoy, al abrir el expediente se continúa esa misma evaluación (no se crea una por médico).
+- Si el paciente **no** tiene ninguna evaluación de hoy, se abre una evaluación en blanco que pasa a ser "la del día" al guardarse por primera vez.
+- Se conserva el botón **"Nueva evaluación"** para los casos en que a propósito se necesite crear una evaluación adicional el mismo día (p. ej. una segunda consulta). Es una acción manual y explícita; el comportamiento por defecto sigue siendo continuar la del día.
+- El historial del paciente sigue mostrando las evaluaciones de días anteriores y se pueden abrir para revisión, igual que hoy.
 
-### 2. Motivo de consulta automático desde el NOG (pacientes IGSS)
-- Al abrir la evaluación de un paciente IGSS, el campo **Motivo de consulta** se completa con la **descripción del servicio del NOG** (solo el texto, sin el número de NOG).
-- La descripción usada es la del **NOG vinculado a esa cita/evaluación**. Si la cita no tiene una orden vinculada, se usa la primera orden IGSS del paciente.
-- El motivo se coloca **siempre** con la descripción del NOG al abrir la evaluación (reemplaza lo que hubiera en ese campo).
-- El campo sigue siendo **editable**: el médico puede ajustar el texto después.
-- Para pacientes que no son IGSS, el motivo de consulta se comporta como hasta ahora (no se autocompleta).
+## Flujo del usuario
+1. El usuario abre el expediente de un paciente (desde Pacientes, Agenda o el menú).
+2. El sistema busca si ese paciente ya tiene una evaluación con fecha de hoy.
+3. Si existe → la abre y se continúa editando sobre esa misma evaluación.
+4. Si no existe → se muestra una evaluación en blanco; al escribir y guardarse por primera vez, queda registrada como la evaluación de hoy.
+5. Si el usuario necesita una evaluación extra el mismo día, pulsa "Nueva evaluación" de forma explícita.
 
-## Flujo de uso
-1. El personal abre Agenda → Tablero del Día y ve, por cada cita, la etiqueta IGSS o el nombre de la otra institución.
-2. Al atender a un paciente IGSS, abre su evaluación oftalmológica.
-3. El Motivo de consulta ya aparece con la descripción del servicio del NOG correspondiente a esa cita.
-4. El médico confirma o edita el motivo y continúa la evaluación.
+## Definición de "hoy"
+El día se calcula con la zona horaria de Guatemala (la misma que ya usa el sistema). Si por datos previos existieran varias evaluaciones de hoy para un paciente, se continúa la más reciente del día.
 
-## Sensación de UI/UX
-- Etiquetas pequeñas tipo "pill", coherentes con las que ya existen en las tarjetas de cita (como "otro"/tipo de cita), sin recargar la tarjeta.
-- Color verde reservado para IGSS (consistente con el resto del módulo IGSS); color neutro/secundario para otras instituciones.
-- El autocompletado del motivo es inmediato y silencioso al abrir la evaluación; no interrumpe con avisos.
+## Sobre Google Calendar
+Consulta respondida: actualmente la aplicación **no** tiene integración ni tarea programada (cron) con Google Calendar. No se realiza ningún trabajo al respecto en esta corrección.
 
 ## Fases de implementación
 
-### Fase 1 (MVP — se construye ahora)
-- Etiqueta IGSS / nombre de institución en cada cita del Tablero del Día.
-- Autocompletado del Motivo de consulta con la descripción del NOG vinculado a la cita/evaluación para pacientes IGSS, campo editable.
+### Fase 1 (MVP, se construye ahora)
+- Al abrir el expediente de un paciente, continuar automáticamente la evaluación de hoy de ese paciente si existe; si no, iniciar una en blanco que se registra como la del día al primer guardado.
+- Reutilización compartida entre médicos (una evaluación del día por paciente, sin importar quién la creó).
+- Mantener el botón "Nueva evaluación" como acción manual para crear una evaluación adicional el mismo día.
+- Evitar que al reabrir el expediente se generen registros nuevos/duplicados del mismo día.
 
 ### Fase 2 (futuro)
-- Filtrar u ordenar el Tablero del Día por institución (p. ej. ver solo IGSS).
-- Mostrar también el número de NOG / No. SPS junto al nombre del paciente en la tarjeta de cita.
+- Aviso visible cuando la evaluación del día ya fue iniciada por otro médico (para dar contexto de quién la abrió).
+- Resolución de posibles duplicados ya existentes de días pasados (herramienta para fusionar o limpiar duplicados del mismo día).
 
 ### Fase 3 (futuro)
-- Resumen del día por institución (conteos IGSS vs otras) en las tarjetas superiores del tablero.
+- Control de edición simultánea (si dos personas abren la misma evaluación del día a la vez), para evitar que se sobreescriban cambios.
 
 ## Supuestos
-- "Otra institución" se toma del campo de institución de referencia ya existente en la ficha del paciente; se muestra tal cual está registrado.
-- La "descripción del NOG" es el nombre del servicio del NOG (texto), no su número.
-- El autocompletado del motivo ocurre al abrir la evaluación; si el paciente IGSS no tiene NOG/orden con descripción, el motivo se deja como está.
-- La etiqueta de institución se muestra para todas las citas del Tablero del Día, incluidas las citas tipo walk-in cuando tienen paciente asociado.
-- No se modifica el PDF ni otros reportes; estos cambios afectan solo el Tablero del Día y la pantalla de evaluación.
+- "Mismo día" = día calendario en zona horaria de Guatemala.
+- La reutilización aplica cada vez que el expediente se abre para un paciente concreto, sin importar el punto de entrada (Pacientes, Agenda o menú).
+- Si hoy ya hay varias evaluaciones del paciente (por duplicados previos), se continúa la más reciente del día; no se eliminan automáticamente las otras en esta fase.
+- Las evaluaciones de días anteriores no se modifican: siguen disponibles solo para revisión en el historial.
+- El botón "Nueva evaluación" sigue disponible para todos los roles que ya pueden crear/editar evaluaciones.
+- No se toca el sellado manual ni ninguna otra lógica del expediente fuera de la apertura/continuación de la evaluación del día.

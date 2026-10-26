@@ -566,8 +566,10 @@ const EvaluacionOftalmologica = () => {
         return (b.fecha_creacion || '').localeCompare(a.fecha_creacion || '');
       });
       setEvaluaciones(list);
+      return list;
     } catch (error) {
       console.error('Error fetching evaluaciones:', error);
+      return [];
     }
   }, []);
 
@@ -1000,12 +1002,16 @@ const EvaluacionOftalmologica = () => {
   }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones, isOnline, saveOfflineData]);
 
   // Cargar evaluación
-  const cargarEvaluacion = async (evaluacion) => {
+  // comoHistorial=true: se abre una evaluación del historial (guarda snapshot para "volver").
+  // comoHistorial=false: se continúa como la evaluación en curso (del día), sin modo historial.
+  const cargarEvaluacion = async (evaluacion, comoHistorial = true) => {
     // Guardar un snapshot de la evaluación en curso (del día) para poder regresar a ella
-    if (!viendoHistorial) {
-      borradorRef.current = { formData, evaluacionActual, searchPaciente };
+    if (comoHistorial) {
+      if (!viendoHistorial) {
+        borradorRef.current = { formData, evaluacionActual, searchPaciente };
+      }
+      setViendoHistorial(true);
     }
-    setViendoHistorial(true);
     setEvaluacionActual(evaluacion);
     
     // Resetear estado CRM al cargar nueva evaluación
@@ -1123,19 +1129,22 @@ const EvaluacionOftalmologica = () => {
     setViendoHistorial(false);
   };
 
-  // Nueva evaluación
+  // Nueva evaluación: crea una evaluación ADICIONAL para el MISMO paciente (acción manual explícita).
+  // Mantiene el paciente seleccionado; al guardarse se registra como un nuevo registro del día.
   const nuevaEvaluacion = () => {
     setEvaluacionActual(null);
     setViendoHistorial(false);
     borradorRef.current = null;
-    setFormData(evaluacionVacia);
-    setSearchPaciente('');
+    setFormData(prev => ({
+      ...evaluacionVacia,
+      paciente_id: prev.paciente_id,
+      paciente_nombre: prev.paciente_nombre,
+      paciente_edad: prev.paciente_edad,
+      paciente_sexo: prev.paciente_sexo,
+      paciente_expediente: prev.paciente_expediente,
+    }));
     setAutoguardadoStatus('');
-    setNotaPaciente('');
     setTiempoRestante(null);
-    // Limpiar el historial (no hay paciente seleccionado)
-    pacienteIdRef.current = null;
-    setEvaluaciones([]);
     // Resetear estado CRM
     setCrmEnviado(false);
     setCrmForm({
@@ -1296,7 +1305,19 @@ const EvaluacionOftalmologica = () => {
     // Nuevo contexto de borrador para este paciente
     borradorRef.current = null;
     setViendoHistorial(false);
-    fetchEvaluaciones(paciente.id);
+    const lista = await fetchEvaluaciones(paciente.id);
+
+    // Continuar la evaluación de HOY si ya existe (una sola evaluación por paciente por día).
+    // "Hoy" en zona horaria de Guatemala, igual que el backend (today_str_gt).
+    const hoyGt = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
+    const evalHoy = (lista || []).find(e => (e.fecha || '') === hoyGt && !e.imported);
+    if (evalHoy) {
+      await cargarEvaluacion(evalHoy, false);
+      toast.info('Se continúa la evaluación de hoy de este paciente');
+      return;
+    }
+
+    // No hay evaluación de hoy: formulario en blanco (se registrará como la del día al guardar)
     cargarNotaPaciente(paciente.id, true);
     
     // Cargar historial médico del paciente (antecedentes y medicamentos)
@@ -1354,7 +1375,7 @@ const EvaluacionOftalmologica = () => {
           gender: p.gender || '',
           record_number: p.record_number || ''
         });
-        toast.success('Paciente cargado para nueva evaluación');
+        toast.success('Expediente del paciente abierto');
       } catch (error) {
         console.error('Error preseleccionando paciente:', error);
         toast.error('No se pudo cargar el paciente seleccionado');
