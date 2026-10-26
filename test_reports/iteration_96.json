@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only test of the fix that makes previous-day ophthalmology evaluations editable (EvaluacionOftalmologica.js), using superadmin and patient 4ceb89de. All 3 requested features passed. (1) For a previous-day eval (2026-10-23), the 'Evaluación de día anterior' badge (eval-dia-anterior) shows, there is no 'Solo lectura' text, and motivo-consulta-input is enabled. Typing triggered one PATCH /autoguardar, the status changed to 'Guardado a las 11:58 a. m.' with no error, the text persisted in GET /api/evaluaciones/{id} (fecha kept as 2026-10-23), and the text was still there after reloading and reopening the eval. (2) Opening the previous-day eval 545ddda3 without editing sent 0 POST/PATCH/PUT requests, showed no status badge, and fecha_actualizacion stayed exactly the same (2026-10-23T17:12:47.611647). (3) Regression: reopening the patient continued today's eval ('Segunda consulta tarde') with no duplicate (count stayed at 17). An eval with sellado=true (set temporarily in the DB) showed 'Expediente sellado' with fields disabled and no día-anterior badge. 'Nueva' cleared the form and its first edit created an additional eval (POST, then PATCH; count went to 18).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Historial -> 'Volver a la evaluación del día'", "issue": "volverAEvaluacionActual() does not set skipAutoguardadoRef.current=true, so going back to today's eval fires an unneeded PATCH /api/evaluaciones/{today_id}/autoguardar (seen for a0c71e69) and updates its fecha_actualizacion even though nothing was edited. The data saved is identical, so impact is low, but it is the same kind of unwanted save the fix was meant to remove.", "affected_selectors": ["[data-testid='historial-volver-actual']"]}
+    ],
+    "design_issues": [
+      {"screen": "EvaluacionOftalmologica header", "issues": ["When a patient is selected the header wraps onto one line and the patient search input shrinks to about 40px (placeholder shows only 'Pac'). Minor, cosmetic."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Set skipAutoguardadoRef.current = true in volverAEvaluacionActual (before setFormData) so going back to today's eval does not trigger an autosave.",
+    "Optional: the autosave effect returns early when isReadOnly is true, before it uses up skipAutoguardadoRef. After opening a sealed eval the flag stays true and silently swallows the next formData change. Consider resetting the flag in that early-return path."
+  ],
+  "critical_code_review_comments": [
+    "EvaluacionOftalmologica.js is about 3800 lines and should be split into smaller modules.",
+    "skipAutoguardadoRef works because cargarEvaluacion updates evaluacionActual and formData in the same synchronous batch. If an await is ever added between the two, the guard will break (the effect would run twice)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (3/3 requested features)"},
+  "seed_data_creation": "Changed motivo_consulta of eval d4f3ed8a to 'TEST superadmin edit dia anterior OK' (this was the edit test). Set sellado=true on d1528f9c temporarily, then set it back to false. Deleted the TEST eval 94dc2925 created by the 'Nueva' test.",
+  "test_credentials": "superadmin / nova2024",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Patient 4ceb89de has 2 evals for today (2026-10-26) and many for 2026-10-23. Testids: historial-toggle-btn, historial-item-{id}, historial-volver-actual, eval-dia-anterior, autoguardado-status, motivo-consulta-input. To test sealing, set sellado=true in Mongo (collection evaluaciones_oftalmologicas)."
+}

@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 46 — Fix: código IGSS corregido no se reflejaba en el PDF)
+**Última actualización**: 2026-06 (Sesión 47 — Fix: evaluaciones de días anteriores ya NO son solo-lectura)
+
+### Sesión 47 — Fix: expedientes de días anteriores EDITABLES (no "sellados") (2026-06)
+- 🐛 **Reporte**: evaluaciones de días anteriores aparecían como "Solo lectura (día anterior)" y no deberían. (Esto se había introducido en la Sesión 44 como solo-lectura.)
+- ✅ **Fix** (`EvaluacionOftalmologica.js`): `isReadOnly` ya NO incluye `esEvalDiaAnterior` → las evaluaciones de días anteriores son **editables**. Se conserva un badge informativo ámbar "Evaluación de día anterior". El **sellado manual** (`sellado=true`) sigue bloqueando la edición.
+- ✅ **Protección contra modificación espuria**: nuevo `skipAutoguardadoRef` — al CARGAR una evaluación no se dispara autoguardado (0 requests, `fecha_actualizacion` intacta); el guardado solo ocurre al EDITAR realmente. Esto resuelve, de forma correcta, el problema original de la Sesión 44 (que abrir una eval previa cambiaba su fecha) sin bloquear la edición.
+- ✅ **Verificado**: testing agent `iteration_96.json` 100% (editar+persistir día anterior; abrir sin editar no modifica; regresión one-per-day, "Nueva" y sellado manual OK).
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 46 — Fix: el código IGSS corregido ahora se refleja en el PDF (2026-06)
 - 🐛 **Bug**: al corregir el Código IGSS (y NOG/No. SPS/Procedimiento) en la orden del paciente, el cambio se veía en el modal de editar paciente pero el PDF del reporte seguía mostrando el valor anterior.
