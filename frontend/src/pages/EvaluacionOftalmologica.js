@@ -298,15 +298,18 @@ const EvaluacionOftalmologica = () => {
   
   const autoguardadoRef = useRef(null);
   const lastSavedRef = useRef(null);
+  // Evita un autoguardado espurio al CARGAR una evaluación (solo guardar en ediciones reales del usuario)
+  const skipAutoguardadoRef = useRef(false);
   const syncIntervalRef = useRef(null);
   
   const OFFLINE_STORAGE_KEY = 'novavision_evaluaciones_offline';
   
   const canEdit = hasPermission('view_evaluacion');
-  // Las evaluaciones de días anteriores son solo de lectura (no se modifican, solo revisión).
+  // Las evaluaciones de días anteriores son EDITABLES (el usuario puede corregir/continuar),
+  // pero se marcan con un distintivo informativo. El sellado manual sí bloquea la edición.
   const hoyGtStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
   const esEvalDiaAnterior = !!(evaluacionActual?.id && evaluacionActual?.fecha && evaluacionActual.fecha !== hoyGtStr);
-  const isReadOnly = !canEdit || evaluacionActual?.sellado || esEvalDiaAnterior;
+  const isReadOnly = !canEdit || evaluacionActual?.sellado;
 
   // Estado inicial de evaluación
   const evaluacionVacia = {
@@ -907,6 +910,12 @@ const EvaluacionOftalmologica = () => {
     // No autoguardar si es solo lectura o no hay paciente seleccionado
     if (isReadOnly || !formData.paciente_id) return;
     
+    // No autoguardar si este cambio de formData proviene de CARGAR una evaluación (no es edición del usuario)
+    if (skipAutoguardadoRef.current) {
+      skipAutoguardadoRef.current = false;
+      return;
+    }
+    
     if (autoguardadoRef.current) {
       clearTimeout(autoguardadoRef.current);
     }
@@ -1008,6 +1017,8 @@ const EvaluacionOftalmologica = () => {
   // comoHistorial=true: se abre una evaluación del historial (guarda snapshot para "volver").
   // comoHistorial=false: se continúa como la evaluación en curso (del día), sin modo historial.
   const cargarEvaluacion = async (evaluacion, comoHistorial = true) => {
+    // Evitar un autoguardado espurio por el cambio de formData que provoca esta carga
+    skipAutoguardadoRef.current = true;
     // Guardar un snapshot de la evaluación en curso (del día) para poder regresar a ella
     if (comoHistorial) {
       if (!viendoHistorial) {
@@ -1827,11 +1838,11 @@ const EvaluacionOftalmologica = () => {
                 </Badge>
               )}
 
-              {/* Indicador de solo lectura para evaluaciones de días anteriores */}
+              {/* Indicador informativo para evaluaciones de días anteriores (editables) */}
               {esEvalDiaAnterior && !evaluacionActual?.sellado && (
-                <Badge className="bg-slate-100 text-slate-600 text-xs" data-testid="eval-solo-lectura-dia-anterior">
-                  <Lock className="w-3 h-3 mr-1" />
-                  Solo lectura (día anterior)
+                <Badge className="bg-amber-100 text-amber-700 text-xs" data-testid="eval-dia-anterior">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  Evaluación de día anterior
                 </Badge>
               )}
               
