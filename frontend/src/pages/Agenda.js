@@ -339,7 +339,62 @@ const Agenda = () => {
   const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const [fechaSeleccionada, setFechaSeleccionada] = useState(getGuatemalaDate());
-  
+
+  // ===== Buscador de pacientes (citas futuras) =====
+  const [buscadorOpen, setBuscadorOpen] = useState(false);
+  const [buscadorQuery, setBuscadorQuery] = useState('');
+  const [buscadorResultados, setBuscadorResultados] = useState([]);
+  const [buscadorBuscando, setBuscadorBuscando] = useState(false);
+  const [buscadorPaciente, setBuscadorPaciente] = useState(null);
+  const [buscadorCitas, setBuscadorCitas] = useState([]);
+  const [buscadorCitasLoading, setBuscadorCitasLoading] = useState(false);
+
+  const buscarPacientesBuscador = useCallback(async (q) => {
+    if (!q || q.trim().length < 2) { setBuscadorResultados([]); return; }
+    setBuscadorBuscando(true);
+    try {
+      const response = await patientApi.search(q.trim(), 20);
+      setBuscadorResultados(response.data || []);
+    } catch (e) {
+      console.error('Error buscando pacientes:', e);
+    } finally {
+      setBuscadorBuscando(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (buscadorPaciente) return; // ya seleccionó un paciente: no re-buscar
+    const t = setTimeout(() => buscarPacientesBuscador(buscadorQuery), 300);
+    return () => clearTimeout(t);
+  }, [buscadorQuery, buscadorPaciente, buscarPacientesBuscador]);
+
+  const seleccionarPacienteBuscador = async (p) => {
+    setBuscadorPaciente(p);
+    setBuscadorResultados([]);
+    setBuscadorCitasLoading(true);
+    setBuscadorCitas([]);
+    try {
+      const { data } = await agendaApi.getCitasFuturasPaciente(p.id);
+      setBuscadorCitas(data.data || []);
+    } catch (e) {
+      console.error('Error cargando citas futuras:', e);
+    } finally {
+      setBuscadorCitasLoading(false);
+    }
+  };
+
+  const limpiarBuscador = () => {
+    setBuscadorQuery('');
+    setBuscadorResultados([]);
+    setBuscadorPaciente(null);
+    setBuscadorCitas([]);
+  };
+
+  const abrirCitaDesdeBuscador = (cita) => {
+    setBuscadorOpen(false);
+    handleOpenCitaDialog(cita);
+  };
+
   // WebSocket para actualizaciones en tiempo real
   const { isConnected: wsConnected, lastMessage: wsMessage } = useAgendaWebSocket({
     onMessage: (message) => {
@@ -1392,6 +1447,10 @@ const Agenda = () => {
                 Limpiar duplicados
               </Button>
             )}
+            <Button onClick={() => setBuscadorOpen(true)} variant="outline" size="sm" data-testid="buscar-paciente-agenda-btn">
+              <Search className="w-4 h-4 mr-1" />
+              Buscar paciente
+            </Button>
             <Button onClick={() => handleOpenCitaDialog()} className="bg-blue-600 hover:bg-blue-700" data-testid="nueva-cita-btn">
               <Plus className="w-4 h-4 mr-1" />
               Nueva Cita
@@ -1400,6 +1459,111 @@ const Agenda = () => {
         </div>
         
         <GoogleCalendarDialog open={gcalOpen} onOpenChange={setGcalOpen} />
+
+        {/* Buscador de pacientes: citas futuras */}
+        <Dialog open={buscadorOpen} onOpenChange={(o) => { setBuscadorOpen(o); if (!o) limpiarBuscador(); }}>
+          <DialogContent className="max-w-lg" data-testid="buscador-paciente-dialog">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5 text-blue-600" />
+                Buscar paciente · próximas citas
+              </DialogTitle>
+              <DialogDescription>
+                Escribe el nombre o apellido del paciente para ver sus citas de hoy en adelante.
+              </DialogDescription>
+            </DialogHeader>
+
+            {!buscadorPaciente ? (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    autoFocus
+                    value={buscadorQuery}
+                    onChange={(e) => setBuscadorQuery(e.target.value)}
+                    placeholder="Nombre y/o apellido..."
+                    className="pl-9"
+                    data-testid="buscador-paciente-input"
+                  />
+                </div>
+                <div className="max-h-80 overflow-y-auto space-y-1">
+                  {buscadorBuscando && <p className="text-sm text-gray-400 py-2 text-center">Buscando...</p>}
+                  {!buscadorBuscando && buscadorQuery.trim().length >= 2 && buscadorResultados.length === 0 && (
+                    <p className="text-sm text-gray-400 py-4 text-center" data-testid="buscador-sin-resultados">Sin resultados</p>
+                  )}
+                  {!buscadorBuscando && buscadorQuery.trim().length < 2 && (
+                    <p className="text-sm text-gray-400 py-4 text-center">Escribe al menos 2 letras</p>
+                  )}
+                  {buscadorResultados.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => seleccionarPacienteBuscador(p)}
+                      className="w-full text-left p-2 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors"
+                      data-testid={`buscador-paciente-result-${p.id}`}
+                    >
+                      <div className="font-medium text-sm">{p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim()}</div>
+                      <div className="text-xs text-gray-500">Exp: {p.record_number || '—'}{p.dpi ? ` · DPI: ${p.dpi}` : ''}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                  <div>
+                    <div className="font-semibold text-sm">{buscadorPaciente.full_name || `${buscadorPaciente.first_name || ''} ${buscadorPaciente.last_name || ''}`.trim()}</div>
+                    <div className="text-xs text-gray-500">Exp: {buscadorPaciente.record_number || '—'}</div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={limpiarBuscador} data-testid="buscador-cambiar-paciente-btn">
+                    <RotateCcw className="w-3 h-3 mr-1" /> Otra búsqueda
+                  </Button>
+                </div>
+                <div className="max-h-80 overflow-y-auto space-y-2">
+                  {buscadorCitasLoading && <p className="text-sm text-gray-400 py-2 text-center">Cargando citas...</p>}
+                  {!buscadorCitasLoading && buscadorCitas.length === 0 && (
+                    <div className="text-center py-6 text-gray-400" data-testid="buscador-sin-citas">
+                      <CalendarDays className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Sin citas próximas</p>
+                    </div>
+                  )}
+                  {buscadorCitas.map((cita) => {
+                    const cfg = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
+                    const IconoEstado = cfg.icon;
+                    let fechaFmt = cita.fecha;
+                    try {
+                      fechaFmt = new Date(cita.fecha + 'T00:00:00').toLocaleDateString('es-GT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+                    } catch (e) {}
+                    return (
+                      <button
+                        key={cita.id}
+                        onClick={() => abrirCitaDesdeBuscador(cita)}
+                        className="w-full text-left p-3 rounded-lg border hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                        data-testid={`buscador-cita-${cita.id}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="w-4 h-4 text-blue-600" />
+                            <span className="font-medium text-sm capitalize">{fechaFmt}</span>
+                            <span className="text-sm text-gray-600">· {cita.hora_inicio}</span>
+                          </div>
+                          <Badge className={`text-xs border ${cfg.color}`}>
+                            <IconoEstado className="w-3 h-3 mr-1" />
+                            {cita.estado}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                          <Stethoscope className="w-3 h-3" />
+                          {cita.medico_nombre || 'Sin médico asignado'}
+                          {cita.tipo_cita ? ` · ${cita.tipo_cita}` : ''}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         
         {/* Bloqueos de agenda (franjas, días, feriados y vacaciones) */}
         <BloqueosAgenda

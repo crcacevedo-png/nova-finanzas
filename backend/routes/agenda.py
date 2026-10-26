@@ -443,6 +443,29 @@ async def cita_hoy_paciente(
     return {"medico": {"id": cita.get("medico_id"), "name": cita.get("medico_nombre")}}
 
 
+@router.get("/paciente/{paciente_id}/citas-futuras", response_model=CitaListResponse)
+async def citas_futuras_paciente(
+    paciente_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Citas de HOY en adelante (hora Guatemala) de un paciente, para el buscador de la Agenda.
+    Incluye las canceladas y 'no asistió' (marcadas con su estado). Ordenadas de la más
+    próxima a la más lejana. No incluye fechas anteriores a hoy."""
+    hoy = today_str_gt()
+    citas = await db.citas.find(
+        {
+            "tipo_agenda": "pacientes",
+            "paciente_id": paciente_id,
+            "fecha": {"$gte": hoy},
+        },
+        {"_id": 0},
+    ).to_list(500)
+    citas.sort(key=lambda c: (c.get("fecha", ""), c.get("hora_inicio", "")))
+    await _enriquecer_instituciones(citas)
+    return CitaListResponse(data=citas, total=len(citas))
+
+
+
 @router.get("/citas/{cita_id}", response_model=CitaResponse)
 async def obtener_cita(
     cita_id: str,

@@ -1,52 +1,58 @@
-# Expediente oftalmológico: una sola evaluación por paciente por día
+# Buscador de pacientes en la Agenda (citas futuras)
 
-Al abrir el expediente de un paciente, el sistema debe continuar la evaluación que ya se inició hoy para ese paciente en lugar de crear una nueva cada vez. Así se mantiene una única "sesión" de evaluación por paciente durante todo el día.
+Un buscador dentro de la Agenda que encuentra a un paciente por nombre y apellido y muestra sus próximas citas.
+Sirve para ubicar rápidamente cuándo vuelve un paciente sin recorrer el calendario día por día.
 
 ## Para quién es
-Médicos oftalmólogos y personal con acceso a evaluaciones (incluye el rol Administrador IGSS) que abren el expediente del mismo paciente varias veces en un día.
+Recepción, personal de agenda, médicos y administradores que necesitan saber si un paciente ya tiene cita y cuándo, atendiendo llamadas o consultas en mostrador.
 
-## Problema actual
-Hoy, cada vez que se abre el expediente de un paciente y se empieza a escribir (o se autollena el motivo), se crea un registro de evaluación nuevo. Resultado: múltiples evaluaciones duplicadas del mismo paciente en el mismo día.
-
-## Qué cambia (experiencia)
-- Al abrir el expediente de un paciente, si ya existe una evaluación de ese paciente con fecha de **hoy**, el expediente la abre y la continúa (misma nota, se sigue editando sobre ella).
-- La evaluación del día es **compartida**: si otro médico la inició hoy, al abrir el expediente se continúa esa misma evaluación (no se crea una por médico).
-- Si el paciente **no** tiene ninguna evaluación de hoy, se abre una evaluación en blanco que pasa a ser "la del día" al guardarse por primera vez.
-- Se conserva el botón **"Nueva evaluación"** para los casos en que a propósito se necesite crear una evaluación adicional el mismo día (p. ej. una segunda consulta). Es una acción manual y explícita; el comportamiento por defecto sigue siendo continuar la del día.
-- El historial del paciente sigue mostrando las evaluaciones de días anteriores y se pueden abrir para revisión, igual que hoy.
+## Funciones principales y experiencia
+- Campo de búsqueda visible en la Agenda donde se escribe el nombre y/o apellido del paciente.
+- La búsqueda tolera coincidencias parciales (por ejemplo, escribir solo el apellido) y no distingue mayúsculas ni acentos.
+- Los resultados muestran los pacientes que coinciden con lo escrito.
+- Al elegir un paciente, se despliega la lista de sus **próximas citas** (de hoy en adelante), cada una con fecha, hora y médico.
+- La lista incluye también las citas futuras **canceladas** y marcadas **"no asistió"**, cada una señalada con su estado para distinguirlas de las vigentes.
+- Al tocar una cita de la lista se abre el detalle de esa cita.
+- Si el paciente no tiene citas futuras, se indica con un mensaje claro ("Sin citas próximas").
+- Solo se consideran citas de hoy en adelante; las citas de días pasados no aparecen en este buscador.
 
 ## Flujo del usuario
-1. El usuario abre el expediente de un paciente (desde Pacientes, Agenda o el menú).
-2. El sistema busca si ese paciente ya tiene una evaluación con fecha de hoy.
-3. Si existe → la abre y se continúa editando sobre esa misma evaluación.
-4. Si no existe → se muestra una evaluación en blanco; al escribir y guardarse por primera vez, queda registrada como la evaluación de hoy.
-5. Si el usuario necesita una evaluación extra el mismo día, pulsa "Nueva evaluación" de forma explícita.
+1. El usuario entra a la Agenda y escribe el nombre o apellido en el buscador de pacientes.
+2. Aparecen los pacientes que coinciden.
+3. El usuario selecciona al paciente deseado.
+4. Se muestra la lista de sus próximas citas (fecha, hora, médico y estado), ordenadas de la más cercana a la más lejana.
+5. El usuario toca una cita y se abre su detalle.
+6. El usuario puede limpiar la búsqueda y empezar otra.
 
-## Definición de "hoy"
-El día se calcula con la zona horaria de Guatemala (la misma que ya usa el sistema). Si por datos previos existieran varias evaluaciones de hoy para un paciente, se continúa la más reciente del día.
-
-## Sobre Google Calendar
-Consulta respondida: actualmente la aplicación **no** tiene integración ni tarea programada (cron) con Google Calendar. No se realiza ningún trabajo al respecto en esta corrección.
+## Sensación UI/UX
+- Integrado de forma natural en la Agenda, coherente con el estilo actual del sistema.
+- Rápido: los resultados se actualizan a medida que se escribe, sin recargar la pantalla.
+- Lista ordenada y legible, con la fecha/hora destacada y una marca visible para las citas canceladas o "no asistió".
+- Estados de "vacío" y "sin resultados" claramente comunicados.
 
 ## Fases de implementación
 
 ### Fase 1 (MVP, se construye ahora)
-- Al abrir el expediente de un paciente, continuar automáticamente la evaluación de hoy de ese paciente si existe; si no, iniciar una en blanco que se registra como la del día al primer guardado.
-- Reutilización compartida entre médicos (una evaluación del día por paciente, sin importar quién la creó).
-- Mantener el botón "Nueva evaluación" como acción manual para crear una evaluación adicional el mismo día.
-- Evitar que al reabrir el expediente se generen registros nuevos/duplicados del mismo día.
+- Buscador por nombre y apellido (coincidencia parcial, sin distinguir acentos/mayúsculas) dentro de la Agenda.
+- Resultados de pacientes y, al seleccionar uno, lista de sus citas de hoy en adelante con fecha, hora, médico y estado.
+- Inclusión de citas futuras canceladas y "no asistió", señaladas con su estado.
+- Apertura del detalle de una cita al tocarla.
+- Mensaje claro cuando el paciente no tiene citas próximas.
 
 ### Fase 2 (futuro)
-- Aviso visible cuando la evaluación del día ya fue iniciada por otro médico (para dar contexto de quién la abrió).
-- Resolución de posibles duplicados ya existentes de días pasados (herramienta para fusionar o limpiar duplicados del mismo día).
+- Filtros dentro de los resultados: por médico, por rango de fechas o por estado de la cita.
+- Acceso rápido para agendar una nueva cita al paciente desde el mismo resultado.
 
 ### Fase 3 (futuro)
-- Control de edición simultánea (si dos personas abren la misma evaluación del día a la vez), para evitar que se sobreescriban cambios.
+- Incluir en el buscador el historial de citas pasadas (con conmutador entre "próximas" e "historial").
+- Búsqueda ampliada por otros datos del paciente (número de expediente, DPI, teléfono).
 
 ## Supuestos
-- "Mismo día" = día calendario en zona horaria de Guatemala.
-- La reutilización aplica cada vez que el expediente se abre para un paciente concreto, sin importar el punto de entrada (Pacientes, Agenda o menú).
-- Si hoy ya hay varias evaluaciones del paciente (por duplicados previos), se continúa la más reciente del día; no se eliminan automáticamente las otras en esta fase.
-- Las evaluaciones de días anteriores no se modifican: siguen disponibles solo para revisión en el historial.
-- El botón "Nueva evaluación" sigue disponible para todos los roles que ya pueden crear/editar evaluaciones.
-- No se toca el sellado manual ni ninguna otra lógica del expediente fuera de la apertura/continuación de la evaluación del día.
+- "Citas futuras" = de hoy en adelante, incluyendo las citas de hoy que aún no han ocurrido; se excluyen fechas anteriores a hoy.
+- El día y la hora se calculan en la zona horaria de Guatemala, igual que el resto del sistema.
+- La búsqueda aplica a las citas de pacientes (no a bloqueos u otros tipos de registro de la agenda).
+- Las citas se listan ordenadas de la más próxima a la más lejana.
+- Las citas canceladas y "no asistió" se muestran con una marca de estado para diferenciarlas de las vigentes.
+- Al seleccionar una cita se abre su detalle en la misma vista de Agenda; no se crea ni modifica nada por solo buscar.
+- El buscador está disponible para los roles que ya tienen acceso a la Agenda.
+- No se modifica ninguna otra función existente de la Agenda.

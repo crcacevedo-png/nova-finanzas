@@ -34,6 +34,8 @@ export const agendaApi = {
   getCita: (id) => axios.get(`${API_URL}/api/agenda/citas/${id}`, getAuthHeaders()),
 
   getCitaHoyPaciente: (pacienteId) => axios.get(`${API_URL}/api/agenda/cita-hoy-paciente/${pacienteId}`, getAuthHeaders()),
+
+  getCitasFuturasPaciente: (pacienteId) => axios.get(`${API_URL}/api/agenda/paciente/${pacienteId}/citas-futuras`, getAuthHeaders()),
   
   createCita: (data) => axios.post(`${API_URL}/api/agenda/citas`, data, getAuthHeaders()),
   
