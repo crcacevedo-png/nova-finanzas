@@ -1,0 +1,34 @@
+{
+  "summary": "Retest of the iteration_97 sticky-status bug in IGSS Producción (consolidated rows): it is fixed. Backend pytest: 22/22 pass (test_produccion_consolidacion.py + test_produccion_igss.py), including test_uncheck_when_state_on_member_eval. UI end-to-end as superadmin, range 2026-10-01..2026-10-31, row SPS-110 (representative a0c71e69-9e39-4a43-a5a9-d4900ba1d333): Pagado was marked then unmarked 2 times. Each mark: checkbox checked, Pagado Q1,350 -> Q3,350, persisted after reload. Each unmark: checkbox unchecked, Pagado back to Q1,350, still unchecked after reload. Enviado mark+unmark was also stable after reload. Consolidation stayed intact after every toggle: 59 prod-row-* = Servicios 59 = sum of NOG counts 59, and sum of NOG subtotals Q69,700 = Producción.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "_build_produccion_rows grouping (carried over from iteration_97)", "issue": "Order key is SPS if present, else NOG. A NOG-only eval and an SPS eval of the same order can become 2 rows. Not retested in this iteration."},
+      {"endpoint": "costo_override read path", "issue": "PATCH writes the override only to the representative. If the read still falls back to a member's override, a stale member override cannot be cleared from the UI. Not observed in this data."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Producción filters", "issues": ["Native type=date inputs instead of the shadcn date picker (unchanged from iteration_97)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_produccion_consolidacion.py", "/app/backend/tests/test_produccion_igss.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: resolve the SPS from patient.igss_ordenes when an eval has only a NOG, to avoid split rows",
+    "Optional: split igss_nogs.py (>1100 lines) into a separate produccion module",
+    "Optional: use the shadcn date picker"
+  ],
+  "critical_code_review_comments": [
+    "PATCH now resolves the siblings by loading ALL evaluations of the patient and calling _resolver_orden on each. This is fine at the current scale, but it is O(n) per toggle for patients with many evals.",
+    "The bool updates run one update_one per eval in a loop; update_many with {evaluacion_id: {$in: ids}} cannot upsert, so the loop is acceptable, but it is not atomic across the group."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% (2/2 requested flows)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None. Toggled Pagado/Enviado on SPS-110 and left them in the original state (unchecked).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Oct 2026 baseline: Servicios 59, Producción Q69,700, Pagado Q1,350, Enviado 3·Q1,850, Facturado 3·Q1,850. SPS-110 row = a0c71e69-9e39-4a43-a5a9-d4900ba1d333 (Pagado cost Q2,000). Checkbox state is read via the data-state attribute on prod-{estado}-{id}."
+}

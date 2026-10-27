@@ -4,7 +4,21 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 47 — Fix: evaluaciones de días anteriores ya NO son solo-lectura)
+**Última actualización**: 2026-06 (Sesión 48 — Producción IGSS: un servicio por orden, sin duplicados)
+
+### Sesión 48 — Producción IGSS: una línea por paciente+orden, sin duplicados (2026-06)
+- 🎯 **Objetivo**: la pestaña Producción IGSS repetía al mismo paciente (una fila por cada evaluación), inflando totales; además listaba evaluaciones en blanco creadas por error.
+- ✅ **Consolidación (Fase 1, solo vista/reporte)** en `routes/igss_nogs.py` `_build_produccion_rows()`:
+  - Una sola fila por `(paciente, orden)`. Orden = **No. SPS**; respaldo **NOG**; respaldo paciente/fecha.
+  - Órdenes distintas (distinto No. SPS) del mismo paciente siguen separadas.
+  - **Evaluaciones en blanco ocultas**: sin médico asignado Y sin datos clínicos (`_eval_tiene_contenido` revisa procedimiento IGSS, diagnósticos, examen/AV/refracción, med/proc IGSS, recetas, recomendaciones, motivo/padecimiento/plan). No se listan ni suman.
+  - Representante del grupo = evaluación más reciente **con contenido**; se usa su `evaluacion_id` para abrir/imprimir/costo.
+  - Estados (Impreso/Enviado/Facturado/Pagado) se **combinan (OR)** entre las evaluaciones de la orden para mostrar.
+- ✅ **PATCH `/produccion/{evaluacion_id}`**: los estados booleanos se aplican a **todas** las evaluaciones de la orden (marcar/desmarcar estable y consistente); `costo_override` solo al representante. Helpers `_resolver_orden`/`_order_key` compartidos.
+- ✅ Totales, subtotales por unidad/NOG y **exportación Excel** derivan de las filas consolidadas (sin inflar). No se borran registros de la BD.
+- ✅ **Verificado**: testing agent `iteration_98.json` (backend 22/22 incl. `test_produccion_consolidacion.py`; UI e2e: SPS-110 consolidó 17 evals → 1 fila, 59 filas = Servicios 59, subtotales = Producción Q69,700, marcar/desmarcar estable tras recarga).
+- 🔜 **Fase 2** (pendiente): herramienta para limpiar en BD los borradores vacíos existentes (con confirmación) y recalcular consumo de NOG. **Fase 3**: no crear evaluación hasta que haya un dato real (evitar borradores desde el origen).
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 47 — Fix: expedientes de días anteriores EDITABLES (no "sellados") (2026-06)
 - 🐛 **Reporte**: evaluaciones de días anteriores aparecían como "Solo lectura (día anterior)" y no deberían. (Esto se había introducido en la Sesión 44 como solo-lectura.)
