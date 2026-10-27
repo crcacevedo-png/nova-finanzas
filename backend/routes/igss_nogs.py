@@ -197,11 +197,13 @@ async def _anular_acreditacion_interna(acred: dict, user: dict, motivo: str):
     )
 
 
-async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "asignacion"):
+async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "asignacion", solo_numeros=None):
     """Asegura que el paciente consuma 1 servicio por cada NOG distinto de sus
     órdenes IGSS (unidad activa + NOG del catálogo activo). Libera las acreditaciones
     que ya no correspondan. Soporta múltiples órdenes (varios NOG) por paciente.
-    Hook llamado al crear/editar/desactivar/reactivar un paciente."""
+    Hook llamado al crear/editar/desactivar/reactivar un paciente.
+    Si se pasa `solo_numeros` (set), solo se consideran objetivo los NOG cuyo número
+    esté en ese conjunto (usado por el recálculo basado en evaluaciones reales)."""
     if not paciente:
         return
     pac_id = paciente.get("id")
@@ -219,6 +221,8 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
             leg = (paciente.get("igss_nog") or "").strip()
             if leg:
                 numeros = [leg]
+        if solo_numeros is not None:
+            numeros = [n for n in numeros if n in solo_numeros]
         for numero in set(numeros):
             nog = await db.igss_nogs.find_one(
                 {"unidad_id": paciente["igss_unit_id"], "numero": numero, "is_active": True},
@@ -486,6 +490,146 @@ async def recalcular_nog(
     result = _nog_con_derivados(fresh)
     result["acreditaciones_nuevas"] = creadas
     return result
+
+
+# ==================== MANTENIMIENTO: BORRADORES VACÍOS Y RECÁLCULO ====================
+
+MANTENIMIENTO_ROLES = ["superadmin", "administrador_igss"]
+
+# Proyección mínima para evaluar si una evaluación es un borrador vacío
+_BORRADOR_PROJ = {
+    "_id": 0, "id": 1, "paciente_id": 1, "paciente_nombre": 1, "paciente_expediente": 1,
+    "fecha": 1, "medico_id": 1, "medico_nombre": 1, "igss_procedimiento": 1, "igss_nog": 1,
+    "motivo_consulta": 1, "padecimiento_actual": 1, "plan": 1, "diagnosticos": 1,
+    "examen": 1, "igss_med_proc": 1, "procedimientos": 1, "recetas": 1, "recomendaciones": 1,
+}
+
+
+class LimpiarBorradoresBody(BaseModel):
+    confirmar: bool = False
+
+
+@router.get("/mantenimiento/borradores-vacios")
+async def preview_borradores_vacios(
+    current_user: dict = Depends(require_role(MANTENIMIENTO_ROLES))
+):
+    """Previsualiza las evaluaciones que son borradores vacíos (sin médico y sin datos
+    clínicos). No elimina nada: devuelve total y una muestra para revisión."""
+    total_evals = 0
+    vacios = []
+    cursor = db.evaluaciones_oftalmologicas.find({}, _BORRADOR_PROJ)
+    async for ev in cursor:
+        total_evals += 1
+        if eval_es_borrador_vacio(ev):
+            vacios.append(ev)
+    muestra = sorted(vacios, key=lambda e: e.get("fecha", ""), reverse=True)[:50]
+    return {
+        "total_evaluaciones": total_evals,
+        "total_vacios": len(vacios),
+        "muestra": [{
+            "id": e["id"],
+            "paciente_nombre": e.get("paciente_nombre", ""),
+            "expediente": e.get("paciente_expediente", ""),
+            "fecha": e.get("fecha", ""),
+        } for e in muestra],
+    }
+
+
+@router.post("/mantenimiento/borradores-vacios/limpiar")
+async def limpiar_borradores_vacios(
+    body: LimpiarBorradoresBody,
+    current_user: dict = Depends(require_role(MANTENIMIENTO_ROLES))
+):
+    """Elimina todas las evaluaciones que son borradores vacíos. Requiere confirmación."""
+    if not body.confirmar:
+        raise HTTPException(status_code=400, detail="Debe confirmar la eliminación")
+    ids = []
+    cursor = db.evaluaciones_oftalmologicas.find({}, _BORRADOR_PROJ)
+    async for ev in cursor:
+        if eval_es_borrador_vacio(ev):
+            ids.append(ev["id"])
+    eliminados = 0
+    for i in range(0, len(ids), 500):
+        res = await db.evaluaciones_oftalmologicas.delete_many({"id": {"$in": ids[i:i + 500]}})
+        eliminados += res.deleted_count
+    # Limpiar estados de producción huérfanos de las evaluaciones eliminadas
+    for i in range(0, len(ids), 500):
+        await db.igss_produccion.delete_many({"evaluacion_id": {"$in": ids[i:i + 500]}})
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "LIMPIEZA_BORRADORES_VACIOS",
+        "user_id": current_user.get("id", ""),
+        "user_name": current_user.get("username", current_user.get("name", "")),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "details": {"eliminados": eliminados},
+    })
+    return {"eliminados": eliminados}
+
+
+async def _recalcular_consumo_por_evaluaciones(user: dict):
+    """Recalcula el consumo (acreditaciones) de cada NOG exigiendo que el paciente
+    tenga al menos una evaluación REAL (con datos clínicos) de ese NOG. Los pacientes
+    con solo borradores vacíos o sin evaluación dejan de consumir cupo. Conserva las
+    acreditaciones marcadas manualmente."""
+    # Pacientes IGSS (para fallback de orden y datos del paciente)
+    pac_igss = await db.patients.find(
+        {"referral_institution": "igss"}, {"_id": 0}
+    ).to_list(None)
+    pac_map = {p["id"]: p for p in pac_igss}
+    # Mapa paciente -> set de números de NOG con evaluación REAL
+    real = {}
+    cursor = db.evaluaciones_oftalmologicas.find({}, _BORRADOR_PROJ)
+    async for ev in cursor:
+        if eval_es_borrador_vacio(ev):
+            continue
+        pac = pac_map.get(ev.get("paciente_id"))
+        if not pac:
+            continue  # evaluación de paciente no IGSS: no afecta consumo
+        numero, _, _, _ = _resolver_orden(ev, pac)
+        if numero:
+            real.setdefault(ev["paciente_id"], set()).add(numero)
+    # Pacientes a reconciliar: activos IGSS con unidad + cualquiera con acreditación vigente
+    acred_ids = await db.igss_nog_acreditaciones.distinct("paciente_id", {"anulada": {"$ne": True}})
+    ids = set(acred_ids) | {p["id"] for p in pac_igss if p.get("is_active", True) and p.get("igss_unit_id")}
+    faltan = [pid for pid in ids if pid not in pac_map]
+    if faltan:
+        for i in range(0, len(faltan), 500):
+            extra = await db.patients.find({"id": {"$in": faltan[i:i + 500]}}, {"_id": 0}).to_list(None)
+            for p in extra:
+                pac_map[p["id"]] = p
+    procesados = 0
+    for pid in ids:
+        pac = pac_map.get(pid)
+        if not pac:
+            continue
+        await _reconciliar_nog_paciente(pac, user, origen="recalculo_eval", solo_numeros=real.get(pid, set()))
+        procesados += 1
+    # Resincronizar contadores de todos los NOG
+    nogs = await db.igss_nogs.find({}, {"_id": 0, "id": 1}).to_list(None)
+    for n in nogs:
+        activos = await db.igss_nog_acreditaciones.count_documents(
+            {"nog_id": n["id"], "anulada": {"$ne": True}})
+        await db.igss_nogs.update_one({"id": n["id"]}, {"$set": {"acreditados": activos}})
+    vigentes = await db.igss_nog_acreditaciones.count_documents({"anulada": {"$ne": True}})
+    return {"pacientes_procesados": procesados, "acreditaciones_vigentes": vigentes, "nogs": len(nogs)}
+
+
+@router.post("/nogs/recalcular-por-evaluaciones")
+async def recalcular_por_evaluaciones(
+    current_user: dict = Depends(require_permission("manage_igss_units"))
+):
+    """Recalcula el consumo de TODOS los NOG contando solo a los pacientes con una
+    evaluación real (con datos clínicos). Útil tras limpiar borradores vacíos."""
+    res = await _recalcular_consumo_por_evaluaciones(current_user)
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "RECALCULO_NOG_POR_EVALUACIONES",
+        "user_id": current_user.get("id", ""),
+        "user_name": current_user.get("username", current_user.get("name", "")),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "details": res,
+    })
+    return res
 
 
 # ==================== ENDPOINTS - ACREDITACIONES / PACIENTES ====================
@@ -916,6 +1060,11 @@ def _eval_tiene_contenido(ev):
 
 def _eval_tiene_medico(ev):
     return _txt(ev.get("medico_id")) or _txt(ev.get("medico_nombre"))
+
+
+def eval_es_borrador_vacio(ev):
+    """Borrador vacío = sin médico asignado Y sin ningún dato clínico."""
+    return not _eval_tiene_medico(ev) and not _eval_tiene_contenido(ev)
 
 
 def _eval_recencia(ev):

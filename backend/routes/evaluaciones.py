@@ -924,6 +924,14 @@ async def create_evaluacion(
     if not evaluacion_dict.get("fecha"):
         evaluacion_dict["fecha"] = today_str_gt()
     
+    # Fase 3: no crear evaluaciones vacías (sin médico y sin ningún dato clínico)
+    from routes.igss_nogs import eval_es_borrador_vacio
+    if eval_es_borrador_vacio(evaluacion_dict):
+        raise HTTPException(
+            status_code=422,
+            detail="No se puede crear una evaluación vacía. Agregue al menos un dato clínico o asigne un médico."
+        )
+    
     await db.evaluaciones_oftalmologicas.insert_one(evaluacion_dict)
     
     # Acreditar servicio al NOG del paciente (IGSS) si corresponde. Nunca bloquea la evaluación.

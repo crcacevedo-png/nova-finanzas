@@ -14,7 +14,10 @@ import {
   ClipboardList,
   Download,
   FileStack,
-  RotateCcw
+  RotateCcw,
+  Wrench,
+  Trash,
+  Loader2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -181,6 +184,12 @@ const UnidadesIGSS = () => {
   const [alertReload, setAlertReload] = useState(0);
   const [resumen, setResumen] = useState(null);
   const [reconciliando, setReconciliando] = useState(false);
+  const [mantOpen, setMantOpen] = useState(false);
+  const [mantPreview, setMantPreview] = useState(null);
+  const [mantLoading, setMantLoading] = useState(false);
+  const [limpiando, setLimpiando] = useState(false);
+  const [recalcEval, setRecalcEval] = useState(false);
+  const [confirmLimpiar, setConfirmLimpiar] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -227,8 +236,55 @@ const UnidadesIGSS = () => {
     }
   };
 
-  const fetchResumen = useCallback(async () => {
+  const abrirMantenimiento = async () => {
+    setMantOpen(true);
+    setConfirmLimpiar(false);
+    setMantPreview(null);
+    setMantLoading(true);
     try {
+      const res = await igssNogApi.previewBorradoresVacios();
+      setMantPreview(res.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al revisar borradores vacíos');
+    } finally {
+      setMantLoading(false);
+    }
+  };
+
+  const handleLimpiarBorradores = async () => {
+    try {
+      setLimpiando(true);
+      const res = await igssNogApi.limpiarBorradoresVacios();
+      const n = res.data?.eliminados ?? 0;
+      toast.success(`${n} borrador(es) vacío(s) eliminado(s). Recalcula el consumo para actualizar los NOG.`);
+      setConfirmLimpiar(false);
+      // refrescar preview
+      const fresh = await igssNogApi.previewBorradoresVacios();
+      setMantPreview(fresh.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al eliminar borradores vacíos');
+    } finally {
+      setLimpiando(false);
+    }
+  };
+
+  const handleRecalcularPorEvaluaciones = async () => {
+    try {
+      setRecalcEval(true);
+      const res = await igssNogApi.recalcularPorEvaluaciones();
+      const v = res.data?.acreditaciones_vigentes ?? 0;
+      const p = res.data?.pacientes_procesados ?? 0;
+      toast.success(`Consumo recalculado por evaluaciones reales: ${v} servicios en ${p} pacientes revisados`);
+      setAlertReload((x) => x + 1);
+      fetchUnits();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al recalcular por evaluaciones');
+    } finally {
+      setRecalcEval(false);
+    }
+  };
+
+  const fetchResumen = useCallback(async () => {    try {
       const response = await igssNogApi.getResumen();
       setResumen(response.data);
     } catch (error) {
@@ -386,6 +442,16 @@ const UnidadesIGSS = () => {
               >
                 <RotateCcw className={`w-4 h-4 mr-2 ${reconciliando ? 'animate-spin' : ''}`} />
                 {reconciliando ? 'Recalculando...' : 'Recalcular consumo'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={abrirMantenimiento}
+                className="btn-outline"
+                data-testid="mantenimiento-igss-button"
+                title="Limpiar borradores vacíos y recalcular el consumo por evaluaciones reales"
+              >
+                <Wrench className="w-4 h-4 mr-2" />
+                Mantenimiento
               </Button>
               <Button 
                 onClick={() => handleOpenDialog()}
@@ -709,6 +775,118 @@ const UnidadesIGSS = () => {
             onChanged={() => setAlertReload((x) => x + 1)}
           />
         )}
+
+        {/* Mantenimiento IGSS: limpiar borradores vacíos + recálculo por evaluaciones */}
+        <Dialog open={mantOpen} onOpenChange={setMantOpen}>
+          <DialogContent className="max-w-lg" data-testid="mantenimiento-dialog">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wrench className="w-5 h-5" /> Mantenimiento IGSS
+              </DialogTitle>
+              <DialogDescription>
+                Depura borradores vacíos y recalcula el consumo de los NOG según las evaluaciones reales.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              {/* Sección 1: Borradores vacíos */}
+              <div className="rounded-lg border p-4 space-y-3" data-testid="mant-borradores-section">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-sm">Borradores vacíos</p>
+                    <p className="text-xs text-gray-500">Evaluaciones sin médico y sin ningún dato clínico.</p>
+                  </div>
+                  {mantLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-700" data-testid="mant-vacios-count">
+                      {mantPreview?.total_vacios ?? 0} vacíos
+                    </Badge>
+                  )}
+                </div>
+
+                {!mantLoading && (mantPreview?.total_vacios ?? 0) > 0 && (
+                  <div className="max-h-40 overflow-auto rounded border bg-gray-50 text-xs" data-testid="mant-vacios-muestra">
+                    {(mantPreview?.muestra || []).map((m) => (
+                      <div key={m.id} className="flex justify-between px-3 py-1 border-b last:border-0">
+                        <span className="truncate mr-2">{m.paciente_nombre || '(sin nombre)'} {m.expediente ? `· ${m.expediente}` : ''}</span>
+                        <span className="text-gray-400 shrink-0">{m.fecha || '—'}</span>
+                      </div>
+                    ))}
+                    {(mantPreview?.total_vacios ?? 0) > (mantPreview?.muestra || []).length && (
+                      <div className="px-3 py-1 text-gray-400 italic">
+                        … y {(mantPreview.total_vacios - (mantPreview.muestra || []).length)} más
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!mantLoading && (mantPreview?.total_vacios ?? 0) === 0 && (
+                  <p className="text-xs text-green-700" data-testid="mant-sin-vacios">No hay borradores vacíos. ✔</p>
+                )}
+
+                {!confirmLimpiar ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={mantLoading || (mantPreview?.total_vacios ?? 0) === 0}
+                    onClick={() => setConfirmLimpiar(true)}
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    data-testid="mant-eliminar-button"
+                  >
+                    <Trash className="w-4 h-4 mr-2" />
+                    Eliminar {mantPreview?.total_vacios ?? 0} borrador(es)
+                  </Button>
+                ) : (
+                  <div className="rounded bg-red-50 border border-red-200 p-3 space-y-2" data-testid="mant-confirm-box">
+                    <p className="text-xs text-red-700">
+                      Esta acción elimina definitivamente {mantPreview?.total_vacios ?? 0} evaluación(es) vacía(s). No se puede deshacer. ¿Continuar?
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={limpiando}
+                        onClick={handleLimpiarBorradores}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        data-testid="mant-confirm-eliminar-button"
+                      >
+                        {limpiando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash className="w-4 h-4 mr-2" />}
+                        {limpiando ? 'Eliminando...' : 'Sí, eliminar'}
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={limpiando} onClick={() => setConfirmLimpiar(false)} data-testid="mant-cancel-eliminar-button">
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sección 2: Recálculo por evaluaciones */}
+              <div className="rounded-lg border p-4 space-y-3" data-testid="mant-recalculo-section">
+                <div>
+                  <p className="font-semibold text-sm">Recalcular consumo por evaluaciones</p>
+                  <p className="text-xs text-gray-500">
+                    Cuenta como servicio solo a los pacientes con una evaluación real (con datos). Libera el cupo de los que solo tenían borradores vacíos.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={recalcEval}
+                  onClick={handleRecalcularPorEvaluaciones}
+                  className="btn-primary"
+                  data-testid="mant-recalcular-eval-button"
+                >
+                  {recalcEval ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-2" />}
+                  {recalcEval ? 'Recalculando...' : 'Recalcular consumo'}
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMantOpen(false)} data-testid="mant-cerrar-button">Cerrar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

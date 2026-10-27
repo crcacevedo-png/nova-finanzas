@@ -188,6 +188,9 @@ export const igssNogApi = {
   delete: (nogId) => axios.delete(`${API_URL}/igss-units/nogs/${nogId}`),
   recalcular: (nogId) => axios.post(`${API_URL}/igss-units/nogs/${nogId}/recalcular`),
   reconciliarTodo: () => axios.post(`${API_URL}/igss-units/nogs/reconciliar-todo`),
+  recalcularPorEvaluaciones: () => axios.post(`${API_URL}/igss-units/nogs/recalcular-por-evaluaciones`),
+  previewBorradoresVacios: () => axios.get(`${API_URL}/igss-units/mantenimiento/borradores-vacios`),
+  limpiarBorradoresVacios: () => axios.post(`${API_URL}/igss-units/mantenimiento/borradores-vacios/limpiar`, { confirmar: true }),
   getPacientes: (nogId) => axios.get(`${API_URL}/igss-units/nogs/${nogId}/pacientes`),
   anularAcreditacion: (nogId, acredId, motivo) =>
     axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/${acredId}/anular`, { motivo }),
