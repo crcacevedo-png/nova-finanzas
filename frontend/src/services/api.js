@@ -218,6 +218,7 @@ export const googleCalendarApi = {
   getConnectUrl: (doctorId) => axios.get(`${API_URL}/oauth/calendar/connect`, { params: { doctor_id: doctorId } }),
   disconnect: (doctorId) => axios.post(`${API_URL}/google-calendar/disconnect`, { doctor_id: doctorId }),
   sync: () => axios.post(`${API_URL}/google-calendar/sync`),
+  resyncFull: () => axios.post(`${API_URL}/google-calendar/resync-full`),
   limpiarDuplicados: () => axios.post(`${API_URL}/google-calendar/limpiar-duplicados`),
 };
 

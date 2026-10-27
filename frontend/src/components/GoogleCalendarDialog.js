@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CalendarCheck, Link2, Unlink, RefreshCw, Check } from 'lucide-react';
+import { CalendarCheck, Link2, Unlink, RefreshCw, Check, History } from 'lucide-react';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -23,6 +23,7 @@ export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
   const [busy, setBusy] = useState(null);
   const [cals, setCals] = useState({});
   const [selBusy, setSelBusy] = useState(null);
+  const [resyncing, setResyncing] = useState(false);
 
   const loadCalendars = useCallback(async (list) => {
     const connected = (list || []).filter((m) => m.connected);
@@ -54,6 +55,23 @@ export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
   }, [loadCalendars]);
 
   useEffect(() => { if (open) fetchStatus(); }, [open, fetchStatus]);
+
+  const resyncCompleto = async () => {
+    setResyncing(true);
+    try {
+      const res = await googleCalendarApi.resyncFull();
+      const d = res.data || {};
+      toast.success(`Resincronización completa: ${d.importadas ?? 0} nuevas, ${d.actualizadas ?? 0} actualizadas, ${d.canceladas ?? 0} canceladas`);
+      if ((d.errores || []).length > 0) {
+        toast.error(`${d.errores.length} médico(s) con error de sincronización`);
+      }
+      fetchStatus();
+    } catch (e) {
+      toast.error('No se pudo resincronizar');
+    } finally {
+      setResyncing(false);
+    }
+  };
 
   const elegirCalendario = async (medico, calId) => {
     const cal = (cals[medico.id] || []).find((c) => c.id === calId);
@@ -194,6 +212,22 @@ export const GoogleCalendarDialog = ({ open, onOpenChange }) => {
             ))
           )}
         </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-500 order-2 sm:order-1">
+            ¿Faltan citas de Google? Usa la resincronización completa para recuperarlas.
+          </p>
+          <Button
+            variant="outline"
+            onClick={resyncCompleto}
+            disabled={resyncing || loading}
+            className="order-1 sm:order-2"
+            data-testid="gcal-resync-full-button"
+          >
+            {resyncing ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <History className="w-4 h-4 mr-2" />}
+            {resyncing ? 'Resincronizando...' : 'Resincronización completa'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

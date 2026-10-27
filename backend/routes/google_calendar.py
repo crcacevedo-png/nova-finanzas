@@ -4,18 +4,18 @@
 # Google -> citas del sistema mediante syncToken). Un calendario dedicado por médico.
 import os
 import uuid
-import hmac
 import asyncio
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from config.database import db
 from routes.auth import get_current_user, require_role
@@ -31,6 +31,9 @@ TOKEN_URI = "https://oauth2.googleapis.com/token"
 TZ_NAME = "America/Guatemala"
 TZ = ZoneInfo(TZ_NAME)
 CAL_SUMMARY = "Novavisión - Citas"
+# Al resincronizar sin syncToken, cuántos días hacia atrás leer (recupera ventanas
+# perdidas sin importar todo el historial del calendario).
+RESYNC_LOOKBACK_DAYS = 30
 
 
 # ==================== HELPERS OAUTH (bloqueantes -> usar en to_thread) ====================
@@ -349,19 +352,24 @@ async def _sync_doctor(doctor):
         if stoken:
             params["syncToken"] = stoken
         else:
-            # Desde hoy en adelante (inicio del día en hora de Guatemala)
-            hoy = datetime.now(TZ).replace(hour=0, minute=0, second=0, microsecond=0)
-            params["timeMin"] = hoy.isoformat()
+            # Sin token (sincronización inicial o resync): leer desde una ventana hacia
+            # atrás para recuperar eventos perdidos, no solo desde hoy.
+            desde = (datetime.now(TZ) - timedelta(days=RESYNC_LOOKBACK_DAYS)).replace(
+                hour=0, minute=0, second=0, microsecond=0)
+            params["timeMin"] = desde.isoformat()
         if page_token:
             params["pageToken"] = page_token
-        return service.events().list(**params).execute()
+        # num_retries aplica backoff exponencial ante 403 rateLimitExceeded / 429 / 5xx
+        return service.events().list(**params).execute(num_retries=5)
 
-    async def _collect(stoken):
+    def _collect(stoken):
+        """Lee TODAS las páginas. Lanza excepción si alguna página falla
+        (así NO avanzamos el token ante un error parcial)."""
         items = []
         next_sync = None
         page = None
         while True:
-            resp = await asyncio.to_thread(_list, page, stoken)
+            resp = _list(page, stoken)
             items.extend(resp.get("items", []))
             next_sync = resp.get("nextSyncToken") or next_sync
             page = resp.get("nextPageToken")
@@ -369,11 +377,25 @@ async def _sync_doctor(doctor):
                 break
         return items, next_sync
 
+    # Intento incremental con syncToken; solo un 410 (token inválido) fuerza resync completo.
     try:
-        events, next_sync = await _collect(sync_token)
-    except Exception:
-        # syncToken inválido (410 GONE) -> resincronización completa
-        events, next_sync = await _collect(None)
+        events, next_sync = await asyncio.to_thread(_collect, sync_token)
+    except HttpError as e:
+        status = e.resp.status if getattr(e, "resp", None) else None
+        if sync_token and status == 410:
+            try:
+                events, next_sync = await asyncio.to_thread(_collect, None)
+            except Exception as e2:
+                print("sync_doctor resync error (token conservado):", doctor.get("id"), e2)
+                return {**res, "error": f"resync: {e2}"}
+        else:
+            # Error transitorio (403 rate limit, red, etc.): conservar token y reintentar
+            # en la próxima ventana. NO avanzar sync_token/last_sync.
+            print("sync_doctor list error (token conservado):", doctor.get("id"), e)
+            return {**res, "error": f"list: {e}"}
+    except Exception as e:
+        print("sync_doctor list error (token conservado):", doctor.get("id"), e)
+        return {**res, "error": f"list: {e}"}
 
     for ev in events:
         try:
@@ -381,6 +403,7 @@ async def _sync_doctor(doctor):
         except Exception as e:
             print("apply_event error:", e)
 
+    # Solo avanzar token/last_sync cuando la lectura completa tuvo éxito.
     if next_sync:
         await db.doctors.update_one({"id": doctor["id"]}, {"$set": {
             "google_calendar.sync_token": next_sync,
@@ -542,19 +565,24 @@ async def run_sync_all() -> dict:
         return {"configured": False, "medicos_sincronizados": 0, "importadas": 0, "actualizadas": 0, "canceladas": 0}
     doctors = await db.doctors.find({"google_calendar.connected": True}).to_list(200)
     totals = {"import": 0, "update": 0, "cancel": 0}
+    errores = []
     for doctor in doctors:
         try:
             r = await _sync_doctor(doctor)
             for k in totals:
-                totals[k] += r[k]
+                totals[k] += r.get(k, 0)
+            if r.get("error"):
+                errores.append({"medico": doctor.get("name", ""), "error": r["error"]})
         except Exception as e:
             print("sync_doctor error:", doctor.get("id"), e)
+            errores.append({"medico": doctor.get("name", ""), "error": str(e)})
     return {
         "configured": True,
         "medicos_sincronizados": len(doctors),
         "importadas": totals["import"],
         "actualizadas": totals["update"],
         "canceladas": totals["cancel"],
+        "errores": errores,
     }
 
 
@@ -564,17 +592,16 @@ async def sync(current_user: dict = Depends(get_current_user)):
     return await run_sync_all()
 
 
-@router.post("/cron/google-calendar-sync")
-async def cron_google_calendar_sync(authorization: str = Header(None)):
-    """Webhook de cron de plataforma: dispara la sincronización (pull) de Google Calendar.
-    Programado en .emergent/crons.yml. Autenticado con WEBHOOK_CRON_SECRET."""
-    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
-    secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
-    expected = f"Bearer {secret}"
-    if not secret or not authorization or not hmac.compare_digest(authorization, expected):
-        raise HTTPException(status_code=401, detail="No autorizado")
-    asyncio.create_task(run_sync_all())
-    return {"accepted": True}
+@router.post("/google-calendar/resync-full")
+async def resync_full(current_user: dict = Depends(require_role(["superadmin"]))):
+    """Fuerza una resincronización COMPLETA: reinicia el syncToken de todos los médicos
+    conectados y vuelve a leer desde la ventana de recuperación (últimos días). Útil para
+    recuperar eventos que fueron omitidos por una ventana de sincronización fallida."""
+    await db.doctors.update_many(
+        {"google_calendar.connected": True},
+        {"$set": {"google_calendar.sync_token": None}},
+    )
+    return await run_sync_all()
 
 
 @router.post("/google-calendar/limpiar-duplicados")

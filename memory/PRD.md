@@ -4,7 +4,16 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 49 — IGSS Fase 2 + Fase 3: limpieza de borradores, recálculo por evaluaciones, no crear vacías)
+**Última actualización**: 2026-06 (Sesión 50 — Fix sincronización Google Calendar: token envenenado por errores)
+
+### Sesión 50 — Fix: Google Calendar no sincronizaba en producción (2026-06)
+- 🐛 **Reporte**: en producción la integración con Google Calendar está conectada pero no sincronizaba (0 eventos importados en ~3 días).
+- 🔍 **RCA (deployer)**: el scheduler interno SÍ corre en producción (1 worker uvicorn, job cada 10 min, `last_sync` avanzando). La causa real era un **fallo silencioso** en `routes/google_calendar.py::_sync_doctor`: ante CUALQUIER excepción (incl. `403 rateLimitExceeded`) hacía un resync recortado a hoy y **avanzaba `sync_token`/`last_sync` igualmente**, marcando como exitosa una ventana fallida → esos eventos nunca se volvían a leer.
+- ✅ **Fix** (`_sync_doctor`): solo se hace resync completo ante un **410** (token inválido) real; errores transitorios (403/429/5xx) se reintentan con backoff (`execute(num_retries=5)`) y, si persisten, **se CONSERVA el token** (se reintenta en la próxima ventana) sin avanzar `last_sync`; el resync usa una ventana de **30 días** hacia atrás (no solo hoy) para recuperar lo perdido; `run_sync_all` ahora expone `errores[]` por médico.
+- ✅ **Recuperación**: nuevo `POST /api/google-calendar/resync-full` (superadmin) reinicia el `sync_token` de todos los médicos conectados y resincroniza; botón "Resincronización completa" en `GoogleCalendarDialog`.
+- ↩️ Se descartó la migración a cron de plataforma (el scheduler interno ya funciona); se mantuvo el job APScheduler cada 10 min.
+- ✅ **Verificado**: test unitario con servicio Google mockeado (4/4): 403→token conservado; 410→resync y avance; éxito→avance; error de red→token conservado. Scheduler reiniciado y disparándose. Endpoints sync/resync-full OK (en preview 0 médicos conectados; las conexiones OAuth viven en la BD de producción).
+- ⚠️ **Requiere REDESPLIEGUE**. Tras desplegar, el superadmin debe usar "Resincronización completa" (Agenda → Google Calendar) para recuperar los ~3 días omitidos.
 
 ### Sesión 49 — IGSS Fase 2 (limpieza + recálculo) y Fase 3 (no crear vacías) (2026-06)
 - 🎯 Continuación del plan de Producción IGSS. Decisiones del usuario: (1) consumo de NOG cuenta a un paciente solo si tiene una evaluación REAL de ese NOG; (2) limpieza borra todas las evaluaciones sin médico Y sin dato clínico; (3) limpieza para SuperAdmin + Administrador IGSS.

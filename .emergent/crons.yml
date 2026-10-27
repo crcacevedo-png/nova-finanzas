@@ -7,10 +7,3 @@ crons:
     method: POST
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     enabled: true
-  - name: gcal-sync
-    description: "Sincroniza las citas con Google Calendar cada 15 minutos (pull de eventos)"
-    cron: "*/15 * * * *"
-    endpoint: "{{BASE_URL}}/api/cron/google-calendar-sync"
-    method: POST
-    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
-    enabled: true
