@@ -1034,7 +1034,7 @@ def _eval_tiene_contenido(ev):
     """True si la evaluación tiene algún dato clínico real (no es borrador vacío)."""
     if _txt(ev.get("igss_procedimiento")):
         return True
-    if any(_txt(ev.get(k)) for k in ("motivo_consulta", "padecimiento_actual", "plan")):
+    if any(_txt(ev.get(k)) for k in ("motivo_consulta", "padecimiento_actual", "plan", "lectura_examenes")):
         return True
     diags = ev.get("diagnosticos") or []
     if any(isinstance(d, dict) and (_txt(d.get("descripcion")) or _txt(d.get("codigo_cie10"))) for d in diags):

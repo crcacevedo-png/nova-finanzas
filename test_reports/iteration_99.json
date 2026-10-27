@@ -1,0 +1,38 @@
+{
+  "summary": "Tested IGSS Fase 2 (Mantenimiento: preview/limpieza/recálculo) and Fase 3 (no crear evaluaciones vacías), backend and UI. Backend pytest: 11/13 pass. The 2 failures are a frontend/backend mismatch: text typed only in lectura_examenes or antecedentes is rejected with 422. Roles work: usuario gets 403 on preview, limpiar and recálculo; igss.admin and superadmin get 200. limpiar without confirmar returns 400. The recálculo is idempotent (112 vigentes), and every NOG's acreditados matches its active acreditaciones, never above cantidad and never negative. Mantenimiento UI as superadmin works end to end with 3 seeded TEST_ legacy drafts: count, sample list, Cancelar (nothing deleted), confirm, a toast saying 3 were deleted, the count going to 0, mant-sin-vacios showing and the eliminar button disabled. As igss.admin, the recálculo toast reads 'Consumo recalculado por evaluaciones reales: 112 servicios en 112 pacientes revisados'. Fase 3 in the UI: opening a patient without typing creates no evaluation on the server, and typing motivo creates exactly one (POST 200, then PATCH autoguardar). BUT the frontend still sends POST /api/evaluaciones on open (422) and the catch block puts that empty draft in the localStorage offline queue: the badge shows 'Guardado offline' and '1 pendiente(s)', and the item can never sync.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/evaluaciones", "issue": "The backend emptiness check (_eval_tiene_contenido) does not count lectura_examenes or antecedentes text (oftalmologicos, quirurgicos, alergias, ...). The frontend tieneDatosClinicos does count them. Result: a user who types only antecedentes or lectura gets 422 and the text goes into the never-syncing offline queue. Either align the backend to include these fields or align the frontend helper."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EvaluacionOftalmologica autosave", "issue": "tieneDatosClinicos() is always true. Its examen loop treats the default examen.tipo_lensometria='Lensometria' (a non-empty string) as clinical data. So the 'no autoguardar vacíos' guard never fires and opening a patient with no typing sends POST /api/evaluaciones, which gets 422.", "selector": "[data-testid='search-paciente'] -> eval-paciente-option-*", "priority": "HIGH"},
+      {"component": "EvaluacionOftalmologica autosave catch (~line 986-1005)", "issue": "Every non-423 error, including 422 'evaluación vacía', is treated as a network error and saved offline. The empty draft lands in localStorage OFFLINE_STORAGE_KEY with the badge 'Guardado offline HH:MM' and '1 pendiente(s)'. syncPendingData keeps it pending forever because every retry returns 422. Opening several patients piles up items. The beforeunload handler also saves offline when status is 'Cambios sin guardar'.", "selector": "connection-status area / pending badge", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Fase 3 - open patient without typing", "issue": "Server-side no empty eval is created (correct, the backend guard works), but the client gets a 422 and builds up offline pending items that can never sync.", "affected_selectors": ["search-paciente", "motivo-consulta-input"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_mantenimiento_borradores.py", "/app/backend/tests/seed_empty_drafts.py", "/app/test_reports/pytest/pytest_mantenimiento.xml"],
+  "action_items": [
+    "Fix tieneDatosClinicos in EvaluacionOftalmologica.js: skip examen.tipo_lensometria (and any other default/enum fields) and check nested refraccion/lensometria objects only for esfera/cilindro/eje/adicion. Make it mirror the backend eval_es_borrador_vacio, including igss_procedimiento and medico_id as 'not empty'. Today selecting only a médico would not autosave if the helper were correct.",
+    "In the autosave catch block (and in syncPendingData), handle 4xx/422 as a validation error: do not save offline, clear the status, and drop already-queued items that return 422 so '1 pendiente(s)' does not stick.",
+    "Align the backend _eval_tiene_contenido with the frontend: either count lectura_examenes and antecedentes text fields as content, or remove them from the frontend helper. Otherwise typing only antecedentes is silently lost into the offline queue.",
+    "Optional: the old DELETE /api/evaluaciones/vacias/purgar (admin/superadmin) uses a different emptiness rule (_evaluacion_esta_vacia, which ignores médico). Consider removing it or unifying it with eval_es_borrador_vacio to avoid two inconsistent purge paths."
+  ],
+  "critical_code_review_comments": [
+    "Frontend tieneDatosClinicos vs backend eval_es_borrador_vacio are out of sync (tipo_lensometria default, lectura_examenes, antecedentes, diagnosticos length vs description, igss_procedimiento, medico).",
+    "Preview and limpiar scan the whole evaluaciones collection (36k docs) in Python each call. Acceptable for now; a Mongo pre-filter (e.g. medico_id empty) would make it faster.",
+    "EvaluacionOftalmologica.js is 3800+ lines and UnidadesIGSS.js about 900: both should be split."
+  ],
+  "updated_files": ["/app/backend/tests/test_mantenimiento_borradores.py", "/app/backend/tests/seed_empty_drafts.py"],
+  "success_rate": {"backend": "85% (11/13; 2 failures = field-alignment mismatch)", "frontend": "80% (Mantenimiento dialog 100%; Fase 3 server outcome correct but client offline-queue bug)"},
+  "seed_data_creation": "Inserted 3 TEST_borrador_* empty evals directly in Mongo via seed_empty_drafts.py. They were deleted through the UI limpieza. All TEST evals created by pytest/UI were cleaned up (0 left).",
+  "test_credentials": "superadmin/nova2024, igss.admin/IgssAdmin2024$, usuario/user2024 (from /app/memory/test_credentials.md)",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest tests/test_mantenimiento_borradores.py (note: it calls limpiar, which deletes all empty drafts). To exercise the UI confirmation flow, first run python /app/backend/tests/seed_empty_drafts.py (adds 3 TEST_ drafts). Non-IGSS patient with no evals: Carlos Ramírez PRB-EXP-000001 (id b42bfab3-01aa-4bb0-b6db-2e131a729da4). Capture network POST /api/evaluaciones: after the fix, opening this patient must send NO POST and the badge must not show 'Guardado offline' or 'N pendiente(s)'. Baseline vigentes = 112."
+}

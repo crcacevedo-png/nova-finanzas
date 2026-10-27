@@ -89,11 +89,8 @@ const tieneDatosClinicos = (fd) => {
   const rec = fd.recomendaciones || {};
   if ((rec.recomendaciones_generales || '').toString().trim()) return true;
   if ((rec.estudios_a_realizar || []).length > 0) return true;
-  // Antecedentes (solo texto libre)
-  const ant = fd.antecedentes || {};
-  for (const v of Object.values(ant)) {
-    if (typeof v === 'string' && v.trim()) return true;
-  }
+  // NOTA: los antecedentes NO cuentan como "dato de la visita" porque se autocargan
+  // del historial del paciente al abrir el expediente (persisten en el paciente aparte).
   return false;
 };
 
@@ -984,11 +981,18 @@ const EvaluacionOftalmologica = () => {
         setAutoguardadoStatus(`Guardado a las ${now}`);
         lastSavedRef.current = new Date();
       } catch (error) {
-        if (error.response?.status === 423) {
+        const status = error.response?.status;
+        if (status === 423) {
           toast.error('Expediente sellado. No se puede editar.');
           setEvaluacionActual(prev => ({ ...prev, sellado: true }));
+        } else if (status === 422 || status === 400) {
+          // El servidor rechazó los datos (p. ej. evaluación aún vacía). No encolar offline.
+          setAutoguardadoStatus('');
+        } else if (status && status < 500) {
+          // Otro error de cliente (403/404, etc.): no tiene sentido guardar offline
+          setAutoguardadoStatus('No se pudo guardar');
         } else {
-          // Si falla la conexión, guardar offline
+          // Error de red o del servidor (5xx / sin respuesta): guardar offline
           console.warn('Error de red, guardando offline:', error);
           setAutoguardadoStatus('Guardando localmente...');
           const dataToSave = {

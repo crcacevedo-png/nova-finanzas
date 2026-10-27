@@ -310,6 +310,7 @@ class EvaluacionOftalmologicaBase(BaseModel):
     medico_nombre: str = ""
     motivo_consulta: str = ""
     padecimiento_actual: str = ""
+    lectura_examenes: str = ""
     
     # Orden IGSS vinculada a esta consulta (para expediente/informe por orden)
     igss_orden_id: Optional[str] = None
@@ -364,6 +365,7 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
     medico_nombre: Optional[str] = None
     motivo_consulta: Optional[str] = None
     padecimiento_actual: Optional[str] = None
+    lectura_examenes: Optional[str] = None
     igss_orden_id: Optional[str] = None
     igss_nog: Optional[str] = None
     igss_no_sps: Optional[str] = None
