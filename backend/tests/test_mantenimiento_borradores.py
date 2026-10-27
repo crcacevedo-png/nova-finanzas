@@ -121,18 +121,22 @@ class TestCreateGuard:
         assert r.status_code == 200, r.text
         created_ids.append(r.json()["id"])
 
-    # Consistency frontend tieneDatosClinicos vs backend: frontend counts these as data
+    # Fase 3 retest: lectura_examenes cuenta como dato clínico y persiste
     def test_lectura_examenes_only(self, sa, patient_id, created_ids):
         r = sa.post(f"{BASE_URL}/api/evaluaciones",
                     json={"paciente_id": patient_id, "lectura_examenes": "TEST lectura"})
         if r.status_code == 200:
             created_ids.append(r.json()["id"])
-        assert r.status_code == 200, f"frontend autosaves but backend rejects: {r.status_code} {r.text[:200]}"
+        assert r.status_code == 200, r.text[:200]
+        assert r.json().get("lectura_examenes") == "TEST lectura"
+        g = sa.get(f"{BASE_URL}/api/evaluaciones/{r.json()['id']}")
+        assert g.status_code == 200
+        assert g.json().get("lectura_examenes") == "TEST lectura"
 
-    def test_antecedentes_only(self, sa, patient_id, created_ids):
-        r = sa.get(f"{BASE_URL}/openapi.json")
+    # Por diseño: antecedentes-only se considera vacía (se autocargan del historial)
+    def test_antecedentes_only_422(self, sa, patient_id, created_ids):
         r = sa.post(f"{BASE_URL}/api/evaluaciones",
-                    json={"paciente_id": patient_id, "antecedentes": {"oftalmologicos": "TEST glaucoma"}})
+                    json={"paciente_id": patient_id, "antecedentes": {"alergias": "x"}})
         if r.status_code == 200:
             created_ids.append(r.json()["id"])
-        assert r.status_code == 200, f"frontend autosaves but backend rejects: {r.status_code} {r.text[:200]}"
+        assert r.status_code == 422, r.text[:200]

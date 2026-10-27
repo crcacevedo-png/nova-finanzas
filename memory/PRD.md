@@ -4,7 +4,17 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 48 — Producción IGSS: un servicio por orden, sin duplicados)
+**Última actualización**: 2026-06 (Sesión 49 — IGSS Fase 2 + Fase 3: limpieza de borradores, recálculo por evaluaciones, no crear vacías)
+
+### Sesión 49 — IGSS Fase 2 (limpieza + recálculo) y Fase 3 (no crear vacías) (2026-06)
+- 🎯 Continuación del plan de Producción IGSS. Decisiones del usuario: (1) consumo de NOG cuenta a un paciente solo si tiene una evaluación REAL de ese NOG; (2) limpieza borra todas las evaluaciones sin médico Y sin dato clínico; (3) limpieza para SuperAdmin + Administrador IGSS.
+- ✅ **Definición unificada de "borrador vacío"** (`routes/igss_nogs.py`): `eval_es_borrador_vacio()` = sin médico Y sin contenido (`_eval_tiene_contenido`: igss_procedimiento, motivo/padecimiento/plan/**lectura_examenes**, diagnósticos, examen/AV/refracción, igss_med_proc, procedimientos, recetas, recomendaciones). **Antecedentes NO cuenta** (se autocargan del historial del paciente al abrir y persisten aparte en el paciente). Exime sellado/importado.
+- ✅ **Fase 2 — Limpieza de borradores** (`GET/POST /api/igss-units/mantenimiento/borradores-vacios[/limpiar]`, roles superadmin/administrador_igss): preview con conteo+muestra, borrado con confirmación, audit log, limpia estados de producción huérfanos.
+- ✅ **Fase 2 — Recálculo por evaluaciones** (`POST /api/igss-units/nogs/recalcular-por-evaluaciones`): recomputa acreditaciones exigiendo evaluación real; pacientes con solo borradores vacíos o sin evaluación liberan cupo; conserva acreditaciones manuales; resincroniza contadores. `_reconciliar_nog_paciente(..., solo_numeros=set)`.
+- ✅ **Fase 3 — No crear evaluaciones vacías**: guard 422 en `POST /api/evaluaciones` si `eval_es_borrador_vacio`; frontend `tieneDatosClinicos` ya NO cuenta antecedentes (abrir un paciente ya no crea borrador); `lectura_examenes` agregado al modelo (Base+Update) y persiste; catch del autoguardado NO encola offline en errores 4xx (evita "pendientes" fantasma).
+- ✅ **UI** (`UnidadesIGSS.js`): botón "Mantenimiento" (data-testid mantenimiento-igss-button) → diálogo con limpieza (preview+confirmar) y recálculo.
+- ✅ **Verificado**: testing agent `iteration_100.json` (backend 13/13; lectura_examenes-only=200 persiste, antecedentes-only/vacía=422 por diseño; roles 403/200; UI: abrir sin trabajar no crea ni encola offline, motivo crea 1; mantenimiento borra con confirmación y recálculo OK).
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 48 — Producción IGSS: una línea por paciente+orden, sin duplicados (2026-06)
 - 🎯 **Objetivo**: la pestaña Producción IGSS repetía al mismo paciente (una fila por cada evaluación), inflando totales; además listaba evaluaciones en blanco creadas por error.

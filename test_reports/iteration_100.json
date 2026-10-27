@@ -1,0 +1,26 @@
+{
+  "summary": "Retest of iteration_99, both fixes verified. Backend pytest: 13/13 pass. lectura_examenes-only gets 200 and the value persists on a later GET. Empty gets 422, and antecedentes-only gets 422, which is by design. motivo-only and medico-only both get 200. Role checks pass: usuario gets 403 on preview, limpiar and recálculo; igss.admin gets 200. UI Fase 3, superadmin on patient PRB-EXP-000001: opening the patient without typing creates no evaluation (DB count 0). No 'Guardado offline' or 'N pendiente(s)' badge appears and the offline keys in localStorage stay empty. Typing motivo autosaves exactly one evaluation (POST 200, then PATCH autoguardar 200, DB count 1) and the badge shows 'Guardado a las 09:31 p. m.'. Mantenimiento UI: 3 seeded TEST_ drafts were deleted after confirmation, the toast said 3 were deleted, the count went to 0, mant-sin-vacios showed and the button was disabled. 'Recalcular consumo' gave POST 200 and the toast 'Consumo recalculado por evaluaciones reales: 112 servicios en 112 pacientes revisados'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EvaluacionOftalmologica tieneDatosClinicos", "issue": "Opening a patient with no typing still sends one POST /api/evaluaciones, which returns 422. The examen loop counts the default examen.tipo_lensometria='Lensometria' as data. It is harmless now (not queued offline, status cleared), but it is a wasted request and leaves a 422 in the logs on every patient open.", "selector": "eval-paciente-option-*", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_mantenimiento_borradores.py", "/app/backend/tests/seed_empty_drafts.py", "/app/test_reports/pytest/pytest_mantenimiento.xml"],
+  "action_items": [
+    "Optional (LOW): in tieneDatosClinicos, skip examen.tipo_lensometria (and other default or enum fields) so that opening a patient sends no POST at all."
+  ],
+  "critical_code_review_comments": [
+    "The beforeunload handler still calls saveOfflineData when status is 'Cambios sin guardar', with no tieneDatosClinicos check. Closing the tab within 2s of opening a patient could queue an empty draft offline. Add the same guard there.",
+    "EvaluacionOftalmologica.js is 3800+ lines and should be split."
+  ],
+  "updated_files": ["/app/backend/tests/test_mantenimiento_borradores.py"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100%"},
+  "seed_data_creation": "Ran seed_empty_drafts.py (3 TEST_ drafts) and deleted them through the UI limpieza. The UI-created eval 2e3fe298 (TEST_retest100) was deleted through the API (GET now returns 404). The pytest TEST evals were cleaned by the fixture.",
+  "test_credentials": "superadmin/nova2024, igss.admin/IgssAdmin2024$, usuario/user2024",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_mantenimiento_borradores.py was updated: lectura_examenes-only must return 200 and persist, and antecedentes-only must return 422 (by design). Evals live in the Mongo collection evaluaciones_oftalmologicas. Test patient: Carlos Ramírez PRB-EXP-000001 (b42bfab3-01aa-4bb0-b6db-2e131a729da4), which has 0 evals. Baseline vigentes = 112."
+}
