@@ -4,13 +4,14 @@
 # Google -> citas del sistema mediante syncToken). Un calendario dedicado por médico.
 import os
 import uuid
+import hmac
 import asyncio
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from fastapi.responses import RedirectResponse
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
@@ -561,6 +562,19 @@ async def run_sync_all() -> dict:
 async def sync(current_user: dict = Depends(get_current_user)):
     """Sincroniza (pull) los calendarios de todos los médicos conectados."""
     return await run_sync_all()
+
+
+@router.post("/cron/google-calendar-sync")
+async def cron_google_calendar_sync(authorization: str = Header(None)):
+    """Webhook de cron de plataforma: dispara la sincronización (pull) de Google Calendar.
+    Programado en .emergent/crons.yml. Autenticado con WEBHOOK_CRON_SECRET."""
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    secret = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    expected = f"Bearer {secret}"
+    if not secret or not authorization or not hmac.compare_digest(authorization, expected):
+        raise HTTPException(status_code=401, detail="No autorizado")
+    asyncio.create_task(run_sync_all())
+    return {"accepted": True}
 
 
 @router.post("/google-calendar/limpiar-duplicados")

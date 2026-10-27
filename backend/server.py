@@ -4099,24 +4099,12 @@ def start_scheduler():
         replace_existing=True
     )
     
-    # Sincronización automática con Google Calendar cada 10 minutos
-    from routes.google_calendar import run_sync_all
-    async def _sync_gcal_job():
-        try:
-            res = await run_sync_all()
-            if res.get("configured") and res.get("medicos_sincronizados"):
-                logger.info(f"Google Calendar sync: {res}")
-        except Exception as e:
-            logger.error(f"Error en sync automático de Google Calendar: {e}")
-    scheduler.add_job(
-        _sync_gcal_job,
-        CronTrigger(minute="*/10"),
-        id="google_calendar_sync",
-        replace_existing=True
-    )
+    # NOTA: La sincronización con Google Calendar se maneja mediante un cron de
+    # plataforma (.emergent/crons.yml -> POST /api/cron/google-calendar-sync),
+    # porque el scheduler en proceso no se ejecuta de forma confiable en producción.
     
     scheduler.start()
-    logger.info("Scheduler iniciado (gastos fijos: 00:05 diario, limpieza tokens: cada 6h, Google Calendar: cada 10min)")
+    logger.info("Scheduler iniciado (gastos fijos: 00:05 diario, limpieza tokens: cada 6h)")
 
 
 # ==================== INCLUIR ROUTER PRINCIPAL ====================
