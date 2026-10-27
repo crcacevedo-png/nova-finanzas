@@ -864,6 +864,64 @@ class ProduccionUpdate(BaseModel):
     costo_override: Optional[float] = Field(None, ge=0)
 
 
+def _txt(v):
+    return bool(v.strip()) if isinstance(v, str) else bool(v)
+
+
+def _refraccion_tiene_datos(r):
+    if not isinstance(r, dict):
+        return False
+    return any(_txt(r.get(k)) for k in ("esfera", "cilindro", "eje", "adicion"))
+
+
+def _examen_tiene_datos(ex):
+    if not isinstance(ex, dict):
+        return False
+    campos = ["avsc_od", "avsc_os", "avcc_od", "avcc_os", "av_binocular", "av_cerca",
+              "queratometria_od", "queratometria_os", "pio_od", "pio_os", "pio_metodo",
+              "segmento_anterior", "segmento_posterior", "motilidad_ocular", "pupilas_reflejos"]
+    if any(_txt(ex.get(c)) for c in campos):
+        return True
+    return any(_refraccion_tiene_datos(ex.get(rk))
+               for rk in ("refraccion_od", "refraccion_os", "lensometria_od", "lensometria_os"))
+
+
+def _eval_tiene_contenido(ev):
+    """True si la evaluación tiene algún dato clínico real (no es borrador vacío)."""
+    if _txt(ev.get("igss_procedimiento")):
+        return True
+    if any(_txt(ev.get(k)) for k in ("motivo_consulta", "padecimiento_actual", "plan")):
+        return True
+    diags = ev.get("diagnosticos") or []
+    if any(isinstance(d, dict) and (_txt(d.get("descripcion")) or _txt(d.get("codigo_cie10"))) for d in diags):
+        return True
+    if _examen_tiene_datos(ev.get("examen")):
+        return True
+    imp = ev.get("igss_med_proc") or {}
+    if imp.get("medicamentos") or imp.get("estudios_procedimientos"):
+        return True
+    procs = ev.get("procedimientos") or []
+    if any(isinstance(p, dict) and (_txt(p.get("tipo_nombre")) or _txt(p.get("descripcion"))) for p in procs):
+        return True
+    rec = ev.get("recetas") or {}
+    if (rec.get("medicamentos") or {}).get("items"):
+        return True
+    if rec.get("anteojos_lista") or rec.get("lentes_contacto_lista"):
+        return True
+    recom = ev.get("recomendaciones") or {}
+    if recom.get("estudios_a_realizar") or _txt(recom.get("recomendaciones_generales")):
+        return True
+    return False
+
+
+def _eval_tiene_medico(ev):
+    return _txt(ev.get("medico_id")) or _txt(ev.get("medico_nombre"))
+
+
+def _eval_recencia(ev):
+    return (ev.get("fecha") or "", ev.get("fecha_actualizacion") or ev.get("ultimo_autoguardado") or "", ev.get("fecha_creacion") or "")
+
+
 async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
     q = {}
     if fecha:
@@ -891,7 +949,8 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
     unit_map = {u["id"]: u for u in unit_list}
     nog_list = await db.igss_nogs.find({"unidad_id": {"$in": unit_ids}}, {"_id": 0, "unidad_id": 1, "numero": 1, "precio": 1}).to_list(None)
     nog_map = {(n["unidad_id"], n["numero"]): n for n in nog_list}
-    rows = []
+    # 1) Candidatos: resolver orden, excluir no-IGSS y ocultar borradores vacíos
+    candidatos = []
     for ev in evals:
         pac = pac_map.get(ev.get("paciente_id"))
         if not pac:
@@ -912,27 +971,71 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
                 proc = proc or ords[0].get("procedimiento", "")
         if nog and numero != nog:
             continue
+        # Ocultar evaluaciones en blanco: sin médico asignado y sin datos clínicos
+        tiene_contenido = _eval_tiene_contenido(ev)
+        if not _eval_tiene_medico(ev) and not tiene_contenido:
+            continue
         unit = unit_map.get(uid)
         precio = float((nog_map.get((uid, numero)) or {}).get("precio") or 0)
-        est = prod_map.get(ev["id"])
-        costo = est.get("costo_override") if (est and est.get("costo_override") is not None) else precio
+        candidatos.append({
+            "ev": ev, "pac": pac, "uid": uid, "unit": unit,
+            "numero": numero, "no_sps": no_sps, "codigo": codigo, "proc": proc,
+            "precio": precio, "tiene_contenido": tiene_contenido,
+        })
+
+    # 2) Agrupar por paciente + orden (No. SPS; respaldo NOG; respaldo paciente/día)
+    grupos = {}
+    for c in candidatos:
+        ev = c["ev"]
+        if (c["no_sps"] or "").strip():
+            okey = ("sps", c["no_sps"].strip())
+        elif c["numero"]:
+            okey = ("nog", c["numero"])
+        else:
+            okey = ("pac", ev.get("fecha") or "")
+        grupos.setdefault((ev.get("paciente_id"), okey), []).append(c)
+
+    # 3) Una fila consolidada por grupo (representante = más reciente con contenido)
+    rows = []
+    for items in grupos.values():
+        con_contenido = [c for c in items if c["tiene_contenido"]]
+        rep = max(con_contenido or items, key=lambda c: _eval_recencia(c["ev"]))
+        ev = rep["ev"]
+        pac = rep["pac"]
+        unit = rep["unit"]
+        # Combinar estados de todas las evaluaciones de la orden; costo del representante
+        impreso = enviado = facturado = pagado = False
+        rep_est = prod_map.get(ev["id"])
+        costo_override = rep_est.get("costo_override") if (rep_est and rep_est.get("costo_override") is not None) else None
+        for c in items:
+            est = prod_map.get(c["ev"]["id"])
+            if not est:
+                continue
+            impreso = impreso or bool(est.get("impreso"))
+            enviado = enviado or bool(est.get("enviado"))
+            facturado = facturado or bool(est.get("facturado"))
+            pagado = pagado or bool(est.get("pagado"))
+            if costo_override is None and est.get("costo_override") is not None:
+                costo_override = est.get("costo_override")
+        precio = rep["precio"]
+        costo = costo_override if costo_override is not None else precio
         rows.append({
             "evaluacion_id": ev["id"],
             "paciente_id": ev.get("paciente_id"),
             "paciente_nombre": ev.get("paciente_nombre") or f"{(pac.get('first_name') or '')} {(pac.get('last_name') or '')}".strip(),
             "expediente": ev.get("paciente_expediente") or pac.get("record_number", ""),
-            "unidad_id": uid or "",
+            "unidad_id": rep["uid"] or "",
             "unidad_nombre": (unit or {}).get("name", ""),
-            "nog": numero, "no_sps": no_sps, "codigo": codigo, "procedimiento": proc,
+            "nog": rep["numero"], "no_sps": rep["no_sps"], "codigo": rep["codigo"], "procedimiento": rep["proc"],
             "medico_nombre": ev.get("medico_nombre", ""),
             "fecha": ev.get("fecha", ""),
             "precio_nog": precio,
             "costo": float(costo or 0),
-            "costo_editado": bool(est and est.get("costo_override") is not None),
-            "impreso": bool(est and est.get("impreso")),
-            "enviado": bool(est and est.get("enviado")),
-            "facturado": bool(est and est.get("facturado")),
-            "pagado": bool(est and est.get("pagado")),
+            "costo_editado": costo_override is not None,
+            "impreso": impreso,
+            "enviado": enviado,
+            "facturado": facturado,
+            "pagado": pagado,
         })
     rows.sort(key=lambda r: (r["unidad_nombre"], r["nog"], r["paciente_nombre"]))
     return rows
