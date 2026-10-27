@@ -1,0 +1,38 @@
+{
+  "summary": "Tested Producción IGSS consolidation end to end (backend pytest plus Playwright UI), using superadmin and the range 2026-10-01..2026-10-31. Rendering works: prod-totales shows Servicios 59, Producción Q69,700, Pagado Q1,350, Pendiente Q68,350, Facturado 3, Enviado 3, with 5 unit cards. 59 prod-row-* rows are rendered, which equals Servicios. No row repeats the same patient + No. SPS. The NOG subtotals add up to 59 services and Q69,700 (= Producción). Toggling Enviado on a row raised Enviado from 3 to 4 (+Q500), it was still marked after a reload, and it was restored afterwards. Export returns HTTP 200 xlsx, and the detail rows in the file equal Servicios. One backend logic bug was found: a status cannot be unchecked when it was set on a non-representative evaluation of the same order.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/igss-units/produccion + PATCH /api/igss-units/produccion/{evaluacion_id}", "issue": "Combined statuses get stuck. _build_produccion_rows ORs impreso/enviado/facturado/pagado across ALL evaluations in the group, but the UI PATCHes only the representative evaluacion_id. If any other evaluation of the same patient+SPS has the status true, the consolidated row can never be unchecked. Repro: PATCH 7f68a258 (member of SPS-110) pagado=true, then PATCH representative a0c71e69 pagado=false; GET still returns pagado=true. Realistic case: statuses marked before consolidation, or the representative changing when a newer eval with content is added. The same applies to costo_override (falls back to a member's override).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "_build_produccion_rows grouping", "issue": "The order key is the No. SPS if present, otherwise the NOG. An eval with igss_nog set but an empty igss_no_sps is keyed ('nog', X), while its sibling with an SPS on the same order is keyed ('sps', Y). This can yield 2 rows for one order. The NOG fallback to the patient's ordenes is also only applied when the NOG is empty, so the SPS is never resolved from igss_ordenes when only the NOG is present."},
+      {"endpoint": "GET /api/igss-units/produccion docstring", "issue": "Still says 'una línea por evaluación' (outdated)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Producción filters", "issues": ["Uses the browser's native type=date inputs (prod-fecha/prod-desde/prod-hasta) instead of the shadcn Calendar/date picker"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_produccion_consolidacion.py", "/app/backend/tests/test_produccion_igss.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix the stuck combined statuses. Option A: in PATCH, apply the update to every evaluacion_id in the same patient+order group (resolve the group server-side). Option B: when consolidating, read statuses/costo_override only from the representative, and migrate existing member states onto it.",
+    "Make the order key resolve the SPS from patient.igss_ordenes when an eval has a NOG but no SPS (match the order by NOG), so the sps/nog keys don't split one order.",
+    "Optional: replace the native date inputs with the shadcn date picker."
+  ],
+  "critical_code_review_comments": [
+    "PATCH writes to a single evaluacion_id while GET aggregates states over the group: read and write paths are inconsistent (root cause of the HIGH bug).",
+    "igss_nogs.py is 1169 lines (>700); consider splitting the Producción section into routes/igss_produccion.py.",
+    "toggleEstado in the frontend does an optimistic update plus a refetch; after the refetch the checkbox reverts to checked in the sticky case without telling the user."
+  ],
+  "updated_files": ["/app/backend/tests/test_produccion_consolidacion.py"],
+  "success_rate": {"backend": "95% (21/22; the 1 failure is the real sticky-state bug)", "frontend": "100% (4/4 requested flows)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "None. The test temporarily set pagado on evals 7f68a258/a0c71e69 and reset them to false (they now have an igss_produccion doc with pagado=false).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "October 2026 range: 59 consolidated rows from 524 evals. The group SPS-110 (patient 4ceb89de) has representative a0c71e69 and members 7f68a258/7e7a4c39/72796129. Use it for the sticky-state test: test_produccion_consolidacion.py::TestEstado::test_uncheck_when_state_on_member_eval. UI testids: tab-produccion, prod-modo (choose option 'Rango'), prod-desde, prod-hasta, prod-totales, prod-row-{id}, prod-{estado}-{id}, prod-export.",
+  "rca of the issue": "Root cause: _build_produccion_rows computes impreso = impreso OR est.impreso for every eval in the group, but actualizar_produccion only upserts igss_produccion for the eval id sent by the UI (the representative). A true value on any member therefore can't be cleared from the UI. Fix: make the write cover the group, or make the read use only the representative."
+}

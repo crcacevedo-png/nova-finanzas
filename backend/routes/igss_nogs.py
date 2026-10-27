@@ -922,6 +922,32 @@ def _eval_recencia(ev):
     return (ev.get("fecha") or "", ev.get("fecha_actualizacion") or ev.get("ultimo_autoguardado") or "", ev.get("fecha_creacion") or "")
 
 
+def _resolver_orden(ev, pac):
+    """Resuelve (numero NOG, No. SPS, código, procedimiento) de una evaluación,
+    con respaldo en la primera orden IGSS del paciente."""
+    numero = (ev.get("igss_nog") or "").strip()
+    no_sps = ev.get("igss_no_sps") or ""
+    codigo = ev.get("igss_codigo") or ""
+    proc = ev.get("igss_procedimiento") or ""
+    if not numero:
+        ords = (pac or {}).get("igss_ordenes") or []
+        if ords:
+            numero = (ords[0].get("nog") or "").strip()
+            no_sps = no_sps or ords[0].get("no_sps", "")
+            codigo = codigo or ords[0].get("codigo", "")
+            proc = proc or ords[0].get("procedimiento", "")
+    return numero, no_sps, codigo, proc
+
+
+def _order_key(no_sps, numero, fecha):
+    """Clave de agrupación por orden: No. SPS; respaldo NOG; respaldo paciente/fecha."""
+    if (no_sps or "").strip():
+        return ("sps", no_sps.strip())
+    if numero:
+        return ("nog", numero)
+    return ("pac", fecha or "")
+
+
 async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
     q = {}
     if fecha:
@@ -958,17 +984,7 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
         uid = pac.get("igss_unit_id")
         if unidad_id and uid != unidad_id:
             continue
-        numero = (ev.get("igss_nog") or "").strip()
-        no_sps = ev.get("igss_no_sps") or ""
-        codigo = ev.get("igss_codigo") or ""
-        proc = ev.get("igss_procedimiento") or ""
-        if not numero:
-            ords = pac.get("igss_ordenes") or []
-            if ords:
-                numero = (ords[0].get("nog") or "").strip()
-                no_sps = no_sps or ords[0].get("no_sps", "")
-                codigo = codigo or ords[0].get("codigo", "")
-                proc = proc or ords[0].get("procedimiento", "")
+        numero, no_sps, codigo, proc = _resolver_orden(ev, pac)
         if nog and numero != nog:
             continue
         # Ocultar evaluaciones en blanco: sin médico asignado y sin datos clínicos
@@ -987,12 +1003,7 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
     grupos = {}
     for c in candidatos:
         ev = c["ev"]
-        if (c["no_sps"] or "").strip():
-            okey = ("sps", c["no_sps"].strip())
-        elif c["numero"]:
-            okey = ("nog", c["numero"])
-        else:
-            okey = ("pac", ev.get("fecha") or "")
+        okey = _order_key(c["no_sps"], c["numero"], ev.get("fecha"))
         grupos.setdefault((ev.get("paciente_id"), okey), []).append(c)
 
     # 3) Una fila consolidada por grupo (representante = más reciente con contenido)
@@ -1092,26 +1103,53 @@ async def actualizar_produccion(
     current_user: dict = Depends(require_role(PRODUCCION_ROLES))
 ):
     """Marca estados (impreso/enviado/facturado/pagado) y/o ajusta el costo de un registro.
+    Los estados se aplican a TODAS las evaluaciones de la misma orden (fila consolidada),
+    para que marcar/desmarcar sea consistente. El costo se ajusta solo en el representante.
     Enviar costo_override=null restablece el costo al precio del NOG."""
-    ev = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0, "id": 1, "paciente_id": 1})
+    ev = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
     if not ev:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
-    pac = await db.patients.find_one({"id": ev.get("paciente_id")}, {"_id": 0, "referral_institution": 1})
+    pac = await db.patients.find_one({"id": ev.get("paciente_id")}, {"_id": 0})
     if not pac or pac.get("referral_institution") != "igss":
         raise HTTPException(status_code=400, detail="La evaluación no pertenece a un paciente IGSS")
     provided = data.model_dump(exclude_unset=True)
     if not provided:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
-    set_fields = {k: v for k, v in provided.items() if v is not None}
-    unset_fields = {k: "" for k, v in provided.items() if v is None}
-    set_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
-    set_fields["updated_by"] = current_user["id"]
-    update_doc = {"$set": set_fields, "$setOnInsert": {"evaluacion_id": evaluacion_id}}
-    if unset_fields:
-        update_doc["$unset"] = unset_fields
-    await db.igss_produccion.update_one(
-        {"evaluacion_id": evaluacion_id}, update_doc, upsert=True
-    )
+    now = datetime.now(timezone.utc).isoformat()
+    uid = current_user["id"]
+
+    # Estados booleanos: se aplican a toda la orden (todas las evaluaciones del grupo)
+    bool_fields = {k: v for k, v in provided.items()
+                   if k in ("impreso", "enviado", "facturado", "pagado") and v is not None}
+    if bool_fields:
+        numero, no_sps, _, _ = _resolver_orden(ev, pac)
+        okey = _order_key(no_sps, numero, ev.get("fecha"))
+        sibs = await db.evaluaciones_oftalmologicas.find(
+            {"paciente_id": ev.get("paciente_id")}, {"_id": 0}).to_list(None)
+        target_ids = {evaluacion_id}
+        for s in sibs:
+            sn, sp, _, _ = _resolver_orden(s, pac)
+            if _order_key(sp, sn, s.get("fecha")) == okey:
+                target_ids.add(s["id"])
+        for tid in target_ids:
+            await db.igss_produccion.update_one(
+                {"evaluacion_id": tid},
+                {"$set": {**bool_fields, "updated_at": now, "updated_by": uid},
+                 "$setOnInsert": {"evaluacion_id": tid}},
+                upsert=True,
+            )
+
+    # Costo: solo en el representante (la evaluación de la fila)
+    if "costo_override" in provided:
+        v = provided["costo_override"]
+        doc = {"$set": {"updated_at": now, "updated_by": uid},
+               "$setOnInsert": {"evaluacion_id": evaluacion_id}}
+        if v is None:
+            doc["$unset"] = {"costo_override": ""}
+        else:
+            doc["$set"]["costo_override"] = v
+        await db.igss_produccion.update_one({"evaluacion_id": evaluacion_id}, doc, upsert=True)
+
     fresh = await db.igss_produccion.find_one({"evaluacion_id": evaluacion_id}, {"_id": 0})
     return fresh
 
