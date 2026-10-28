@@ -1,5 +1,13 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-28 — Dashboard: filtro de fecha/rango + tarjeta Producción IGSS
+**Solicitud:** (1) Elegir un día o rango para ver el resumen de cualquier fecha. (2) Tarjeta con la facturación IGSS del día desde el módulo de producción.
+**Backend:** `GET /api/dashboard/resumen-dia` ahora acepta `fecha` (un día) o `desde`/`hasta` (rango); sin params usa hoy (GT). Óptica y acreditaciones filtran por rango UTC del/los día(s) GT; citas y evaluaciones por string de fecha. Nuevo bloque `produccion_igss` reutilizando `_build_produccion_rows`/`_produccion_totales` de `routes/igss_nogs.py`: servicios, total (costo), facturado, pagado, pendiente. Respuesta incluye `fecha`, `desde`, `hasta`.
+**Frontend:** `Dashboard.js` — toggle Día/Rango con inputs de fecha y botón Aplicar (testids `resumen-mode-dia/rango`, `resumen-fecha/desde/hasta-input`, `resumen-aplicar-btn`); título cambia a "Resumen del período" en rango; 5ª tarjeta "Producción IGSS" (icono FileText). Helper `fmtFecha` evita desfase de día al mostrar fechas. `dashboardApi.getResumenDia(params)`.
+**Verificado:** curl día/rango con datos reales (rango 21–23 oct: evals 37, citas 3, acreditaciones 112/Q132,550, producción 1 servicio/Q100); screenshots escritorio (5 tarjetas en fila) y móvil sin overflow.
+
+
+
 ## 2026-10-28 — Dashboard: sección "Resumen del día"
 **Solicitud:** Agregar al dashboard (superadmin) las ventas del día, citas y evaluaciones del día, e incluir servicios al IGSS y su total.
 **Backend:** nuevo `GET /api/dashboard/resumen-dia` (require_permission view_dashboard) en server.py. Devuelve, en hora Guatemala:

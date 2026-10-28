@@ -77,7 +77,7 @@ export const dashboardApi = {
   getAlerts30: () => axios.get(`${API_URL}/dashboard/alerts/30`),
   getAlerts60: () => axios.get(`${API_URL}/dashboard/alerts/60`),
   getChartData: () => axios.get(`${API_URL}/dashboard/chart-data`),
-  getResumenDia: () => axios.get(`${API_URL}/dashboard/resumen-dia`),
+  getResumenDia: (params) => axios.get(`${API_URL}/dashboard/resumen-dia`, { params }),
 };
 
 // Bank Accounts API

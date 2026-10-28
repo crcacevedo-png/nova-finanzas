@@ -16,9 +16,12 @@ import {
   ShoppingCart,
   CalendarDays,
   Eye,
-  Stethoscope
+  Stethoscope,
+  FileText
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import {
@@ -147,6 +150,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [resumenDia, setResumenDia] = useState(null);
+  const [resumenMode, setResumenMode] = useState('dia');
+  const [resumenFecha, setResumenFecha] = useState('');
+  const [resumenDesde, setResumenDesde] = useState('');
+  const [resumenHasta, setResumenHasta] = useState('');
+  const [resumenLoading, setResumenLoading] = useState(false);
   const [chartData, setChartData] = useState([]);
   const [alerts30, setAlerts30] = useState([]);
   const [alerts60, setAlerts60] = useState([]);
@@ -168,6 +176,12 @@ const Dashboard = () => {
 
       setStats(statsRes.data);
       setResumenDia(resumenDiaRes.data);
+      const rd = resumenDiaRes.data;
+      if (rd && rd.desde && !resumenFecha) {
+        setResumenFecha(rd.desde);
+        setResumenDesde(rd.desde);
+        setResumenHasta(rd.hasta || rd.desde);
+      }
       setChartData(chartRes.data || []);
       setAlerts30(alerts30Res.data || []);
       setAlerts60(alerts60Res.data || []);
@@ -176,6 +190,27 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const aplicarFiltroResumen = async () => {
+    const params = resumenMode === 'rango'
+      ? { desde: resumenDesde, hasta: resumenHasta }
+      : { fecha: resumenFecha };
+    setResumenLoading(true);
+    try {
+      const res = await dashboardApi.getResumenDia(params);
+      setResumenDia(res.data);
+    } catch (error) {
+      console.error('Error fetching resumen del día:', error);
+    } finally {
+      setResumenLoading(false);
+    }
+  };
+
+  const fmtFecha = (s) => {
+    if (!s) return '';
+    const [y, m, d] = s.split('-');
+    return `${d}/${m}/${y}`;
   };
 
   if (loading) {
@@ -213,24 +248,84 @@ const Dashboard = () => {
 
         {/* Resumen del Día */}
         <div data-testid="resumen-dia-section">
-          <h2 className="text-base font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Resumen del día</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {resumenDia?.fecha ? 'Resumen del día' : 'Resumen del período'}
+              </h2>
+              <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
+                {resumenDia?.fecha
+                  ? fmtFecha(resumenDia.fecha)
+                  : `${fmtFecha(resumenDia?.desde)} — ${fmtFecha(resumenDia?.hasta)}`}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-color, #d7e3e0)' }}>
+                <button
+                  data-testid="resumen-mode-dia"
+                  onClick={() => setResumenMode('dia')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${resumenMode === 'dia' ? 'gradient-teal text-white' : 'bg-white'}`}
+                  style={resumenMode === 'dia' ? {} : { color: 'var(--text-secondary)' }}
+                >Día</button>
+                <button
+                  data-testid="resumen-mode-rango"
+                  onClick={() => setResumenMode('rango')}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${resumenMode === 'rango' ? 'gradient-teal text-white' : 'bg-white'}`}
+                  style={resumenMode === 'rango' ? {} : { color: 'var(--text-secondary)' }}
+                >Rango</button>
+              </div>
+              {resumenMode === 'dia' ? (
+                <Input
+                  type="date"
+                  data-testid="resumen-fecha-input"
+                  value={resumenFecha}
+                  onChange={(e) => setResumenFecha(e.target.value)}
+                  className="h-8 w-[150px] text-xs"
+                />
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="date"
+                    data-testid="resumen-desde-input"
+                    value={resumenDesde}
+                    onChange={(e) => setResumenDesde(e.target.value)}
+                    className="h-8 w-[140px] text-xs"
+                  />
+                  <span className="text-xs" style={{ color: 'var(--text-hint)' }}>a</span>
+                  <Input
+                    type="date"
+                    data-testid="resumen-hasta-input"
+                    value={resumenHasta}
+                    onChange={(e) => setResumenHasta(e.target.value)}
+                    className="h-8 w-[140px] text-xs"
+                  />
+                </div>
+              )}
+              <Button
+                data-testid="resumen-aplicar-btn"
+                onClick={aplicarFiltroResumen}
+                disabled={resumenLoading}
+                className="h-8 px-4 text-xs gradient-teal text-white"
+              >{resumenLoading ? 'Cargando...' : 'Aplicar'}</Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <StatCard
-              title="Ventas del Día"
+              title={resumenDia?.fecha ? 'Ventas del Día' : 'Ventas'}
               value={formatCurrency(resumenDia?.ventas?.total || 0)}
               icon={ShoppingCart}
               colorClass="metric-teal"
               subtitle={`${resumenDia?.ventas?.cantidad || 0} ventas · Cobrado ${formatCurrency(resumenDia?.ventas?.cobrado || 0)}`}
             />
             <StatCard
-              title="Citas del Día"
+              title={resumenDia?.fecha ? 'Citas del Día' : 'Citas'}
               value={`${resumenDia?.citas?.total || 0}`}
               icon={CalendarDays}
               colorClass="metric-blue"
               subtitle={`${resumenDia?.citas?.atendidas || 0} atendidas · ${resumenDia?.citas?.canceladas || 0} canceladas`}
             />
             <StatCard
-              title="Evaluaciones del Día"
+              title={resumenDia?.fecha ? 'Evaluaciones del Día' : 'Evaluaciones'}
               value={`${resumenDia?.evaluaciones?.total || 0}`}
               icon={Eye}
               colorClass="metric-amber"
@@ -242,6 +337,13 @@ const Dashboard = () => {
               icon={Stethoscope}
               colorClass="metric-red"
               subtitle={`Total ${formatCurrency(resumenDia?.igss?.total || 0)}`}
+            />
+            <StatCard
+              title="Producción IGSS"
+              value={formatCurrency(resumenDia?.produccion_igss?.total || 0)}
+              icon={FileText}
+              colorClass="metric-teal"
+              subtitle={`${resumenDia?.produccion_igss?.servicios || 0} servicios · Facturado ${formatCurrency(resumenDia?.produccion_igss?.facturado || 0)}`}
             />
           </div>
         </div>

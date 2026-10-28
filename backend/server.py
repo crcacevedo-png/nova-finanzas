@@ -3522,12 +3522,34 @@ async def get_dashboard_stats(current_user: dict = Depends(require_permission("v
     }
 
 @api_router.get("/dashboard/resumen-dia")
-async def get_dashboard_resumen_dia(current_user: dict = Depends(require_permission("view_dashboard"))):
-    """Resumen operativo del día: ventas de óptica, citas, evaluaciones y servicios IGSS."""
-    hoy = now_gt().strftime("%Y-%m-%d")
-    inicio_utc, fin_utc = dia_gt_a_rango_utc(hoy)
+async def get_dashboard_resumen_dia(
+    fecha: Optional[str] = None,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    current_user: dict = Depends(require_permission("view_dashboard"))
+):
+    """Resumen operativo: ventas de óptica, citas, evaluaciones, servicios IGSS y
+    facturación de producción IGSS. Filtra por un día (fecha) o un rango (desde/hasta).
+    Sin parámetros usa el día de hoy (hora Guatemala)."""
+    from routes.igss_nogs import _build_produccion_rows, _produccion_totales
 
-    # Ventas de óptica del día
+    # Resolver ventana de fechas (strings YYYY-MM-DD en hora Guatemala)
+    if desde and hasta:
+        f_desde, f_hasta = desde, hasta
+    elif fecha:
+        f_desde = f_hasta = fecha
+    else:
+        f_desde = f_hasta = now_gt().strftime("%Y-%m-%d")
+    if f_desde > f_hasta:
+        f_desde, f_hasta = f_hasta, f_desde
+
+    # Rango UTC para colecciones con timestamp (óptica, acreditaciones)
+    inicio_utc = dia_gt_a_rango_utc(f_desde)[0]
+    fin_utc = dia_gt_a_rango_utc(f_hasta)[1]
+    # Filtro para colecciones con fecha string (citas, evaluaciones)
+    fecha_filtro = {"$gte": f_desde, "$lte": f_hasta}
+
+    # Ventas de óptica
     ventas = await db.optica_sales.find(
         {"created_at": {"$gte": inicio_utc, "$lte": fin_utc}},
         {"_id": 0, "total": 1, "total_paid": 1}
@@ -3535,19 +3557,19 @@ async def get_dashboard_resumen_dia(current_user: dict = Depends(require_permiss
     ventas_total = round(sum(v.get("total", 0) or 0 for v in ventas), 2)
     ventas_cobrado = round(sum(v.get("total_paid", 0) or 0 for v in ventas), 2)
 
-    # Citas del día (fecha es string YYYY-MM-DD en hora Guatemala)
-    citas = await db.citas.find({"fecha": hoy}, {"_id": 0, "estado": 1}).to_list(5000)
+    # Citas (fecha es string YYYY-MM-DD en hora Guatemala)
+    citas = await db.citas.find({"fecha": fecha_filtro}, {"_id": 0, "estado": 1}).to_list(10000)
     citas_atendidas = sum(1 for c in citas if c.get("estado") in ["Atendida", "En consulta", "Presente"])
     citas_canceladas = sum(1 for c in citas if c.get("estado") in ["Cancelada", "No asistió"])
 
-    # Evaluaciones oftalmológicas del día
-    evaluaciones_total = await db.evaluaciones_oftalmologicas.count_documents({"fecha": hoy})
+    # Evaluaciones oftalmológicas
+    evaluaciones_total = await db.evaluaciones_oftalmologicas.count_documents({"fecha": fecha_filtro})
 
-    # Servicios al IGSS del día: acreditaciones NOG no anuladas + total monetario (precio del NOG)
+    # Servicios al IGSS: acreditaciones NOG no anuladas + total monetario (precio del NOG)
     acreditaciones = await db.igss_nog_acreditaciones.find(
         {"fecha_acreditacion": {"$gte": inicio_utc, "$lte": fin_utc}, "anulada": {"$ne": True}},
         {"_id": 0, "nog_id": 1}
-    ).to_list(5000)
+    ).to_list(10000)
     nog_ids = list({a["nog_id"] for a in acreditaciones if a.get("nog_id")})
     precios = {}
     if nog_ids:
@@ -3555,12 +3577,30 @@ async def get_dashboard_resumen_dia(current_user: dict = Depends(require_permiss
             precios[n["id"]] = n.get("precio", 0) or 0
     igss_total = round(sum(precios.get(a.get("nog_id"), 0) for a in acreditaciones), 2)
 
+    # Producción IGSS (módulo de facturación): una línea por orden con costo y estados
+    rows = await _build_produccion_rows(
+        f_desde if f_desde == f_hasta else None,
+        None if f_desde == f_hasta else f_desde,
+        None if f_desde == f_hasta else f_hasta,
+        None, None
+    )
+    prod_tot = _produccion_totales(rows)
+
     return {
-        "fecha": hoy,
+        "fecha": f_desde if f_desde == f_hasta else None,
+        "desde": f_desde,
+        "hasta": f_hasta,
         "ventas": {"cantidad": len(ventas), "total": ventas_total, "cobrado": ventas_cobrado},
         "citas": {"total": len(citas), "atendidas": citas_atendidas, "canceladas": citas_canceladas},
         "evaluaciones": {"total": evaluaciones_total},
-        "igss": {"servicios": len(acreditaciones), "total": igss_total}
+        "igss": {"servicios": len(acreditaciones), "total": igss_total},
+        "produccion_igss": {
+            "servicios": prod_tot["servicios"],
+            "total": prod_tot["total_costo"],
+            "facturado": prod_tot["por_estado"]["facturado"]["monto"],
+            "pagado": prod_tot["total_pagado"],
+            "pendiente": prod_tot["total_pendiente"]
+        }
     }
 
 
