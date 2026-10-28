@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '../components/ui/dialog';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import { igssNogApi } from '../services/api';
 import {
   ClipboardList, Plus, Search, Pencil, Power, PowerOff, Loader2, AlertTriangle, XCircle, CheckCircle2,
@@ -393,6 +393,7 @@ const GestionNOG = () => {
           </DialogContent>
         </Dialog>
       </div>
+      <Toaster position="top-right" richColors />
     </Layout>
   );
 };

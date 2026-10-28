@@ -4,7 +4,16 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 50 — Fix sincronización Google Calendar: token envenenado por errores)
+**Última actualización**: 2026-06 (Sesión 51 — Menú NOG: gestión central de NOG IGSS)
+
+### Sesión 51 — Menú "NOG": ingreso y gestión central de NOG IGSS (2026-06)
+- 🎯 Nuevo menú propio "NOG" (bajo IGSS) para dar de alta y administrar todos los NOG de todas las unidades en un solo lugar, sin entrar unidad por unidad.
+- ✅ **Acceso (3 roles con acceso completo)**: SuperAdmin, Administrador IGSS y Administrador general. Se otorgó `manage_igss_units` al rol `admin` (`config/permissions.py`). El ítem del sidebar se muestra por **permiso** `manage_igss_units` (no por config de menú guardada), para garantizar visibilidad en despliegues existentes.
+- ✅ **Backend** (`routes/igss_nogs.py`): nuevo `GET /api/igss-units/nogs/all` (lista global con `unidad_nombre`/`unidad_codigo` + derivados). Campo nuevo **`fecha_asignacion`** agregado a `NogCreate`/`NogUpdate`, al documento, y a `_nog_con_derivados`. Reutiliza `POST /{unit_id}/nogs` (crear eligiendo unidad) y `PUT /nogs/{nog_id}` (editar/activar-desactivar). Reglas de cupo (90% aviso, 100% bloqueo) y unicidad de número por unidad sin cambios.
+- ✅ **Frontend**: nueva página `pages/GestionNOG.js` (ruta `/igss/nog`, `ProtectedRoute requiredPermission=manage_igss_units`): tabla de todos los NOG con buscador (número/servicio), filtros por unidad y estado, tarjetas de totales, diálogo crear/editar (unidad obligatoria y bloqueada al editar, fecha de asignación, tipo de compra, cupos, precio), y activar/desactivar por fila. Menú registrado en `menu_config.py` (`gestion_nog`) y en el sidebar (`Layout.js`). Cada página monta su propio `<Toaster />`.
+- ✅ **Verificado**: testing agent `iteration_101.json` (backend 7/7; UI: render, crear con fecha_asignacion, validación, editar con unidad deshabilitada, toggle estado, buscador+filtros con totales; roles: superadmin/igss.admin ven y usan, usuario 403 y redirigido). Fix aplicado: faltaba `<Toaster/>` en la página.
+- 🔜 Fase 2: exportación de la lista + alertas automáticas 90%/100%. Fase 3: control de vigencia/vencimiento.
+- ⚠️ Requiere redespliegue para producción.
 
 ### Sesión 50 — Fix: Google Calendar no sincronizaba en producción (2026-06)
 - 🐛 **Reporte**: en producción la integración con Google Calendar está conectada pero no sincronizaba (0 eventos importados en ~3 días).

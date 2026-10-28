@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the new central NOG menu (/igss/nog), backend and frontend. Backend: 7/7 pytest pass. Covers the global list (28 NOG from more than 1 unit, with unidad_nombre and fecha_asignacion, no _id), create with fecha_asignacion, duplicate number -> 400, validation 422/404, edit fecha/servicio, toggling is_active (changes estado and the nogs-activos availability), igss.admin create/edit/delete = 200, usuario = 403 on GET/POST/PUT, unauthenticated = 401/403. Frontend: the NOG item appears in the sidebar under IGSS for superadmin and igss.admin and is absent for usuario; usuario is redirected from /igss/nog to /pacientes. Table rows, totals cards, create, edit (Unidad disabled, fields prefilled), toggle (Inactivo/Activo badge), search by number and by service, unit filter and estado filter all work, and the totals follow the filters. Bug found and fixed: the page never mounted a sonner <Toaster />, so ALL toasts were invisible (validation errors 'El número de NOG es obligatorio' / 'La unidad es obligatoria', plus the create, edit and toggle success messages). Added Toaster as the other pages do; toasts now show. Validation does block creation (the dialog stays open and the count did not increase). Test NOGs (NOG-QA-*) deleted; total is back to 28.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST/PUT /api/igss-units/.../nogs", "issue": "fecha_asignacion is a free-form string with no YYYY-MM-DD format validation"},
+      {"endpoint": "GET /api/igss-units/nogs/all", "issue": "The 'unidades' list includes inactive units (no is_active filter), so a NOG can be created in an inactive unit from the dialog"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "GestionNOG", "issue": "FIXED BY TESTER: no <Toaster/> mounted, so no toast (error or success) was ever visible", "selector": "[data-sonner-toast]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/igss/nog", "issues": ["The 'Disp.' column shows the remaining cupos for inactive NOGs (e.g. 5) while the 'Disponibles' card counts 0 for inactive ones. Inconsistent; consider showing 0 or graying out the value for inactive NOGs", "Fecha de asignación uses the browser's native date input (mm/dd/yyyy in an en-US browser) instead of the shadcn Calendar used elsewhere", "The Toaster is mounted per page instead of globally in App.js, a fragile pattern that caused this bug"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_gestion_nog.py", "/app/test_reports/pytest/pytest_gestion_nog.xml"],
+  "action_items": [
+    "Optional: validate the fecha_asignacion format (YYYY-MM-DD) in NogCreate/NogUpdate",
+    "Optional: exclude inactive units from the create-dialog unit selector",
+    "Optional: align the 'Disp.' column with the card for inactive NOGs",
+    "Consider mounting the sonner Toaster once globally in App.js"
+  ],
+  "critical_code_review_comments": [
+    "GestionNOG.js was missing the Toaster (fixed)",
+    "The unit filter and search run client-side over the full list (to_list(None)); fine at the current scale (28 NOG)"
+  ],
+  "updated_files": ["/app/frontend/src/pages/GestionNOG.js (added Toaster import + <Toaster position='top-right' richColors />)", "/app/backend/tests/test_gestion_nog.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% after the Toaster fix"},
+  "test_credentials": "superadmin/nova2024, igss.admin/IgssAdmin2024$, usuario/user2024 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None persisted; NOG-QA-UI01, NOG-QA-UI02 and NOG-QA-PYT* were created and then deleted",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The IGSS sidebar section is collapsible: click 'IGSS' before nav-gestion-nog becomes visible. Run the regression with: REACT_APP_BACKEND_URL=... pytest backend/tests/test_gestion_nog.py (it cleans up after itself). The 'Administrador general' role (admin) has manage_igss_units=True in config/permissions.py; it was not tested with a real admin user because there are no credentials for one.",
+  "rca of the issue": "Toasts not visible on /igss/nog: sonner's Toaster is not mounted globally; each page renders its own <Toaster/>. GestionNOG.js imported only `toast`, so toast() calls had no container. Fix: render <Toaster position='top-right' richColors /> inside the page."
+}
