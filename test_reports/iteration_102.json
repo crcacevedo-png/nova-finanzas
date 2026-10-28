@@ -1,0 +1,17 @@
+{
+  "summary": "Frontend-only testing of NOG dual amounts (Monto individual + Monto total) at /igss/nog as superadmin. All 3 flows passed: autosuggest (5x100 -> 500.00), manual total 3000 respected after changing precio (120) and cantidad (6); saved row shows 'Monto individual' Q 100.00 and 'Monto total' Q 3,000.00; edit preloads 3000, change to 3500 -> Q 3,500.00; default without manual total (4x250) -> Q 1,000.00. Test NOGs deleted via DELETE /api/igss-units/nogs/{id} (200).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor UX: in edit mode montoTotalManual=true, so changing cupos/individual during edit never re-suggests the total (by design but could surprise users; consider a 'recalcular' link).",
+    "Minor: if user manually clears Monto total to empty, autosuggest stays off (manual=true); save falls back to precio*cantidad, which is acceptable."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Created NOG-QA-MT and NOG-QA-DEF (Hospital General de Enfermedades); both deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "NOG dual amounts verified in UI. Login via placeholders 'Ingresa tu usuario'/'Ingresa tu contraseña'; unit select is native <select> nog-form-unidad."
+}

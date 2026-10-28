@@ -4,7 +4,14 @@
 Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
-**Última actualización**: 2026-06 (Sesión 51 — Menú NOG: gestión central de NOG IGSS)
+### Sesión 52 — NOG: monto total + monto individual por servicio (2026-06)
+- 🎯 En el ingreso de NOG se puede capturar el **Monto total del NOG** además del **Monto individual por servicio** (antes solo aparecía el individual). Ambos se muestran en la tabla.
+- ✅ **Backend** (`routes/igss_nogs.py`): nuevo campo editable `monto_total` en `NogCreate`/`NogUpdate`, documento y `_nog_con_derivados` (fallback = precio×cantidad para NOG existentes). Si no se envía al crear, se asigna precio×cantidad.
+- ✅ **Frontend** (`pages/GestionNOG.js`): campo "Monto total del NOG (Q)" (autosugerido = individual×cupos mientras no se edite a mano; respeta el valor manual), relabel "Monto individual por servicio"; nuevas columnas "Monto individual" y "Monto total" en la tabla.
+- ✅ **Verificado**: testing agent `iteration_102.json` (autosugerencia 5×100→500; total manual 3000 respetado tras cambiar individual/cupos; columnas correctas; edición 3000→3500; default 4×250→1000). Backend confirmado por curl.
+- ⚠️ Requiere redespliegue para producción.
+
+**Última actualización**: 2026-06 (Sesión 52 — NOG: monto total + monto individual)
 
 ### Sesión 51 — Menú "NOG": ingreso y gestión central de NOG IGSS (2026-06)
 - 🎯 Nuevo menú propio "NOG" (bajo IGSS) para dar de alta y administrar todos los NOG de todas las unidades en un solo lugar, sin entrar unidad por unidad.
