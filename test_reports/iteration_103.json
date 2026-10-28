@@ -1,0 +1,39 @@
+{
+  "summary": "Backend-only E2E testing of NOG Fase 1 (cupo per AUTHORIZATION/No. SPS) via REST, using an isolated TEST_ unit with 3 TEST NOGs (cantidad 50/2/10). All data was cleaned up afterwards, and a check confirmed 0 leftover units, NOGs, patients or evaluations. 16 tests ran: 13 passed, 3 failed. Cupo consumption works. A patient with 2 orders on the same NOG and different SPS uses 2 cupos, and each acreditación stores no_sps. Extra consultations under an existing SPS do not deduct. 1 SPS plus 3 evaluations uses 1 cupo. With no SPS, 2 evaluations use 1 cupo (legacy). An evaluation with a new SPS uses 1 cupo once. A legacy acreditación without SPS blocks new SPS. PUT on the patient is idempotent, and adding or removing an SPS adds or frees 1 cupo. The NOG counter matches the active acreditaciones. The 100% block works: 3 SPS on a cantidad-2 NOG gives acreditados=2, estado completado, with no overdraw. The 90% warning works: 9/10 gives por_completarse, and /nogs/alertas lists both the 90% and the 100% NOG. Over a full date range, production shows one row per (patient, SPS), and the row date is the earliest consultation even when it was created later. igss.admin can access /produccion, /nogs/all and /nogs/alertas. FAILED: (1) the production listing is built only from evaluations inside the queried date range, so a follow-up under the same SPS shows up as a new row on its own day or month; (2) production lists authorizations that never used a cupo; (3) editing an unrelated patient field (phone) cancels a cupo that a new-SPS evaluation had used.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/igss-units/produccion (and /produccion/reporte/excel)", "issue": "Grouping by authorization is applied only to the evaluations inside the queried date range (_build_produccion_rows q['fecha']). Repro: SPS-B1 first consultation on 2025-11-10, follow-up on 2025-11-12. GET ?fecha=2025-11-12 returns a row for SPS-B1 dated 2025-11-12. With daily filters (the default is today) or monthly ranges that cross the first consultation, the same authorization appears again as a new production/billing line, which breaks the rule 'dos consultas bajo el mismo No. SPS no generan dos filas'.", "priority": "HIGH"},
+      {"endpoint": "PUT /api/patients/{id} -> _reconciliar_nog_paciente", "issue": "An acreditación created by an evaluation with a new SPS (origen='evaluacion', SPS not in patient.igss_ordenes) is cancelled with motivo reasignacion_nog on ANY patient PUT, even a phone-only change. Repro: patient with order SPS-B1, evaluation with igss_no_sps SPS-B2 (acreditados +1), then PUT {phone} -> acreditados -1. The cupo is freed while the production row stays.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/igss-units/produccion", "issue": "Production is evaluation-driven and ignores acreditaciones. Authorizations that did NOT use a cupo still show as billable rows, for example: an evaluation with a new SPS blocked by a legacy no-SPS acreditación (the comodín), or an evaluation on a NOG that is already at 100% (SPS-K9 on the full NOG). This is inconsistent with 'la unidad que descuenta cupo y aparece en producción es la autorización'. Confirm whether it is intended."},
+      {"endpoint": "_order_key / _build_produccion_rows", "issue": "The group key is (paciente_id, ('sps', no_sps)) and does not include the NOG number, so the same SPS on two different NOGs of one patient would merge into one row. This is an edge case."},
+      {"endpoint": "_reconciliar_nog_paciente", "issue": "Mixed orders on the same NOG (one with SPS, one without) depend on the iteration order of set(pares): the '' order blocks or is blocked depending on order, so the result is non-deterministic."},
+      {"endpoint": "_sincronizar_acreditaciones (POST nogs, /recalcular)", "issue": "This still calls _crear_acreditacion without no_sps, so retroactive or recalculated acreditaciones are legacy wildcards (no SPS). They then block all further SPS for that patient on that NOG, so a patient with 2 SPS synced retroactively uses only 1 cupo."},
+      {"endpoint": "GET /api/igss-units/nogs/{id}/pacientes", "issue": "igss_no_sps shows the FIRST matching order's SPS for every acreditación of that NOG, not the acreditación's own no_sps. A patient with SPS-A1 and SPS-A2 shows SPS-A1 twice. It should use a['no_sps']."},
+      {"endpoint": "POST /api/igss-units/nogs/{id}/acreditaciones/aplicar", "issue": "Manual apply creates an acreditación without SPS (a wildcard) and returns 'duplicada' whenever the patient already has any acreditación on the NOG, so you cannot manually apply a second authorization."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_nog_por_autorizacion.py", "/app/test_reports/pytest/pytest_nog_autorizacion.xml"],
+  "action_items": [
+    "In _build_produccion_rows: for each (paciente, SPS/NOG) group, check whether an evaluation of the same authorization exists BEFORE the range start (or the 'fecha' filter). If one exists, drop the group, or always compute the first-consultation date globally and include the row only if that date falls in the range.",
+    "In _reconciliar_nog_paciente: do not cancel origen='evaluacion' acreditaciones whose SPS comes from a real evaluation. Either keep them as targets (union of order SPS and evaluated SPS), or add the new SPS to patient.igss_ordenes when the evaluation uses it.",
+    "Decide whether production should only list authorizations with an active acreditación (or flag them as 'sin cupo'), so billing stays consistent with cupo.",
+    "In listar_pacientes_nog and the Excel export: show the acreditación's own no_sps.",
+    "In _sincronizar_acreditaciones: pass the SPS of each order (iterate the patient's orders) so retroactive sync does not create wildcards."
+  ],
+  "critical_code_review_comments": [
+    "igss_nogs.py is 1432 lines and should be split (catalog/acreditaciones, mantenimiento, produccion, excel).",
+    "_order_key should include the NOG number: ('sps', numero, sps).",
+    "The evaluation hook in evaluaciones.py swallows all exceptions (except: pass), so acreditación failures are silent. At least log them."
+  ],
+  "updated_files": ["/app/backend/tests/test_nog_por_autorizacion.py"],
+  "success_rate": {"backend": "81% (13/16)", "frontend": "not tested (backend only)"},
+  "test_credentials": "superadmin/nova2024, igss.admin/IgssAdmin2024$ (from /app/memory/test_credentials.md) - both logged in OK",
+  "seed_data_creation": "Temporary TEST_Unidad_SPS_<tag> unit, NOGs TEST-main/cap/aviso-<tag>, TEST_SPS patients and evaluations dated 2025-11-10/12/14. All removed in the fixture teardown (verified 0 leftovers).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest /app/backend/tests/test_nog_por_autorizacion.py. It is self-contained: it creates its own unit and NOGs and cleans up via pymongo on test_database. Evaluations are posted to /api/evaluaciones with motivo_consulta as clinical content. Patient creation itself uses cupo (reconcile at POST /patients). The 3 failing tests encode the expected behaviour for the reported bugs.",
+  "rca of the issue": "(1) _build_produccion_rows queries evaluaciones_oftalmologicas filtered by fecha, desde or hasta, then groups only that subset. The 'primera consulta' is the first one inside the window, not the first one for the authorization. (2) _reconciliar_nog_paciente builds target_keys only from patient.igss_ordenes. An acreditación from _acreditar_evaluacion with an evaluation-only SPS matches no target and is not 'manual', so it is cancelled (motivo reasignacion_nog) on every PUT /patients/{id}."
+}

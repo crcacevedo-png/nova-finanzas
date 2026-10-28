@@ -166,3 +166,11 @@
   - Guard de ejecución única por entorno (colección `system_flags`, key `nog_dedup_cleanup_v1`): corre una sola vez por BD (preview y producción separadas).
 - Validado en preview: pruebas de inyección con variantes de acento/espacio -> deduplicación correcta (eliminó copia seed, conservó original con sus acreditados, reapuntó NOG nuevos). Idempotente; guard omite ejecuciones posteriores.
 - PENDIENTE: al REPUBLICAR, la limpieza corre una vez en producción y elimina las copias conservando los originales.
+
+## 2026-06 — Fase 1 regla de facturación por AUTORIZACIÓN (No. SPS) — correcciones E2E
+- Unidad facturable = autorización (No. SPS). 1ra consulta por No. SPS descuenta cupo y genera fila de producción; seguimientos bajo el mismo SPS no descuentan ni duplican fila. Otro SPS del mismo NOG = nuevo servicio. Sin SPS = 1 descuento por paciente/NOG (comodín legado).
+- Fix HIGH #1 (_build_produccion_rows): la "primera consulta" se calcula GLOBALMENTE (todas las fechas del paciente), no solo dentro de la ventana consultada. La autorización aparece solo si su primera consulta cae en el filtro (helper _en_ventana). Un seguimiento en otro día/mes ya NO genera fila nueva.
+- Fix HIGH #2 (_reconciliar_nog_paciente): los objetivos ahora son la UNIÓN de las órdenes del paciente y las autorizaciones de sus evaluaciones REALES (SPS no vacío, no borrador). Editar un dato no-IGSS (p.ej. teléfono) ya NO anula un cupo descontado por una evaluación con SPS nuevo (origen='evaluacion').
+- Producción oculta autorizaciones por SPS que un comodín legado (acreditación sin SPS del mismo paciente/NOG) ya absorbió. DECISIÓN DEL USUARIO: una autorización que no descontó cupo por NOG al 100% SÍ aparece en Producción.
+- Hook de acreditación en evaluaciones.py ahora registra los fallos (logging) en vez de ignorarlos.
+- Pruebas: tests/test_nog_por_autorizacion.py -> 16/16 PASS (antes 13/16). Suite autolimpia datos TEST_.

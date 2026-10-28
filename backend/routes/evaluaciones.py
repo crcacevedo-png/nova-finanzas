@@ -938,8 +938,10 @@ async def create_evaluacion(
     try:
         from routes.igss_nogs import _acreditar_evaluacion
         await _acreditar_evaluacion(paciente, evaluacion_dict, current_user)
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger("igss").warning(
+            "Acreditación de evaluación %s falló: %s", evaluacion_dict.get("id"), e)
     
     # Agendar próxima cita si corresponde (idempotente)
     await sincronizar_proxima_cita(

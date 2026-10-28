@@ -249,6 +249,23 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
                 pares = [(leg, (paciente.get("igss_no_sps") or "").strip())]
         if solo_numeros is not None:
             pares = [(n, s) for (n, s) in pares if n in solo_numeros]
+        # Autorizaciones derivadas de evaluaciones REALES del paciente: una
+        # evaluación con un No. SPS nuevo (no presente en las órdenes) también es
+        # una autorización facturable y su cupo no debe liberarse al editar al
+        # paciente. Se ignoran los borradores vacíos y los SPS en blanco.
+        evs = await db.evaluaciones_oftalmologicas.find(
+            {"paciente_id": pac_id}, {"_id": 0}
+        ).to_list(None)
+        for ev in evs:
+            if eval_es_borrador_vacio(ev):
+                continue
+            n = (ev.get("igss_nog") or "").strip()
+            s = (ev.get("igss_no_sps") or "").strip()
+            if not n or not s:
+                continue
+            if solo_numeros is not None and n not in solo_numeros:
+                continue
+            pares.append((n, s))
         for numero, sps in set(pares):
             nog = await db.igss_nogs.find_one(
                 {"unidad_id": paciente["igss_unit_id"], "numero": numero, "is_active": True},
@@ -1169,7 +1186,22 @@ def _order_key(no_sps, numero, fecha):
     return ("pac", fecha or "")
 
 
+def _en_ventana(fecha_dia, fecha, desde, hasta):
+    """True si `fecha_dia` (YYYY-MM-DD) cae dentro del filtro solicitado."""
+    d = (fecha_dia or "")[:10]
+    if not d:
+        return False
+    if fecha:
+        return d == fecha[:10]
+    if desde and d < desde[:10]:
+        return False
+    if hasta and d > hasta[:10]:
+        return False
+    return True
+
+
 async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
+    # 1) Ventana: evaluaciones del periodo solo para ubicar a los pacientes afectados.
     q = {}
     if fecha:
         q["fecha"] = fecha
@@ -1181,16 +1213,33 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
             rango["$lte"] = hasta
         if rango:
             q["fecha"] = rango
-    evals = await db.evaluaciones_oftalmologicas.find(q, {"_id": 0}).to_list(None)
-    if not evals:
+    evals_win = await db.evaluaciones_oftalmologicas.find(q, {"_id": 0, "paciente_id": 1}).to_list(None)
+    if not evals_win:
         return []
-    # Carga por lotes (evita N+1)
-    pac_ids = list({e.get("paciente_id") for e in evals if e.get("paciente_id")})
-    ev_ids = [e["id"] for e in evals]
+    pac_ids = list({e.get("paciente_id") for e in evals_win if e.get("paciente_id")})
     pac_list = await db.patients.find({"id": {"$in": pac_ids}, "referral_institution": "igss"}, {"_id": 0}).to_list(None)
     pac_map = {p["id"]: p for p in pac_list}
+    if not pac_map:
+        return []
+    # 2) TODAS las evaluaciones de esos pacientes (todas las fechas) para calcular la
+    #    PRIMERA consulta de cada autorización y consolidar seguimientos de cualquier día.
+    igss_pac_ids = list(pac_map.keys())
+    evals = await db.evaluaciones_oftalmologicas.find(
+        {"paciente_id": {"$in": igss_pac_ids}}, {"_id": 0}).to_list(None)
+    if not evals:
+        return []
+    ev_ids = [e["id"] for e in evals]
     prod_list = await db.igss_produccion.find({"evaluacion_id": {"$in": ev_ids}}, {"_id": 0}).to_list(None)
     prod_map = {p["evaluacion_id"]: p for p in prod_list}
+    # Acreditaciones vigentes de los pacientes: para ocultar autorizaciones que un
+    # comodín legado (sin SPS) ya absorbió (no descontaron su propio cupo).
+    acred_list = await db.igss_nog_acreditaciones.find(
+        {"paciente_id": {"$in": igss_pac_ids}, "anulada": {"$ne": True}},
+        {"_id": 0, "paciente_id": 1, "numero_nog": 1, "no_sps": 1}).to_list(None)
+    acred_idx = {}
+    for a in acred_list:
+        acred_idx.setdefault(a.get("paciente_id"), set()).add(
+            (a.get("numero_nog", ""), (a.get("no_sps") or "").strip()))
     unit_ids = list({p.get("igss_unit_id") for p in pac_list if p.get("igss_unit_id")})
     unit_list = await db.igss_units.find({"id": {"$in": unit_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)
     unit_map = {u["id"]: u for u in unit_list}
@@ -1230,11 +1279,22 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
     # 3) Una fila consolidada por grupo (representante = más reciente con contenido);
     #    la fecha mostrada es la de la PRIMERA consulta de la autorización.
     rows = []
-    for items in grupos.values():
+    for (pid, okey), items in grupos.items():
         con_contenido = [c for c in items if c["tiene_contenido"]]
         rep = max(con_contenido or items, key=lambda c: _eval_recencia(c["ev"]))
         primera = min(items, key=lambda c: (c["ev"].get("fecha") or "", c["ev"].get("fecha_creacion") or ""))
         fecha_primera = primera["ev"].get("fecha", "")
+        # Incluir la autorización SOLO si su PRIMERA consulta cae en el filtro pedido.
+        # Así un seguimiento (mismo No. SPS) en otro día/mes no genera una fila nueva.
+        if not _en_ventana(fecha_primera, fecha, desde, hasta):
+            continue
+        # Ocultar autorizaciones por SPS que no descontaron su propio cupo porque un
+        # comodín legado (acreditación sin SPS) del mismo paciente/NOG ya las absorbió.
+        _sps = (rep["no_sps"] or "").strip()
+        if _sps:
+            _pac_acr = acred_idx.get(pid, set())
+            if (rep["numero"], _sps) not in _pac_acr and (rep["numero"], "") in _pac_acr:
+                continue
         ev = rep["ev"]
         pac = rep["pac"]
         unit = rep["unit"]
