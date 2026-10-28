@@ -672,14 +672,16 @@ const CuentasCobrarOptica = () => {
               <div className="relative mt-2">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Q</span>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  max={cuentaSeleccionada?.saldo_pendiente || 0}
+                  type="text"
+                  inputMode="decimal"
                   value={montoAbono}
-                  onChange={(e) => setMontoAbono(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(',', '.');
+                    if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setMontoAbono(v);
+                  }}
                   className="pl-8 text-lg font-bold"
                   placeholder="0.00"
+                  data-testid="abono-monto-input"
                 />
               </div>
               <div className="flex gap-2 mt-2">

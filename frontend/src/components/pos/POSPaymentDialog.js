@@ -76,10 +76,12 @@ const POSPaymentDialog = ({
                 <Button
                   key={mp.value}
                   variant={metodoPagoActual === mp.value ? 'default' : 'outline'}
-                  className={metodoPagoActual === mp.value ? 'bg-teal-600' : ''}
+                  className={`flex flex-col h-auto py-2 gap-1 ${metodoPagoActual === mp.value ? 'bg-teal-600' : ''}`}
                   onClick={() => setMetodoPagoActual(mp.value)}
+                  data-testid={`pos-metodo-${mp.value}`}
                 >
                   <Icon className="h-4 w-4" />
+                  <span className="text-[11px] leading-tight text-center whitespace-normal">{mp.label}</span>
                 </Button>
               );
             })}
