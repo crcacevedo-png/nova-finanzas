@@ -1710,6 +1710,120 @@ async def seed_igss_nogs_from_list():
     print(f"Seed NOG IGSS: unidades nuevas={creadas_unidades}, NOG nuevos={creados_nogs}, omitidos(existentes)={omitidos_nogs}")
 
 
+async def cleanup_igss_nog_seed_duplicates():
+    """Limpia los duplicados de unidades/NOG IGSS creados por el importador
+    automático (que no reconoció registros preexistentes por diferencias de
+    acentos/espacios). Idempotente y acotado a las unidades del listado oficial:
+      - Agrupa unidades por nombre normalizado (sin acentos, espacios colapsados).
+        Si hay >1, conserva la MÁS ANTIGUA (el registro original del usuario) y
+        reapunta sus NOG y pacientes a ella, luego elimina las copias nuevas.
+      - Dentro de la unidad conservada, deduplica los NOG por número (y por
+        servicio en baja cuantía): conserva el más antiguo y elimina las copias.
+    En entornos sin duplicados (p.ej. vista previa) no borra nada."""
+    import json as _json
+    import unicodedata as _ud
+    import re as _re
+
+    # Ejecución única por entorno (preview y producción tienen BD separadas)
+    flag = await db.system_flags.find_one({"key": "nog_dedup_cleanup_v1"})
+    if flag and flag.get("done"):
+        return
+
+    path = os.path.join(os.path.dirname(__file__), "data", "igss_nogs_seed.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            items = _json.load(fh)
+    except Exception as e:
+        print(f"Limpieza NOG IGSS: no se pudo leer seed ({path}): {e}")
+        return
+
+    def _norm(s: str) -> str:
+        s = (s or "").strip()
+        s = "".join(c for c in _ud.normalize("NFD", s) if _ud.category(c) != "Mn")
+        return _re.sub(r"\s+", " ", s).upper()
+
+    # Nombres de unidad y, por unidad, los números/servicios del listado oficial
+    seed_unit_names = {}  # norm_name -> set de numeros y set de servicios normalizados
+    for it in items:
+        key = _norm(it.get("unidad_nombre"))
+        if not key:
+            continue
+        entry = seed_unit_names.setdefault(key, {"numeros": set(), "servicios": set()})
+        numero = (it.get("numero") or "").strip()
+        if numero:
+            entry["numeros"].add(numero)
+        else:
+            entry["servicios"].add(_norm(it.get("nombre_servicio")))
+
+    all_units = await db.igss_units.find({}, {"_id": 0}).to_list(5000)
+    from collections import defaultdict
+    units_by_norm = defaultdict(list)
+    for u in all_units:
+        units_by_norm[_norm(u.get("name"))].append(u)
+
+    unidades_eliminadas = 0
+    nogs_eliminados = 0
+
+    for norm_name, seed_info in seed_unit_names.items():
+        group = units_by_norm.get(norm_name, [])
+        if not group:
+            continue
+        # Conservar la unidad más antigua (el registro original del usuario)
+        group_sorted = sorted(group, key=lambda u: u.get("created_at") or "")
+        survivor = group_sorted[0]
+        survivor_id = survivor["id"]
+        duplicates = group_sorted[1:]
+
+        # Conjuntos de números/servicios ya presentes en la unidad conservada
+        survivor_nogs = await db.igss_nogs.find({"unidad_id": survivor_id}, {"_id": 0}).to_list(5000)
+        survivor_numeros = {(n.get("numero") or "").strip() for n in survivor_nogs if (n.get("numero") or "").strip()}
+        survivor_servicios = {_norm(n.get("nombre_servicio")) for n in survivor_nogs if not (n.get("numero") or "").strip()}
+
+        # Para cada unidad duplicada: borrar el NOG si ya existe en la conservada;
+        # si no existe, reapuntarlo a la conservada (NOG genuinamente nuevo).
+        for dup in duplicates:
+            dup_nogs = await db.igss_nogs.find({"unidad_id": dup["id"]}, {"_id": 0}).to_list(5000)
+            for n in dup_nogs:
+                numero = (n.get("numero") or "").strip()
+                serv = _norm(n.get("nombre_servicio"))
+                ya_existe = (numero in survivor_numeros) if numero else (serv in survivor_servicios)
+                if ya_existe:
+                    await db.igss_nogs.delete_one({"id": n["id"]})
+                    await db.igss_nog_acreditaciones.delete_many({"nog_id": n["id"]})
+                    nogs_eliminados += 1
+                else:
+                    await db.igss_nogs.update_one({"id": n["id"]}, {"$set": {"unidad_id": survivor_id}})
+                    if numero:
+                        survivor_numeros.add(numero)
+                    else:
+                        survivor_servicios.add(serv)
+            # Reapuntar acreditaciones restantes y pacientes de la copia
+            await db.igss_nog_acreditaciones.update_many(
+                {"unidad_id": dup["id"]}, {"$set": {"unidad_id": survivor_id}})
+            await db.patients.update_many(
+                {"igss_unit_id": dup["id"]}, {"$set": {"igss_unit_id": survivor_id}})
+
+        # Eliminar las unidades duplicadas ya vaciadas (sin NOG ni pacientes)
+        for dup in duplicates:
+            tiene_nogs = await db.igss_nogs.count_documents({"unidad_id": dup["id"]})
+            tiene_pac = await db.patients.count_documents({"igss_unit_id": dup["id"]})
+            if tiene_nogs == 0 and tiene_pac == 0:
+                await db.igss_units.delete_one({"id": dup["id"]})
+                unidades_eliminadas += 1
+
+    if unidades_eliminadas or nogs_eliminados:
+        print(f"Limpieza NOG IGSS: unidades duplicadas eliminadas={unidades_eliminadas}, NOG duplicados eliminados={nogs_eliminados}")
+    else:
+        print("Limpieza NOG IGSS: sin duplicados que eliminar")
+
+    await db.system_flags.update_one(
+        {"key": "nog_dedup_cleanup_v1"},
+        {"$set": {"done": True, "unidades_eliminadas": unidades_eliminadas, "nogs_eliminados": nogs_eliminados}},
+        upsert=True,
+    )
+
+
+
 
 async def seed_catalogos_oftalmologicos():
     """Seed de catálogos oftalmológicos y evaluación de ejemplo"""
@@ -4484,8 +4598,11 @@ async def startup_event():
     # Seed de catálogos oftalmológicos
     await seed_catalogos_oftalmologicos()
     await seed_catalogos_igss()
-    # Importación idempotente del listado oficial de NOG IGSS
-    await seed_igss_nogs_from_list()
+    # NOTA: el importador automático de NOG (seed_igss_nogs_from_list) fue DESACTIVADO
+    # porque en producción duplicaba unidades/NOG existentes (diferencias de acentos/
+    # espacios en los nombres impedían reconocer los registros ya ingresados).
+    # En su lugar se ejecuta una limpieza idempotente que elimina esas copias.
+    await cleanup_igss_nog_seed_duplicates()
     
     # Índices de Inventario
     await db.bodegas_inventario.create_index([("codigo", 1)], unique=True)

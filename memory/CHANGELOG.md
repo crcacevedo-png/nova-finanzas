@@ -154,3 +154,15 @@
   - monto_total = "Precio total del contrato"; precio = "Precio individual".
 - Verificado en preview: 1ra corrida creó 10 unidades + 54 NOG; 2da corrida omitió los 54 (idempotencia). API /api/igss-units/nogs/all devuelve 82 NOG con montos individual/total correctos y etiqueta de tipo de compra.
 - Queda activo en producción al publicar (se ejecuta en el arranque del backend). Si los NOG ya existen en prod, se omiten (sin duplicar).
+
+## 2026-06 — Corrección de duplicados NOG/Unidades IGSS
+- Causa raíz: el importador automático de NOG (startup) no reconoció unidades/NOG ya existentes en PRODUCCIÓN por diferencias de acentos/espacios/comillas en los nombres, y creó copias (unidades y NOG duplicados en Gestión NOG y en Unidades IGSS).
+- Fix 1: se desactivó la llamada automática a `seed_igss_nogs_from_list()` en el startup (ya no crea copias).
+- Fix 2: nueva función `cleanup_igss_nog_seed_duplicates()` en server.py:
+  - Agrupa unidades por nombre NORMALIZADO (sin acentos, espacios colapsados, mayúsculas).
+  - Conserva la unidad MÁS ANTIGUA (registro original del usuario); reapunta NOG/pacientes a ella.
+  - Por cada NOG de la copia: si el número/servicio ya existe en la conservada, lo elimina; si no, lo reapunta (NOG genuinamente nuevo no se pierde).
+  - Elimina las unidades duplicadas ya vaciadas.
+  - Guard de ejecución única por entorno (colección `system_flags`, key `nog_dedup_cleanup_v1`): corre una sola vez por BD (preview y producción separadas).
+- Validado en preview: pruebas de inyección con variantes de acento/espacio -> deduplicación correcta (eliminó copia seed, conservó original con sus acreditados, reapuntó NOG nuevos). Idempotente; guard omite ejecuciones posteriores.
+- PENDIENTE: al REPUBLICAR, la limpieza corre una vez en producción y elimina las copias conservando los originales.
