@@ -12,7 +12,11 @@ import {
   Building2,
   Repeat,
   AlertCircle,
-  XCircle
+  XCircle,
+  ShoppingCart,
+  CalendarDays,
+  Eye,
+  Stethoscope
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -142,6 +146,7 @@ const AlertCard = ({ title, alerts, type, icon: Icon }) => {
 const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
+  const [resumenDia, setResumenDia] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [alerts30, setAlerts30] = useState([]);
   const [alerts60, setAlerts60] = useState([]);
@@ -153,14 +158,16 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, chartRes, alerts30Res, alerts60Res] = await Promise.all([
+      const [statsRes, chartRes, alerts30Res, alerts60Res, resumenDiaRes] = await Promise.all([
         dashboardApi.getStats(),
         dashboardApi.getChartData(),
         dashboardApi.getAlerts30(),
-        dashboardApi.getAlerts60()
+        dashboardApi.getAlerts60(),
+        dashboardApi.getResumenDia()
       ]);
 
       setStats(statsRes.data);
+      setResumenDia(resumenDiaRes.data);
       setChartData(chartRes.data || []);
       setAlerts30(alerts30Res.data || []);
       setAlerts60(alerts60Res.data || []);
@@ -203,6 +210,42 @@ const Dashboard = () => {
         <NogAlertasBanner
           onVer={(a) => navigate(`/configuracion/unidades-igss?nogUnidad=${a.unidad_id}&nog=${a.nog_id}&nombre=${encodeURIComponent(a.unidad_nombre || '')}`)}
         />
+
+        {/* Resumen del Día */}
+        <div data-testid="resumen-dia-section">
+          <h2 className="text-base font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Resumen del día</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Ventas del Día"
+              value={formatCurrency(resumenDia?.ventas?.total || 0)}
+              icon={ShoppingCart}
+              colorClass="metric-teal"
+              subtitle={`${resumenDia?.ventas?.cantidad || 0} ventas · Cobrado ${formatCurrency(resumenDia?.ventas?.cobrado || 0)}`}
+            />
+            <StatCard
+              title="Citas del Día"
+              value={`${resumenDia?.citas?.total || 0}`}
+              icon={CalendarDays}
+              colorClass="metric-blue"
+              subtitle={`${resumenDia?.citas?.atendidas || 0} atendidas · ${resumenDia?.citas?.canceladas || 0} canceladas`}
+            />
+            <StatCard
+              title="Evaluaciones del Día"
+              value={`${resumenDia?.evaluaciones?.total || 0}`}
+              icon={Eye}
+              colorClass="metric-amber"
+              subtitle="Evaluaciones oftalmológicas"
+            />
+            <StatCard
+              title="Servicios IGSS"
+              value={`${resumenDia?.igss?.servicios || 0}`}
+              icon={Stethoscope}
+              colorClass="metric-red"
+              subtitle={`Total ${formatCurrency(resumenDia?.igss?.total || 0)}`}
+            />
+          </div>
+        </div>
+
 
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

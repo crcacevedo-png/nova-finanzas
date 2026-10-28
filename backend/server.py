@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Literal, Dict, Set
 import uuid
 from datetime import datetime, timezone, timedelta
-from utils.timezone import now_gt, GUATEMALA_TZ
+from utils.timezone import now_gt, GUATEMALA_TZ, dia_gt_a_rango_utc
 import jwt
 import bcrypt
 import io
@@ -3520,6 +3520,49 @@ async def get_dashboard_stats(current_user: dict = Depends(require_permission("v
         "alertas_30_dias": 0,
         "alertas_60_dias": 0
     }
+
+@api_router.get("/dashboard/resumen-dia")
+async def get_dashboard_resumen_dia(current_user: dict = Depends(require_permission("view_dashboard"))):
+    """Resumen operativo del día: ventas de óptica, citas, evaluaciones y servicios IGSS."""
+    hoy = now_gt().strftime("%Y-%m-%d")
+    inicio_utc, fin_utc = dia_gt_a_rango_utc(hoy)
+
+    # Ventas de óptica del día
+    ventas = await db.optica_sales.find(
+        {"created_at": {"$gte": inicio_utc, "$lte": fin_utc}},
+        {"_id": 0, "total": 1, "total_paid": 1}
+    ).to_list(5000)
+    ventas_total = round(sum(v.get("total", 0) or 0 for v in ventas), 2)
+    ventas_cobrado = round(sum(v.get("total_paid", 0) or 0 for v in ventas), 2)
+
+    # Citas del día (fecha es string YYYY-MM-DD en hora Guatemala)
+    citas = await db.citas.find({"fecha": hoy}, {"_id": 0, "estado": 1}).to_list(5000)
+    citas_atendidas = sum(1 for c in citas if c.get("estado") in ["Atendida", "En consulta", "Presente"])
+    citas_canceladas = sum(1 for c in citas if c.get("estado") in ["Cancelada", "No asistió"])
+
+    # Evaluaciones oftalmológicas del día
+    evaluaciones_total = await db.evaluaciones_oftalmologicas.count_documents({"fecha": hoy})
+
+    # Servicios al IGSS del día: acreditaciones NOG no anuladas + total monetario (precio del NOG)
+    acreditaciones = await db.igss_nog_acreditaciones.find(
+        {"fecha_acreditacion": {"$gte": inicio_utc, "$lte": fin_utc}, "anulada": {"$ne": True}},
+        {"_id": 0, "nog_id": 1}
+    ).to_list(5000)
+    nog_ids = list({a["nog_id"] for a in acreditaciones if a.get("nog_id")})
+    precios = {}
+    if nog_ids:
+        async for n in db.igss_nogs.find({"id": {"$in": nog_ids}}, {"_id": 0, "id": 1, "precio": 1}):
+            precios[n["id"]] = n.get("precio", 0) or 0
+    igss_total = round(sum(precios.get(a.get("nog_id"), 0) for a in acreditaciones), 2)
+
+    return {
+        "fecha": hoy,
+        "ventas": {"cantidad": len(ventas), "total": ventas_total, "cobrado": ventas_cobrado},
+        "citas": {"total": len(citas), "atendidas": citas_atendidas, "canceladas": citas_canceladas},
+        "evaluaciones": {"total": evaluaciones_total},
+        "igss": {"servicios": len(acreditaciones), "total": igss_total}
+    }
+
 
 @api_router.get("/dashboard/alerts/30")
 async def get_alerts_30(current_user: dict = Depends(require_permission("view_due_payments"))):

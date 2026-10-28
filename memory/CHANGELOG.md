@@ -1,5 +1,18 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-28 — Dashboard: sección "Resumen del día"
+**Solicitud:** Agregar al dashboard (superadmin) las ventas del día, citas y evaluaciones del día, e incluir servicios al IGSS y su total.
+**Backend:** nuevo `GET /api/dashboard/resumen-dia` (require_permission view_dashboard) en server.py. Devuelve, en hora Guatemala:
+- `ventas` (óptica de hoy): cantidad, total vendido, total cobrado (optica_sales por rango UTC del día GT).
+- `citas` de hoy (colección `citas`, campo `fecha` YYYY-MM-DD): total, atendidas (Atendida/En consulta/Presente), canceladas (Cancelada/No asistió).
+- `evaluaciones` de hoy (`evaluaciones_oftalmologicas.fecha`): total.
+- `igss`: servicios del día = acreditaciones NOG no anuladas (`igss_nog_acreditaciones.fecha_acreditacion`) + `total` monetario = suma del `precio` del NOG asociado (`igss_nogs.precio`).
+**Frontend:** `Dashboard.js` nueva sección "Resumen del día" (data-testid `resumen-dia-section`) con 4 StatCards (Ventas del Día, Citas del Día, Evaluaciones del Día, Servicios IGSS con total). `dashboardApi.getResumenDia`.
+**Verificado:** curl 200 con datos reales; lógica de total IGSS validada (112/112 acreditaciones con precio); screenshot desktop+móvil sin overflow.
+**Supuestos (confirmables):** "ventas del día" = ventas de óptica; "servicios al IGSS" = acreditaciones NOG del día y su valor por precio de NOG (no la producción/facturación IGSS de `igss_produccion`).
+
+
+
 ## 2026-10-28 — Caja y Punto de Venta Individuales por Usuario (Fase 1 MVP)
 **Solicitud:** Cada usuario opera exclusivamente su propia caja clínica diaria y cada venta de óptica queda atribuida al vendedor. Supervisores (Admin/SuperAdmin) ven consolidado y pueden cerrar/reabrir cajas ajenas. Conservar históricos del modelo compartido.
 
