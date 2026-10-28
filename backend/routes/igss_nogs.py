@@ -108,19 +108,30 @@ def _nog_con_derivados(nog: dict) -> dict:
     }
 
 
-async def _crear_acreditacion(nog: dict, paciente: dict, evaluacion: dict, origen: str, user: dict):
+async def _crear_acreditacion(nog: dict, paciente: dict, evaluacion: dict, origen: str, user: dict, no_sps: str = None):
     """Crea una acreditación (1 servicio) de forma atómica y sin sobregiro.
-    Devuelve (ok, motivo). Deduplica por (nog_id, paciente_id)."""
+    Devuelve (ok, motivo). La unidad facturable es la AUTORIZACIÓN (No. SPS):
+    se deduplica por (nog_id, paciente_id, no_sps). Autorizaciones distintas
+    (otro No. SPS) bajo el mismo NOG cuentan por separado.
+    Reglas de bloqueo para no duplicar descuentos ni afectar lo histórico:
+      - Si la nueva consulta NO trae No. SPS => 1 descuento por paciente/NOG
+        (cualquier acreditación vigente del paciente en ese NOG lo bloquea).
+      - Una acreditación vigente SIN No. SPS (legada/pre-regla) actúa como
+        comodín y bloquea nuevos descuentos del paciente en ese NOG.
+      - Misma autorización (mismo No. SPS) ya acreditada => no descuenta de nuevo."""
     pac_id = (paciente or {}).get("id")
     eval_id = (evaluacion or {}).get("id")
-    # Deduplicar por paciente: 1 servicio consumido por paciente por NOG
+    sps = (no_sps or "").strip()
+    # Deduplicar por (paciente, NOG, autorización)
     if pac_id:
-        existe = await db.igss_nog_acreditaciones.find_one(
+        existentes = await db.igss_nog_acreditaciones.find(
             {"nog_id": nog["id"], "paciente_id": pac_id, "anulada": {"$ne": True}},
-            {"_id": 0, "id": 1}
-        )
-        if existe:
-            return False, "duplicada"
+            {"_id": 0, "no_sps": 1}
+        ).to_list(None)
+        for e in existentes:
+            e_sps = (e.get("no_sps") or "").strip()
+            if sps == "" or e_sps == "" or e_sps == sps:
+                return False, "duplicada"
 
     cantidad = int(nog.get("cantidad") or 0)
     # Guarda atómica: solo incrementa si aún hay cupo (no hay sobregiro)
@@ -141,6 +152,7 @@ async def _crear_acreditacion(nog: dict, paciente: dict, evaluacion: dict, orige
         "paciente_expediente": (paciente or {}).get("record_number", ""),
         "paciente_nombre": f"{(paciente or {}).get('first_name', '')} {(paciente or {}).get('last_name', '')}".strip(),
         "evaluacion_id": eval_id or "",
+        "no_sps": sps,
         "fecha_acreditacion": now,
         "origen": origen,
         "anulada": False,
@@ -209,9 +221,10 @@ async def _anular_acreditacion_interna(acred: dict, user: dict, motivo: str):
 
 
 async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "asignacion", solo_numeros=None):
-    """Asegura que el paciente consuma 1 servicio por cada NOG distinto de sus
-    órdenes IGSS (unidad activa + NOG del catálogo activo). Libera las acreditaciones
-    que ya no correspondan. Soporta múltiples órdenes (varios NOG) por paciente.
+    """Asegura que el paciente consuma 1 servicio por cada AUTORIZACIÓN distinta
+    (par NOG + No. SPS) de sus órdenes IGSS (unidad activa + NOG del catálogo
+    activo). Dos órdenes del mismo NOG con distinto No. SPS consumen 2 cupos.
+    Libera las acreditaciones que ya no correspondan. Soporta múltiples órdenes.
     Hook llamado al crear/editar/desactivar/reactivar un paciente.
     Si se pasa `solo_numeros` (set), solo se consideran objetivo los NOG cuyo número
     esté en ese conjunto (usado por el recálculo basado en evaluaciones reales)."""
@@ -221,27 +234,29 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
     if not pac_id:
         return
 
-    # NOGs objetivo a partir de las órdenes del paciente (o legacy igss_nog)
-    target_nogs = {}  # nog_id -> doc
+    # Órdenes objetivo a partir de las órdenes del paciente (o legacy igss_nog).
+    # La unidad objetivo es la AUTORIZACIÓN: (nog_id, no_sps).
+    target_orders = {}  # (nog_id, sps) -> (nog_doc, sps)
     if (paciente.get("is_active", True)
             and paciente.get("referral_institution") == "igss"
             and paciente.get("igss_unit_id")):
         ordenes = paciente.get("igss_ordenes") or []
-        numeros = [str(o.get("nog", "") or "").strip() for o in ordenes if str(o.get("nog", "") or "").strip()]
-        if not numeros:
+        pares = [(str(o.get("nog", "") or "").strip(), str(o.get("no_sps", "") or "").strip())
+                 for o in ordenes if str(o.get("nog", "") or "").strip()]
+        if not pares:
             leg = (paciente.get("igss_nog") or "").strip()
             if leg:
-                numeros = [leg]
+                pares = [(leg, (paciente.get("igss_no_sps") or "").strip())]
         if solo_numeros is not None:
-            numeros = [n for n in numeros if n in solo_numeros]
-        for numero in set(numeros):
+            pares = [(n, s) for (n, s) in pares if n in solo_numeros]
+        for numero, sps in set(pares):
             nog = await db.igss_nogs.find_one(
                 {"unidad_id": paciente["igss_unit_id"], "numero": numero, "is_active": True},
                 {"_id": 0}
             )
             if nog:
-                target_nogs[nog["id"]] = nog
-    target_ids = set(target_nogs.keys())
+                target_orders[(nog["id"], sps)] = (nog, sps)
+    target_keys = set(target_orders.keys())
 
     # Acreditaciones vigentes del paciente
     vigentes = await db.igss_nog_acreditaciones.find(
@@ -251,24 +266,34 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
     ya_tiene = set()
     for a in vigentes:
         nid = a.get("nog_id")
-        if nid in target_ids and nid not in ya_tiene:
-            ya_tiene.add(nid)  # conservar exactamente una por NOG objetivo
+        a_sps = (a.get("no_sps") or "").strip()
+        matched = None
+        if (nid, a_sps) in target_keys and (nid, a_sps) not in ya_tiene:
+            matched = (nid, a_sps)
+        elif a_sps == "":
+            # Legada sin SPS: cubre cualquier autorización pendiente de ese NOG
+            cand = [k for k in target_keys if k[0] == nid and k not in ya_tiene]
+            if cand:
+                matched = cand[0]
+        if matched:
+            ya_tiene.add(matched)  # conservar exactamente una por autorización objetivo
         elif a.get("origen") == "manual":
             continue  # conservar descuentos aplicados manualmente (corrección puntual)
         else:
-            motivo = "reasignacion_nog" if target_ids else "sin_nog"
+            motivo = "reasignacion_nog" if target_keys else "sin_nog"
             await _anular_acreditacion_interna(a, user, motivo)
 
     # Crear las acreditaciones objetivo que falten
-    for nid, nog in target_nogs.items():
-        if nid not in ya_tiene:
-            await _crear_acreditacion(nog, paciente, None, origen, user)
+    for key, (nog, sps) in target_orders.items():
+        if key not in ya_tiene:
+            await _crear_acreditacion(nog, paciente, None, origen, user, no_sps=sps)
 
 
 async def _acreditar_evaluacion(paciente: dict, evaluacion: dict, user: dict):
     """Hook llamado al crear una Evaluación Oftalmológica.
-    Acredita 1 servicio al NOG de la orden de la evaluación (o al NOG del paciente)
-    si tiene cupo. Deduplicado por (nog_id, paciente_id)."""
+    Acredita 1 servicio al NOG de la orden (autorización/No. SPS) de la evaluación
+    si tiene cupo. La primera consulta por autorización descuenta; las siguientes
+    bajo el mismo No. SPS no vuelven a descontar (dedup por nog/paciente/No. SPS)."""
     if not paciente:
         return
     if paciente.get("referral_institution") != "igss":
@@ -279,12 +304,21 @@ async def _acreditar_evaluacion(paciente: dict, evaluacion: dict, user: dict):
               or (paciente.get("igss_nog") or "").strip())
     if not unidad_id or not numero:
         return
+    # Autorización (No. SPS): de la evaluación; respaldo en la orden del paciente que coincide
+    sps = ((evaluacion or {}).get("igss_no_sps") or "").strip()
+    if not sps:
+        for o in (paciente.get("igss_ordenes") or []):
+            if str(o.get("nog", "") or "").strip() == numero:
+                sps = str(o.get("no_sps", "") or "").strip()
+                break
+        if not sps:
+            sps = (paciente.get("igss_no_sps") or "").strip()
     nog = await db.igss_nogs.find_one(
         {"unidad_id": unidad_id, "numero": numero, "is_active": True}, {"_id": 0}
     )
     if not nog:
         return
-    await _crear_acreditacion(nog, paciente, evaluacion, "evaluacion", user)
+    await _crear_acreditacion(nog, paciente, evaluacion, "evaluacion", user, no_sps=sps)
 
 
 async def _get_nog_or_404(nog_id: str) -> dict:
@@ -1193,11 +1227,14 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
         okey = _order_key(c["no_sps"], c["numero"], ev.get("fecha"))
         grupos.setdefault((ev.get("paciente_id"), okey), []).append(c)
 
-    # 3) Una fila consolidada por grupo (representante = más reciente con contenido)
+    # 3) Una fila consolidada por grupo (representante = más reciente con contenido);
+    #    la fecha mostrada es la de la PRIMERA consulta de la autorización.
     rows = []
     for items in grupos.values():
         con_contenido = [c for c in items if c["tiene_contenido"]]
         rep = max(con_contenido or items, key=lambda c: _eval_recencia(c["ev"]))
+        primera = min(items, key=lambda c: (c["ev"].get("fecha") or "", c["ev"].get("fecha_creacion") or ""))
+        fecha_primera = primera["ev"].get("fecha", "")
         ev = rep["ev"]
         pac = rep["pac"]
         unit = rep["unit"]
@@ -1226,7 +1263,7 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
             "unidad_nombre": (unit or {}).get("name", ""),
             "nog": rep["numero"], "no_sps": rep["no_sps"], "codigo": rep["codigo"], "procedimiento": rep["proc"],
             "medico_nombre": ev.get("medico_nombre", ""),
-            "fecha": ev.get("fecha", ""),
+            "fecha": fecha_primera,
             "precio_nog": precio,
             "costo": float(costo or 0),
             "costo_editado": costo_override is not None,
