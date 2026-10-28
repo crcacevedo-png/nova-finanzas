@@ -142,3 +142,15 @@
 ## 2026-06 — Producción IGSS: verificación testing agent (iteration_85) + fixes
 - Testing agent: backend 92% (único fallo: validación de costo negativo), frontend 100% tras corregir la ruta de "abrir expediente" (/evaluacion-oftalmologica). Retest no requerido.
 - Fixes aplicados: costo_override ahora Field(ge=0) (negativo → 422); costo_override=null restablece al precio del NOG ($unset); PATCH valida que la evaluación sea de paciente IGSS; listado optimizado (carga por lotes, de ~2-5s a ~0.15s); fecha por defecto usa hora de Guatemala; debounce (350ms) en filtros; input de costo se refresca al cambiar el valor del servidor.
+
+## 2026-06 — Importación oficial de NOG IGSS (listado del cliente)
+- Se cargó el listado oficial de 54 NOG (10 unidades) provisto por el usuario en Excel (NOGs_IGSS.xlsx).
+- Datos en /app/backend/data/igss_nogs_seed.json (generados fielmente desde el xlsx con openpyxl).
+- Importador idempotente seed_igss_nogs_from_list() en server.py, ejecutado al arranque (tras seed_catalogos_igss):
+  - Reutiliza unidades por nombre (case/espacios-insensible) y crea las que falten.
+  - NOG se identifican por (unidad, número) para compra directa y por (unidad, servicio) para baja cuantía sin número.
+  - NO duplica ni modifica NOG existentes; los omite. Preserva acreditados del listado.
+  - tipo_compra: con número = compra_directa; sin número = baja_cuantia (según indicación del usuario).
+  - monto_total = "Precio total del contrato"; precio = "Precio individual".
+- Verificado en preview: 1ra corrida creó 10 unidades + 54 NOG; 2da corrida omitió los 54 (idempotencia). API /api/igss-units/nogs/all devuelve 82 NOG con montos individual/total correctos y etiqueta de tipo de compra.
+- Queda activo en producción al publicar (se ejecuta en el arranque del backend). Si los NOG ya existen en prod, se omiten (sin duplicar).

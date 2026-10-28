@@ -1604,6 +1604,113 @@ async def seed_catalogos_igss():
         print(f"Catálogo IGSS '{coll_name}' sembrado: {len(docs)} registros")
 
 
+async def seed_igss_nogs_from_list():
+    """Importa el listado oficial de NOG IGSS desde /data/igss_nogs_seed.json.
+    Idempotente: no duplica unidades ni NOG existentes. Reutiliza unidades por
+    nombre (sin distinguir mayúsculas/espacios) y crea las que falten. Los NOG
+    se identifican por (unidad, número) para compra directa y por
+    (unidad, servicio) para baja cuantía sin número. Si ya existen, se omiten."""
+    import json as _json
+    import re as _re
+    path = os.path.join(os.path.dirname(__file__), "data", "igss_nogs_seed.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            items = _json.load(fh)
+    except Exception as e:
+        print(f"No se pudo leer seed NOG IGSS ({path}): {e}")
+        return
+
+    admin = await db.users.find_one({"username": "superadmin"})
+    created_by = admin["id"] if admin else "system"
+    now = datetime.now(timezone.utc).isoformat()
+
+    def _norm(s: str) -> str:
+        return _re.sub(r"\s+", " ", (s or "").strip()).upper()
+
+    # Cache de unidades por nombre normalizado
+    unidad_cache = {}
+    creadas_unidades = 0
+    creados_nogs = 0
+    omitidos_nogs = 0
+
+    for item in items:
+        unidad_nombre = (item.get("unidad_nombre") or "").strip()
+        if not unidad_nombre:
+            continue
+        key = _norm(unidad_nombre)
+
+        # Resolver / crear unidad
+        unidad = unidad_cache.get(key)
+        if not unidad:
+            unidad = await db.igss_units.find_one(
+                {"name": {"$regex": f"^{_re.escape(unidad_nombre)}$", "$options": "i"}}
+            )
+            if not unidad:
+                unidad = {
+                    "id": str(uuid.uuid4()),
+                    "name": unidad_nombre,
+                    "code": "",
+                    "description": "",
+                    "is_active": True,
+                    "created_by": created_by,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                await db.igss_units.insert_one(dict(unidad))
+                creadas_unidades += 1
+            unidad_cache[key] = unidad
+
+        unidad_id = unidad["id"]
+        numero = (item.get("numero") or "").strip()
+        tipo = item.get("tipo_compra") or ("compra_directa" if numero else "baja_cuantia")
+        nombre_servicio = (item.get("nombre_servicio") or "").strip()
+
+        # Detectar duplicado
+        if numero:
+            existe = await db.igss_nogs.find_one({"unidad_id": unidad_id, "numero": numero})
+        else:
+            existe = await db.igss_nogs.find_one({
+                "unidad_id": unidad_id,
+                "numero": "",
+                "nombre_servicio": {"$regex": f"^{_re.escape(nombre_servicio)}$", "$options": "i"},
+            })
+        if existe:
+            omitidos_nogs += 1
+            continue
+
+        cantidad = int(item.get("cantidad") or 0)
+        precio = float(item.get("precio") or 0)
+        monto_total = item.get("monto_total")
+        monto_total = round(float(monto_total), 2) if monto_total is not None else round(precio * cantidad, 2)
+        acreditados = int(item.get("acreditados") or 0)
+
+        nog_doc = {
+            "id": str(uuid.uuid4()),
+            "unidad_id": unidad_id,
+            "numero": numero,
+            "nombre_servicio": nombre_servicio,
+            "tipo_compra": tipo,
+            "cantidad": cantidad,
+            "precio": precio,
+            "monto_total": monto_total,
+            "fecha_asignacion": "",
+            "acreditados": max(acreditados, 0),
+            "is_active": True,
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        try:
+            await db.igss_nogs.insert_one(nog_doc)
+            creados_nogs += 1
+        except Exception as e:
+            print(f"NOG '{numero or nombre_servicio}' en '{unidad_nombre}' no insertado: {e}")
+            omitidos_nogs += 1
+
+    print(f"Seed NOG IGSS: unidades nuevas={creadas_unidades}, NOG nuevos={creados_nogs}, omitidos(existentes)={omitidos_nogs}")
+
+
+
 async def seed_catalogos_oftalmologicos():
     """Seed de catálogos oftalmológicos y evaluación de ejemplo"""
     # Verificar si ya existen datos
@@ -4377,6 +4484,8 @@ async def startup_event():
     # Seed de catálogos oftalmológicos
     await seed_catalogos_oftalmologicos()
     await seed_catalogos_igss()
+    # Importación idempotente del listado oficial de NOG IGSS
+    await seed_igss_nogs_from_list()
     
     # Índices de Inventario
     await db.bodegas_inventario.create_index([("codigo", 1)], unique=True)
