@@ -61,11 +61,22 @@ export const POSSalesDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Ventas del Día</DialogTitle>
+          <DialogTitle>Mis Ventas del Día</DialogTitle>
           <DialogDescription>
-            Total: {formatCurrency(resumenDia.total)} ({resumenDia.cantidad} ventas)
+            {resumenDia.cantidad} ventas | Vendido: {formatCurrency(resumenDia.total)} | Cobrado: {formatCurrency(resumenDia.cobrado)}
           </DialogDescription>
         </DialogHeader>
+
+        {resumenDia.por_metodo && Object.keys(resumenDia.por_metodo).length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="pos-ventas-por-metodo">
+            {Object.entries(resumenDia.por_metodo).map(([metodo, monto]) => (
+              <div key={metodo} className="p-2 rounded-lg border text-center" style={{ borderColor: 'var(--border-color)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{metodo}</p>
+                <p className="font-bold text-teal-500">{formatCurrency(monto)}</p>
+              </div>
+            ))}
+          </div>
+        )}
         
         <div className="max-h-96 overflow-y-auto space-y-2">
           {ventasHoy.length === 0 ? (

@@ -4,13 +4,13 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
-from utils.timezone import now_gt
+from utils.timezone import now_gt, today_str_gt, dia_gt_a_rango_utc
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
 
 from config.database import db
-from routes.auth import get_current_user, require_permission
+from routes.auth import get_current_user, require_permission, require_role
 
 
 # ==================== ROUTERS ====================
@@ -933,6 +933,84 @@ async def get_pending_sales(current_user: dict = Depends(require_permission("vie
     }
 
 
+async def _resumen_ventas(cajero_id: Optional[str], inicio: str, fin: str) -> dict:
+    """Resumen de ventas de óptica en un rango: total vendido, cobrado y desglose por método."""
+    sales_query = {"created_at": {"$gte": inicio, "$lte": fin}}
+    if cajero_id:
+        sales_query["created_by"] = cajero_id
+    sales = await db.optica_sales.find(sales_query, {"_id": 0}).to_list(5000)
+    cantidad = len(sales)
+    total_vendido = sum(s.get("total", 0) for s in sales)
+
+    pay_query = {"created_at": {"$gte": inicio, "$lte": fin}}
+    if cajero_id:
+        pay_query["created_by"] = cajero_id
+    pagos = await db.optica_sale_payments.find(pay_query, {"_id": 0}).to_list(10000)
+    por_metodo = {"Efectivo": 0, "Tarjeta": 0, "Transferencia": 0, "Cheque": 0}
+    total_cobrado = 0
+    for p in pagos:
+        metodo = (p.get("payment_method") or "Efectivo").strip().title()
+        monto = p.get("amount", 0)
+        total_cobrado += monto
+        por_metodo[metodo] = por_metodo.get(metodo, 0) + monto
+
+    return {
+        "cantidad_ventas": cantidad,
+        "total_vendido": round(total_vendido, 2),
+        "total_cobrado": round(total_cobrado, 2),
+        "por_metodo": por_metodo
+    }
+
+
+@router.get("/sales/resumen-dia")
+async def get_resumen_ventas_dia(
+    fecha: Optional[str] = None,
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Resumen de ventas del día del vendedor actual."""
+    fecha_dia = fecha or today_str_gt()
+    inicio, fin = dia_gt_a_rango_utc(fecha_dia)
+    resumen = await _resumen_ventas(current_user["id"], inicio, fin)
+    return {"fecha": fecha_dia, "vendedor": current_user.get("name"), **resumen}
+
+
+@router.get("/sales/resumen-dia/consolidado")
+async def get_resumen_ventas_consolidado(
+    fecha: Optional[str] = None,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Resumen de ventas del día de todos los vendedores (Admin/SuperAdmin)."""
+    fecha_dia = fecha or today_str_gt()
+    inicio, fin = dia_gt_a_rango_utc(fecha_dia)
+
+    sales = await db.optica_sales.find(
+        {"created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(5000)
+    vendedores = {}
+    for s in sales:
+        vid = s.get("created_by") or "sin_vendedor"
+        if vid not in vendedores:
+            vendedores[vid] = s.get("created_by_name") or "Sin vendedor"
+
+    data = []
+    total_general = 0
+    cobrado_general = 0
+    for vid, nombre in vendedores.items():
+        r = await _resumen_ventas(vid, inicio, fin)
+        total_general += r["total_vendido"]
+        cobrado_general += r["total_cobrado"]
+        data.append({"vendedor_id": vid, "vendedor_nombre": nombre, **r})
+
+    data.sort(key=lambda x: x["total_vendido"], reverse=True)
+    return {
+        "fecha": fecha_dia,
+        "data": data,
+        "total_vendedores": len(data),
+        "total_vendido": round(total_general, 2),
+        "total_cobrado": round(cobrado_general, 2)
+    }
+
+
 @router.get("/sales/{sale_id}", response_model=OpticaSaleResponse)
 async def get_optica_sale(sale_id: str, current_user: dict = Depends(require_permission("view_optica"))):
     """Obtener detalle de una venta"""
@@ -1032,6 +1110,7 @@ async def create_optica_sale(sale_data: OpticaSaleCreate, current_user: dict = D
         "status": status,
         "notes": sale_data.notes or "",
         "created_by": current_user["id"],
+        "created_by_name": current_user.get("name", current_user.get("username", "")),
         "created_at": now,
         "updated_at": now
     }

@@ -61,15 +61,22 @@ async def notify_caja_update(event_type: str, data: dict, exclude_ws=None):
 
 # ==================== HELPERS ====================
 
-async def calcular_totales_caja_dia(fecha_dia: str) -> dict:
-    """Calcula totales del día para la caja clínica"""
+async def calcular_totales_caja_dia(fecha_dia: str, cajero_id: Optional[str] = None) -> dict:
+    """Calcula totales del día para la caja clínica.
+
+    Si se pasa cajero_id, los totales quedan acotados a los movimientos de ese usuario
+    (caja individual). Sin cajero_id se calcula el total consolidado del día.
+    """
     # Día local de Guatemala convertido a rango UTC (coincide con fechas isoformat en UTC)
     inicio, fin = dia_gt_a_rango_utc(fecha_dia)
     
-    movimientos = await db.caja_movimientos.find({
+    query = {
         "origen": "clinica",
         "fecha": {"$gte": inicio, "$lte": fin}
-    }, {"_id": 0}).to_list(1000)
+    }
+    if cajero_id:
+        query["cajero_id"] = cajero_id
+    movimientos = await db.caja_movimientos.find(query, {"_id": 0}).to_list(10000)
     
     totales = {
         "total_ingresos": 0, "total_egresos": 0,
@@ -98,15 +105,16 @@ async def get_caja_estado(
     fecha: Optional[str] = None,
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Obtener estado de la caja del día"""
+    """Obtener estado de la caja del día (individual del usuario actual)"""
     fecha_hoy = fecha or today_str_gt()
     
     cierre = await db.caja_cierres.find_one({
         "fecha": fecha_hoy,
-        "origen": "clinica"
+        "origen": "clinica",
+        "abierto_por": current_user["id"]
     }, {"_id": 0})
     
-    totales = await calcular_totales_caja_dia(fecha_hoy)
+    totales = await calcular_totales_caja_dia(fecha_hoy, cajero_id=current_user["id"])
     
     # Calcular saldo efectivo vivo
     saldo_efectivo = 0
@@ -128,17 +136,18 @@ async def abrir_caja(
     apertura: CajaCierreApertura,
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Abrir caja del día"""
+    """Abrir caja del día (individual del usuario actual)"""
     fecha_hoy = today_str_gt()
     now = datetime.now(timezone.utc)
     
-    # Verificar que no existe caja abierta para hoy
+    # Verificar que este usuario no tenga ya una caja para hoy (una por usuario por día)
     existing = await db.caja_cierres.find_one({
         "fecha": fecha_hoy,
-        "origen": "clinica"
+        "origen": "clinica",
+        "abierto_por": current_user["id"]
     })
     if existing:
-        raise HTTPException(status_code=400, detail="Ya existe una caja para el día de hoy")
+        raise HTTPException(status_code=400, detail="Ya tienes una caja para el día de hoy")
     
     cierre = {
         "id": str(uuid.uuid4()),
@@ -193,12 +202,13 @@ async def get_movimientos(
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Listar movimientos del día"""
+    """Listar movimientos del día (individuales del usuario actual)"""
     fecha_hoy = fecha or today_str_gt()
     inicio, fin = dia_gt_a_rango_utc(fecha_hoy)
     
     query = {
         "origen": "clinica",
+        "cajero_id": current_user["id"],
         "fecha": {"$gte": inicio, "$lte": fin}
     }
     if tipo:
@@ -217,22 +227,24 @@ async def crear_movimiento(
     movimiento: CajaMovimientoCreate,
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Crear nuevo movimiento de caja"""
+    """Crear nuevo movimiento de caja (en la caja individual del usuario)"""
     fecha_hoy = today_str_gt()
     now = datetime.now(timezone.utc)
     
-    # Verificar que la caja está abierta
+    # Verificar que la caja del usuario está abierta
     cierre = await db.caja_cierres.find_one({
         "fecha": fecha_hoy,
         "origen": "clinica",
+        "abierto_por": current_user["id"],
         "estado": "Abierto"
     })
     if not cierre:
-        raise HTTPException(status_code=400, detail="La caja del día no está abierta")
+        raise HTTPException(status_code=400, detail="No tienes una caja abierta hoy")
     
     mov_dict = {
         "id": str(uuid.uuid4()),
         "origen": "clinica",
+        "cierre_id": cierre["id"],
         "fecha": now.isoformat(),
         "tipo": movimiento.tipo,
         "categoria": movimiento.categoria,
@@ -275,6 +287,9 @@ async def actualizar_movimiento(
     existing = await db.caja_movimientos.find_one({"id": movimiento_id, "origen": "clinica"}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    es_supervisor = current_user.get("role") in ("admin", "superadmin")
+    if not es_supervisor and existing.get("cajero_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Solo puedes modificar movimientos de tu propia caja")
     if existing.get("bloqueado"):
         raise HTTPException(status_code=400, detail="No se puede modificar un movimiento bloqueado")
     
@@ -305,72 +320,74 @@ async def eliminar_movimiento(
 
 # ==================== CIERRE DIARIO ====================
 
-@router.post("/cierre", response_model=CajaCierreResponse)
-async def cerrar_caja(
-    cierre_req: CajaCierreRequest,
-    current_user: dict = Depends(require_permission("manage_caja"))
-):
-    """Cerrar caja del día"""
-    fecha_hoy = today_str_gt()
+async def _aplicar_cierre(cierre: dict, efectivo_contado: float, observaciones: Optional[str], current_user: dict) -> dict:
+    """Aplica el cierre a una caja individual: calcula totales del usuario dueño de la caja,
+    guarda la diferencia y bloquea solo los movimientos de ese usuario en el día."""
     now = datetime.now(timezone.utc)
-    
-    cierre = await db.caja_cierres.find_one({
-        "fecha": fecha_hoy,
-        "origen": "clinica",
-        "estado": "Abierto"
-    })
-    if not cierre:
-        raise HTTPException(status_code=400, detail="No hay caja abierta para cerrar")
-    
-    # Calcular totales
-    totales = await calcular_totales_caja_dia(fecha_hoy)
-    
-    # Calcular saldo esperado en efectivo
+    cajero_id = cierre.get("abierto_por")
+    fecha_dia = cierre["fecha"]
+
+    totales = await calcular_totales_caja_dia(fecha_dia, cajero_id=cajero_id)
     saldo_esperado = cierre["monto_apertura"] + totales["ingresos"]["efectivo"] - totales["egresos"]["efectivo"]
-    diferencia = cierre_req.efectivo_contado - saldo_esperado
-    
-    # Actualizar cierre
+    diferencia = efectivo_contado - saldo_esperado
+
     update_data = {
         "estado": "Cerrado",
         "total_ingresos": totales["total_ingresos"],
         "total_egresos": totales["total_egresos"],
         "saldo_esperado_efectivo": saldo_esperado,
-        "efectivo_contado": cierre_req.efectivo_contado,
+        "efectivo_contado": efectivo_contado,
         "diferencia": diferencia,
-        "observaciones": cierre_req.observaciones,
+        "observaciones": observaciones,
         "cerrado_por": current_user["id"],
         "cerrado_por_nombre": current_user["name"],
         "fecha_cierre": now.isoformat()
     }
-    
     await db.caja_cierres.update_one({"id": cierre["id"]}, {"$set": update_data})
-    
-    # Bloquear todos los movimientos del día (rango del día local de Guatemala)
-    _ini_dia, _fin_dia = dia_gt_a_rango_utc(fecha_hoy)
+
+    # Bloquear solo los movimientos del usuario dueño de la caja en el día
+    _ini_dia, _fin_dia = dia_gt_a_rango_utc(fecha_dia)
     await db.caja_movimientos.update_many(
-        {"origen": "clinica", "fecha": {"$gte": _ini_dia, "$lte": _fin_dia}},
+        {"origen": "clinica", "cajero_id": cajero_id, "fecha": {"$gte": _ini_dia, "$lte": _fin_dia}},
         {"$set": {"bloqueado": True}}
     )
-    
+
     if audit_logger:
         await audit_logger(
             current_user["id"],
             "CAJA_CIERRE",
             "caja_cierres",
             cierre["id"],
-            details={"fecha": fecha_hoy, "diferencia": diferencia}
+            details={"fecha": fecha_dia, "diferencia": diferencia, "caja_de": cierre.get("abierto_por_nombre")}
         )
-    
+
     updated = await db.caja_cierres.find_one({"id": cierre["id"]}, {"_id": 0})
-    
-    # Notificar a clientes WebSocket
     await notify_caja_update("caja_cerrada", {
         "cierre": updated,
         "usuario": current_user["name"],
         "diferencia": diferencia
     })
-    
     return updated
+
+
+@router.post("/cierre", response_model=CajaCierreResponse)
+async def cerrar_caja(
+    cierre_req: CajaCierreRequest,
+    current_user: dict = Depends(require_permission("manage_caja"))
+):
+    """Cerrar la caja individual del usuario actual"""
+    fecha_hoy = today_str_gt()
+    
+    cierre = await db.caja_cierres.find_one({
+        "fecha": fecha_hoy,
+        "origen": "clinica",
+        "abierto_por": current_user["id"],
+        "estado": "Abierto"
+    })
+    if not cierre:
+        raise HTTPException(status_code=400, detail="No tienes una caja abierta para cerrar")
+    
+    return await _aplicar_cierre(cierre, cierre_req.efectivo_contado, cierre_req.observaciones, current_user)
 
 
 @router.get("/cierres")
@@ -379,13 +396,64 @@ async def get_historial_cierres(
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Obtener historial de cierres"""
-    total = await db.caja_cierres.count_documents({"origen": "clinica"})
+    """Obtener historial de cierres del usuario actual"""
+    query = {"origen": "clinica", "abierto_por": current_user["id"]}
+    total = await db.caja_cierres.count_documents(query)
     cierres = await db.caja_cierres.find(
-        {"origen": "clinica"}, {"_id": 0}
+        query, {"_id": 0}
     ).sort("fecha", -1).skip(offset).limit(limit).to_list(limit)
     
     return {"data": cierres, "total": total}
+
+
+@router.get("/consolidado")
+async def get_caja_consolidado(
+    fecha: Optional[str] = None,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Vista consolidada de todas las cajas individuales de un día (Admin/SuperAdmin)."""
+    fecha_dia = fecha or today_str_gt()
+    cierres = await db.caja_cierres.find(
+        {"origen": "clinica", "fecha": fecha_dia}, {"_id": 0}
+    ).sort("fecha_apertura", 1).to_list(500)
+    
+    data = []
+    tot_ingresos = 0
+    tot_egresos = 0
+    for c in cierres:
+        totales = await calcular_totales_caja_dia(fecha_dia, cajero_id=c.get("abierto_por"))
+        saldo_vivo = c.get("monto_apertura", 0) + totales["ingresos"]["efectivo"] - totales["egresos"]["efectivo"]
+        tot_ingresos += totales["total_ingresos"]
+        tot_egresos += totales["total_egresos"]
+        data.append({
+            **c,
+            "totales_dia": totales,
+            "saldo_efectivo_vivo": saldo_vivo
+        })
+    
+    return {
+        "fecha": fecha_dia,
+        "data": data,
+        "total_cajas": len(data),
+        "total_ingresos": tot_ingresos,
+        "total_egresos": tot_egresos
+    }
+
+
+@router.post("/consolidado/{cierre_id}/cerrar", response_model=CajaCierreResponse)
+async def cerrar_caja_supervisor(
+    cierre_id: str,
+    cierre_req: CajaCierreRequest,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Cerrar la caja de cualquier usuario (Admin/SuperAdmin)."""
+    cierre = await db.caja_cierres.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
+    if not cierre:
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
+    if cierre.get("estado") != "Abierto":
+        raise HTTPException(status_code=400, detail="La caja ya está cerrada")
+    
+    return await _aplicar_cierre(cierre, cierre_req.efectivo_contado, cierre_req.observaciones, current_user)
 
 
 @router.get("/cierres/{cierre_id}", response_model=CajaCierreResponse)
@@ -403,9 +471,9 @@ async def get_cierre(
 @router.post("/cierres/{cierre_id}/reabrir")
 async def reabrir_caja(
     cierre_id: str,
-    current_user: dict = Depends(require_role("superadmin"))
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
 ):
-    """Reabrir un cierre de caja (solo SuperAdmin)"""
+    """Reabrir un cierre de caja (Admin/SuperAdmin)"""
     cierre = await db.caja_cierres.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
     if not cierre:
         raise HTTPException(status_code=404, detail="Cierre no encontrado")
@@ -421,14 +489,17 @@ async def reabrir_caja(
             "diferencia": None,
             "cerrado_por": None,
             "cerrado_por_nombre": None,
-            "fecha_cierre": None
+            "fecha_cierre": None,
+            "reabierto_por": current_user["id"],
+            "reabierto_por_nombre": current_user["name"],
+            "fecha_reapertura": datetime.now(timezone.utc).isoformat()
         }}
     )
     
-    # Desbloquear movimientos del día (rango del día local de Guatemala)
+    # Desbloquear solo los movimientos del usuario dueño de la caja en el día
     _ini_dia, _fin_dia = dia_gt_a_rango_utc(cierre['fecha'])
     await db.caja_movimientos.update_many(
-        {"origen": "clinica", "fecha": {"$gte": _ini_dia, "$lte": _fin_dia}},
+        {"origen": "clinica", "cajero_id": cierre.get("abierto_por"), "fecha": {"$gte": _ini_dia, "$lte": _fin_dia}},
         {"$set": {"bloqueado": False}}
     )
     
@@ -686,6 +757,7 @@ async def registrar_abono(
         caja_abierta = await db.caja_cierres.find_one({
             "fecha": fecha_hoy,
             "origen": "clinica",
+            "abierto_por": current_user["id"],
             "estado": "Abierto"
         })
     
@@ -729,6 +801,7 @@ async def registrar_abono(
         mov_dict = {
             "id": movimiento_caja_id,
             "origen": "clinica",
+            "cierre_id": caja_abierta["id"],
             "fecha": now.isoformat(),
             "tipo": "Ingreso",
             "categoria": "Cobro CxC",
@@ -739,6 +812,8 @@ async def registrar_abono(
             "paciente_id": cuenta.get("paciente_id"),
             "paciente_nombre": cuenta.get("paciente_nombre"),
             "bloqueado": False,
+            "cajero_id": current_user["id"],
+            "cajero_nombre": current_user["name"],
             "creado_por": current_user["id"],
             "creado_por_nombre": current_user["name"],
             "fecha_creacion": now.isoformat(),

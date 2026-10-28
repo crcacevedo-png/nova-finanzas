@@ -191,6 +191,14 @@ const Caja = () => {
   // Historial de cierres
   const [historialCierres, setHistorialCierres] = useState([]);
   const [historialDialogOpen, setHistorialDialogOpen] = useState(false);
+
+  // Vista consolidada (Admin/SuperAdmin): todas las cajas del día
+  const [consolidado, setConsolidado] = useState(null);
+  const [loadingConsolidado, setLoadingConsolidado] = useState(false);
+  const [consolidadoDialogOpen, setConsolidadoDialogOpen] = useState(false);
+  const [cierreSupervisorDialogOpen, setCierreSupervisorDialogOpen] = useState(false);
+  const [cajaSupervisorTarget, setCajaSupervisorTarget] = useState(null);
+  const [cierreSupervisorForm, setCierreSupervisorForm] = useState({ efectivo_contado: '', observaciones: '' });
   const [cierreDetalleDialog, setCierreDetalleDialog] = useState(false);
   const [cierreDetalle, setCierreDetalle] = useState(null);
   
@@ -405,8 +413,8 @@ const Caja = () => {
   };
 
   const handleReabrirCaja = async (cierreId) => {
-    if (!isSuperAdmin) {
-      toast.error('Solo SuperAdmin puede reabrir cajas');
+    if (!isAdminOrSuperAdmin) {
+      toast.error('Solo Admin o SuperAdmin puede reabrir cajas');
       return;
     }
     setSubmitting(true);
@@ -415,11 +423,46 @@ const Caja = () => {
       toast.success('Caja reabierta exitosamente');
       fetchCajaEstado();
       fetchHistorialCierres();
+      if (consolidadoDialogOpen) fetchConsolidado();
       if (cierreDetalleDialog) {
         setCierreDetalleDialog(false);
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al reabrir caja');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const fetchConsolidado = async () => {
+    setLoadingConsolidado(true);
+    try {
+      const response = await axios.get(`${API_URL}/caja/consolidado`);
+      setConsolidado(response.data);
+    } catch (error) {
+      console.error('Error fetching consolidado:', error);
+      toast.error('Error al obtener las cajas');
+    } finally {
+      setLoadingConsolidado(false);
+    }
+  };
+
+  const handleCerrarCajaSupervisor = async (e) => {
+    e.preventDefault();
+    if (!cajaSupervisorTarget) return;
+    setSubmitting(true);
+    try {
+      await axios.post(`${API_URL}/caja/consolidado/${cajaSupervisorTarget.id}/cerrar`, {
+        efectivo_contado: parseFloat(cierreSupervisorForm.efectivo_contado) || 0,
+        observaciones: cierreSupervisorForm.observaciones
+      });
+      toast.success('Caja cerrada');
+      setCierreSupervisorDialogOpen(false);
+      setCajaSupervisorTarget(null);
+      fetchConsolidado();
+      fetchCajaEstado();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al cerrar caja');
     } finally {
       setSubmitting(false);
     }
@@ -936,9 +979,19 @@ const Caja = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Caja</h1>
-            <p className="text-slate-500 text-sm">Control financiero del área clínica</p>
+            <h1 className="text-2xl font-bold text-slate-800">Mi Caja</h1>
+            <p className="text-slate-500 text-sm">Control financiero individual del área clínica</p>
           </div>
+          {isAdminOrSuperAdmin && (
+            <Button
+              variant="outline"
+              onClick={() => { fetchConsolidado(); setConsolidadoDialogOpen(true); }}
+              data-testid="btn-todas-cajas"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Todas las cajas
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -1026,8 +1079,8 @@ const Caja = () => {
               {!cajaEstado?.caja_abierta ? (
                 // Caja cerrada o no existe
                 cajaEstado?.cierre?.estado === 'Cerrado' ? (
-                  // Hay cierre del día pero está cerrado - mostrar Reabrir (solo SuperAdmin)
-                  isSuperAdmin && (
+                  // Hay cierre del día pero está cerrado - mostrar Reabrir (Admin/SuperAdmin)
+                  isAdminOrSuperAdmin && (
                     <Button 
                       onClick={() => handleReabrirCaja(cajaEstado.cierre.id)}
                       disabled={submitting}
@@ -1830,7 +1883,7 @@ const Caja = () => {
                       >
                         <Printer className="w-4 h-4" />
                       </Button>
-                      {isSuperAdmin && cierre.estado === 'Cerrado' && (
+                      {isAdminOrSuperAdmin && cierre.estado === 'Cerrado' && (
                         <Button 
                           variant="ghost" 
                           size="sm"
@@ -1913,7 +1966,7 @@ const Caja = () => {
                 Imprimir
               </Button>
             )}
-            {isSuperAdmin && cierreDetalle?.estado === 'Cerrado' && (
+            {isAdminOrSuperAdmin && cierreDetalle?.estado === 'Cerrado' && (
               <Button 
                 onClick={() => handleReabrirCaja(cierreDetalle.id)} 
                 disabled={submitting}
@@ -1924,6 +1977,124 @@ const Caja = () => {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Todas las cajas (consolidado Admin/SuperAdmin) */}
+      <Dialog open={consolidadoDialogOpen} onOpenChange={setConsolidadoDialogOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Todas las cajas del día</DialogTitle>
+            <DialogDescription>
+              {consolidado?.fecha} · {consolidado?.total_cajas || 0} cajas · Ingresos {formatCurrency(consolidado?.total_ingresos || 0)} · Egresos {formatCurrency(consolidado?.total_egresos || 0)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {loadingConsolidado ? (
+              <div className="text-center py-8 text-slate-500">Cargando...</div>
+            ) : (consolidado?.data?.length || 0) === 0 ? (
+              <div className="text-center py-8 text-slate-500" data-testid="consolidado-vacio">No hay cajas abiertas hoy</div>
+            ) : (
+              <Table data-testid="consolidado-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Usuario</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Apertura</TableHead>
+                    <TableHead className="text-right">Ingresos</TableHead>
+                    <TableHead className="text-right">Egresos</TableHead>
+                    <TableHead className="text-right">Saldo efectivo</TableHead>
+                    <TableHead className="text-right">Diferencia</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {consolidado.data.map((c) => (
+                    <TableRow key={c.id} data-testid={`consolidado-row-${c.id}`}>
+                      <TableCell className="font-medium">{c.abierto_por_nombre}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${c.estado === 'Abierto' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {c.estado}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(c.monto_apertura || 0)}</TableCell>
+                      <TableCell className="text-right text-green-600">{formatCurrency(c.totales_dia?.total_ingresos || 0)}</TableCell>
+                      <TableCell className="text-right text-red-600">{formatCurrency(c.totales_dia?.total_egresos || 0)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(c.saldo_efectivo_vivo || 0)}</TableCell>
+                      <TableCell className="text-right">{c.diferencia != null ? formatCurrency(c.diferencia) : '—'}</TableCell>
+                      <TableCell className="text-right">
+                        {c.estado === 'Abierto' ? (
+                          <Button
+                            variant="ghost" size="sm" className="text-red-600"
+                            data-testid={`consolidado-cerrar-${c.id}`}
+                            onClick={() => {
+                              setCajaSupervisorTarget(c);
+                              setCierreSupervisorForm({ efectivo_contado: (c.saldo_efectivo_vivo || 0).toString(), observaciones: '' });
+                              setCierreSupervisorDialogOpen(true);
+                            }}
+                          >
+                            <Lock className="w-4 h-4 mr-1" /> Cerrar
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost" size="sm" className="text-yellow-600"
+                            data-testid={`consolidado-reabrir-${c.id}`}
+                            disabled={submitting}
+                            onClick={() => handleReabrirCaja(c.id)}
+                          >
+                            <Unlock className="w-4 h-4 mr-1" /> Reabrir
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsolidadoDialogOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Cerrar caja de otro usuario (supervisor) */}
+      <Dialog open={cierreSupervisorDialogOpen} onOpenChange={setCierreSupervisorDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cerrar caja de {cajaSupervisorTarget?.abierto_por_nombre}</DialogTitle>
+            <DialogDescription>
+              Saldo esperado en efectivo: {formatCurrency(cajaSupervisorTarget?.saldo_efectivo_vivo || 0)}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCerrarCajaSupervisor} className="space-y-4">
+            <div>
+              <Label>Efectivo contado</Label>
+              <Input
+                type="text" inputMode="decimal"
+                value={cierreSupervisorForm.efectivo_contado}
+                onChange={(e) => { const v = e.target.value.replace(',', '.'); if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setCierreSupervisorForm({ ...cierreSupervisorForm, efectivo_contado: v }); }}
+                placeholder="0.00"
+                data-testid="cierre-supervisor-efectivo"
+                required
+              />
+            </div>
+            <div>
+              <Label>Observaciones</Label>
+              <Textarea
+                value={cierreSupervisorForm.observaciones}
+                onChange={(e) => setCierreSupervisorForm({ ...cierreSupervisorForm, observaciones: e.target.value })}
+                placeholder="Notas del cierre..."
+                data-testid="cierre-supervisor-obs"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCierreSupervisorDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={submitting} className="bg-red-600 hover:bg-red-700" data-testid="cierre-supervisor-submit">
+                {submitting ? 'Cerrando...' : 'Cerrar caja'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

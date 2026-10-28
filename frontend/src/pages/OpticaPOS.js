@@ -110,7 +110,7 @@ const OpticaPOS = () => {
   
   // Ventas del día
   const [ventasHoy, setVentasHoy] = useState([]);
-  const [resumenDia, setResumenDia] = useState({ total: 0, cantidad: 0 });
+  const [resumenDia, setResumenDia] = useState({ total: 0, cobrado: 0, cantidad: 0, por_metodo: {} });
   const [ventasDialogOpen, setVentasDialogOpen] = useState(false);
   
   // Confirmación de venta exitosa
@@ -219,14 +219,23 @@ const OpticaPOS = () => {
   const fetchVentasHoy = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/optica/sales`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const ventas = response.data?.data || [];
-      setVentasHoy(ventas);
+      const [resumenRes, salesRes] = await Promise.all([
+        axios.get(`${API_URL}/optica/sales/resumen-dia`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_URL}/optica/sales`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      const r = resumenRes.data || {};
+      // Solo las ventas del vendedor actual
+      const misVentas = (salesRes.data?.data || []).filter(v => v.created_by === user?.id);
+      setVentasHoy(misVentas);
       setResumenDia({
-        total: ventas.reduce((sum, v) => sum + (v.total || 0), 0),
-        cantidad: ventas.length
+        total: r.total_vendido || 0,
+        cobrado: r.total_cobrado || 0,
+        cantidad: r.cantidad_ventas || 0,
+        por_metodo: r.por_metodo || {}
       });
     } catch (error) {
       console.error('Error fetching sales:', error);
@@ -583,8 +592,8 @@ const OpticaPOS = () => {
                   <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
                     Punto de Venta - Óptica
                   </h1>
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    Ventas de {resumenDia.cantidad} | Total: {formatCurrency(resumenDia.total)}
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }} data-testid="pos-resumen-vendedor">
+                    Mis ventas de hoy: {resumenDia.cantidad} | Cobrado: {formatCurrency(resumenDia.cobrado)}
                   </p>
                 </div>
               </div>

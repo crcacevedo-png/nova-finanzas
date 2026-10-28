@@ -1,49 +1,67 @@
-# Regla del NOG: una consulta facturable por autorización, el resto es seguimiento
+# Caja y Punto de Venta Individuales por Usuario
 
-La primera consulta de un paciente bajo cada autorización del IGSS (No. SPS) es la que descuenta cupo del NOG y aparece en el listado de producción.
-Las consultas siguientes bajo esa misma autorización se guardan como evaluación clínica, pero no descuentan cupo ni generan otra línea de producción.
+Cada usuario maneja su propia caja y su propio punto de venta: abre, registra y cierra únicamente lo suyo.
+Las ventas y movimientos quedan atribuidos, en caja y en auditoría, al usuario responsable, y los supervisores ven todo consolidado.
 
 ## Para quién es
-Personal de NovaVisión que gestiona pacientes IGSS, las evaluaciones oftalmológicas y el listado de producción que se factura al IGSS.
+- Cajeros y recepción de la clínica, que abren y cierran su caja diaria.
+- Vendedores de óptica, que cobran ventas a su nombre.
+- Administradores y SuperAdmin, que supervisan y cierran las cajas de todos.
 
-## Qué cambia y cómo se comporta
-- La unidad que se factura y descuenta cupo deja de ser "el NOG del paciente" y pasa a ser **la autorización del IGSS (No. SPS)** vinculada a la consulta.
-- Bajo una misma autorización (mismo No. SPS), el paciente puede tener varias consultas, pero:
-  - solo la **primera por fecha** descuenta un cupo del NOG y aparece en el listado de producción;
-  - las demás quedan guardadas como evaluación oftalmológica normal, sin descuento y sin línea nueva en producción.
-- Si el mismo paciente tiene **otra autorización distinta (otro No. SPS)** bajo el mismo NOG, esa sí cuenta como un nuevo servicio: descuenta otro cupo y genera otra línea de producción.
-- Cuando una consulta no tiene No. SPS registrado, se mantiene el comportamiento actual: un solo descuento por paciente dentro de ese NOG.
-- El conteo de cupos del NOG, el aviso al 90% y el bloqueo al 100% siguen funcionando igual; lo único que cambia es **qué** cuenta como un consumo.
-- La regla aplica **de ahora en adelante**. No se recalculan ni se tocan los descuentos ni las líneas de producción ya existentes.
+## Funcionalidades y experiencia
 
-## Flujo de uso
-1. El paciente llega con una orden del IGSS (No. SPS + NOG) y se le crea su primera evaluación bajo esa orden: se descuenta un cupo del NOG y aparece una línea en producción con la fecha de esa primera consulta.
-2. El paciente regresa para control bajo la misma orden: se documenta la evaluación en su historial, pero el listado de producción y el cupo del NOG no cambian.
-3. El paciente recibe una nueva orden del IGSS (otro No. SPS) para otro servicio bajo el mismo NOG: su primera consulta de esa nueva orden descuenta otro cupo y agrega otra línea de producción.
-4. En el listado de producción, cada autorización del paciente aparece una sola vez, con la fecha de su primera consulta.
+### Caja de la clínica (individual)
+- Cada usuario abre **su** caja del día con su monto de apertura. No hereda ni comparte la caja de otro.
+- Un usuario puede registrar ingresos y egresos solo si **su** caja está abierta; esos movimientos pertenecen a su caja.
+- El estado, los totales por método de pago y el saldo en efectivo que ve cada usuario corresponden solo a su propia caja.
+- Cada usuario hace **su** cierre: cuenta su efectivo, el sistema calcula el esperado y la diferencia, y bloquea sus movimientos del día.
+- Una sola caja por usuario por día: tras cerrarla no se vuelve a abrir ese día (salvo reapertura por un supervisor).
 
-## Apariencia y experiencia
-Sin pantallas nuevas en esta fase. Las consultas de seguimiento siguen viéndose como evaluaciones oftalmológicas normales dentro del historial del paciente, sin distintivos adicionales. El listado de producción y la gestión de NOG se ven igual; solo cambia qué filas y qué descuentos se generan.
+### Punto de venta de óptica (individual)
+- Cada venta queda registrada a nombre del vendedor que la cobró.
+- No se exige tener una caja abierta para cobrar: la venta se procesa igual, pero siempre atribuida al usuario responsable.
+- Cada vendedor ve el resumen de **sus** ventas del día (total cobrado y desglose por método de pago).
+
+### Supervisión (Admin y SuperAdmin)
+- Vista consolidada de todas las cajas de un día: por usuario, con su estado (abierta/cerrada), montos y diferencia.
+- Pueden cerrar o reabrir la caja de cualquier usuario.
+- Pueden ver las ventas de óptica de todos los vendedores.
+
+### Auditoría
+- Apertura, cierre, reapertura, movimientos y ventas registran al usuario responsable y quedan en el historial de auditoría.
+
+## Flujo del usuario
+1. El cajero inicia sesión y abre su caja del día con el monto inicial.
+2. Durante el día registra ingresos/egresos, que se suman solo a su caja.
+3. En óptica, el vendedor cobra ventas; cada una queda a su nombre.
+4. Al terminar, cada usuario cuenta su efectivo y cierra su propia caja; el sistema muestra el esperado y la diferencia.
+5. Un supervisor entra a la vista consolidada, revisa las cajas de todos, y si hace falta cierra o reabre alguna.
+
+## Estilo / sensación
+- Se mantiene la línea visual actual del sistema (tonos teal, tarjetas y tablas ya usadas).
+- La pantalla de caja encabeza con "Mi caja" para el usuario; los supervisores tienen un acceso adicional a "Todas las cajas".
+- Indicadores claros de caja abierta/cerrada y de diferencias en el arqueo.
 
 ## Fases de implementación
 
-### Fase 1 (lo que se construye ahora)
-- Aplicar la regla usando la autorización (No. SPS) como unidad facturable, de ahora en adelante.
-- Primera consulta por autorización = un descuento de cupo + una línea de producción, fechada en esa primera consulta.
-- Consultas siguientes bajo la misma autorización = solo evaluación clínica (sin descuento, sin línea).
-- Autorizaciones distintas (otro No. SPS) bajo el mismo NOG = cuentan por separado.
-- Sin migración ni recálculo de datos históricos.
+### Fase 1 — MVP (se construye ahora)
+- Caja de la clínica individual por usuario: apertura, movimientos, estado, totales y cierre diario, todo acotado a cada usuario (una caja por usuario por día).
+- Ventas de óptica atribuidas al vendedor responsable, sin exigir caja abierta, con resumen diario por vendedor.
+- Vista consolidada para Admin y SuperAdmin con las cajas de todos y la opción de cerrar/reabrir cualquiera.
+- Auditoría de todas las acciones por usuario responsable.
 
-### Fase 2 (futuro)
-- Recálculo retroactivo opcional y bajo confirmación, con vista previa, para aplicar la regla a los registros históricos (unificar repeticiones antiguas y otorgar los descuentos faltantes de autorizaciones múltiples).
-- Distintivo visible de "seguimiento (no facturable)" en el listado del NOG y/o en producción.
+### Fase 2 (posterior)
+- Corte de caja formal de óptica por usuario, con conteo de efectivo contra lo esperado y comprobante imprimible.
+- Reportes y exportación de cajas y ventas por usuario y rango de fechas.
 
-### Fase 3 (futuro)
-- Reportes por paciente: historial de consultas bajo cada NOG y conteo de consultas facturables vs. de seguimiento.
+### Fase 3 (posterior)
+- Varios turnos por día por usuario y entrega de turno entre cajeros.
+- Tableros de diferencias y alertas por usuario a lo largo del tiempo.
 
 ## Supuestos
-- "Autorización" = No. SPS de la orden IGSS vinculada a la evaluación (o la orden del paciente). Si no hay No. SPS, el descuento se limita a uno por paciente dentro del NOG (comportamiento actual).
-- "Primera" = la consulta más antigua por fecha; si hay empate, la de creación más temprana.
-- No hay migración de datos: los descuentos y las líneas de producción ya registrados se dejan tal cual; la regla rige solo para consultas nuevas.
-- Las consultas de seguimiento permanecen visibles únicamente en el historial clínico del paciente, sin marcas nuevas.
-- El cupo contratado del NOG, el aviso al 90% y el bloqueo al 100% no cambian de lógica.
+- El modelo pasa a ser "una caja por usuario por día"; los cierres y movimientos antiguos (caja compartida) se conservan tal cual, visibles para supervisores, sin reescribir históricos.
+- Un usuario no puede registrar movimientos de clínica si no tiene su propia caja abierta ese día.
+- Un abono de cuentas por cobrar que se marque "registrar en caja" entra a la caja abierta del usuario que lo registra; si ese usuario no tiene caja abierta, el abono se guarda pero no genera movimiento de caja (igual que hoy cuando la caja está cerrada).
+- Las ventas de óptica siguen funcionando sin caja; solo se les agrega la atribución al vendedor y el resumen por usuario.
+- "Ver todas" y "cerrar/reabrir cualquiera" quedan limitados a los roles Admin y SuperAdmin; el resto solo su propia caja.
+- Se mantiene la separación actual entre caja de clínica y óptica.
