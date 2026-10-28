@@ -154,6 +154,7 @@ const Dashboard = () => {
   const [resumenFecha, setResumenFecha] = useState('');
   const [resumenDesde, setResumenDesde] = useState('');
   const [resumenHasta, setResumenHasta] = useState('');
+  const [hoyGt, setHoyGt] = useState('');
   const [resumenLoading, setResumenLoading] = useState(false);
   const [chartData, setChartData] = useState([]);
   const [alerts30, setAlerts30] = useState([]);
@@ -181,6 +182,7 @@ const Dashboard = () => {
         setResumenFecha(rd.desde);
         setResumenDesde(rd.desde);
         setResumenHasta(rd.hasta || rd.desde);
+        setHoyGt(rd.desde);
       }
       setChartData(chartRes.data || []);
       setAlerts30(alerts30Res.data || []);
@@ -192,10 +194,7 @@ const Dashboard = () => {
     }
   };
 
-  const aplicarFiltroResumen = async () => {
-    const params = resumenMode === 'rango'
-      ? { desde: resumenDesde, hasta: resumenHasta }
-      : { fecha: resumenFecha };
+  const fetchResumenConParams = async (params) => {
     setResumenLoading(true);
     try {
       const res = await dashboardApi.getResumenDia(params);
@@ -204,6 +203,40 @@ const Dashboard = () => {
       console.error('Error fetching resumen del día:', error);
     } finally {
       setResumenLoading(false);
+    }
+  };
+
+  const aplicarFiltroResumen = () => {
+    const params = resumenMode === 'rango'
+      ? { desde: resumenDesde, hasta: resumenHasta }
+      : { fecha: resumenFecha };
+    fetchResumenConParams(params);
+  };
+
+  const aplicarRapido = (preset) => {
+    const base = hoyGt || resumenFecha;
+    if (!base) return;
+    const pad = (n) => String(n).padStart(2, '0');
+    const [y, m, d] = base.split('-').map(Number);
+    if (preset === 'hoy') {
+      setResumenMode('dia');
+      setResumenFecha(base);
+      fetchResumenConParams({ fecha: base });
+    } else if (preset === 'semana') {
+      const dt = new Date(y, m - 1, d);
+      const off = dt.getDay() === 0 ? 6 : dt.getDay() - 1;
+      const start = new Date(y, m - 1, d - off);
+      const desde = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
+      setResumenMode('rango');
+      setResumenDesde(desde);
+      setResumenHasta(base);
+      fetchResumenConParams({ desde, hasta: base });
+    } else if (preset === 'mes') {
+      const desde = `${y}-${pad(m)}-01`;
+      setResumenMode('rango');
+      setResumenDesde(desde);
+      setResumenHasta(base);
+      fetchResumenConParams({ desde, hasta: base });
     }
   };
 
@@ -260,6 +293,26 @@ const Dashboard = () => {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 mr-1">
+                <button
+                  data-testid="resumen-rapido-hoy"
+                  onClick={() => aplicarRapido('hoy')}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white hover:bg-teal-50 transition-colors"
+                  style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-color, #d7e3e0)' }}
+                >Hoy</button>
+                <button
+                  data-testid="resumen-rapido-semana"
+                  onClick={() => aplicarRapido('semana')}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white hover:bg-teal-50 transition-colors"
+                  style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-color, #d7e3e0)' }}
+                >Esta semana</button>
+                <button
+                  data-testid="resumen-rapido-mes"
+                  onClick={() => aplicarRapido('mes')}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded-md border bg-white hover:bg-teal-50 transition-colors"
+                  style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-color, #d7e3e0)' }}
+                >Este mes</button>
+              </div>
               <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-color, #d7e3e0)' }}>
                 <button
                   data-testid="resumen-mode-dia"

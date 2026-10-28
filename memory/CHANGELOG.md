@@ -1,5 +1,12 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-28 — Dashboard: accesos rápidos de fecha (Hoy / Esta semana / Este mes)
+**Solicitud:** Agregar botones "Hoy", "Esta semana" y "Este mes" junto al filtro de fecha.
+**Frontend:** `Dashboard.js` — 3 botones (testids `resumen-rapido-hoy/semana/mes`) que ajustan modo (Día/Rango), fechas y recargan el resumen de inmediato. "Hoy" = día actual; "Esta semana" = lunes→hoy; "Este mes" = día 1→hoy. Base de cálculo = `hoyGt` (día actual en hora Guatemala, tomado de la primera respuesta del backend). Refactor: `fetchResumenConParams` compartido por Aplicar y los accesos rápidos.
+**Verificado:** screenshots — "Esta semana" (26–28/10) y "Este mes" (01–28/10: 6 ventas Q2,230, 28 citas) actualizan etiqueta, inputs y tarjetas; sin overflow en escritorio ni móvil.
+
+
+
 ## 2026-10-28 — Dashboard: filtro de fecha/rango + tarjeta Producción IGSS
 **Solicitud:** (1) Elegir un día o rango para ver el resumen de cualquier fecha. (2) Tarjeta con la facturación IGSS del día desde el módulo de producción.
 **Backend:** `GET /api/dashboard/resumen-dia` ahora acepta `fecha` (un día) o `desde`/`hasta` (rango); sin params usa hoy (GT). Óptica y acreditaciones filtran por rango UTC del/los día(s) GT; citas y evaluaciones por string de fecha. Nuevo bloque `produccion_igss` reutilizando `_build_produccion_rows`/`_produccion_totales` de `routes/igss_nogs.py`: servicios, total (costo), facturado, pagado, pendiente. Respuesta incluye `fecha`, `desde`, `hasta`.
