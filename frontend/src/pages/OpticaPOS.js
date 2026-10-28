@@ -219,18 +219,11 @@ const OpticaPOS = () => {
   const fetchVentasHoy = async () => {
     try {
       const token = localStorage.getItem('token');
-      const [resumenRes, salesRes] = await Promise.all([
-        axios.get(`${API_URL}/optica/sales/resumen-dia`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_URL}/optica/sales`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
+      const resumenRes = await axios.get(`${API_URL}/optica/sales/resumen-dia`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       const r = resumenRes.data || {};
-      // Solo las ventas del vendedor actual
-      const misVentas = (salesRes.data?.data || []).filter(v => v.created_by === user?.id);
-      setVentasHoy(misVentas);
+      setVentasHoy(r.sales || []);
       setResumenDia({
         total: r.total_vendido || 0,
         cobrado: r.total_cobrado || 0,
@@ -600,6 +593,7 @@ const OpticaPOS = () => {
               
               <Button
                 variant="outline"
+                data-testid="pos-ver-ventas-btn"
                 onClick={() => { fetchVentasHoy(); setVentasDialogOpen(true); }}
               >
                 <Receipt className="h-4 w-4 mr-2" />

@@ -1,5 +1,29 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-28 — Caja y Punto de Venta Individuales por Usuario (Fase 1 MVP)
+**Solicitud:** Cada usuario opera exclusivamente su propia caja clínica diaria y cada venta de óptica queda atribuida al vendedor. Supervisores (Admin/SuperAdmin) ven consolidado y pueden cerrar/reabrir cajas ajenas. Conservar históricos del modelo compartido.
+
+**Backend `routes/caja.py` (todo verificado por curl E2E):**
+- `calcular_totales_caja_dia(fecha, cajero_id=None)` scoped por usuario.
+- `/estado`, `/movimientos` (GET), `/cierres` (historial): scoped a `current_user` (cierre por `abierto_por`, movimientos por `cajero_id`).
+- `/apertura`: una caja por usuario por día. `/movimientos` (POST): exige caja PROPIA abierta; setea `cajero_id`+`cierre_id`. `PUT /movimientos`: no-supervisor solo edita los propios.
+- `/cierre`: cierra la caja propia; bloquea solo los movimientos del usuario (helper `_aplicar_cierre`).
+- `GET /consolidado` + `POST /consolidado/{id}/cerrar` (require_role admin/superadmin): ver todas las cajas del día con totales/saldo/diferencia por usuario y cerrar cualquiera.
+- `POST /cierres/{id}/reabrir`: ampliado de solo-superadmin a Admin+SuperAdmin; desbloquea solo movimientos del dueño.
+- Abono CxC `registrar_en_caja`: usa la caja abierta del usuario que registra; sin caja propia abierta guarda el abono sin movimiento; movimiento atribuido con `cajero_id`/`cajero_nombre`.
+
+**Backend `routes/optica.py`:**
+- v1 create ahora guarda `created_by_name`.
+- `GET /sales/resumen-dia` (vendedor actual): total vendido, cobrado, cantidad, `por_metodo` y `sales[]` (solo del día, scoped por `created_by` y rango UTC del día GT). `GET /sales/resumen-dia/consolidado` (admin/superadmin) por vendedor.
+
+**Frontend:** `Caja.js` encabezado "Mi Caja", botón "Todas las cajas" (admin/superadmin) → diálogo consolidado con cerrar/reabrir por usuario; estado "Sin abrir/Cerrada/Abierta"; egresos en rojo con `-`. `OpticaPOS.js`+`POSSalesDialogs.js`: diálogo "Mis Ventas del Día" con desglose por método y lista solo de hoy.
+
+**Testing:** testing_agent iteration_104 → 7/7 flujos OK (usuario normal sin controles de supervisor, apertura/movimiento/cierre con diferencia, supervisor consolidado+cerrar+reabrir, aislamiento entre usuarios, POS resumen por vendedor). Fix HIGH posterior: la lista "Mis Ventas del Día" ahora solo muestra ventas de hoy (verificado curl+UI).
+
+**Pendiente (fuera de MVP / pre-existente, NO regresiones):** no hay selector Tipo Ingreso/Egreso en el diálogo de movimiento (diseño previo; egresos entran por otros flujos/API); `formatDate` global tiene off-by-one en fechas 'YYYY-MM-DD' (util compartida app-wide); el rol `usuario` no tiene el menú `finanzas_caja` habilitado (decisión de configuración — habilitarlo por rol desde Configuración de menús). Fase 2: corte formal óptica por usuario + comprobante. Fase 3: turnos múltiples y entrega entre cajeros.
+
+
+
 ## 2026-06 — NOG IGSS: descuento al asignar al paciente + diagnóstico "admin IGSS no crea NOG"
 **Solicitudes:** (1) El rol administrador IGSS no podía crear NOG (reportado en producción). (2) Asignar un NOG al paciente no restaba los servicios disponibles por unidad.
 **Decisión del usuario:** descontar 1 servicio del NOG AL ASIGNARLO al paciente (crear/editar), 1 solo descuento por paciente, sin volver a descontar en la evaluación.

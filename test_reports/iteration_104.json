@@ -1,0 +1,42 @@
+{
+  "summary": "Frontend E2E check of Phase 1 'Caja individual por usuario' and the Óptica POS per-seller summary, using Playwright on the public URL plus a few curl checks. All 7 requested flows work. Normal user (usuario): header says 'Mi Caja'; btn-todas-cajas is hidden. Opened the caja with Q100 and added an Ingreso of Q50 via the UI. An Egreso of Q20 had to be created via API because the UI has no way to register one. Totals show Ingresos Q50, Egresos Q20, Saldo Q130. Closed the caja with Q125 counted; expected Q130 and diferencia -Q5.00 were shown. After closing, no reabrir button appears (main page or historial), and the API returns 403 for reabrir and 400 for a second apertura. SuperAdmin: btn-todas-cajas is visible; consolidado-table lists usuario's caja with the correct values; Reabrir changed it to Abierto; Cerrar through the supervisor dialog changed it back to Cerrado. Isolation holds: superadmin's estado and movimientos do not include usuario's data. POS: a sale of Q150 in Efectivo updated the header to 'Mis ventas de hoy: 1 | Cobrado: Q 150.00', and the 'Mis Ventas del Día' dialog shows the totals and the breakdown by método. Found 3 functional bugs and some minor UI issues, listed below.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpticaPOS 'Mis Ventas del Día' list", "issue": "fetchVentasHoy calls GET /api/optica/sales without dateFrom/dateTo and only filters client-side by created_by. The dialog therefore lists ALL historical sales of the seller (e.g. sales from 13/10, 06/10, 18/08) under the title 'Mis Ventas del Día', while the header says '1 ventas'. Fix: pass dateFrom/dateTo set to today in GT time (or filter by fecha).", "selector": "OpticaPOS.js fetchVentasHoy ~line 226", "priority": "HIGH"},
+      {"component": "Caja Movimientos del Día table", "issue": "Every row is rendered as '+Q' in green, regardless of mov.tipo. An Egreso of Q20 shows as '+Q 20.00'. Use mov.tipo === 'Egreso' to show '-' and red.", "selector": "Caja.js ~line 1192", "priority": "MEDIUM"},
+      {"component": "Caja Nuevo Movimiento dialog", "issue": "The UI has no Tipo selector and the code hardcodes tipo: 'Ingreso' (Caja.js line 544). Users cannot register an Egreso from the UI, although the requirements expect ingreso and egreso movements.", "selector": "Caja.js handleSaveMovimiento", "priority": "MEDIUM"},
+      {"component": "Historial de Cierres date", "issue": "A cierre with fecha '2026-10-28' shows as 27/10/26. formatDate does new Date('YYYY-MM-DD'), which is parsed as UTC midnight and then shifted to Guatemala time (UTC-6), so the date is off by one day. The detail title and print view are affected too.", "selector": "services/api.js formatDate", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Caja (usuario)", "issues": ["The sidebar for the 'usuario' role has no Finanzas > Caja entry (only Pacientes, Evaluación, Agenda, Inventario). The user can reach /caja only by typing the URL. Check the menu permissions for the usuario role."]},
+      {"screen": "Caja estado card", "issues": ["When no caja exists today (cierre null), the Estado card says 'Cerrada' while showing 'Abrir Caja'. It should say 'Sin abrir'."]},
+      {"screen": "OpticaPOS", "issues": ["The 'Ver Ventas' button has no data-testid.", "Walk-in sales (no patient) show 'Paciente no encontrado' in the ventas list; 'Consumidor final' would be clearer."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OpticaPOS.fetchVentasHoy: filter GET /optica/sales by today's date (dateFrom/dateTo) so the 'Mis Ventas del Día' list matches resumen-dia",
+    "Caja movimientos table: show Egreso as '-Q' in red based on mov.tipo",
+    "Add a Tipo (Ingreso/Egreso) selector with egreso categories to the Nuevo Movimiento dialog, or confirm that egresos are intentionally excluded",
+    "Fix formatDate for date-only 'YYYY-MM-DD' strings (parse as local date or skip the timezone conversion) to remove the off-by-one day",
+    "Add the Caja menu item for the usuario role, since it has manage_caja",
+    "Add data-testid to the 'Ver Ventas' button"
+  ],
+  "critical_code_review_comments": [
+    "Caja.js is 2685 lines; split it into components (CajaDiaria, Consolidado dialogs, CxC, Cierres financieros)",
+    "The supervisor cerrar dialog sends parseFloat(...) || 0, so an empty field silently closes the caja with 0 counted; validate that the field is required",
+    "The consolidado empty state says 'No hay cajas abiertas hoy' even though the list also includes closed cajas; 'No hay cajas hoy' is more accurate"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested; spot checks via curl passed)", "frontend": "86% (6/7 flows fully as specified; the Egreso part of flow 2 is not possible from the UI)"},
+  "seed_data_creation": "Created today (server date 2026-10-28): caja for 'usuario' (apertura Q100, TEST_consulta UI ingreso Q50, TEST_egreso API egreso Q20; currently Cerrado after supervisor close). Superadmin caja (apertura Q50, closed via API). One óptica sale ORD-202610-0006 of Q150 in Efectivo by superadmin.",
+  "test_credentials": "usuario/user2024 and superadmin/nova2024, from /app/memory/test_credentials.md",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Patient search in the Caja movement dialog needs at least 2 characters (e.g. 'Mar'). Result items are div.cursor-pointer inside the dialog. Closing the apertura dialog uses the 'Abrir Caja' button inside the dialog. POS: product cards are div.cursor-pointer.group; pay flow is pos-pagar-btn > pos-metodo-Efectivo > 'Monto exacto' > + button > 'Confirmar Venta'. Today's cajas for usuario and superadmin already exist (one per day), so a reopen needs a supervisor."
+}

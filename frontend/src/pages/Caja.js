@@ -450,6 +450,10 @@ const Caja = () => {
   const handleCerrarCajaSupervisor = async (e) => {
     e.preventDefault();
     if (!cajaSupervisorTarget) return;
+    if (cierreSupervisorForm.efectivo_contado === '' || isNaN(parseFloat(cierreSupervisorForm.efectivo_contado))) {
+      toast.error('Ingresa el efectivo contado');
+      return;
+    }
     setSubmitting(true);
     try {
       await axios.post(`${API_URL}/caja/consolidado/${cajaSupervisorTarget.id}/cerrar`, {
@@ -1020,7 +1024,7 @@ const Caja = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-slate-500">Estado</p>
-                      <p className="text-xl font-bold">{cajaEstado?.caja_abierta ? 'Abierta' : 'Cerrada'}</p>
+                      <p className="text-xl font-bold">{cajaEstado?.caja_abierta ? 'Abierta' : (cajaEstado?.cierre ? 'Cerrada' : 'Sin abrir')}</p>
                     </div>
                     {cajaEstado?.caja_abierta ? (
                       <Unlock className="w-8 h-8 text-green-600" />
@@ -1189,8 +1193,8 @@ const Caja = () => {
                             <TableCell>
                               <Badge variant="outline">{mov.metodo_pago}</Badge>
                             </TableCell>
-                            <TableCell className="text-right font-medium text-green-600">
-                              +{formatCurrency(mov.monto)}
+                            <TableCell className={`text-right font-medium ${mov.tipo === 'Egreso' ? 'text-red-600' : 'text-green-600'}`}>
+                              {mov.tipo === 'Egreso' ? '-' : '+'}{formatCurrency(mov.monto)}
                             </TableCell>
                             <TableCell className="text-center">
                               {!mov.bloqueado && cajaEstado?.caja_abierta && (
@@ -1993,7 +1997,7 @@ const Caja = () => {
             {loadingConsolidado ? (
               <div className="text-center py-8 text-slate-500">Cargando...</div>
             ) : (consolidado?.data?.length || 0) === 0 ? (
-              <div className="text-center py-8 text-slate-500" data-testid="consolidado-vacio">No hay cajas abiertas hoy</div>
+              <div className="text-center py-8 text-slate-500" data-testid="consolidado-vacio">No hay cajas hoy</div>
             ) : (
               <Table data-testid="consolidado-table">
                 <TableHeader>

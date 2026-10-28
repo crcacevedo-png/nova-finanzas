@@ -971,7 +971,12 @@ async def get_resumen_ventas_dia(
     fecha_dia = fecha or today_str_gt()
     inicio, fin = dia_gt_a_rango_utc(fecha_dia)
     resumen = await _resumen_ventas(current_user["id"], inicio, fin)
-    return {"fecha": fecha_dia, "vendedor": current_user.get("name"), **resumen}
+    sales = await db.optica_sales.find(
+        {"created_at": {"$gte": inicio, "$lte": fin}, "created_by": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(5000)
+    sales = [await enrich_sale(s) for s in sales]
+    return {"fecha": fecha_dia, "vendedor": current_user.get("name"), "sales": sales, **resumen}
 
 
 @router.get("/sales/resumen-dia/consolidado")
