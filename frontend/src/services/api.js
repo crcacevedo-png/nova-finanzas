@@ -180,6 +180,7 @@ export const igssUnitApi = {
 // NOG por Unidad IGSS API (contratos de servicios y acreditaciones)
 export const igssNogApi = {
   getByUnit: (unitId) => axios.get(`${API_URL}/igss-units/${unitId}/nogs`),
+  getAll: () => axios.get(`${API_URL}/igss-units/nogs/all`),
   getActivos: (unitId) => axios.get(`${API_URL}/igss-units/${unitId}/nogs-activos`),
   getAlertas: () => axios.get(`${API_URL}/igss-units/nogs/alertas`),
   getResumen: () => axios.get(`${API_URL}/igss-units/nogs/resumen`),

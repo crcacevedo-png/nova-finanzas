@@ -307,6 +307,14 @@ AVAILABLE_MENUS = {
         "category": "igss",
         "description": "Catálogo de unidades del IGSS"
     },
+    "gestion_nog": {
+        "id": "gestion_nog",
+        "label": "NOG",
+        "path": "/igss/nog",
+        "icon": "ClipboardList",
+        "category": "igss",
+        "description": "Ingreso y gestión central de todos los NOG del IGSS"
+    },
     # Configuración
     "gestion_usuarios": {
         "id": "gestion_usuarios",
@@ -344,7 +352,7 @@ DEFAULT_MENU_CONFIG = {
         "finanzas_pagos", "finanzas_proveedores", "finanzas_gastos_fijos", "finanzas_autorizaciones",
         "inventario_panel", "inventario_bodegas", "inventario_productos",
         "inventario_lotes", "inventario_kardex", "inventario_categorias", "inventario_pos",
-        "inventario_sociedades"
+        "inventario_sociedades", "gestion_nog"
     ],
     "usuario": [
         "pacientes", "evaluacion_oftalmologica", "agenda",
@@ -355,7 +363,7 @@ DEFAULT_MENU_CONFIG = {
         "optica_tipos_lente", "optica_pos", "optica_cxc", "optica_compras"
     ],
     "administrador_igss": [
-        "pacientes", "unidades_igss"
+        "pacientes", "unidades_igss", "gestion_nog"
     ],
     "medico": [
         "pacientes", "agenda", "evaluacion_oftalmologica"

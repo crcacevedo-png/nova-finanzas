@@ -64,7 +64,7 @@ PERMISSIONS = {
         "create_patients": True,
         "edit_patients": True,
         "delete_patients": False,
-        "manage_igss_units": False,
+        "manage_igss_units": True,
         "import_patients": True,
         "export_patients": True,
         # Sin acceso a Óptica

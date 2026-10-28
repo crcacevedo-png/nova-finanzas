@@ -188,6 +188,14 @@ const Layout = ({ children }) => {
       testId: 'nav-unidades-igss' 
     });
   }
+  if (hasPermission('manage_igss_units')) {
+    igssItems.push({
+      path: '/igss/nog',
+      icon: ClipboardList,
+      label: 'NOG',
+      testId: 'nav-gestion-nog'
+    });
+  }
 
   const getRoleBadgeClass = (role) => {
     const classes = {

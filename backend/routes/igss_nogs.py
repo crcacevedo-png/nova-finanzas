@@ -34,6 +34,7 @@ class NogCreate(BaseModel):
     tipo_compra: Optional[str] = ""
     cantidad: int = Field(..., ge=1)
     precio: float = Field(0, ge=0)
+    fecha_asignacion: Optional[str] = ""
 
 
 class NogUpdate(BaseModel):
@@ -42,6 +43,7 @@ class NogUpdate(BaseModel):
     tipo_compra: Optional[str] = None
     cantidad: Optional[int] = Field(None, ge=1)
     precio: Optional[float] = Field(None, ge=0)
+    fecha_asignacion: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -82,6 +84,7 @@ def _nog_con_derivados(nog: dict) -> dict:
         "nombre_servicio": nog.get("nombre_servicio", ""),
         "tipo_compra": nog.get("tipo_compra", ""),
         "tipo_compra_label": TIPO_COMPRA_LABELS.get(nog.get("tipo_compra", ""), nog.get("tipo_compra", "")),
+        "fecha_asignacion": nog.get("fecha_asignacion", ""),
         "cantidad": cantidad,
         "precio": precio,
         "acreditados": acreditados,
@@ -398,6 +401,7 @@ async def crear_nog(
         "tipo_compra": data.tipo_compra or "",
         "cantidad": int(data.cantidad),
         "precio": float(data.precio or 0),
+        "fecha_asignacion": (data.fecha_asignacion or "").strip(),
         "acreditados": 0,
         "is_active": True,
         "created_by": current_user["id"],
@@ -633,6 +637,30 @@ async def recalcular_por_evaluaciones(
 
 
 # ==================== ENDPOINTS - ACREDITACIONES / PACIENTES ====================
+
+@router.get("/nogs/all")
+async def listar_todos_nogs(
+    current_user: dict = Depends(require_permission("manage_igss_units"))
+):
+    """Lista TODOS los NOG de TODAS las unidades (para el menú central de NOG),
+    con el nombre de la unidad y los contadores derivados. El filtrado por unidad,
+    estado y la búsqueda se hacen en el cliente."""
+    units = {u["id"]: u for u in await db.igss_units.find(
+        {}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(2000)}
+    nogs_docs = await db.igss_nogs.find({}, {"_id": 0}).to_list(None)
+    data = []
+    for n in nogs_docs:
+        d = _nog_con_derivados(n)
+        u = units.get(n.get("unidad_id"), {})
+        d["unidad_nombre"] = u.get("name", "")
+        d["unidad_codigo"] = u.get("code", "")
+        data.append(d)
+    data.sort(key=lambda x: (x.get("unidad_nombre", ""), x.get("numero", "")))
+    unidades = [{"id": u["id"], "name": u.get("name", ""), "code": u.get("code", "")}
+                for u in units.values()]
+    unidades.sort(key=lambda x: x["name"])
+    return {"data": data, "unidades": unidades, "total": len(data)}
+
 
 @router.get("/nogs/resumen")
 async def resumen_nogs(

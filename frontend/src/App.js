@@ -12,6 +12,7 @@ import Proveedores from './pages/Proveedores';
 import GastosFijos from './pages/GastosFijos';
 import Pacientes from './pages/Pacientes';
 import UnidadesIGSS from './pages/UnidadesIGSS';
+import GestionNOG from './pages/GestionNOG';
 // Módulo Óptica
 import OpticaInventario from './pages/OpticaInventario';
 import OpticaVentas from './pages/OpticaVentas';
@@ -210,6 +211,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="manage_igss_units">
             <UnidadesIGSS />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/igss/nog" 
+        element={
+          <ProtectedRoute requiredPermission="manage_igss_units">
+            <GestionNOG />
           </ProtectedRoute>
         } 
       />
