@@ -55,7 +55,7 @@ const EstadoBadge = ({ estado }) => {
 
 const emptyForm = {
   id: null, numero: '', nombre_servicio: '', tipo_compra: '', cantidad: '',
-  precio: '', unidad_id: '', fecha_asignacion: '', is_active: true,
+  precio: '', monto_total: '', montoTotalManual: false, unidad_id: '', fecha_asignacion: '', is_active: true,
 };
 
 const GestionNOG = () => {
@@ -107,23 +107,47 @@ const GestionNOG = () => {
     setForm({
       id: n.id, numero: n.numero || '', nombre_servicio: n.nombre_servicio || '',
       tipo_compra: n.tipo_compra || '', cantidad: String(n.cantidad ?? ''),
-      precio: String(n.precio ?? ''), unidad_id: n.unidad_id || '',
+      precio: String(n.precio ?? ''), monto_total: String(n.monto_total ?? ''), montoTotalManual: true,
+      unidad_id: n.unidad_id || '',
       fecha_asignacion: (n.fecha_asignacion || '').slice(0, 10), is_active: n.is_active,
     });
     setDialogOpen(true);
   };
+
+  // Autosugerir el monto total = individual × cupos, mientras el usuario no lo edite a mano.
+  const onCantidad = (v) => setForm((f) => {
+    const next = { ...f, cantidad: v };
+    if (!f.montoTotalManual) {
+      const p = parseFloat(f.precio) || 0; const c = parseInt(v, 10) || 0;
+      next.monto_total = (p && c) ? (p * c).toFixed(2) : '';
+    }
+    return next;
+  });
+  const onPrecio = (v) => setForm((f) => {
+    const next = { ...f, precio: v };
+    if (!f.montoTotalManual) {
+      const p = parseFloat(v) || 0; const c = parseInt(f.cantidad, 10) || 0;
+      next.monto_total = (p && c) ? (p * c).toFixed(2) : '';
+    }
+    return next;
+  });
+  const onMontoTotal = (v) => setForm((f) => ({ ...f, monto_total: v, montoTotalManual: true }));
 
   const guardar = async () => {
     if (!form.numero.trim()) { toast.error('El número de NOG es obligatorio'); return; }
     if (!form.unidad_id) { toast.error('La unidad es obligatoria'); return; }
     const cant = parseInt(form.cantidad, 10);
     if (!cant || cant < 1) { toast.error('La cantidad de cupos debe ser al menos 1'); return; }
+    const montoTotalNum = form.monto_total !== ''
+      ? (parseFloat(form.monto_total) || 0)
+      : (parseFloat(form.precio) || 0) * cant;
     const payload = {
       numero: form.numero.trim(),
       nombre_servicio: form.nombre_servicio.trim(),
       tipo_compra: form.tipo_compra || '',
       cantidad: cant,
       precio: parseFloat(form.precio) || 0,
+      monto_total: +(montoTotalNum || 0).toFixed(2),
       fecha_asignacion: form.fecha_asignacion || '',
     };
     setSaving(true);
@@ -245,18 +269,19 @@ const GestionNOG = () => {
                   <th className="px-4 py-3 font-semibold">Fecha asignación</th>
                   <th className="px-4 py-3 font-semibold text-center">Cupos</th>
                   <th className="px-4 py-3 font-semibold text-center">Disp.</th>
-                  <th className="px-4 py-3 font-semibold text-right">Precio</th>
+                  <th className="px-4 py-3 font-semibold text-right">Monto individual</th>
+                  <th className="px-4 py-3 font-semibold text-right">Monto total</th>
                   <th className="px-4 py-3 font-semibold">Estado</th>
                   <th className="px-4 py-3 font-semibold text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-400">
+                  <tr><td colSpan={11} className="px-4 py-10 text-center text-slate-400">
                     <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
                   </td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-400" data-testid="nog-empty">
+                  <tr><td colSpan={11} className="px-4 py-10 text-center text-slate-400" data-testid="nog-empty">
                     No hay NOG que coincidan con los filtros.
                   </td></tr>
                 ) : (
@@ -270,6 +295,7 @@ const GestionNOG = () => {
                       <td className="px-4 py-3 text-center text-slate-600">{n.acreditados} / {n.cantidad}</td>
                       <td className="px-4 py-3 text-center font-medium text-slate-700">{n.disponibles}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{fmtQ(n.precio)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-800" data-testid={`nog-monto-total-${n.id}`}>{fmtQ(n.monto_total)}</td>
                       <td className="px-4 py-3"><EstadoBadge estado={n.estado} /></td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
@@ -357,18 +383,29 @@ const GestionNOG = () => {
                 <Input
                   type="number" min="1"
                   value={form.cantidad}
-                  onChange={(e) => setForm((f) => ({ ...f, cantidad: e.target.value }))}
+                  onChange={(e) => onCantidad(e.target.value)}
                   className="mt-1" data-testid="nog-form-cantidad"
                 />
               </div>
               <div>
-                <Label>Precio por cupo (Q)</Label>
+                <Label>Monto individual por servicio (Q)</Label>
                 <Input
                   type="number" min="0" step="0.01"
                   value={form.precio}
-                  onChange={(e) => setForm((f) => ({ ...f, precio: e.target.value }))}
+                  onChange={(e) => onPrecio(e.target.value)}
                   className="mt-1" data-testid="nog-form-precio"
                 />
+              </div>
+
+              <div className="col-span-2">
+                <Label>Monto total del NOG (Q)</Label>
+                <Input
+                  type="number" min="0" step="0.01"
+                  value={form.monto_total}
+                  onChange={(e) => onMontoTotal(e.target.value)}
+                  className="mt-1" data-testid="nog-form-monto-total"
+                />
+                <p className="text-xs text-slate-400 mt-1">Se sugiere automáticamente (individual × cupos); puedes escribir otro monto.</p>
               </div>
 
               <div className="col-span-2">

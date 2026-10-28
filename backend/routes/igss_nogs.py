@@ -34,6 +34,7 @@ class NogCreate(BaseModel):
     tipo_compra: Optional[str] = ""
     cantidad: int = Field(..., ge=1)
     precio: float = Field(0, ge=0)
+    monto_total: Optional[float] = Field(None, ge=0)
     fecha_asignacion: Optional[str] = ""
 
 
@@ -43,6 +44,7 @@ class NogUpdate(BaseModel):
     tipo_compra: Optional[str] = None
     cantidad: Optional[int] = Field(None, ge=1)
     precio: Optional[float] = Field(None, ge=0)
+    monto_total: Optional[float] = Field(None, ge=0)
     fecha_asignacion: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -77,6 +79,11 @@ def _nog_con_derivados(nog: dict) -> dict:
     disponibles = max(cantidad - acreditados, 0)
     is_active = nog.get("is_active", True)
     porcentaje = round((acreditados / cantidad) * 100, 1) if cantidad > 0 else 0
+    monto_total = nog.get("monto_total")
+    if monto_total is None:
+        monto_total = round(cantidad * precio, 2)
+    else:
+        monto_total = round(float(monto_total), 2)
     return {
         "id": nog["id"],
         "unidad_id": nog.get("unidad_id", ""),
@@ -87,6 +94,7 @@ def _nog_con_derivados(nog: dict) -> dict:
         "fecha_asignacion": nog.get("fecha_asignacion", ""),
         "cantidad": cantidad,
         "precio": precio,
+        "monto_total": monto_total,
         "acreditados": acreditados,
         "disponibles": disponibles,
         "porcentaje": porcentaje,
@@ -401,6 +409,8 @@ async def crear_nog(
         "tipo_compra": data.tipo_compra or "",
         "cantidad": int(data.cantidad),
         "precio": float(data.precio or 0),
+        "monto_total": (round(float(data.monto_total), 2) if data.monto_total is not None
+                        else round(float(data.precio or 0) * int(data.cantidad), 2)),
         "fecha_asignacion": (data.fecha_asignacion or "").strip(),
         "acreditados": 0,
         "is_active": True,
