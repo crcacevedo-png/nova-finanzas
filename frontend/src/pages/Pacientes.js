@@ -1072,6 +1072,7 @@ const Pacientes = () => {
                       <SelectItem value="unido">Unido(a)</SelectItem>
                       <SelectItem value="divorciado">Divorciado(a)</SelectItem>
                       <SelectItem value="viudo">Viudo(a)</SelectItem>
+                      <SelectItem value="infante">Infante</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
