@@ -450,11 +450,11 @@ const PuntoVenta = () => {
     const descItems = carrito.reduce((sum, item) => sum + item.descuento, 0);
     const pct = parseFloat(descuentoPorcentaje) || 0;
     const descGlobal = pct > 0 ? Math.round(subtotal * (pct / 100) * 100) / 100 : 0;
-    const factor = pct > 0 ? (1 - pct / 100) : 1;
-    const baseIva = carrito.filter(i => i.afecto_iva).reduce((sum, i) => sum + i.subtotal, 0);
-    const iva = Math.round(baseIva * factor * 0.12 * 100) / 100;
     const descuento = Math.round((descItems + descGlobal) * 100) / 100;
-    const total = Math.round(((subtotal - descGlobal) + iva) * 100) / 100;
+    // El precio ya incluye el IVA: el total es la suma de precios menos el descuento,
+    // sin sumar 12% por encima. El IVA se calcula "hacia adentro" solo para contabilidad.
+    const total = Math.round((subtotal - descGlobal) * 100) / 100;
+    const iva = Math.round((total - total / 1.12) * 100) / 100;
     const cantidadItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
     
     return { subtotal, descuento, descGlobal, iva, total, cantidadItems };

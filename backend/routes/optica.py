@@ -1251,6 +1251,9 @@ async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dic
     if discount_amount > 0 and not autoriza:
         raise HTTPException(status_code=400, detail="Debe indicar quién autoriza el descuento")
     total = round(subtotal - discount_amount, 2)
+    # El precio ya incluye el IVA: se calcula "hacia adentro" sobre el total con
+    # descuento, solo para efectos contables (no altera el total cobrado).
+    iva_incluido = round(total - total / 1.12, 2)
     
     # Calcular total pagado (excluyendo montos de CxC)
     total_paid = sum(p.amount for p in sale_data.payments if p.method != 'Cuenta por Cobrar')
@@ -1288,6 +1291,7 @@ async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dic
         "discount_amount": discount_amount,
         "discount_authorized_by": autoriza,
         "total": total,
+        "iva": iva_incluido,
         "total_paid": total_paid,
         "balance_due": balance_due,
         "payment_method": payment_method,

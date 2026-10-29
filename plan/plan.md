@@ -1,67 +1,51 @@
-# Caja y Punto de Venta Individuales por Usuario
+# IVA incluido en el precio — en todo el sistema
 
-Cada usuario maneja su propia caja y su propio punto de venta: abre, registra y cierra únicamente lo suyo.
-Las ventas y movimientos quedan atribuidos, en caja y en auditoría, al usuario responsable, y los supervisores ven todo consolidado.
+El precio que se ingresa al registrar un producto es el precio final al público y ya lleva el IVA adentro.
+El sistema deja de sumar el 12% por encima en cualquier venta; el IVA pasa a calcularse como la parte que ya viene incluida en ese precio.
 
 ## Para quién es
-- Cajeros y recepción de la clínica, que abren y cierran su caja diaria.
-- Vendedores de óptica, que cobran ventas a su nombre.
-- Administradores y SuperAdmin, que supervisan y cierran las cajas de todos.
+Personal de la clínica y de la óptica que cobra en los puntos de venta, y quien lleva la contabilidad y necesita conocer el IVA de cada venta sin que ese impuesto altere el precio cobrado al cliente.
 
-## Funcionalidades y experiencia
+## Qué cambia y cómo se experimenta
+- **El precio es el precio.** Lo que se teclea como precio de un producto es lo que paga el cliente. El sistema nunca le agrega un 12% adicional.
+- **El total cuadra a la vista.** En el punto de venta de clínica, el Total es la suma de los precios menos el descuento. Ya no aparece una diferencia inexplicable entre el subtotal, el descuento y el total.
+- **El IVA se calcula “hacia adentro”.** Para efectos contables, cada venta guarda el monto de IVA que ya venía incluido en el precio (la parte correspondiente al 12% dentro del precio final), sin modificar el total cobrado.
+- **Se elimina la marca “afecto a IVA”** de la pantalla de ingreso y edición de productos. Todos los productos se tratan como precio final con IVA incluido.
+- **El IVA sigue oculto en pantalla y en tickets.** Al cobrar y en los comprobantes impresos solo se muestran el detalle de productos, el descuento (si lo hay) y el total. El monto de IVA queda guardado para contabilidad, no se despliega al cliente.
+- **Aplica a los dos puntos de venta.** Tanto el punto de venta de clínica como el de óptica quedan bajo la misma regla: precio final sin sumar IVA, y registro del IVA incluido para contabilidad.
 
-### Caja de la clínica (individual)
-- Cada usuario abre **su** caja del día con su monto de apertura. No hereda ni comparte la caja de otro.
-- Un usuario puede registrar ingresos y egresos solo si **su** caja está abierta; esos movimientos pertenecen a su caja.
-- El estado, los totales por método de pago y el saldo en efectivo que ve cada usuario corresponden solo a su propia caja.
-- Cada usuario hace **su** cierre: cuenta su efectivo, el sistema calcula el esperado y la diferencia, y bloquea sus movimientos del día.
-- Una sola caja por usuario por día: tras cerrarla no se vuelve a abrir ese día (salvo reapertura por un supervisor).
+## Flujo de uso
+1. En el ingreso de productos ya no se ve la casilla de “afecto a IVA”; se captura el precio final del producto.
+2. En el punto de venta se agregan productos; el carrito muestra el subtotal con esos precios.
+3. Se aplica (opcionalmente) el descuento por porcentaje con su autorizador, como ya funciona hoy.
+4. El Total mostrado = suma de precios − descuento. No se añade ningún 12%.
+5. Al confirmar la venta, el sistema guarda, además del total, el monto de IVA que ya estaba incluido en ese total (para contabilidad).
+6. El ticket y el detalle de la venta muestran productos, descuento y total, sin línea de IVA.
 
-### Punto de venta de óptica (individual)
-- Cada venta queda registrada a nombre del vendedor que la cobró.
-- No se exige tener una caja abierta para cobrar: la venta se procesa igual, pero siempre atribuida al usuario responsable.
-- Cada vendedor ve el resumen de **sus** ventas del día (total cobrado y desglose por método de pago).
-
-### Supervisión (Admin y SuperAdmin)
-- Vista consolidada de todas las cajas de un día: por usuario, con su estado (abierta/cerrada), montos y diferencia.
-- Pueden cerrar o reabrir la caja de cualquier usuario.
-- Pueden ver las ventas de óptica de todos los vendedores.
-
-### Auditoría
-- Apertura, cierre, reapertura, movimientos y ventas registran al usuario responsable y quedan en el historial de auditoría.
-
-## Flujo del usuario
-1. El cajero inicia sesión y abre su caja del día con el monto inicial.
-2. Durante el día registra ingresos/egresos, que se suman solo a su caja.
-3. En óptica, el vendedor cobra ventas; cada una queda a su nombre.
-4. Al terminar, cada usuario cuenta su efectivo y cierra su propia caja; el sistema muestra el esperado y la diferencia.
-5. Un supervisor entra a la vista consolidada, revisa las cajas de todos, y si hace falta cierra o reabre alguna.
-
-## Estilo / sensación
-- Se mantiene la línea visual actual del sistema (tonos teal, tarjetas y tablas ya usadas).
-- La pantalla de caja encabeza con "Mi caja" para el usuario; los supervisores tienen un acceso adicional a "Todas las cajas".
-- Indicadores claros de caja abierta/cerrada y de diferencias en el arqueo.
+## Sensación de la interfaz
+Sin cambios de estilo. Se mantiene la apariencia actual (tema teal, tarjetas y tablas). El punto de venta de clínica se ve más limpio y coherente: subtotal, descuento y total que sí cuadran entre sí.
 
 ## Fases de implementación
 
 ### Fase 1 — MVP (se construye ahora)
-- Caja de la clínica individual por usuario: apertura, movimientos, estado, totales y cierre diario, todo acotado a cada usuario (una caja por usuario por día).
-- Ventas de óptica atribuidas al vendedor responsable, sin exigir caja abierta, con resumen diario por vendedor.
-- Vista consolidada para Admin y SuperAdmin con las cajas de todos y la opción de cerrar/reabrir cualquiera.
-- Auditoría de todas las acciones por usuario responsable.
+- El sistema deja de sumar el 12% en las ventas; el total pasa a ser la suma de los precios menos el descuento.
+- Cada venta (clínica y óptica) guarda el IVA como la parte incluida en el precio (precio − precio/1.12), calculada después del descuento.
+- Se elimina la marca “afecto a IVA” del ingreso y edición de productos; todos los productos se tratan como precio con IVA incluido.
+- Se mantiene el IVA oculto en pantalla y tickets; solo total y descuento visibles.
+- Las ventas ya registradas no se recalculan: conservan sus cifras originales.
 
-### Fase 2 (posterior)
-- Corte de caja formal de óptica por usuario, con conteo de efectivo contra lo esperado y comprobante imprimible.
-- Reportes y exportación de cajas y ventas por usuario y rango de fechas.
+### Fase 2 — Visibilidad contable (futuro)
+- Reporte de IVA por período (ventas, IVA incluido, descuentos) para clínica y óptica.
+- Exportación de ese reporte para contabilidad.
 
-### Fase 3 (posterior)
-- Varios turnos por día por usuario y entrega de turno entre cajeros.
-- Tableros de diferencias y alertas por usuario a lo largo del tiempo.
+### Fase 3 — Facturación electrónica (futuro)
+- Integración con facturación electrónica (FEL Guatemala) usando el esquema de IVA incluido ya establecido.
 
 ## Supuestos
-- El modelo pasa a ser "una caja por usuario por día"; los cierres y movimientos antiguos (caja compartida) se conservan tal cual, visibles para supervisores, sin reescribir históricos.
-- Un usuario no puede registrar movimientos de clínica si no tiene su propia caja abierta ese día.
-- Un abono de cuentas por cobrar que se marque "registrar en caja" entra a la caja abierta del usuario que lo registra; si ese usuario no tiene caja abierta, el abono se guarda pero no genera movimiento de caja (igual que hoy cuando la caja está cerrada).
-- Las ventas de óptica siguen funcionando sin caja; solo se les agrega la atribución al vendedor y el resumen por usuario.
-- "Ver todas" y "cerrar/reabrir cualquiera" quedan limitados a los roles Admin y SuperAdmin; el resto solo su propia caja.
-- Se mantiene la separación actual entre caja de clínica y óptica.
+- Los precios ya cargados en los productos se consideran finales con IVA incluido; no se migran ni se modifican.
+- Al quitar la marca “afecto a IVA”, todos los productos quedan tratados como IVA incluido; cualquier producto que antes estuviera marcado como exento pasará a calcular su IVA incluido como precio − precio/1.12.
+- El IVA guardado por venta se calcula sobre el total ya con descuento aplicado.
+- Las ventas históricas conservan los montos con los que se registraron (no se recalculan).
+- La regla aplica a los dos puntos de venta; la óptica, que hoy no guardaba IVA, pasará a guardar el IVA incluido para mantener consistencia contable.
+- Los reportes o exportaciones que hoy mostraran un IVA sumado reflejarán en su lugar el IVA incluido.
+- El descuento por porcentaje con autorizador, implementado antes, se mantiene tal cual.

@@ -573,12 +573,12 @@ async def crear_venta(
     if descuento_monto > 0 and not (venta.descuento_autoriza or "").strip():
         raise HTTPException(status_code=400, detail="Debe indicar quién autoriza el descuento")
     descuento_autoriza = (venta.descuento_autoriza or "").strip()
-    factor = (1 - descuento_pct / 100) if descuento_pct > 0 else 1
-    # IVA (12% en Guatemala) calculado sobre la base afecta ya con el descuento aplicado.
-    # Se mantiene almacenado aunque no se muestre en pantalla (ya incluido en el precio final).
-    iva_total = round(afecto_subtotal * factor * 0.12, 2)
+    # El precio ya incluye el IVA: el total es la suma de precios menos el descuento,
+    # SIN sumar 12% por encima. El IVA se calcula "hacia adentro" (parte ya incluida)
+    # sobre el total con descuento aplicado, solo para efectos contables.
     descuento_total = round(descuento_total + descuento_monto, 2)
-    total = round((subtotal - descuento_monto) + iva_total, 2)
+    total = round(subtotal - descuento_monto, 2)
+    iva_total = round(total - total / 1.12, 2)
     
     # Validar que las formas de pago cubren el total
     total_pagado = sum(fp.monto for fp in venta.formas_pago)
