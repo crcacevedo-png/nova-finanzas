@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Skeleton } from '../components/ui/skeleton';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 
 // Componentes POS refactorizados
 import {
@@ -519,6 +519,8 @@ const OpticaPOS = () => {
       setMedicosResults([]);
       setFormasPago([]);
       setObservaciones('');
+      setDescuentoPorcentaje('');
+      setDescuentoAutoriza('');
       setReceta({
         od_esfera: '', od_cilindro: '', od_eje: '', od_add: '',
         oi_esfera: '', oi_cilindro: '', oi_eje: '', oi_add: '',
@@ -589,6 +591,7 @@ const OpticaPOS = () => {
 
   return (
     <Layout>
+      <Toaster position="top-right" richColors />
       <div className="flex h-[calc(100vh-80px)]" data-testid="optica-pos-page">
         {/* Panel izquierdo - Productos */}
         <div className="flex-1 flex flex-col overflow-hidden p-4">

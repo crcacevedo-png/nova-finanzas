@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend E2E (Playwright, desktop 1920x1080) of % discount + authorizer in POS Óptica (/optica/punto-venta) and POS Clínica (/punto-venta), plus hidden IVA in clinic POS. Core flows work: field visibility, discount math, blocking sale without authorizer, sale created with discount persisted, IVA hidden in UI/ticket/detail but stored in backend. Found 2 bugs in Óptica POS: (1) the error toast never shows because OpticaPOS has no <Toaster/> (the sale is blocked silently); (2) the discount % and authorizer are not cleared after a successful sale. There is also 1 business/UX concern in Clínica: Subtotal - Descuento != Total because hidden IVA is still added.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/ventas", "issue": "Response model omits descuento_monto (returned null in POST response), though it is stored in the DB (30). Not blocking."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpticaPOS (pages/OpticaPOS.js)", "issue": "With discount > 0 and no authorizer, Confirmar Venta correctly does NOT POST /api/optica/sales/v2, but the toast 'Indique quién autoriza el descuento' never appears. OpticaPOS imports toast from 'sonner' but renders no <Toaster/>, and there is no global Toaster in App.js. PuntoVenta.js renders its own Toaster. Every toast in Óptica POS (errors and success) is invisible, so the user just sees nothing happen.", "selector": "[data-sonner-toast]", "priority": "HIGH"},
+      {"component": "OpticaPOS procesarVenta success cleanup (~line 515)", "issue": "After a successful sale, the cart is cleared but descuentoPorcentaje ('10') and descuentoAutoriza ('TEST_Gerente') stay in the inputs. The next sale silently inherits the 10% discount and the authorizer. Add setDescuentoPorcentaje('') and setDescuentoAutoriza('') there (or call limpiarCarrito). Clinic POS resets correctly.", "selector": "[data-testid='pos-optica-descuento-pct'], [data-testid='pos-optica-descuento-autoriza']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "POS Clínica totals / ticket / detalle", "issues": ["Because IVA is hidden but still added to the total, the visible math does not add up. Example: Subtotal Q300, Descuento -Q30, TOTAL Q302.40 (no discount: Subtotal Q300, TOTAL Q336). Cashiers and patients will see an unexplained difference. Confirm with the user whether prices should be treated as IVA-included (total = subtotal - discount, with IVA broken out internally) rather than IVA added on top."]},
+      {"screen": "POS Clínica detalle de venta", "issues": ["The discount line shows the authorizer but not the % applied (e.g. 'Descuento 10%'). Optional."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OpticaPOS.js: render <Toaster position='top-right' richColors /> (as PuntoVenta does) or add a global Toaster so the 'Indique quién autoriza el descuento' error and other toasts are visible.",
+    "OpticaPOS.js procesarVenta success branch: reset descuentoPorcentaje and descuentoAutoriza after a sale.",
+    "Clarify the clinic IVA business rule: hidden IVA is still added on top, so Subtotal - Descuento != Total on screen, ticket and detail (300 - 30 -> 302.40)."
+  ],
+  "critical_code_review_comments": [
+    "Óptica and clínica both validate the authorizer on the frontend and the backend (backend returns 400). Good.",
+    "PuntoVenta.js and OpticaPOS.js are large files (~1950 and ~780 lines). Consider splitting.",
+    "The discount % input has no clamp in the UI (min/max are HTML-only). Values over 100 rely on backend validation (le=100) and will surface as an error toast. In Óptica that toast is invisible because of the Toaster bug."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped as requested; DB values verified)", "frontend": "80% (12/15 checks passed; 2 Óptica bugs, 1 clinic business/UX concern)"},
+  "seed_data_creation": "Opened clinic caja for superadmin on 2026-10-29 via POST /api/caja/apertura (monto_apertura 0, caja id b1429762-0827-4b6e-b05a-997e2b6c1369). Created test sales: Óptica ORD-202610-0007 (id 18f072e2-9c24-4e46-8c80-8f43ea4f6dbb, Generic Básico armazón Q150, 10%, total 135, authorizer TEST_Gerente; frame stock decremented by 1). Clínica VTA-20261029-0001 (id 5d827753-e355-4509-b1e0-2cef3c66ed83, service SERV-00001 Q300, 10%, iva 32.4, total 302.40, authorizer TEST_Dr Autoriza; service, so no stock impact).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Óptica POS: product cards are '.cursor-pointer.group' inside [data-testid=optica-pos-page]. To pay: Monto exacto -> '+' button (svg.lucide-plus) -> Confirmar Venta. Clínica POS: use product data-testid producto-605fc05e-8161-4f70-9689-6638b57ae34e (SERV-00001, unlimited stock, afecto_iva). To pay: 'Todo' -> 'Agregar' -> btn-confirmar-venta. Ticket printing opens a popup that auto-closes; the ticket HTML (no IVA line, shows Descuento) was verified in code, and GET /api/ventas/{id}/ticket returns totales {subtotal 300, descuento 30, iva 32.4, total 302.4}. The superadmin clinic caja for 2026-10-29 is already open.",
+  "rca of the issue": "Invisible Óptica toast: sonner's toast() needs a mounted <Toaster/>, which OpticaPOS never renders. Discount carry-over: the success branch of procesarVenta resets the state fields one by one instead of calling limpiarCarrito(), and the new discount state was only added to limpiarCarrito."
+}
