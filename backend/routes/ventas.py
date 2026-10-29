@@ -71,6 +71,7 @@ class VentaResponse(BaseModel):
     subtotal: float
     descuento_total: float
     descuento_porcentaje: float = 0
+    descuento_monto: float = 0
     descuento_autoriza: Optional[str] = ""
     iva: float
     total: float

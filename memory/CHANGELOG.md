@@ -1,5 +1,18 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-29 — POS: descuento por % con autorizador + IVA oculto en clínica
+**Solicitud:** (1) Descuento por un solo % sobre el total en POS Óptica y Clínica, con nombre de quien autoriza (obligatorio si descuento>0). (2) Ocultar IVA del POS de clínica (decisión del usuario: solo ocultar en pantalla/tickets pero seguir calculándolo y guardándolo).
+**Backend:**
+- `routes/optica.py` — `OpticaSaleCreateV2` + `discount_percent`, `discount_authorized_by`; `create_optica_sale_v2` calcula `total = subtotal - subtotal*%/100`, valida autorizador (400 si falta) y guarda `discount_percent/amount/authorized_by`; respuesta incluye estos campos.
+- `routes/ventas.py` — `VentaCreate` + `descuento_porcentaje`, `descuento_autoriza`; descuento global % aplicado al subtotal, IVA 12% recalculado sobre base afecta con factor (1-%/100), valida autorizador; guarda `descuento_total/porcentaje/monto/autoriza`, `iva`, `total`. `VentaResponse` expone los nuevos campos.
+**Frontend:**
+- Óptica (`OpticaPOS.js` + `POSCart.js`): campos `pos-optica-descuento-pct` y `pos-optica-descuento-autoriza`, línea de descuento, reset tras venta, se agregó `<Toaster/>`.
+- Clínica (`PuntoVenta.js`): campos `pv-descuento-pct` y `pv-descuento-autoriza`; línea de IVA ELIMINADA de resumen, ticket y detalle; reset en `limpiarCarrito`.
+**Testing:** iteración 105 (hallazgos) + 106 (retest 100% frontend). Backend óptica validado por curl (400 sin autorizador; 150→135 con 10%).
+**PENDIENTE DE CONFIRMAR CON USUARIO:** por la decisión de "seguir sumando/guardando el IVA pero ocultarlo", el Total visible = (Subtotal − Descuento) + IVA oculto, por lo que la resta visible NO cuadra (ej. Subtotal 300 − Desc 30 → Total 302.40). Si los precios YA incluyen IVA, lo correcto sería que el total = suma de precios finales (IVA incluido, no sumado aparte).
+
+
+
 ## 2026-10-28 — Dashboard: accesos rápidos de fecha (Hoy / Esta semana / Este mes)
 **Solicitud:** Agregar botones "Hoy", "Esta semana" y "Este mes" junto al filtro de fecha.
 **Frontend:** `Dashboard.js` — 3 botones (testids `resumen-rapido-hoy/semana/mes`) que ajustan modo (Día/Rango), fechas y recargan el resumen de inmediato. "Hoy" = día actual; "Esta semana" = lunes→hoy; "Este mes" = día 1→hoy. Base de cálculo = `hoyGt` (día actual en hora Guatemala, tomado de la primera respuesta del backend). Refactor: `fetchResumenConParams` compartido por Aplicar y los accesos rápidos.

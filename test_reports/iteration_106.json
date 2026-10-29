@@ -1,0 +1,30 @@
+{
+  "summary": "Retest of the 2 HIGH Óptica bugs from iteration 105 plus a clinic POS regression check (frontend only, Playwright, 1920x1080). Both bugs are fixed. (1) /optica/punto-venta: with Descuento 10% and no authorizer, Confirmar Venta shows the sonner toast 'Indique quién autoriza el descuento' and does not POST /api/optica/sales/v2. (2) After a successful sale with 10% and authorizer TEST_Gerente (subtotal 150 -> total 135, ORD-202610-0008), the discount % field is empty ('') on the next sale, the authorizer field is hidden because the discount is 0, and the total goes back to Q150. Clinic /punto-venta: no IVA line in totals or sale detail; the sale is blocked with a toast when there is no authorizer (no POST); with an authorizer the sale is created (VTA-20261029-0002); the discount resets after the sale; the detail shows 'Descuento (aut. TEST_Dr Autoriza) -Q30' with no IVA; IVA 32.4 is still stored in the DB.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/ventas", "issue": "Response returns descuento_monto=null and has no authorizer field. The DB stores descuento_monto=30 and descuento_autoriza='TEST_Dr Autoriza'. The response model omits them. Not blocking."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "POS Clínica totals / detail", "issues": ["Still open from iteration 105, a business-rule question: hidden IVA is added on top, so Subtotal Q300 - Descuento Q30 shows TOTAL Q302.40. The visible math does not add up. Confirm with the user."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: confirm the clinic IVA rule (whether prices include IVA) because the visible total != subtotal - discount.",
+    "Optional: include descuento_monto and descuento_autoriza in the POST /api/ventas response model."
+  ],
+  "critical_code_review_comments": [
+    "OpticaPOS.js now renders <Toaster/> and resets descuentoPorcentaje/descuentoAutoriza in the success branch. The success branch still duplicates the limpiarCarrito logic. Calling limpiarCarrito() would avoid future drift."
+  ],
+  "updated_files": ["/app/test_reports/iteration_106.json"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (all requested retest/regression checks passed)"},
+  "seed_data_creation": "Test sales created: Óptica ORD-202610-0008 (id 063fee56-daaa-433c-8018-525d8a0999cd, Generic Básico Q150, 10%, total 135, authorizer TEST_Gerente, frame stock -1). Clínica VTA-20261029-0002 (id 86f82ab7-c66c-49e5-af7a-bf00b136bbe9, SERV-00001 Q300, 10%, iva 32.4, total 302.40, authorizer TEST_Dr Autoriza).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Óptica: cards '[data-testid=optica-pos-page] .cursor-pointer.group'. Pay: pos-pagar-btn -> 'Monto exacto' -> dialog button:has(svg.lucide-plus) -> 'Confirmar Venta'. Clínica: product producto-605fc05e-8161-4f70-9689-6638b57ae34e. Pay: btn-cobrar -> 'Todo' -> dialog button:has-text('Agregar') (label is 'Agregar Efectivo - Q X') -> btn-confirmar-venta. The superadmin clinic caja for 2026-10-29 is open."
+}
