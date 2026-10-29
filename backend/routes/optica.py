@@ -225,6 +225,8 @@ class OpticaSaleCreateV2(BaseModel):
     items: List[SaleItemV2] = []
     subtotal: float = Field(ge=0)
     discount: float = Field(ge=0, default=0)
+    discount_percent: float = Field(ge=0, le=100, default=0)
+    discount_authorized_by: Optional[str] = None
     total: float = Field(ge=0)
     payments: List[SalePaymentV2] = []
     notes: Optional[str] = None
@@ -295,6 +297,7 @@ class OpticaSaleResponse(BaseModel):
     subtotal: float
     discount_percent: float
     discount_amount: float
+    discount_authorized_by: Optional[str] = ""
     total: float
     total_paid: float
     balance_due: float
@@ -1238,8 +1241,16 @@ async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dic
             })
     
     # Calcular totales
-    discount_amount = sale_data.discount
-    total = subtotal - discount_amount
+    discount_percent = sale_data.discount_percent or 0
+    if discount_percent > 0:
+        discount_amount = round(subtotal * discount_percent / 100, 2)
+    else:
+        discount_amount = sale_data.discount or 0
+        discount_percent = round(discount_amount / subtotal * 100, 2) if subtotal > 0 else 0
+    autoriza = (sale_data.discount_authorized_by or "").strip()
+    if discount_amount > 0 and not autoriza:
+        raise HTTPException(status_code=400, detail="Debe indicar quién autoriza el descuento")
+    total = round(subtotal - discount_amount, 2)
     
     # Calcular total pagado (excluyendo montos de CxC)
     total_paid = sum(p.amount for p in sale_data.payments if p.method != 'Cuenta por Cobrar')
@@ -1273,8 +1284,9 @@ async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dic
         "lens_total": sum(li["subtotal"] for li in lens_items),
         "items_v2": processed_items,  # Guardar items en formato V2 también
         "subtotal": subtotal,
-        "discount_percent": (discount_amount / subtotal * 100) if subtotal > 0 else 0,
+        "discount_percent": discount_percent,
         "discount_amount": discount_amount,
+        "discount_authorized_by": autoriza,
         "total": total,
         "total_paid": total_paid,
         "balance_due": balance_due,

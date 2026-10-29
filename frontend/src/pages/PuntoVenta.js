@@ -116,6 +116,8 @@ const PuntoVenta = () => {
   const [referenciaPagoActual, setReferenciaPagoActual] = useState('');
   const [formasPago, setFormasPago] = useState([]);
   const [observaciones, setObservaciones] = useState('');
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState('');
+  const [descuentoAutoriza, setDescuentoAutoriza] = useState('');
   
   // Para CxC
   const [pagadores, setPagadores] = useState([]);
@@ -433,6 +435,8 @@ const PuntoVenta = () => {
     setMedicosResults([]);
     setObservaciones('');
     setFormasPago([]);
+    setDescuentoPorcentaje('');
+    setDescuentoAutoriza('');
     setMetodoPagoActual('Efectivo');
     setMontoPagoActual('');
     setReferenciaPagoActual('');
@@ -443,16 +447,20 @@ const PuntoVenta = () => {
 
   const calcularTotales = () => {
     const subtotal = carrito.reduce((sum, item) => sum + item.subtotal, 0);
-    const descuento = carrito.reduce((sum, item) => sum + item.descuento, 0);
+    const descItems = carrito.reduce((sum, item) => sum + item.descuento, 0);
+    const pct = parseFloat(descuentoPorcentaje) || 0;
+    const descGlobal = pct > 0 ? Math.round(subtotal * (pct / 100) * 100) / 100 : 0;
+    const factor = pct > 0 ? (1 - pct / 100) : 1;
     const baseIva = carrito.filter(i => i.afecto_iva).reduce((sum, i) => sum + i.subtotal, 0);
-    const iva = baseIva * 0.12;
-    const total = subtotal + iva;
+    const iva = Math.round(baseIva * factor * 0.12 * 100) / 100;
+    const descuento = Math.round((descItems + descGlobal) * 100) / 100;
+    const total = Math.round(((subtotal - descGlobal) + iva) * 100) / 100;
     const cantidadItems = carrito.reduce((sum, item) => sum + item.cantidad, 0);
     
-    return { subtotal, descuento, iva, total, cantidadItems };
+    return { subtotal, descuento, descGlobal, iva, total, cantidadItems };
   };
 
-  const { subtotal, descuento, iva, total, cantidadItems } = calcularTotales();
+  const { subtotal, descuento, descGlobal, iva, total, cantidadItems } = calcularTotales();
 
   // ==================== FUNCIONES DE PAGO ====================
 
@@ -554,6 +562,12 @@ const PuntoVenta = () => {
       toast.error('Seleccione el médico para esta venta');
       return;
     }
+
+    // Si hay descuento, se debe indicar quién lo autoriza
+    if ((parseFloat(descuentoPorcentaje) || 0) > 0 && !descuentoAutoriza.trim()) {
+      toast.error('Indique quién autoriza el descuento');
+      return;
+    }
     
     setSubmitting(true);
     
@@ -589,6 +603,8 @@ const PuntoVenta = () => {
           afecto_iva: item.afecto_iva
         })),
         formas_pago: formasPagoData,
+        descuento_porcentaje: parseFloat(descuentoPorcentaje) || 0,
+        descuento_autoriza: descuentoAutoriza.trim() || null,
         efectivo_recibido: efectivoTotalRecibido > 0 ? efectivoTotalRecibido : null,
         observaciones: observaciones || null
       };
@@ -888,10 +904,6 @@ const PuntoVenta = () => {
                   <span>-Q${ticket.totales.descuento.toFixed(2)}</span>
                 </div>
               ` : ''}
-              <div class="total-line">
-                <span>IVA (12%):</span>
-                <span>Q${ticket.totales.iva.toFixed(2)}</span>
-              </div>
               <div class="total-line total-final">
                 <span>TOTAL:</span>
                 <span>Q${ticket.totales.total.toFixed(2)}</span>
@@ -1383,15 +1395,48 @@ const PuntoVenta = () => {
 
             {/* Totales */}
             <div className="border-t bg-slate-50 p-4">
-              <div className="space-y-1 mb-3">
+              <div className="space-y-2 mb-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">IVA (12%)</span>
-                  <span>{formatCurrency(iva)}</span>
+
+                {/* Descuento por porcentaje */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-slate-500">Descuento (%)</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={descuentoPorcentaje}
+                    onChange={(e) => setDescuentoPorcentaje(e.target.value)}
+                    placeholder="0"
+                    className="h-8 w-24 text-right"
+                    data-testid="pv-descuento-pct"
+                  />
                 </div>
+                {(parseFloat(descuentoPorcentaje) || 0) > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-red-600">
+                      <span>Descuento</span>
+                      <span data-testid="pv-descuento-monto">- {formatCurrency(descGlobal)}</span>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block text-slate-500">
+                        Autoriza descuento <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={descuentoAutoriza}
+                        onChange={(e) => setDescuentoAutoriza(e.target.value)}
+                        placeholder="Nombre de quien autoriza"
+                        className="h-8"
+                        data-testid="pv-descuento-autoriza"
+                      />
+                    </div>
+                  </>
+                )}
+
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span>TOTAL</span>
                   <span className="text-blue-600">{formatCurrency(total)}</span>
@@ -1863,10 +1908,12 @@ const PuntoVenta = () => {
                   <span>Subtotal</span>
                   <span>{formatCurrency(ventaDetalle.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>IVA</span>
-                  <span>{formatCurrency(ventaDetalle.iva)}</span>
-                </div>
+                {ventaDetalle.descuento_total > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>Descuento{ventaDetalle.descuento_autoriza ? ` (aut. ${ventaDetalle.descuento_autoriza})` : ''}</span>
+                    <span>- {formatCurrency(ventaDetalle.descuento_total)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total</span>
                   <span className="text-blue-600">{formatCurrency(ventaDetalle.total)}</span>

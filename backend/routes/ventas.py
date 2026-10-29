@@ -49,6 +49,8 @@ class VentaCreate(BaseModel):
     medico_nombre: Optional[str] = None
     items: List[VentaItem]
     formas_pago: List[FormaPago]
+    descuento_porcentaje: float = Field(default=0, ge=0, le=100)
+    descuento_autoriza: Optional[str] = None
     observaciones: Optional[str] = None
     # FEL Guatemala - preparado pero deshabilitado
     datos_fel: Optional[dict] = None
@@ -68,6 +70,8 @@ class VentaResponse(BaseModel):
     cantidad_items: int
     subtotal: float
     descuento_total: float
+    descuento_porcentaje: float = 0
+    descuento_autoriza: Optional[str] = ""
     iva: float
     total: float
     formas_pago: List[dict]
@@ -517,7 +521,7 @@ async def crear_venta(
     # Calcular totales
     subtotal = 0
     descuento_total = 0
-    iva_total = 0
+    afecto_subtotal = 0
     items_procesados = []
     items_para_descuento = []
     
@@ -539,10 +543,9 @@ async def crear_venta(
         subtotal += item_subtotal
         descuento_total += item.descuento
         
-        # Calcular IVA (12% en Guatemala)
+        # Base afecta a IVA (el IVA se calcula luego del descuento global)
         if item.afecto_iva:
-            iva_item = item_subtotal * 0.12
-            iva_total += iva_item
+            afecto_subtotal += item_subtotal
         
         items_procesados.append({
             "producto_id": item.producto_id,
@@ -563,7 +566,18 @@ async def crear_venta(
                 "cantidad": item.cantidad
             })
     
-    total = subtotal + iva_total
+    # Descuento global por porcentaje sobre el total de la venta
+    descuento_pct = venta.descuento_porcentaje or 0
+    descuento_monto = round(subtotal * descuento_pct / 100, 2) if descuento_pct > 0 else 0
+    if descuento_monto > 0 and not (venta.descuento_autoriza or "").strip():
+        raise HTTPException(status_code=400, detail="Debe indicar quién autoriza el descuento")
+    descuento_autoriza = (venta.descuento_autoriza or "").strip()
+    factor = (1 - descuento_pct / 100) if descuento_pct > 0 else 1
+    # IVA (12% en Guatemala) calculado sobre la base afecta ya con el descuento aplicado.
+    # Se mantiene almacenado aunque no se muestre en pantalla (ya incluido en el precio final).
+    iva_total = round(afecto_subtotal * factor * 0.12, 2)
+    descuento_total = round(descuento_total + descuento_monto, 2)
+    total = round((subtotal - descuento_monto) + iva_total, 2)
     
     # Validar que las formas de pago cubren el total
     total_pagado = sum(fp.monto for fp in venta.formas_pago)
@@ -720,6 +734,9 @@ async def crear_venta(
         "cantidad_items": sum(item["cantidad"] for item in items_procesados),
         "subtotal": round(subtotal, 2),
         "descuento_total": round(descuento_total, 2),
+        "descuento_porcentaje": descuento_pct,
+        "descuento_monto": descuento_monto,
+        "descuento_autoriza": descuento_autoriza,
         "iva": round(iva_total, 2),
         "total": round(total, 2),
         "formas_pago": formas_pago_procesadas,

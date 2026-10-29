@@ -26,6 +26,11 @@ const POSCart = ({
   onRemoverMedico,
   calcularSubtotal,
   calcularTotal,
+  calcularDescuento,
+  descuentoPorcentaje,
+  onDescuentoPorcentajeChange,
+  descuentoAutoriza,
+  onDescuentoAutorizaChange,
   onModificarCantidad,
   onEliminarItem,
   onLimpiarCarrito,
@@ -211,6 +216,43 @@ const POSCart = ({
             <span style={{ color: 'var(--text-secondary)' }}>Subtotal:</span>
             <span style={{ color: 'var(--text-primary)' }}>{formatCurrency(calcularSubtotal())}</span>
           </div>
+
+          {/* Descuento por porcentaje */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Descuento (%):</span>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={descuentoPorcentaje}
+              onChange={(e) => onDescuentoPorcentajeChange(e.target.value)}
+              placeholder="0"
+              className="h-8 w-24 text-right"
+              data-testid="pos-optica-descuento-pct"
+            />
+          </div>
+          {(parseFloat(descuentoPorcentaje) || 0) > 0 && (
+            <>
+              <div className="flex justify-between text-sm text-red-500">
+                <span>Descuento:</span>
+                <span data-testid="pos-optica-descuento-monto">- {formatCurrency(calcularDescuento())}</span>
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                  Autoriza descuento <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={descuentoAutoriza}
+                  onChange={(e) => onDescuentoAutorizaChange(e.target.value)}
+                  placeholder="Nombre de quien autoriza"
+                  className="h-8"
+                  data-testid="pos-optica-descuento-autoriza"
+                />
+              </div>
+            </>
+          )}
+
           <div className="flex justify-between text-lg font-bold">
             <span style={{ color: 'var(--text-primary)' }}>Total:</span>
             <span className="text-teal-500">{formatCurrency(calcularTotal())}</span>

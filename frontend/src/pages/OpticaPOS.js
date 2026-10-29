@@ -99,6 +99,8 @@ const OpticaPOS = () => {
   const [referenciaPagoActual, setReferenciaPagoActual] = useState('');
   const [formasPago, setFormasPago] = useState([]);
   const [observaciones, setObservaciones] = useState('');
+  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState('');
+  const [descuentoAutoriza, setDescuentoAutoriza] = useState('');
   
   // Receta óptica
   const [recetaDialogOpen, setRecetaDialogOpen] = useState(false);
@@ -303,6 +305,8 @@ const OpticaPOS = () => {
     setMedicoSearch('');
     setMedicosResults([]);
     setFormasPago([]);
+    setDescuentoPorcentaje('');
+    setDescuentoAutoriza('');
     setReceta({
       od_esfera: '', od_cilindro: '', od_eje: '', od_add: '',
       oi_esfera: '', oi_cilindro: '', oi_eje: '', oi_add: '',
@@ -318,8 +322,14 @@ const OpticaPOS = () => {
     return carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
   };
 
+  const calcularDescuento = () => {
+    const pct = parseFloat(descuentoPorcentaje) || 0;
+    if (pct <= 0) return 0;
+    return Math.round(calcularSubtotal() * (pct / 100) * 100) / 100;
+  };
+
   const calcularTotal = () => {
-    return calcularSubtotal();
+    return calcularSubtotal() - calcularDescuento();
   };
 
   const calcularTotalPagado = () => {
@@ -422,6 +432,12 @@ const OpticaPOS = () => {
       toast.error('Seleccione el médico para esta venta');
       return;
     }
+
+    // Si hay descuento, se debe indicar quién lo autoriza
+    if ((parseFloat(descuentoPorcentaje) || 0) > 0 && !descuentoAutoriza.trim()) {
+      toast.error('Indique quién autoriza el descuento');
+      return;
+    }
     
     setSubmitting(true);
     
@@ -449,7 +465,9 @@ const OpticaPOS = () => {
         doctor_name: medico?.name || null,
         items,
         subtotal: calcularSubtotal(),
-        discount: 0,
+        discount: calcularDescuento(),
+        discount_percent: parseFloat(descuentoPorcentaje) || 0,
+        discount_authorized_by: descuentoAutoriza.trim(),
         total: calcularTotal(),
         payments: pagosNormales.map(fp => ({
           method: fp.metodo,
@@ -689,6 +707,11 @@ const OpticaPOS = () => {
           onRemoverMedico={() => { setMedico(null); setMedicoSearch(''); setMedicosResults([]); }}
           calcularSubtotal={calcularSubtotal}
           calcularTotal={calcularTotal}
+          calcularDescuento={calcularDescuento}
+          descuentoPorcentaje={descuentoPorcentaje}
+          onDescuentoPorcentajeChange={setDescuentoPorcentaje}
+          descuentoAutoriza={descuentoAutoriza}
+          onDescuentoAutorizaChange={setDescuentoAutoriza}
           onModificarCantidad={modificarCantidad}
           onEliminarItem={eliminarDelCarrito}
           onLimpiarCarrito={limpiarCarrito}
