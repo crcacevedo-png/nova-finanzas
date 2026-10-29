@@ -345,8 +345,8 @@ const EvaluacionOftalmologica = () => {
       avcc_od: '', avcc_os: '',
       av_binocular: '', av_cerca: '',
       tipo_lensometria: 'Lensometria',
-      lensometria_od: { esfera: '', cilindro: '', eje: '' },
-      lensometria_os: { esfera: '', cilindro: '', eje: '' },
+      lensometria_od: { esfera: '', cilindro: '', eje: '', adicion: '' },
+      lensometria_os: { esfera: '', cilindro: '', eje: '', adicion: '' },
       refraccion_od: { esfera: '', cilindro: '', eje: '', adicion: '' },
       refraccion_os: { esfera: '', cilindro: '', eje: '', adicion: '' },
       queratometria_od: '', queratometria_os: '',
@@ -2280,13 +2280,6 @@ const EvaluacionOftalmologica = () => {
           <div className="space-y-4">
             <CollapsibleSection title="Examen Oftalmológico" icon={Eye} defaultOpen={true}>
               <div className="space-y-4">
-                {/* Encabezado OD/OS */}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div></div>
-                  <div className="bg-blue-100 rounded py-1 text-xs font-semibold text-blue-700">OD (Derecho)</div>
-                  <div className="bg-blue-100 rounded py-1 text-xs font-semibold text-blue-700">OS (Izquierdo)</div>
-                </div>
-                
                 {/* Agudeza Visual */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-blue-700">Agudeza Visual</Label>
@@ -2361,30 +2354,31 @@ const EvaluacionOftalmologica = () => {
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-1 text-center text-xs">
+                  <div className="grid grid-cols-5 gap-1 text-center text-xs">
                     <div></div>
                     <div className="text-gray-500">Esfera</div>
                     <div className="text-gray-500">Cilindro</div>
                     <div className="text-gray-500">Eje</div>
+                    <div className="text-gray-500">Adición</div>
                   </div>
-                  <div className="grid grid-cols-4 gap-1 items-center">
+                  <div className="grid grid-cols-5 gap-1 items-center">
                     <Label className="text-xs text-right">OD</Label>
-                    {['esfera', 'cilindro', 'eje'].map(field => (
+                    {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
                       <Input
                         key={field}
-                        value={formData.examen.lensometria_od[field]}
+                        value={formData.examen.lensometria_od[field] || ''}
                         onChange={(e) => updateNestedField(`examen.lensometria_od.${field}`, e.target.value)}
                         disabled={isReadOnly}
                         className="input-teal text-xs h-7"
                       />
                     ))}
                   </div>
-                  <div className="grid grid-cols-4 gap-1 items-center">
+                  <div className="grid grid-cols-5 gap-1 items-center">
                     <Label className="text-xs text-right">OS</Label>
-                    {['esfera', 'cilindro', 'eje'].map(field => (
+                    {['esfera', 'cilindro', 'eje', 'adicion'].map(field => (
                       <Input
                         key={field}
-                        value={formData.examen.lensometria_os[field]}
+                        value={formData.examen.lensometria_os[field] || ''}
                         onChange={(e) => updateNestedField(`examen.lensometria_os.${field}`, e.target.value)}
                         disabled={isReadOnly}
                         className="input-teal text-xs h-7"
