@@ -2283,6 +2283,11 @@ const EvaluacionOftalmologica = () => {
                 {/* Agudeza Visual */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-blue-700">Agudeza Visual</Label>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div></div>
+                    <div className="text-gray-500 font-medium">OD</div>
+                    <div className="text-gray-500 font-medium">OS</div>
+                  </div>
                   <CampoODOS
                     label="Sin Corrección"
                     valueOD={formData.examen.avsc_od}
