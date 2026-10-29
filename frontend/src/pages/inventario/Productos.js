@@ -406,13 +406,13 @@ const Productos = () => {
       'codigo', 'codigo_barras', 'nombre', 'nombre_generico', 'descripcion',
       'categoria', 'tipo', 'presentacion', 'unidad_medida', 'precio_compra', 'precio_venta',
       'existencia_minima', 'existencia_maxima', 'controla_inventario', 'controla_lotes',
-      'requiere_receta', 'afecto_iva'
+      'requiere_receta'
     ];
     
     const sampleRow = [
       'PROD-001', '7501234567890', 'Producto Ejemplo', 'Nombre Genérico', 'Descripción del producto',
       'Medicamentos', 'producto', 'Caja x 10', 'unidad', '80.00', '100.00',
-      '5', '100', 'true', 'false', 'false', 'true'
+      '5', '100', 'true', 'false', 'false'
     ];
     
     const csvContent = [
@@ -420,7 +420,7 @@ const Productos = () => {
       sampleRow.join(','),
       '# tipo: producto, servicio, insumo',
       '# unidad_medida: unidad, caja, frasco, tubo, sobre, ampolla, ml, litro, mg, gramo, kg',
-      '# controla_inventario, controla_lotes, requiere_receta, afecto_iva: true o false'
+      '# controla_inventario, controla_lotes, requiere_receta: true o false'
     ].join('\n');
     
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1419,7 +1419,7 @@ const Productos = () => {
                   <li>• codigo, codigo_barras, nombre_generico, descripcion</li>
                   <li>• categoria, tipo (producto/servicio/insumo), presentacion</li>
                   <li>• unidad_medida, precio_compra, precio_venta, existencia_minima, existencia_maxima</li>
-                  <li>• controla_inventario, controla_lotes, requiere_receta, afecto_iva (true/false)</li>
+                  <li>• controla_inventario, controla_lotes, requiere_receta (true/false)</li>
                 </ul>
                 <Button 
                   variant="link" 

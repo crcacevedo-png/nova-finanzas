@@ -1,5 +1,19 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-29 — IVA incluido en el precio (todo el sistema) — Fase 1 MVP
+**Plan aprobado:** el precio del producto ya incluye el IVA; el sistema deja de sumar 12% por encima. Total = suma de precios − descuento. El IVA se calcula "hacia adentro" (total − total/1.12) después del descuento, solo para contabilidad, y permanece oculto en pantalla/tickets. Aplica a POS Clínica y Óptica. Ventas históricas NO se recalculan.
+**Backend:**
+- `routes/ventas.py` — `total = subtotal − descuento_monto` (sin sumar IVA); `iva_total = total − total/1.12`. Se eliminó la lógica `afecto_iva`/factor del cálculo.
+- `routes/optica.py` — `create_optica_sale_v2`: guarda `iva = total − total/1.12` en el documento de venta (antes óptica no guardaba IVA).
+**Frontend:**
+- `PuntoVenta.js` — `calcularTotales`: `total = subtotal − descGlobal`; `iva = total − total/1.12` (oculto). La resta ahora cuadra en pantalla.
+- `Productos.js` — se eliminó `afecto_iva` del formulario de ingreso/edición y de la plantilla/ayuda de importación CSV.
+**Testing (iteración 107, frontend 100%):** Clínica: 1 ítem 300 → Total 300 (sin +12%); con 10% → Total 270 exacto; venta creada con `iva=28.93` (=270−270/1.12) en DB; sin línea de IVA en resumen/pago/ticket/detalle. Óptica: 150 → Total 150; con 10%+autorizador → 135. Formulario de productos sin casilla "Afecto a IVA".
+**Nota:** hallazgo ajeno a este cambio — stock a nivel de lote de "Fenilefrina 2.5% gotas" no coincide con el stock de la tarjeta (dato preexistente de dispensario), no relacionado con IVA.
+**Pendiente (futuro):** Fase 2 reporte de IVA por período + exportación contable; Fase 3 facturación electrónica (FEL) con esquema IVA incluido.
+
+
+
 ## 2026-10-29 — POS: descuento por % con autorizador + IVA oculto en clínica
 **Solicitud:** (1) Descuento por un solo % sobre el total en POS Óptica y Clínica, con nombre de quien autoriza (obligatorio si descuento>0). (2) Ocultar IVA del POS de clínica (decisión del usuario: solo ocultar en pantalla/tickets pero seguir calculándolo y guardándolo).
 **Backend:**

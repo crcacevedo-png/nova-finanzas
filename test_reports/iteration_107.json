@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend E2E check of the new IVA-INCLUIDO rule (superadmin/nova2024). POS Clínica: 1 item 300 gives Total 300 (no 12% added). 2 items 300+55=355 gives Total 355; with 10%: Descuento -35.50 and Total 319.50. Service only 300 with 10%: Descuento -30 and Total 270 exactly. No IVA line in the totals summary, payment dialog, 'Ventas del Día' list or detail dialog. Sale VTA-20261029-0004 was created via POST /api/ventas (200): subtotal 300, descuento 30, total 270, iva 28.93 (=270-270/1.12, confirmed in DB). The ticket HTML template has no IVA line (checked in code). POS Óptica: Generic Básico 150 gives Total 150; with 10% + autorizador: -15, Total 135. POST /api/optica/sales/v2 returned 200 (ORD-202610-0009), and the DB has total 135 and iva 14.46 (=135-135/1.12). Productos: the New and Edit forms have no 'Afecto a IVA' checkbox. Created TEST_IVA_Incluido (POST 200) and edited the sale price to 224 (PUT 200); both persisted in the table.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "POS Clínica sale with Fenilefrina 2.5% gotas", "issue": "POST /api/ventas returned 400 'Stock insuficiente para Fenilefrina 2.5% gotas' even though the card shows 15 (the product list shows 43 und). Lot-level stock in Dispensario doesn't match the stock shown on the card. Looks like a pre-existing data or lot problem, not caused by the IVA change.", "affected_selectors": ["[data-testid^='producto-']", "[data-testid='btn-confirmar-venta']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: the product Excel template/import (Productos.js lines ~409, 423, 1422) still lists the 'afecto_iva' column. Remove it there too for consistency with the form.",
+    "Optional: look into why Fenilefrina's card stock (15) doesn't match its lot stock in Dispensario (sale rejected as insufficient)."
+  ],
+  "critical_code_review_comments": [
+    "PuntoVenta.js calcularTotales: total = subtotal - descGlobal and ignores descItems. That is correct today because item.descuento is always 0, but if per-item discounts are added later, keep it in line with the backend (item_subtotal already subtracts item.descuento).",
+    "PuntoVenta.js line 372: adding the same product again recomputes subtotal without subtracting item.descuento, while actualizarCantidad (line 420) does subtract it. This is inconsistent, but harmless while descuento=0.",
+    "The margin % in Productos is calculated on the IVA-included sale price. Business may want margin on the net price (precio/1.12)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (frontend only)", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Created clinic sale VTA-20261029-0004 (Q270, 10% disc, autoriza TEST_Autoriza), óptica sale ORD-202610-0009 (Q135, 10% disc, TEST_Autoriza), and product TEST_IVA_Incluido (PROD-00023, precio_venta 224).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Caja is open in preview. Clinic POS testids: pv-descuento-pct, pv-descuento-autoriza, btn-cobrar, 'Agregar Efectivo' button, btn-confirmar-venta. Óptica POS: hover a card and click the visible 'Agregar' button; testids pos-optica-descuento-pct/-autoriza, pos-pagar-btn; in the dialog click 'Monto exacto', then the '+' button (div.flex.items-end button), then 'Confirmar Venta'. Use services (Consulta Oftalmológica General 300) for clinic sales to avoid lot-stock errors."
+}
