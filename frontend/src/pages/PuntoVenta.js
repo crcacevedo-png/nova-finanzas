@@ -385,6 +385,9 @@ const PuntoVenta = () => {
           nombre: producto.nombre,
           cantidad: 1,
           precio_unitario: producto.precio_venta,
+          precio_lista: producto.precio_venta,
+          precio_compra: producto.precio_compra || 0,
+          precio_variable: false,
           descuento: 0,
           subtotal: producto.precio_venta,
           afecto_iva: producto.afecto_iva,
@@ -425,6 +428,23 @@ const PuntoVenta = () => {
 
   const eliminarDelCarrito = (productoId) => {
     setCarrito(prev => prev.filter(item => item.producto_id !== productoId));
+  };
+
+  const togglePrecioVariable = (productoId) => {
+    setCarrito(prev => prev.map(item =>
+      item.producto_id === productoId
+        ? { ...item, precio_variable: !item.precio_variable }
+        : item
+    ));
+  };
+
+  const actualizarPrecio = (productoId, nuevoPrecio) => {
+    const val = parseFloat(nuevoPrecio);
+    setCarrito(prev => prev.map(item => {
+      if (item.producto_id !== productoId) return item;
+      const precio = isNaN(val) ? 0 : val;
+      return { ...item, precio_unitario: precio, subtotal: item.cantidad * precio - item.descuento };
+    }));
   };
 
   const limpiarCarrito = () => {
@@ -568,6 +588,15 @@ const PuntoVenta = () => {
       toast.error('Indique quién autoriza el descuento');
       return;
     }
+
+    // Precio variable: no puede ser menor al costo registrado del artículo
+    const itemBajoCosto = carrito.find(
+      item => item.precio_variable && (item.precio_compra || 0) > 0 && item.precio_unitario < item.precio_compra
+    );
+    if (itemBajoCosto) {
+      toast.error(`El precio de "${itemBajoCosto.nombre}" no puede ser menor al costo (${formatCurrency(itemBajoCosto.precio_compra)})`);
+      return;
+    }
     
     setSubmitting(true);
     
@@ -600,7 +629,9 @@ const PuntoVenta = () => {
           precio_unitario: item.precio_unitario,
           descuento: item.descuento,
           subtotal: item.subtotal,
-          afecto_iva: item.afecto_iva
+          afecto_iva: item.afecto_iva,
+          precio_variable: item.precio_variable || false,
+          precio_lista: item.precio_lista ?? item.precio_unitario
         })),
         formas_pago: formasPagoData,
         descuento_porcentaje: parseFloat(descuentoPorcentaje) || 0,
@@ -1349,18 +1380,49 @@ const PuntoVenta = () => {
                           <p className="text-sm font-medium text-slate-800 line-clamp-1">
                             {item.nombre}
                           </p>
-                          <p className="text-xs text-slate-500">
-                            {formatCurrency(item.precio_unitario)} c/u
-                          </p>
+                          {item.precio_variable ? (
+                            <div className="flex items-center gap-1 mt-1">
+                              <span className="text-xs text-slate-500">Q</span>
+                              <Input
+                                type="number"
+                                min={item.precio_compra || 0}
+                                step="0.01"
+                                value={item.precio_unitario}
+                                onChange={(e) => actualizarPrecio(item.producto_id, e.target.value)}
+                                className={`h-7 w-24 text-xs ${item.precio_unitario < (item.precio_compra || 0) ? 'border-red-500 focus-visible:ring-red-500' : 'border-amber-400'}`}
+                                data-testid={`pv-precio-variable-input-${item.producto_id}`}
+                              />
+                              <span className="text-xs text-slate-400">c/u</span>
+                              {item.precio_unitario < (item.precio_compra || 0) && (
+                                <span className="text-[10px] font-medium text-red-600">menor al costo</span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500">
+                              {formatCurrency(item.precio_unitario)} c/u
+                            </p>
+                          )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => eliminarDelCarrito(item.producto_id)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`h-6 w-6 p-0 ${item.precio_variable ? 'text-amber-600 bg-amber-50' : 'text-slate-400 hover:text-blue-600'}`}
+                            onClick={() => togglePrecioVariable(item.producto_id)}
+                            title="Precio variable"
+                            data-testid={`pv-precio-variable-toggle-${item.producto_id}`}
+                          >
+                            <Tag className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => eliminarDelCarrito(item.producto_id)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                       
                       <div className="flex items-center justify-between">

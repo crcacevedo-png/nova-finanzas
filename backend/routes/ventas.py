@@ -28,6 +28,9 @@ class VentaItem(BaseModel):
     descuento: float = Field(default=0, ge=0)
     subtotal: float = 0
     afecto_iva: bool = True
+    # Precio variable (solo POS clínica): precio distinto al de lista para este renglón
+    precio_variable: bool = False
+    precio_lista: Optional[float] = None
     # Campos para trazabilidad de lotes (se llenan al confirmar)
     lotes_consumidos: List[dict] = []
 
@@ -539,6 +542,15 @@ async def crear_venta(
         if not producto.get("activo", True):
             raise HTTPException(status_code=400, detail=f"Producto '{producto['nombre']}' no está activo")
         
+        # Precio variable: validar que no sea menor al costo registrado del artículo
+        precio_lista = producto.get("precio_venta", item.precio_unitario)
+        costo = producto.get("precio_compra", 0) or 0
+        if item.precio_variable and costo > 0 and item.precio_unitario < costo:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El precio de '{producto['nombre']}' no puede ser menor al costo ({costo})"
+            )
+        
         # Calcular subtotal del item
         item_subtotal = item.cantidad * item.precio_unitario - item.descuento
         subtotal += item_subtotal
@@ -557,6 +569,8 @@ async def crear_venta(
             "descuento": item.descuento,
             "subtotal": item_subtotal,
             "afecto_iva": item.afecto_iva,
+            "precio_variable": item.precio_variable,
+            "precio_lista": precio_lista if item.precio_variable else None,
             "lotes_consumidos": []
         })
         
