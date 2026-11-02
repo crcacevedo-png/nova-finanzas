@@ -465,7 +465,10 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
       (NO se vuelven a contar como ingreso para evitar duplicar).
     - conciliacion_cajas: arqueo de cada caja clínica (esperado vs contado).
     """
-    inicio, fin = dia_gt_a_rango_utc(fecha_dia)
+    try:
+        inicio, fin = dia_gt_a_rango_utc(fecha_dia)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida, use formato YYYY-MM-DD")
 
     facturado = 0.0
     cxc_generada = 0.0
@@ -482,15 +485,18 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
             }
         return por_usuario[key]
 
-    # ===== CLÍNICA: ventas del día (campo fecha = día GT) =====
+    # ===== CLÍNICA: ventas del día (campo fecha = ISO UTC -> rango del día GT) =====
     ventas_cli = await db.ventas.find(
-        {"origen": "clinica", "fecha": fecha_dia}, {"_id": 0}
+        {"origen": "clinica", "estado": {"$ne": "anulada"}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
     ).to_list(5000)
     for v in ventas_cli:
         total = v.get("total", 0) or 0
         formas = v.get("formas_pago", [])
         cobrado_v = sum((fp.get("monto", 0) or 0) for fp in formas if fp.get("metodo") != "Cuenta por Cobrar")
         cxc_v = sum((fp.get("monto", 0) or 0) for fp in formas if fp.get("metodo") == "Cuenta por Cobrar")
+        # formas_pago guarda el efectivo RECIBIDO (incluye vuelto): limitar a lo aplicado a la venta
+        cxc_v = min(cxc_v, total)
+        cobrado_v = max(0.0, min(cobrado_v, total - cxc_v))
         facturado += total
         cxc_generada += cxc_v
         cobrado_de_ventas_hoy += cobrado_v
@@ -505,7 +511,7 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
 
     # ===== ÓPTICA: ventas del día (created_at ISO) =====
     ventas_opt = await db.optica_sales.find(
-        {"created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+        {"created_at": {"$gte": inicio, "$lte": fin}, "status": {"$ne": "cancelado"}}, {"_id": 0}
     ).to_list(5000)
     sale_ids = [s["id"] for s in ventas_opt]
     pagos_hoy_por_venta = {}
@@ -535,7 +541,7 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
     cobrado_metodos = {m: 0.0 for m in _METODOS_CAJA}
     cobrado_metodos["otro"] = 0.0
     movs = await db.caja_movimientos.find(
-        {"origen": "clinica", "tipo": "Ingreso", "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+        {"origen": "clinica", "tipo": "Ingreso", "anulado": {"$ne": True}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
     ).to_list(10000)
     for m in movs:
         k = _norm_metodo_cierre(m.get("metodo_pago"))
@@ -543,12 +549,22 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
     pagos_opt_hoy = await db.optica_sale_payments.find(
         {"created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
     ).to_list(10000)
+    # Excluir pagos de ventas de óptica canceladas
+    pago_sale_ids = list({p.get("sale_id") for p in pagos_opt_hoy if p.get("sale_id")})
+    canceladas = set()
+    if pago_sale_ids:
+        cancel_docs = await db.optica_sales.find(
+            {"id": {"$in": pago_sale_ids}, "status": "cancelado"}, {"_id": 0, "id": 1}
+        ).to_list(10000)
+        canceladas = {d["id"] for d in cancel_docs}
     for p in pagos_opt_hoy:
+        if p.get("sale_id") in canceladas:
+            continue
         k = _norm_metodo_cierre(p.get("payment_method"))
         cobrado_metodos[k] = cobrado_metodos.get(k, 0.0) + (p.get("amount", 0) or 0)
 
     movs_eg = await db.caja_movimientos.find(
-        {"origen": "clinica", "tipo": "Egreso", "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+        {"origen": "clinica", "tipo": "Egreso", "anulado": {"$ne": True}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
     ).to_list(10000)
     egresos_total = sum((m.get("monto", 0) or 0) for m in movs_eg)
 

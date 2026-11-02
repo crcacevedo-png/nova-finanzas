@@ -1,0 +1,51 @@
+{
+  "summary": "Tested Cierre del Día (backend+UI), the manual and cron email send, and the CxC descripcion field. Found and FIXED a CRITICAL bug in calcular_cierre_diario: clinic sales (db.ventas.fecha is a full ISO UTC timestamp) were queried with exact match {'fecha': 'YYYY-MM-DD'}, so ALL Clínica POS sales were excluded from the cierre (today showed Q150 = only óptica; after fix it shows Q955 with 5 clinic + 2 óptica sales). Also fixed: anulled/cancelled sales were counted, anulled caja movements were counted, cash change (vuelto) inflated cobrado so the devengado invariant broke, and an invalid fecha caused a 500. After the fixes: 12/12 backend tests pass (the email test passed in run 1 and was excluded later to avoid spamming recipients). UI checks pass: nav, cards, tables, date change, refresh, email toast, and CxC descripcion in list and detail for both óptica and clínica.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/caja/cierre-diario", "issue": "FIXED BY T1: clinic ventas query used exact match on 'fecha' (stored as ISO UTC datetime) so clinic sales never appeared; changed to the GT day range {'$gte': inicio, '$lte': fin}", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/caja/cierre-diario", "issue": "FIXED BY T1: anulled clinic sales (estado='anulada'), cancelled optica sales (status='cancelado') and anulled caja_movimientos (anulado=True) were counted"},
+      {"endpoint": "GET /api/caja/cierre-diario", "issue": "FIXED BY T1: formas_pago stores cash RECEIVED (including change), so cobrado_de_ventas_hoy was overstated (e.g. total 683.2 vs paid 700) and ingreso_facturado != cobrado + cxc. Now cobrado is clamped to total - cxc"},
+      {"endpoint": "GET /api/caja/cierre-diario?fecha=bad", "issue": "FIXED BY T1: returned 500, now returns 400"},
+      {"endpoint": "GET /api/caja/cierre-diario", "issue": "NOT FIXED: optica_sale_payments of a cancelled optica sale are still counted in cobrado_por_metodo. Decide whether cancelling refunds those payments"},
+      {"endpoint": "GET /api/caja/cierre-diario", "issue": "NOT FIXED: CxC created manually (POST /cuentas-cobrar/optica or /clinica without a sale) are not counted as ingreso of the day. Only CxC that come from POS sales count. Confirm this matches the devengado requirement"},
+      {"endpoint": "POST /api/ventas", "issue": "NOT FIXED (pre-existing): accepts a 'Cuenta por Cobrar' forma_pago larger than the sale total (sale total 25, CxC created for 28, 'cambio' 3). CxC should be capped or rejected"},
+      {"endpoint": "GET /api/ventas/productos", "issue": "NOT FIXED (pre-existing data): products show existencia>2, but the sale fails with 'Stock insuficiente ... lote' (BSS Plus 500ml, Cuchillete 2.75mm, Dorzolamida/Timolol). Lot stock does not match existencia"},
+      {"endpoint": "POST /api/caja/cierre-diario/enviar", "issue": "Provider blocks drampalma@novavision.me as undeliverable (422). The code handles it and continues (expected per E1), but this recipient never receives the report"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Layout sidebar Finanzas group", "issue": "'/cierre-diario' is missing from the auto-open list (finanzasOpen initial state) and from the active-highlight list, so on direct load or refresh of /cierre-diario the Finanzas group is collapsed and not highlighted", "selector": "[data-testid='nav-finanzas']", "priority": "LOW"},
+      {"component": "CXCDetalleDialog (clínica)", "issue": "Pre-existing: a Cancelado CxC still shows an enabled 'Registrar Abono' button and Saldo Q28. Fecha de Emisión shows 01/11/26 for a CxC emitted 2026-11-02 (date-only string parsed as UTC then shown in local time)", "selector": "[data-testid='cxc-detalle-descripcion']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Cierre del Día", "issues": ["The date picker is the native browser <input type='date'> instead of the shadcn Calendar/Popover", "On a busy day the warning toast for a rejected recipient overlaps the 'Enviar por correo' button area (cosmetic)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_cierre_diario.py", "/app/test_reports/pytest/pytest_cierre_diario.xml"],
+  "action_items": [
+    "Review T1's fixes in /app/backend/routes/caja.py calcular_cierre_diario: date-range query for clinic ventas, filters for anulada/cancelado/anulado, cash-change clamp, 400 on invalid fecha",
+    "Decide whether payments of cancelled optica sales should be excluded from cobrado",
+    "Decide whether manual CxC (not from a sale) should count toward ingreso_facturado of the day",
+    "Add '/cierre-diario' to the Finanzas auto-open and active-path arrays in Layout.js",
+    "Validate in POST /api/ventas that the CxC amount is not greater than the sale total",
+    "Optional: use the shadcn Calendar for cierre-fecha-input; hide Registrar Abono for Cancelado/Anulado CxC"
+  ],
+  "critical_code_review_comments": [
+    "caja.py is 1270+ lines; consider moving the cierre-diario logic to its own module",
+    "Existing caja reports (calcular_totales_caja_dia etc.) also do not filter anulado movements. Systemic: anulled sales may still affect arqueo/esperado",
+    "email_service: EMAIL_FROM_NAME has a default value (minor, against the no-defaults env rule); destinatarios come from CIERRE_DIARIO_EMAILS env, which is fine",
+    "The cron endpoint correctly uses hmac.compare_digest and BackgroundTasks"
+  ],
+  "updated_files": ["/app/backend/routes/caja.py", "/app/backend/tests/test_cierre_diario.py"],
+  "success_rate": {"backend": "100% after T1 fixes (12/12 + email test passed once); 1 critical bug found before fix", "frontend": "100% of requested flows"},
+  "test_credentials": "superadmin/nova2024, usuario/user2024 (403 check); WEBHOOK_CRON_SECRET from backend/.env",
+  "seed_data_creation": "Created TEST_ clinic POS sales with CxC (VTA-20261102-0010, -0014, -0018 and others), all anulled. Created TEST_ optica CxCs, anulled. Possibly created responsable 'TEST_Responsable Cierre' (only if none existed).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... pytest tests/test_cierre_diario.py -k 'not enviar_manual' (skip the email test to avoid emailing real recipients). Preview date is 2026-11-02 and today's cierre shows Q955 (5 clínica + 2 óptica). 2026-07-29 has an optica sale with CxC 350 and abonos previos 300.",
+  "rca of the issue": "Clinic ventas store 'fecha' as now.isoformat() (UTC datetime), while caja_cierres store 'fecha' as a GT date string. calcular_cierre_diario reused the caja_cierres date-string pattern for ventas, so the exact match never hit. Other endpoints (/ventas/hoy, /ventas/resumen-dia) correctly use dia_gt_a_rango_utc. Mitigation applied: use the same range query."
+}
