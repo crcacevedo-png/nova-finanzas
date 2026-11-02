@@ -1,5 +1,19 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-10-29 — Precio variable por renglón en POS de Clínica — Fase 1 MVP
+**Plan aprobado:** permitir cambiar el precio de un artículo al vender (solo POS clínica), con mínimo = costo (precio_compra), sin tope superior, sin autorización. Se marca internamente el renglón como precio variable y se guarda el precio de lista original; el comprobante NO muestra la marca. Óptica sin cambios.
+**Backend (`routes/ventas.py`):**
+- `VentaItem` + `precio_variable: bool`, `precio_lista: Optional[float]`.
+- En el loop de venta: si `precio_variable` valida `precio_unitario >= precio_compra` (400 si es menor y costo>0); si NO es variable, fuerza `precio_unitario = precio_venta` (lista) — evita bypass. Guarda `precio_variable` y `precio_lista` en el item.
+- `ProductoPOSResponse` + `precio_compra` (poblado en `/productos` y `/productos-rapidos`) para que la UI valide el costo.
+**Frontend (`PuntoVenta.js`):**
+- Ícono Tag por renglón (`pv-precio-variable-toggle-<id>`) que activa input editable (`pv-precio-variable-input-<id>`); borde rojo + 'menor al costo' si < costo; recálculo inmediato del total.
+- Toggle OFF restaura el precio de lista. Pre-chequeos antes de cobrar: precio>0 y precio>=costo. Payload envía `precio_variable` y `precio_lista`.
+**Testing:** it.108 (6/7) → correcciones → it.109 (retest, ambos HIGH corregidos, 95%, sin retest pendiente). DB confirma item con precio_variable=true, precio_lista=100, precio_unitario=150; renglón no variable guarda precio de lista. Comprobante sin marca de precio variable. Óptica sin cambios.
+**Futuro:** Fase 2 reporte de ventas con precio variable (lista/aplicado/diferencia/usuario) + margen sobre costo; Fase 3 políticas por rol/categoría.
+
+
+
 ## 2026-10-29 — IVA incluido en el precio (todo el sistema) — Fase 1 MVP
 **Plan aprobado:** el precio del producto ya incluye el IVA; el sistema deja de sumar 12% por encima. Total = suma de precios − descuento. El IVA se calcula "hacia adentro" (total − total/1.12) después del descuento, solo para contabilidad, y permanece oculto en pantalla/tickets. Aplica a POS Clínica y Óptica. Ventas históricas NO se recalculan.
 **Backend:**

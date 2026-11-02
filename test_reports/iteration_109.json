@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend retest of Precio Variable in the Clinic POS (/punto-venta) after iteration 108. Both HIGH bugs are FIXED. (1) Below cost: typing 40 when cost is 60 shows a red border and the 'menor al costo' label. When the user tries to pay, the frontend pre-check toast appears: 'El precio de \"TEST_PV_Servicio\" no puede ser menor al costo (Q 60.00)'. No POST /api/ventas is sent. (2) Toggle OFF: set the price to 20, then turn the toggle off. The price goes back to Q100 and the total is recalculated. The next sale payload sends precio_unitario=100, precio_variable=false, and the DB stores 100. A valid variable price of 150 creates the sale, and the DB has precio_variable=true, precio_lista=100, precio_unitario=150. /api/ventas/productos and /productos-rapidos now return precio_compra. Regression PASS: 10% discount without an authorizer is blocked, and with TEST_Gerente the sale is saved at Q135. The detail dialog and the ticket API show only the charged price with no variable-price mark. Optica POS has no pv-precio-variable elements. One minor issue: the 'Ingrese un precio válido' toast is effectively unreachable (details below), but the sale is still blocked in every 0/empty case.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PuntoVenta confirmarVenta / payment dialog", "issue": "With a 0 or empty variable price, the 'Ingrese un precio válido' toast never showed. (a) If the product has cost > 0, the cost check runs first, so the user sees the 'menor al costo (Q 60.00)' toast instead. (b) If that line is the only item, the total is Q0, so 'Agregar Efectivo' adds nothing and btn-confirmar-venta stays disabled with no explanation. The sale is never created, so this is UX only. Suggested fix: run the precio>0 check before the cost check, and run it in abrirDialogoPago so the user gets the message when clicking Cobrar.", "selector": "btn-cobrar / btn-confirmar-venta", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional (LOW): move the precio<=0 validation ahead of the cost check and into abrirDialogoPago so 'Ingrese un precio válido' is shown when the price is 0 or empty"
+  ],
+  "critical_code_review_comments": [
+    "PuntoVenta.js is about 2028 lines and should be split (cart, payment dialog, sales-of-day dialog)",
+    "actualizarPrecio turns an empty input into 0, so the line instantly shows Q0.00. Consider keeping the raw string while editing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only); product endpoints spot-checked OK", "frontend": "95% (all 6 requested checks pass; the 'Ingrese un precio válido' message is not surfaced, but the sale is still blocked)"},
+  "seed_data_creation": "Reused product test-pv-servicio-0001 (TEST_PV_Servicio, list 100, cost 60). Created sales VTA-20261102-0003 (Q100, toggle-off), VTA-20261102-0004 (Q150, PV), VTA-20261102-0005 (id c8f67df1-74d0-47de-80eb-9d1eb0681b02, PV 150 with 10% discount authorized by TEST_Gerente = Q135).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Payment flow: btn-cobrar, then 'Todo', then 'Agregar Efectivo', then btn-confirmar-venta. Capture the POST /api/ventas request to check the payload. Product with stock for mixed carts: 605fc05e-8161-4f70-9689-6638b57ae34e (Consulta Oftalmológica General, Q300, cost 0). The first quick product (Acetazolamida) has stock 0.",
+  "test_credentials": "superadmin / nova2024 (from /app/memory/test_credentials.md)"
+}

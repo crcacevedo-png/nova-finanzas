@@ -599,19 +599,19 @@ const PuntoVenta = () => {
       return;
     }
 
-    // Precio variable: no puede ser menor al costo registrado del artículo
-    const itemBajoCosto = carrito.find(
-      item => item.precio_variable && (item.precio_compra || 0) > 0 && item.precio_unitario < item.precio_compra
-    );
-    if (itemBajoCosto) {
-      toast.error(`El precio de "${itemBajoCosto.nombre}" no puede ser menor al costo (${formatCurrency(itemBajoCosto.precio_compra)})`);
-      return;
-    }
+    // Precio variable: validar precio > 0 y que no sea menor al costo
     const itemPrecioInvalido = carrito.find(
       item => item.precio_variable && (!item.precio_unitario || item.precio_unitario <= 0)
     );
     if (itemPrecioInvalido) {
       toast.error(`Ingrese un precio válido para "${itemPrecioInvalido.nombre}"`);
+      return;
+    }
+    const itemBajoCosto = carrito.find(
+      item => item.precio_variable && (item.precio_compra || 0) > 0 && item.precio_unitario < item.precio_compra
+    );
+    if (itemBajoCosto) {
+      toast.error(`El precio de "${itemBajoCosto.nombre}" no puede ser menor al costo (${formatCurrency(itemBajoCosto.precio_compra)})`);
       return;
     }
     
