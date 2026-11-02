@@ -1,5 +1,17 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-11-02 — Rol óptica: acceso al Punto de Venta de CLÍNICA
+**Pedido:** el usuario óptica ya tenía Caja, pero faltaba el Punto de Venta de clínica (`/punto-venta`).
+**Causa:** el POS de clínica exige el permiso `manage_sales` (ventas.py `get_current_user_dependency`), que el rol óptica no tenía; y no había ítem de menú de POS clínica para óptica.
+**Fix:**
+- `frontend/src/components/Layout.js` — ítem "Punto de Venta Clínica" (`/punto-venta`, testid `nav-optica-pos-clinica`) en la sección Óptica, visible con `hasPermission('manage_sales')`.
+- `backend/server.py` — `_MODULE_PERMS['optica'].manage_sales = True` (default del sistema).
+- `backend/server.py` (startup) — migración idempotente: `db.roles['optica']` recibe `manage_caja=true` y `manage_sales=true` en cada arranque (asegura que producción obtenga el permiso tras el redeploy, aunque el doc de rol ya exista; `resolve_permissions` fusiona default + db.roles).
+**Verificado (preview):** óptica → `/auth/me` manage_sales=true; el menú muestra "Punto de Venta Clínica" y la ruta `/punto-venta` carga sin 403.
+**IMPORTANTE:** requiere REDEPLOY (la migración corre al iniciar el backend en producción) y que los usuarios óptica cierren sesión y vuelvan a entrar.
+
+
+
 ## 2026-11-02 — FIX: menú del rol óptica (POS, CxC ya por config; Caja por código)
 **Síntoma (producción):** el usuario óptica tenía permisos de POS óptica, Cuentas por Cobrar y Caja, pero no aparecían en el menú.
 **RCA (deployer, lectura de prod):** el menú se controla por `menu_configurations` (Menús por Rol), NO por permisos. POS óptica y CxC óptica YA estaban habilitados en la config de prod (editada por superadmin) → solo requieren re-login (los menús se cargan al iniciar sesión). 'Caja' NO podía aparecer para óptica por código: en `Layout.js` el bloque Finanzas (con Caja) está excluido para rol óptica y no existía ítem de Caja para óptica.

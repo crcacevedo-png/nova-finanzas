@@ -528,7 +528,7 @@ _MODULE_PERMS = {
     "superadmin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
     "admin": {"view_inventory": True, "manage_inventory": True, "manage_sales": True, "manage_caja": True},
     "usuario": {"view_inventory": True, "manage_inventory": False, "manage_sales": True, "manage_caja": True},
-    "optica": {"view_inventory": False, "manage_inventory": False, "manage_sales": False, "manage_caja": True},
+    "optica": {"view_inventory": False, "manage_inventory": False, "manage_sales": True, "manage_caja": True},
 }
 for _rol, _perms_mod in _MODULE_PERMS.items():
     PERMISSIONS.setdefault(_rol, {}).update(_perms_mod)
@@ -4470,6 +4470,16 @@ async def startup_event():
             {"name": "administrador_igss", "permissions.view_evaluacion": {"$ne": True}},
             {"$set": {"permissions.view_evaluacion": True, "updated_at": datetime.now(timezone.utc).isoformat()}}
         )
+
+    # Migración idempotente: el rol óptica puede operar Caja y Punto de Venta de clínica
+    await db.roles.update_one(
+        {"name": "optica"},
+        {"$set": {
+            "permissions.manage_caja": True,
+            "permissions.manage_sales": True,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
     # Índice único por token de la blacklist
