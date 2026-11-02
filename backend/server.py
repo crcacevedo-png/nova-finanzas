@@ -3078,6 +3078,10 @@ api_router.include_router(caja_catalogos_router, tags=["Caja - Catálogos"])
 api_router.include_router(caja_cxc_router, tags=["Caja - CxC"])
 api_router.include_router(caja_cierres_financieros_router, tags=["Caja - Cierres Financieros"])
 
+# Servicio de correo (cierre diario por email + cron)
+from routes.email_service import router as email_service_router
+api_router.include_router(email_service_router, tags=["Email - Cierre Diario"])
+
 # ==================== MÓDULO DE AGENDA - PACIENTES ====================
 # Rutas para la agenda de citas de pacientes (INDEPENDIENTE de Sala de Operaciones)
 from routes.agenda import (

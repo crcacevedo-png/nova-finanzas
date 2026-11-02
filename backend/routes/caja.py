@@ -440,6 +440,173 @@ async def get_caja_consolidado(
     }
 
 
+# ==================== CIERRE DIARIO CONSOLIDADO (DIAGNÓSTICO) ====================
+
+_METODOS_CAJA = ["efectivo", "tarjeta", "transferencia", "cheque"]
+
+
+def _norm_metodo_cierre(m: Optional[str]) -> str:
+    m = (m or "efectivo").strip().lower()
+    if m in ("cuenta por cobrar", "credito", "crédito", "cxc"):
+        return "cxc"
+    if m not in _METODOS_CAJA:
+        return "otro"
+    return m
+
+
+async def calcular_cierre_diario(fecha_dia: str) -> dict:
+    """Diagnóstico de cierre del día de TODOS los usuarios (clínica + óptica).
+
+    - ingreso_facturado: total vendido el día (incluye lo que quedó en CxC -> las
+      cuentas por cobrar cuentan como ingreso del día en que se generan).
+    - total_cobrado: dinero realmente recibido en el día, por método de pago.
+    - cxc_generada_hoy: parte de las ventas de hoy que quedó pendiente de cobro.
+    - abonos_cuentas_previas: cobros recibidos hoy de cuentas de días anteriores
+      (NO se vuelven a contar como ingreso para evitar duplicar).
+    - conciliacion_cajas: arqueo de cada caja clínica (esperado vs contado).
+    """
+    inicio, fin = dia_gt_a_rango_utc(fecha_dia)
+
+    facturado = 0.0
+    cxc_generada = 0.0
+    cobrado_de_ventas_hoy = 0.0
+    por_usuario = {}
+    ventas_detalle = []
+
+    def _usr(uid, nombre):
+        key = uid or "—"
+        if key not in por_usuario:
+            por_usuario[key] = {
+                "usuario_id": key, "usuario_nombre": nombre or "—",
+                "facturado": 0.0, "cobrado": 0.0, "cxc_generada": 0.0, "num_ventas": 0
+            }
+        return por_usuario[key]
+
+    # ===== CLÍNICA: ventas del día (campo fecha = día GT) =====
+    ventas_cli = await db.ventas.find(
+        {"origen": "clinica", "fecha": fecha_dia}, {"_id": 0}
+    ).to_list(5000)
+    for v in ventas_cli:
+        total = v.get("total", 0) or 0
+        formas = v.get("formas_pago", [])
+        cobrado_v = sum((fp.get("monto", 0) or 0) for fp in formas if fp.get("metodo") != "Cuenta por Cobrar")
+        cxc_v = sum((fp.get("monto", 0) or 0) for fp in formas if fp.get("metodo") == "Cuenta por Cobrar")
+        facturado += total
+        cxc_generada += cxc_v
+        cobrado_de_ventas_hoy += cobrado_v
+        u = _usr(v.get("vendedor_id"), v.get("vendedor_nombre"))
+        u["facturado"] += total; u["cobrado"] += cobrado_v; u["cxc_generada"] += cxc_v; u["num_ventas"] += 1
+        ventas_detalle.append({
+            "modulo": "Clínica", "numero": v.get("numero_venta"),
+            "usuario": v.get("vendedor_nombre") or "—",
+            "cliente": v.get("paciente_nombre") or "Cliente General",
+            "total": round(total, 2), "cobrado": round(cobrado_v, 2), "pendiente": round(cxc_v, 2),
+        })
+
+    # ===== ÓPTICA: ventas del día (created_at ISO) =====
+    ventas_opt = await db.optica_sales.find(
+        {"created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(5000)
+    sale_ids = [s["id"] for s in ventas_opt]
+    pagos_hoy_por_venta = {}
+    if sale_ids:
+        pagos = await db.optica_sale_payments.find(
+            {"sale_id": {"$in": sale_ids}, "created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+        ).to_list(10000)
+        for p in pagos:
+            pagos_hoy_por_venta[p["sale_id"]] = pagos_hoy_por_venta.get(p["sale_id"], 0.0) + (p.get("amount", 0) or 0)
+    for s in ventas_opt:
+        total = s.get("total", 0) or 0
+        cobrado_v = pagos_hoy_por_venta.get(s["id"], 0.0)
+        cxc_v = max(0.0, round(total - cobrado_v, 2))
+        facturado += total
+        cxc_generada += cxc_v
+        cobrado_de_ventas_hoy += cobrado_v
+        u = _usr(s.get("created_by"), s.get("created_by_name"))
+        u["facturado"] += total; u["cobrado"] += cobrado_v; u["cxc_generada"] += cxc_v; u["num_ventas"] += 1
+        ventas_detalle.append({
+            "modulo": "Óptica", "numero": s.get("order_number"),
+            "usuario": s.get("created_by_name") or "—",
+            "cliente": s.get("patient_name") or "Cliente",
+            "total": round(total, 2), "cobrado": round(cobrado_v, 2), "pendiente": cxc_v,
+        })
+
+    # ===== COBRADO DEL DÍA por método (dinero real recibido) =====
+    cobrado_metodos = {m: 0.0 for m in _METODOS_CAJA}
+    cobrado_metodos["otro"] = 0.0
+    movs = await db.caja_movimientos.find(
+        {"origen": "clinica", "tipo": "Ingreso", "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(10000)
+    for m in movs:
+        k = _norm_metodo_cierre(m.get("metodo_pago"))
+        cobrado_metodos[k] = cobrado_metodos.get(k, 0.0) + (m.get("monto", 0) or 0)
+    pagos_opt_hoy = await db.optica_sale_payments.find(
+        {"created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(10000)
+    for p in pagos_opt_hoy:
+        k = _norm_metodo_cierre(p.get("payment_method"))
+        cobrado_metodos[k] = cobrado_metodos.get(k, 0.0) + (p.get("amount", 0) or 0)
+
+    movs_eg = await db.caja_movimientos.find(
+        {"origen": "clinica", "tipo": "Egreso", "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(10000)
+    egresos_total = sum((m.get("monto", 0) or 0) for m in movs_eg)
+
+    total_cobrado_dia = sum(cobrado_metodos.values())
+    abonos_cuentas_previas = max(0.0, round(total_cobrado_dia - cobrado_de_ventas_hoy, 2))
+
+    # ===== CONCILIACIÓN DE CAJAS (clínica) =====
+    cajas = await db.caja_cierres.find(
+        {"origen": "clinica", "fecha": fecha_dia}, {"_id": 0}
+    ).sort("fecha_apertura", 1).to_list(500)
+    conciliacion = []
+    for c in cajas:
+        totales = await calcular_totales_caja_dia(fecha_dia, cajero_id=c.get("abierto_por"))
+        esperado = c.get("monto_apertura", 0) + totales["ingresos"]["efectivo"] - totales["egresos"]["efectivo"]
+        contado = c.get("efectivo_contado")
+        diferencia = round(contado - esperado, 2) if contado is not None else None
+        conciliacion.append({
+            "cajero": c.get("abierto_por_nombre") or "—",
+            "estado": c.get("estado"),
+            "monto_apertura": round(c.get("monto_apertura", 0), 2),
+            "efectivo_esperado": round(esperado, 2),
+            "efectivo_contado": contado,
+            "diferencia": diferencia,
+        })
+
+    por_usuario_list = sorted(por_usuario.values(), key=lambda x: x["facturado"], reverse=True)
+    for u in por_usuario_list:
+        for k in ("facturado", "cobrado", "cxc_generada"):
+            u[k] = round(u[k], 2)
+
+    return {
+        "fecha": fecha_dia,
+        "resumen": {
+            "ingreso_facturado": round(facturado, 2),
+            "total_cobrado": round(total_cobrado_dia, 2),
+            "cxc_generada_hoy": round(cxc_generada, 2),
+            "cobrado_de_ventas_hoy": round(cobrado_de_ventas_hoy, 2),
+            "abonos_cuentas_previas": abonos_cuentas_previas,
+            "egresos": round(egresos_total, 2),
+            "num_ventas": len(ventas_detalle),
+        },
+        "cobrado_por_metodo": {k: round(v, 2) for k, v in cobrado_metodos.items()},
+        "por_usuario": por_usuario_list,
+        "conciliacion_cajas": conciliacion,
+        "ventas": sorted(ventas_detalle, key=lambda x: x["total"], reverse=True),
+    }
+
+
+@router.get("/cierre-diario")
+async def get_cierre_diario(
+    fecha: Optional[str] = None,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Diagnóstico de cierre del día (todos los usuarios, clínica + óptica)."""
+    fecha_dia = fecha or today_str_gt()
+    return await calcular_cierre_diario(fecha_dia)
+
+
 @router.post("/consolidado/{cierre_id}/cerrar", response_model=CajaCierreResponse)
 async def cerrar_caja_supervisor(
     cierre_id: str,

@@ -24,6 +24,7 @@ import {
   Eye,
   Package,
   Wallet,
+  Calculator,
   ClipboardCheck,
   Scissors,
   Shield,
@@ -141,6 +142,7 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('finanzas_pagos')) finanzasItems.push({ path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_autorizaciones')) finanzasItems.push({ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' });
+    if (isAdminOrSuperAdmin) finanzasItems.push({ path: '/cierre-diario', icon: Calculator, label: 'Cierre del Día', testId: 'nav-cierre-diario' });
   }
   
   // Inventario sub-items - Filtrados por configuración de menús

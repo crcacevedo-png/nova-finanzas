@@ -114,6 +114,11 @@ const CXCDetalleDialog = ({
             <div className="p-4 rounded-lg border" style={{ borderColor: 'var(--border-color)' }}>
               <Label className="text-sm text-slate-500">Concepto</Label>
               <p className="font-medium mt-1">{cuenta.concepto}</p>
+              {cuenta.descripcion && (
+                <p className="text-sm text-slate-600 mt-2" data-testid="cxc-detalle-descripcion">
+                  Servicio: {cuenta.descripcion}
+                </p>
+              )}
               {cuenta.notas && (
                 <p className="text-sm text-slate-500 mt-2">
                   Notas: {cuenta.notas}

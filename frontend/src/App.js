@@ -29,6 +29,7 @@ import AuditLogs from './pages/AuditLogs';
 import Respaldos from './pages/Respaldos';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
+import CierreDiario from './pages/CierreDiario';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
 import LaboratorioPruebas from './pages/LaboratorioPruebas';
@@ -72,9 +73,12 @@ const ProtectedRoute = ({ children, requiredPermission, requiredRole, requiredMe
   // Determinar página de redirección basada en rol
   const defaultPage = user?.role === 'superadmin' ? '/dashboard' : '/pacientes';
 
-  // Verificar rol requerido (ej: 'superadmin')
-  if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to={defaultPage} replace />;
+  // Verificar rol requerido (acepta string o lista de roles)
+  if (requiredRole) {
+    const rolesPermitidos = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!rolesPermitidos.includes(user?.role)) {
+      return <Navigate to={defaultPage} replace />;
+    }
   }
 
   if (requiredPermission && !hasPermission(requiredPermission)) {
@@ -373,6 +377,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="manage_caja">
             <Caja />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Cierre del Día - Diagnóstico consolidado (Admin/SuperAdmin) */}
+      <Route 
+        path="/cierre-diario" 
+        element={
+          <ProtectedRoute requiredRole={["admin", "superadmin"]}>
+            <CierreDiario />
           </ProtectedRoute>
         } 
       />

@@ -689,6 +689,7 @@ async def crear_venta(
                 "tipo_pagador_nombre": responsable_nombre,
                 "pagador_nombre": responsable_nombre,
                 "concepto": f"Venta {numero_venta}",
+                "descripcion": ", ".join(it["nombre"] for it in items_procesados) if items_procesados else None,
                 "referencia": numero_venta,
                 "monto_total": fp.monto,
                 "monto_pagado": 0,

@@ -119,8 +119,13 @@ const CXCTable = ({
                   <TableCell>
                     {cuenta.paciente_nombre || '-'}
                   </TableCell>
-                  <TableCell className="max-w-[150px] truncate">
-                    {cuenta.concepto}
+                  <TableCell className="max-w-[200px] truncate">
+                    <div className="truncate">{cuenta.concepto}</div>
+                    {cuenta.descripcion && (
+                      <div className="text-xs text-slate-500 truncate" title={cuenta.descripcion} data-testid="cxc-descripcion">
+                        {cuenta.descripcion}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {formatCurrency(cuenta.monto_total)}

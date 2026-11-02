@@ -429,8 +429,13 @@ const CuentasCobrarOptica = () => {
                             {cuenta.paciente_nombre || 'Sin paciente'}
                           </div>
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {cuenta.concepto}
+                        <TableCell className="max-w-[240px] truncate">
+                          <div className="truncate">{cuenta.concepto}</div>
+                          {cuenta.descripcion && (
+                            <div className="text-xs text-slate-500 truncate" title={cuenta.descripcion} data-testid="cxc-descripcion">
+                              {cuenta.descripcion}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(cuenta.monto_total)}
@@ -548,6 +553,11 @@ const CuentasCobrarOptica = () => {
               <div className="p-4 rounded-lg border" style={{ borderColor: 'var(--border-color)' }}>
                 <Label className="text-sm text-slate-500">Concepto</Label>
                 <p className="font-medium mt-1">{cuentaSeleccionada.concepto}</p>
+                {cuentaSeleccionada.descripcion && (
+                  <p className="text-sm text-slate-600 mt-2" data-testid="cxc-detalle-descripcion">
+                    Servicio: {cuentaSeleccionada.descripcion}
+                  </p>
+                )}
                 {cuentaSeleccionada.notas && (
                   <p className="text-sm text-slate-500 mt-2">
                     Notas: {cuentaSeleccionada.notas}

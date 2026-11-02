@@ -54,6 +54,7 @@ class CxCOpticaCreate(BaseModel):
     monto_total: float = Field(..., ge=0)
     monto_pagado: float = Field(default=0, ge=0)
     concepto: str
+    descripcion: Optional[str] = None
     fecha_vencimiento: Optional[str] = None
     notas: Optional[str] = None
 
@@ -69,6 +70,7 @@ class CxCClinicaCreate(BaseModel):
     monto_total: float = Field(..., ge=0)
     monto_pagado: float = Field(default=0, ge=0)
     concepto: str
+    descripcion: Optional[str] = None
     fecha_vencimiento: Optional[str] = None
     notas: Optional[str] = None
 
@@ -88,6 +90,7 @@ class CxCResponse(BaseModel):
     monto_pagado: float = 0
     saldo_pendiente: float
     concepto: str
+    descripcion: Optional[str] = None
     estado: str  # "Pendiente", "Parcial", "Pagado", "Vencido", "Anulado"
     fecha_emision: str
     fecha_vencimiento: Optional[str] = None
@@ -257,7 +260,8 @@ async def listar_cxc_optica(
         query["$or"] = [
             {"paciente_nombre": {"$regex": search, "$options": "i"}},
             {"numero_cuenta": {"$regex": search, "$options": "i"}},
-            {"concepto": {"$regex": search, "$options": "i"}}
+            {"concepto": {"$regex": search, "$options": "i"}},
+            {"descripcion": {"$regex": search, "$options": "i"}}
         ]
     
     total = await db.cuentas_por_cobrar.count_documents(query)
@@ -322,6 +326,7 @@ async def crear_cxc_optica(
         "monto_pagado": cuenta.monto_pagado,
         "saldo_pendiente": saldo,
         "concepto": cuenta.concepto,
+        "descripcion": cuenta.descripcion,
         "estado": estado,
         "fecha_emision": now.isoformat(),
         "fecha_vencimiento": cuenta.fecha_vencimiento,
@@ -366,7 +371,8 @@ async def listar_cxc_clinica(
             {"paciente_nombre": {"$regex": search, "$options": "i"}},
             {"responsable_nombre": {"$regex": search, "$options": "i"}},
             {"numero_cuenta": {"$regex": search, "$options": "i"}},
-            {"concepto": {"$regex": search, "$options": "i"}}
+            {"concepto": {"$regex": search, "$options": "i"}},
+            {"descripcion": {"$regex": search, "$options": "i"}}
         ]
     
     total = await db.cuentas_por_cobrar.count_documents(query)
@@ -459,6 +465,7 @@ async def crear_cxc_clinica(
         "monto_pagado": cuenta.monto_pagado,
         "saldo_pendiente": saldo,
         "concepto": cuenta.concepto,
+        "descripcion": cuenta.descripcion,
         "estado": estado,
         "fecha_emision": now.isoformat(),
         "fecha_vencimiento": cuenta.fecha_vencimiento,
