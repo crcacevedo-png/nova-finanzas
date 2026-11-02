@@ -4490,6 +4490,16 @@ async def startup_event():
         ]},
         {"$addToSet": {"enabled_menus": "optica_accesorios"}}
     )
+
+    # Migración idempotente: habilitar el Dashboard de óptica a los roles que ya
+    # tienen el POS de óptica (para que puedan ver ventas/compras/rentabilidad)
+    await db.menu_configurations.update_many(
+        {"$and": [
+            {"enabled_menus": "optica_pos"},
+            {"enabled_menus": {"$ne": "optica_dashboard"}}
+        ]},
+        {"$addToSet": {"enabled_menus": "optica_dashboard"}}
+    )
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
     # Índice único por token de la blacklist

@@ -1,0 +1,42 @@
+{
+  "summary": "Frontend test of Óptica Dashboard (Rentabilidad + Informes) for accessories inclusion. Accessories feature WORKS: 'Accesorios' row renders (4 / Q150 / Q50 / Q100 / 66.7%) for Hoy/Mes; Semana shows Aros+Accesorios; Año shows Aros/Monturas, Lentes de Contacto, Tipos de Lente, Accesorios. Period switching refreshes cards and table with no JS errors. Informes Nov 2026 Top 10 lists 'ACC: NovaVision Estuche rigido' (2, Q90) and 'ACC: TESTBrand TEST_Estuche_...' (2, Q60). BLOCKERS: (1) the optica role CANNOT open /optica/dashboard because the frontend route and sidebar item are superadmin-only, so I ran the test as superadmin. (2) A long-standing field mismatch: dashboard code reads 'paid_amount' but sales are saved with 'total_paid'. Because of this, Cobrado shows Q0, the Pagado column shows 'Q NaN', and Balance Ingresos is Q0 even though orders are marked 'pagado'.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "/api/optica/dashboard/ventas-dia, /stats, /informe-mensual, /ventas-por-origen, monthly aggregations (routes/optica.py lines ~1576,1588,1832,1844,2013,2039,2050,2111,2260)", "issue": "Uses field 'paid_amount' but optica_sales documents store 'total_paid' (see create sale lines 1230/1431/1474 and payments line 1516). Result: total_cobrado=0, saldo_pendiente=total, informe balance.ingresos=0, ventas-dia rows lack paid_amount -> UI 'Q NaN'. Verified in DB: ORD-202611-0001 has total_paid, status 'pagado', no paid_amount.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "/api/optica/dashboard/rentabilidad?periodo=año", "issue": "Lentes de Contacto costos Q0.00 -> margen 100%; cost is probably missing for contact lens items (check cost lookup for contact lens in items_v2/legacy)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "App.js route /optica/dashboard + Layout.js line 214", "issue": "Route uses requiredRole='superadmin' and sidebar item needs isSuperAdmin, so the optica user (optica/Optica2024$) is sent to /pacientes. The user asked for everything to appear on the óptica dashboard, but óptica users cannot reach it. The backend already allows view_optica.", "selector": "[data-testid='nav-optica-dashboard']", "priority": "HIGH"},
+      {"component": "OpticaDashboard Resumen > Ventas del Día", "issue": "Pagado column shows 'Q NaN' (venta.paid_amount undefined; field is total_paid)", "selector": "Ventas del Día table", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Top cards / Informe Mensual", "issue": "Cobrado Hoy Q0.00 / Pendiente Q150 and Informe 'Cobrado Q0.00', 'Balance Ingresos Q0.00' even though both orders are 'pagado'. Same root cause as the paid_amount/total_paid mismatch.", "affected_selectors": ["Cobrado Hoy card", "Balance del Mes card"]}
+    ],
+    "design_issues": [
+      {"screen": "Rentabilidad por Categoría", "issues": ["The td has the CSS class 'capitalize', so labels render as 'Lentes De Contacto' and 'Tipos De Lente'. Remove 'capitalize' because the labels are already mapped."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Replace 'paid_amount' with 'total_paid' (or use a $ifNull fallback) across the optica dashboard endpoints in routes/optica.py, and use venta.total_paid in the OpticaDashboard Ventas del Día table",
+    "Allow the optica role to open /optica/dashboard: change the App.js route to requiredPermission='view_optica' and update the Layout.js sidebar condition (if the user wants óptica staff to see it)",
+    "Remove 'capitalize' from the category label td in OpticaDashboard.js",
+    "Check the contact lens cost calculation in rentabilidad (costos Q0 -> 100% margin)"
+  ],
+  "critical_code_review_comments": [
+    "paid_amount vs total_paid schema drift breaks every 'cobrado' metric on the dashboard",
+    "Dashboard is superadmin-gated on the frontend while the backend permits view_optica, which is inconsistent"
+  ],
+  "updated_files": ["/app/test_reports/iteration_111.json"],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "80% - accessories/category/top-products features pass; cobrado/pagado figures wrong; optica role blocked"},
+  "test_credentials": "optica/Optica2024$ (blocked from dashboard), superadmin/nova2024 (used for UI test)",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Nov 2026 has 2 accessory sales (ORD-202611-0001 Q90, -0002 Q60, both status pagado, total_paid field). After the fix, Cobrado Hoy should be Q150, the Pagado column should show numbers, Informe balance ingresos should be Q150, and the optica user should reach /optica/dashboard.",
+  "rca of the issue": "Sale creation (routes/optica.py ~1230/1431) writes 'total_paid'/'balance_due'. Dashboard aggregations sum '$paid_amount', which doesn't exist, so they get 0 and the frontend gets undefined (formatCurrency gives NaN)."
+}

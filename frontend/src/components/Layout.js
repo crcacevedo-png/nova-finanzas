@@ -211,7 +211,7 @@ const Layout = ({ children }) => {
   // Optica sub-items - Filtrados por configuración de menús
   const opticaItems = [];
   if (canViewOptica) {
-    if (isSuperAdmin && isMenuEnabled('optica_dashboard')) opticaItems.push({ path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' });
+    if (isMenuEnabled('optica_dashboard')) opticaItems.push({ path: '/optica/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-optica-dashboard' });
     if (isMenuEnabled('optica_armazones')) opticaItems.push({ path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' });
     if (isMenuEnabled('optica_lentes_contacto')) opticaItems.push({ path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' });
     if (isMenuEnabled('optica_tipos_lente')) opticaItems.push({ path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' });

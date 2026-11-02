@@ -316,7 +316,7 @@ const OpticaDashboard = () => {
                             <td className="px-3 py-2 font-mono text-xs">{venta.order_number}</td>
                             <td className="px-3 py-2">{venta.patient_name}</td>
                             <td className="px-3 py-2 text-right font-medium">{formatCurrency(venta.total)}</td>
-                            <td className="px-3 py-2 text-right text-green-600">{formatCurrency(venta.paid_amount)}</td>
+                            <td className="px-3 py-2 text-right text-green-600">{formatCurrency(venta.total_paid)}</td>
                             <td className="px-3 py-2 text-center">
                               <Badge variant={venta.status === 'pagado' ? 'success' : 'warning'}>
                                 {venta.status}
@@ -423,7 +423,7 @@ const OpticaDashboard = () => {
                             .filter(([_, cat]) => cat.cantidad > 0 || cat.ingresos > 0)
                             .map(([key, cat]) => (
                             <tr key={key} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 font-medium capitalize">
+                              <td className="px-4 py-3 font-medium">
                                 {{
                                   aros: 'Aros/Monturas',
                                   lentes_contacto: 'Lentes de Contacto',

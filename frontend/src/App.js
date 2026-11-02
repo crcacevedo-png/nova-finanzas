@@ -236,7 +236,7 @@ function AppRoutes() {
       <Route 
         path="/optica/dashboard" 
         element={
-          <ProtectedRoute requiredRole="superadmin">
+          <ProtectedRoute requiredPermission="view_optica">
             <OpticaDashboard />
           </ProtectedRoute>
         } 

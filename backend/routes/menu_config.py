@@ -367,7 +367,7 @@ DEFAULT_MENU_CONFIG = {
         "inventario_panel", "inventario_productos", "inventario_lotes"
     ],
     "optica": [
-        "pacientes", "optica_armazones", "optica_lentes_contacto",
+        "pacientes", "optica_dashboard", "optica_armazones", "optica_lentes_contacto",
         "optica_tipos_lente", "optica_accesorios", "optica_pos", "optica_cxc", "optica_compras"
     ],
     "administrador_igss": [

@@ -1573,7 +1573,7 @@ async def get_optica_dashboard_stats(current_user: dict = Depends(require_permis
         {"$group": {
             "_id": None,
             "total_ventas": {"$sum": "$total"},
-            "total_cobrado": {"$sum": "$paid_amount"},
+            "total_cobrado": {"$sum": "$total_paid"},
             "count": {"$sum": 1}
         }}
     ]
@@ -1585,7 +1585,7 @@ async def get_optica_dashboard_stats(current_user: dict = Depends(require_permis
         {"$match": {"status": "pendiente"}},
         {"$group": {
             "_id": None,
-            "saldo_pendiente": {"$sum": {"$subtract": ["$total", "$paid_amount"]}},
+            "saldo_pendiente": {"$sum": {"$subtract": ["$total", "$total_paid"]}},
             "count_pendientes": {"$sum": 1}
         }}
     ]
@@ -1829,7 +1829,7 @@ async def get_ventas_del_dia(current_user: dict = Depends(require_permission("vi
         {"$group": {
             "_id": None,
             "total_ventas": {"$sum": "$total"},
-            "total_cobrado": {"$sum": "$paid_amount"},
+            "total_cobrado": {"$sum": "$total_paid"},
             "total_descuentos": {"$sum": "$discount_amount"},
             "num_ordenes": {"$sum": 1}
         }}
@@ -1841,7 +1841,7 @@ async def get_ventas_del_dia(current_user: dict = Depends(require_permission("vi
     # Obtener ventas individuales del día
     ventas_dia = await db.optica_sales.find(
         {"created_at": {"$gte": today_start.isoformat()}, "status": {"$ne": "cancelado"}},
-        {"_id": 0, "id": 1, "order_number": 1, "patient_name": 1, "total": 1, "paid_amount": 1, "status": 1, "created_at": 1}
+        {"_id": 0, "id": 1, "order_number": 1, "patient_name": 1, "total": 1, "total_paid": 1, "status": 1, "created_at": 1}
     ).sort("created_at", -1).to_list(100)
     
     return {
@@ -2010,7 +2010,7 @@ async def get_ventas_por_origen(
     ventas = await db.optica_sales.find({
         "created_at": {"$gte": fecha_inicio, "$lte": fecha_fin},
         "status": {"$ne": "cancelado"}
-    }, {"_id": 0, "patient_id": 1, "total": 1, "paid_amount": 1, "discount_amount": 1}).to_list(10000)
+    }, {"_id": 0, "patient_id": 1, "total": 1, "total_paid": 1, "discount_amount": 1}).to_list(10000)
     
     # Obtener info de pacientes
     patient_ids = list(set(v.get("patient_id") for v in ventas if v.get("patient_id")))
@@ -2036,7 +2036,7 @@ async def get_ventas_por_origen(
         
         if not patient:
             origenes["sin_paciente"]["total"] += venta.get("total", 0)
-            origenes["sin_paciente"]["cobrado"] += venta.get("paid_amount", 0)
+            origenes["sin_paciente"]["cobrado"] += venta.get("total_paid", 0)
             origenes["sin_paciente"]["descuentos"] += venta.get("discount_amount", 0)
             origenes["sin_paciente"]["count"] += 1
             continue
@@ -2047,7 +2047,7 @@ async def get_ventas_por_origen(
             origen = "particular"
         
         origenes[origen]["total"] += venta.get("total", 0)
-        origenes[origen]["cobrado"] += venta.get("paid_amount", 0)
+        origenes[origen]["cobrado"] += venta.get("total_paid", 0)
         origenes[origen]["descuentos"] += venta.get("discount_amount", 0)
         origenes[origen]["count"] += 1
         
@@ -2108,7 +2108,7 @@ async def get_informe_mensual_optica(
     }, {"_id": 0}).to_list(5000)
     
     total_ventas = sum(v.get("total", 0) for v in ventas)
-    total_cobrado = sum(v.get("paid_amount", 0) for v in ventas)
+    total_cobrado = sum(v.get("total_paid", 0) for v in ventas)
     total_descuentos = sum(v.get("discount_amount", 0) for v in ventas)
     
     # Ventas por día
@@ -2257,7 +2257,7 @@ async def get_historial_mensual_optica(
             {"$group": {
                 "_id": None,
                 "total": {"$sum": "$total"},
-                "cobrado": {"$sum": "$paid_amount"},
+                "cobrado": {"$sum": "$total_paid"},
                 "count": {"$sum": 1}
             }}
         ]
