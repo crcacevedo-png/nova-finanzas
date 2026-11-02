@@ -1,7 +1,7 @@
 # /app/backend/models/agenda.py
 # Modelos Pydantic para el módulo de Agenda de Pacientes
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -75,16 +75,25 @@ class CitaAsignarUpdate(BaseModel):
     asignado_a_medico_nombre: str
 
 class CitaResponse(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_none_values(cls, data):
+        # Citas antiguas/parciales pueden tener campos en null; se descartan para
+        # que apliquen los valores por defecto y no falle la validación del response.
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if v is not None}
+        return data
+
     id: str
     paciente_id: str
-    paciente_nombre: str
-    medico_id: str
-    medico_nombre: str
-    fecha: str
-    hora_inicio: str
+    paciente_nombre: str = ""
+    medico_id: Optional[str] = None
+    medico_nombre: Optional[str] = None
+    fecha: str = ""
+    hora_inicio: str = ""
     hora_fin: Optional[str] = None
-    duracion_minutos: int
-    tipo_cita: str
+    duracion_minutos: int = 0
+    tipo_cita: str = ""
     estado: str = EstadoCita.AGENDADA
     asistio: Optional[bool] = None
     hora_llegada: Optional[str] = None
@@ -101,9 +110,9 @@ class CitaResponse(BaseModel):
     igss_procedimiento: Optional[str] = None
     referral_institution: Optional[str] = None
     referral_institution_label: Optional[str] = None
-    creado_por: str
+    creado_por: Optional[str] = None
     creado_por_nombre: Optional[str] = ""
-    fecha_creacion: str
+    fecha_creacion: Optional[str] = None
     actualizado_por: Optional[str] = None
     fecha_actualizacion: Optional[str] = None
 

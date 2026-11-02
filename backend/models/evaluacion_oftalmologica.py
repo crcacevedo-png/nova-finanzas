@@ -1,7 +1,7 @@
 # /app/backend/models/evaluacion_oftalmologica.py
 # Modelos para Evaluación Oftalmológica
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -386,6 +386,16 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
 
 class EvaluacionOftalmologicaResponse(EvaluacionOftalmologicaBase):
     model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_none_values(cls, data):
+        # Documentos antiguos/parciales pueden tener campos en null; se descartan
+        # para que apliquen los valores por defecto y no falle la validación.
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if v is not None}
+        return data
+
     id: str
     cita_id: Optional[str] = None
     creado_por: str = ""

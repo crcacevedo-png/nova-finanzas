@@ -1,5 +1,14 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-11-02 — FIX producción: autoguardado y cambio de estado de citas (CORS PATCH)
+**Síntomas (solo producción):** (1) el autoguardado de expedientes no persistía; (2) al presionar "Iniciar" (Presente → En consulta) en Agenda salía "Error al cambiar estado".
+**Causa raíz (RCA del deployer):** el `CORSMiddleware` en `backend/server.py` NO incluía `PATCH` en `allow_methods`. Los endpoints afectados son PATCH (`/api/evaluaciones/{id}/autoguardar` y `/api/agenda/citas/{id}/estado`), por lo que el preflight OPTIONS del navegador era rechazado (400 'Disallowed CORS method') y la petición PATCH nunca llegaba al handler. El front caía a "guardado offline" / "Error al cambiar estado". En preview no se notaba por configuración de origin.
+**Fix:** `server.py` — `allow_methods` ahora incluye `PATCH` (GET, POST, PUT, PATCH, DELETE, OPTIONS). Corrige también cualquier otro endpoint PATCH (p.ej. inventario). Verificado: preflight OPTIONS PATCH → 200 con `access-control-allow-methods` incluyendo PATCH en /autoguardar y /citas/{id}/estado.
+**Robustez adicional (defensa, no era la causa):** `CitaResponse` y `EvaluacionOftalmologicaResponse` ahora descartan valores `null` de nivel superior (validator `mode="before"`) para tolerar documentos antiguos/parciales sin romper la validación del response.
+**IMPORTANTE:** requiere REDEPLOY para aplicar en producción.
+
+
+
 ## 2026-10-29 — Precio variable por renglón en POS de Clínica — Fase 1 MVP
 **Plan aprobado:** permitir cambiar el precio de un artículo al vender (solo POS clínica), con mínimo = costo (precio_compra), sin tope superior, sin autorización. Se marca internamente el renglón como precio variable y se guarda el precio de lista original; el comprobante NO muestra la marca. Óptica sin cambios.
 **Backend (`routes/ventas.py`):**
