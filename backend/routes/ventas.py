@@ -499,10 +499,7 @@ async def crear_venta(
     now = datetime.now(timezone.utc)
     fecha_hoy = today_str_gt()
     
-    # Verificar permisos
-    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
-        raise HTTPException(status_code=403, detail="Sin permisos para realizar ventas")
-    
+    # El permiso manage_sales ya se valida en get_current_user_dependency().
     # Validar que hay items
     if not venta.items or len(venta.items) == 0:
         raise HTTPException(status_code=400, detail="La venta debe tener al menos un producto")

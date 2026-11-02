@@ -1,5 +1,13 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-11-02 — FIX: óptica no podía cobrar en POS de clínica ("Sin permisos para realizar ventas")
+**Síntoma:** el usuario óptica ya veía el menú de Punto de Venta de clínica, pero al cobrar: "Sin permisos para realizar ventas".
+**Causa:** `routes/ventas.py` `crear_venta` tenía un chequeo HARDCODEADO por rol (`if role not in ["superadmin","admin","usuario"]: 403`) además de la dependencia que ya valida `manage_sales`. Ese check excluía a óptica (y a cualquier rol personalizado con el permiso).
+**Fix:** se eliminó el chequeo por rol redundante; la autorización queda solo en `get_current_user_dependency()` (permiso `manage_sales`). Verificado: óptica POST /api/ventas ya no da 403 de permiso (pasa a validación normal 400 por venta vacía). caja.py y cuentas_cobrar.py no tienen checks por rol (usan permisos), así que óptica también puede abrir caja/CxC.
+**IMPORTANTE:** requiere REDEPLOY para producción.
+
+
+
 ## 2026-11-02 — FIX: crash "Algo salió mal" al agregar orden NOG a un paciente
 **Síntoma:** al agregar una orden NOG en la ficha del paciente (IGSS) aparecía la página de error (ErrorBoundary).
 **Causa raíz:** el endpoint `GET /api/igss-units/{unit}/nogs-activos` devolvía NOGs con `numero` vacío. En el selector de NOG (`NogSelector`, Radix Select) un `<SelectItem value="">` lanza una excepción ("A <Select.Item /> must have a value prop that is not an empty string") → crash capturado por el ErrorBoundary. Verificado: la unidad 9d8260dc devolvía 11 NOGs, el primero con numero="".
