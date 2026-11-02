@@ -1,0 +1,41 @@
+{
+  "summary": "Frontend E2E of new Precio Variable feature in Clinic POS (/punto-venta) + Optica regression. 6 of 7 requested items PASS. Toggle shows up, price input works, total recalculates right away, valid sale saves precio_variable=true / precio_lista=100 / precio_unitario=150, works with the % discount (300-10%=270), detail/ticket show only the charged price, Optica POS unchanged. FAIL: the frontend cost rule never fires (no red border, no 'menor al costo' label, no pre-check toast) because /api/ventas/productos does not return precio_compra. The sale is still blocked, but only by the backend 400, whose message reaches the user as a toast. Also found: turning the toggle OFF keeps the edited price, which skips the cost check completely.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/ventas/productos and /api/ventas/productos-rapidos", "issue": "ProductoPOSResponse (routes/ventas.py ~L118) has no precio_compra field, so the POS gets precio_compra=undefined and sets it to 0. Because of that the client-side cost validation, the red border and the 'menor al costo' label never trigger.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/ventas", "issue": "Cost validation runs only when item.precio_variable is true. The backend accepts any precio_unitario when precio_variable=false (it never checks it against producto.precio_venta), so a client can sell below cost/list price by sending precio_variable=false."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PuntoVenta cart row - precio variable input", "issue": "Typed 40 for a product with cost 60: the border stayed amber and 'menor al costo' did not appear. Root cause: the item's precio_compra is 0 (missing from the API).", "selector": "pv-precio-variable-input-<id>", "priority": "HIGH"},
+      {"component": "togglePrecioVariable", "issue": "Turning the toggle OFF does not put precio_unitario back to precio_lista. Repro: toggle ON, type 20 (cost 60), toggle OFF. The cart shows Q20 at a fixed price and the payload sends precio_variable=false with precio_unitario=20, so neither the frontend nor the backend checks cost. Fix: when toggling off, set precio_unitario=precio_lista and recalculate subtotal.", "selector": "pv-precio-variable-toggle-<id>", "priority": "HIGH"},
+      {"component": "actualizarPrecio", "issue": "Clearing the input turns the price into 0 (the total shows Q0.00). For products with cost 0 a Q0 line can be sold. Consider requiring a price > 0.", "selector": "pv-precio-variable-input-<id>", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Below-cost checkout", "issue": "The frontend pre-check in confirmarVenta (L593) is never reached because precio_compra=0. The block happens only through the backend 400 ('El precio de 'X' no puede ser menor al costo (60.0)'), shown as a toast. The user still gets blocked, but a POST is made, and the cost text is formatted as '60.0' instead of currency.", "affected_selectors": ["btn-confirmar-venta"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Add precio_compra: float = 0 to ProductoPOSResponse and fill it (p.get('precio_compra', 0)) in /ventas/productos and /ventas/productos-rapidos, so the red border, the 'menor al costo' label and the client pre-check work",
+    "In togglePrecioVariable, when turning OFF, reset precio_unitario to precio_lista and recalculate subtotal",
+    "Optional: in the backend, when precio_variable=false, force precio_unitario = producto.precio_venta (or validate it)",
+    "Optional: block an empty or 0 variable price"
+  ],
+  "critical_code_review_comments": [
+    "The frontend cost rule depends on a field the POS product endpoints never return",
+    "Toggle-off leaves a modified price marked as non-variable, which bypasses the cost check and hides the variable-price audit trail",
+    "PuntoVenta.js is 2011 lines and should be split"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "86% (6/7 requested checks pass; cost-rule UI fails)"},
+  "seed_data_creation": "Inserted product productos_inventario id='test-pv-servicio-0001' (TEST_PV_Servicio, origen clinica, service with no inventory, precio_venta 100, precio_compra 60). Opened the superadmin clinic caja with Q100. Created 2 test sales: VTA-20261102-0001 (Q150, PV 150) and VTA-20261102-0002 (id 8bd3bb46-b5b9-4a42-8f38-1feec7efe20a, 2x150 with 10% discount authorized by TEST_Gerente = Q270).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use product test-pv-servicio-0001 (cost 60, list 100) for cost-rule checks. Payment flow: btn-cobrar, then 'Todo', then 'Agregar Efectivo', then btn-confirmar-venta. Detail: btn-ventas-hoy, then a row, then the 'Detalle de Venta' dialog. The ticket API GET /api/ventas/{id}/ticket returns only cantidad/nombre/precio_unitario/descuento/subtotal (OK). Optica POS has no pv-precio-variable elements (OK).",
+  "rca of the issue": "agregarAlCarrito reads producto.precio_compra || 0, but the products come from GET /api/ventas/productos with response_model=ProductoPOSResponse, which drops precio_compra. So item.precio_compra is always 0 and every frontend check of item.precio_unitario < item.precio_compra is false. Backend validation still uses the DB value, so it blocks correctly."
+}

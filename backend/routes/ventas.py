@@ -122,6 +122,7 @@ class ProductoPOSResponse(BaseModel):
     nombre: str
     categoria_nombre: Optional[str] = None
     precio_venta: float
+    precio_compra: float = 0
     afecto_iva: bool
     existencia: int
     controla_inventario: bool = True
@@ -268,6 +269,7 @@ async def buscar_productos_pos(
             nombre=p["nombre"],
             categoria_nombre=categorias.get(p.get("categoria_id")),
             precio_venta=p.get("precio_venta", 0),
+            precio_compra=p.get("precio_compra", 0) or 0,
             afecto_iva=p.get("afecto_iva", True),
             existencia=existencia,
             controla_inventario=controla_inv,
@@ -361,6 +363,7 @@ async def obtener_productos_rapidos(
             nombre=p["nombre"],
             categoria_nombre=categorias.get(p.get("categoria_id")),
             precio_venta=p.get("precio_venta", 0),
+            precio_compra=p.get("precio_compra", 0) or 0,
             afecto_iva=p.get("afecto_iva", True),
             existencia=existencia,
             controla_inventario=controla_inv,
@@ -542,17 +545,22 @@ async def crear_venta(
         if not producto.get("activo", True):
             raise HTTPException(status_code=400, detail=f"Producto '{producto['nombre']}' no está activo")
         
-        # Precio variable: validar que no sea menor al costo registrado del artículo
+        # Precio variable: validar que no sea menor al costo registrado del artículo.
+        # Un renglón NO variable usa siempre el precio de lista (no se puede alterar).
         precio_lista = producto.get("precio_venta", item.precio_unitario)
         costo = producto.get("precio_compra", 0) or 0
-        if item.precio_variable and costo > 0 and item.precio_unitario < costo:
-            raise HTTPException(
-                status_code=400,
-                detail=f"El precio de '{producto['nombre']}' no puede ser menor al costo ({costo})"
-            )
+        if item.precio_variable:
+            precio_aplicado = item.precio_unitario
+            if costo > 0 and precio_aplicado < costo:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El precio de '{producto['nombre']}' no puede ser menor al costo (Q{costo:.2f})"
+                )
+        else:
+            precio_aplicado = precio_lista
         
         # Calcular subtotal del item
-        item_subtotal = item.cantidad * item.precio_unitario - item.descuento
+        item_subtotal = item.cantidad * precio_aplicado - item.descuento
         subtotal += item_subtotal
         descuento_total += item.descuento
         
@@ -565,7 +573,7 @@ async def crear_venta(
             "codigo": producto.get("codigo", ""),
             "nombre": producto["nombre"],
             "cantidad": item.cantidad,
-            "precio_unitario": item.precio_unitario,
+            "precio_unitario": precio_aplicado,
             "descuento": item.descuento,
             "subtotal": item_subtotal,
             "afecto_iva": item.afecto_iva,

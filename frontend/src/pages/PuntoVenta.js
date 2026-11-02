@@ -431,11 +431,21 @@ const PuntoVenta = () => {
   };
 
   const togglePrecioVariable = (productoId) => {
-    setCarrito(prev => prev.map(item =>
-      item.producto_id === productoId
-        ? { ...item, precio_variable: !item.precio_variable }
-        : item
-    ));
+    setCarrito(prev => prev.map(item => {
+      if (item.producto_id !== productoId) return item;
+      const activar = !item.precio_variable;
+      if (activar) {
+        return { ...item, precio_variable: true };
+      }
+      // Al desactivar, restaurar el precio de lista y recalcular
+      const precio = item.precio_lista ?? item.precio_unitario;
+      return {
+        ...item,
+        precio_variable: false,
+        precio_unitario: precio,
+        subtotal: item.cantidad * precio - item.descuento
+      };
+    }));
   };
 
   const actualizarPrecio = (productoId, nuevoPrecio) => {
@@ -595,6 +605,13 @@ const PuntoVenta = () => {
     );
     if (itemBajoCosto) {
       toast.error(`El precio de "${itemBajoCosto.nombre}" no puede ser menor al costo (${formatCurrency(itemBajoCosto.precio_compra)})`);
+      return;
+    }
+    const itemPrecioInvalido = carrito.find(
+      item => item.precio_variable && (!item.precio_unitario || item.precio_unitario <= 0)
+    );
+    if (itemPrecioInvalido) {
+      toast.error(`Ingrese un precio válido para "${itemPrecioInvalido.nombre}"`);
       return;
     }
     
