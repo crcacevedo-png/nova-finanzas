@@ -1883,6 +1883,7 @@ async def get_rentabilidad_optica(
     frames = {f["id"]: f for f in await db.optica_frames.find({}, {"_id": 0}).to_list(1000)}
     lentes_contacto = {l["id"]: l for l in await db.optica_contact_lenses.find({}, {"_id": 0}).to_list(1000)}
     tipos_lente = {t["id"]: t for t in await db.optica_lens_types.find({}, {"_id": 0}).to_list(1000)}
+    accesorios = {a["id"]: a for a in await db.optica_accessories.find({}, {"_id": 0}).to_list(1000)}
     
     # Calcular rentabilidad
     total_ingresos = 0
@@ -1890,79 +1891,82 @@ async def get_rentabilidad_optica(
     desglose_categorias = {
         "aros": {"ingresos": 0, "costos": 0, "cantidad": 0},
         "lentes_contacto": {"ingresos": 0, "costos": 0, "cantidad": 0},
-        "tipos_lente": {"ingresos": 0, "costos": 0, "cantidad": 0}
+        "tipos_lente": {"ingresos": 0, "costos": 0, "cantidad": 0},
+        "accesorios": {"ingresos": 0, "costos": 0, "cantidad": 0},
+        "otros": {"ingresos": 0, "costos": 0, "cantidad": 0}
     }
     
     for venta in ventas:
-        # Procesar aros
-        if venta.get("frame_id"):
-            frame = frames.get(venta["frame_id"])
-            if frame:
-                precio_venta = venta.get("frame_price", frame.get("sale_price", 0))
-                precio_costo = frame.get("cost_price", 0)
-                total_ingresos += precio_venta
-                total_costos += precio_costo
-                desglose_categorias["aros"]["ingresos"] += precio_venta
-                desglose_categorias["aros"]["costos"] += precio_costo
-                desglose_categorias["aros"]["cantidad"] += 1
-        
-        # Procesar lentes de contacto
-        if venta.get("contact_lens_id"):
-            lente = lentes_contacto.get(venta["contact_lens_id"])
-            if lente:
-                precio_venta = venta.get("contact_lens_price", lente.get("sale_price", 0))
-                precio_costo = lente.get("cost_price", 0)
-                total_ingresos += precio_venta
-                total_costos += precio_costo
-                desglose_categorias["lentes_contacto"]["ingresos"] += precio_venta
-                desglose_categorias["lentes_contacto"]["costos"] += precio_costo
-                desglose_categorias["lentes_contacto"]["cantidad"] += 1
-        
-        # Procesar tipos de lente (lens_items)
-        for item in venta.get("lens_items", []):
-            tipo = tipos_lente.get(item.get("lens_type_id"))
-            if tipo:
+        items_v2 = venta.get("items_v2", [])
+
+        if items_v2:
+            # Ventas del POS (V2): contienen TODOS los productos vendidos
+            for item in items_v2:
+                tipo_item = item.get("type")
+                producto_id = item.get("product_id")
                 subtotal = item.get("subtotal", 0)
                 cantidad = item.get("quantity", 1)
-                # Estimar costo (usar default_price como referencia de costo si no hay cost_price)
-                costo_unitario = tipo.get("cost_price", tipo.get("default_price", 0) * 0.5)
-                total_ingresos += subtotal
-                total_costos += costo_unitario * cantidad
-                desglose_categorias["tipos_lente"]["ingresos"] += subtotal
-                desglose_categorias["tipos_lente"]["costos"] += costo_unitario * cantidad
-                desglose_categorias["tipos_lente"]["cantidad"] += cantidad
-        
-        # Procesar items V2 (POS)
-        for item in venta.get("items", []):
-            tipo_item = item.get("type")
-            producto_id = item.get("product_id")
-            subtotal = item.get("subtotal", 0)
-            cantidad = item.get("quantity", 1)
-            
-            if tipo_item == "frame":
-                frame = frames.get(producto_id)
-                costo = frame.get("cost_price", 0) * cantidad if frame else 0
-                desglose_categorias["aros"]["ingresos"] += subtotal
-                desglose_categorias["aros"]["costos"] += costo
-                desglose_categorias["aros"]["cantidad"] += cantidad
-                total_ingresos += subtotal
-                total_costos += costo
-            elif tipo_item == "contact_lens":
-                lente = lentes_contacto.get(producto_id)
-                costo = lente.get("cost_price", 0) * cantidad if lente else 0
-                desglose_categorias["lentes_contacto"]["ingresos"] += subtotal
-                desglose_categorias["lentes_contacto"]["costos"] += costo
-                desglose_categorias["lentes_contacto"]["cantidad"] += cantidad
+
+                if tipo_item == "frame":
+                    frame = frames.get(producto_id)
+                    costo = frame.get("cost_price", 0) * cantidad if frame else 0
+                    cat = "aros"
+                elif tipo_item == "contact_lens":
+                    lente = lentes_contacto.get(producto_id)
+                    costo = lente.get("cost_price", 0) * cantidad if lente else 0
+                    cat = "lentes_contacto"
+                elif tipo_item == "lens_type":
+                    tipo = tipos_lente.get(producto_id)
+                    costo = tipo.get("cost_price", tipo.get("default_price", 0) * 0.5) * cantidad if tipo else 0
+                    cat = "tipos_lente"
+                elif tipo_item == "accessory":
+                    acc = accesorios.get(producto_id)
+                    costo = acc.get("cost_price", 0) * cantidad if acc else 0
+                    cat = "accesorios"
+                else:
+                    costo = 0
+                    cat = "otros"
+
+                desglose_categorias[cat]["ingresos"] += subtotal
+                desglose_categorias[cat]["costos"] += costo
+                desglose_categorias[cat]["cantidad"] += cantidad
                 total_ingresos += subtotal
                 total_costos += costo
-            elif tipo_item == "lens_type":
-                tipo = tipos_lente.get(producto_id)
-                costo = tipo.get("cost_price", tipo.get("default_price", 0) * 0.5) * cantidad if tipo else 0
-                desglose_categorias["tipos_lente"]["ingresos"] += subtotal
-                desglose_categorias["tipos_lente"]["costos"] += costo
-                desglose_categorias["tipos_lente"]["cantidad"] += cantidad
-                total_ingresos += subtotal
-                total_costos += costo
+        else:
+            # Ventas legacy (sin items_v2): usar campos individuales
+            if venta.get("frame_id"):
+                frame = frames.get(venta["frame_id"])
+                if frame:
+                    precio_venta = venta.get("frame_price", frame.get("sale_price", 0))
+                    precio_costo = frame.get("cost_price", 0)
+                    total_ingresos += precio_venta
+                    total_costos += precio_costo
+                    desglose_categorias["aros"]["ingresos"] += precio_venta
+                    desglose_categorias["aros"]["costos"] += precio_costo
+                    desglose_categorias["aros"]["cantidad"] += 1
+
+            if venta.get("contact_lens_id"):
+                lente = lentes_contacto.get(venta["contact_lens_id"])
+                if lente:
+                    precio_venta = venta.get("contact_lens_price", lente.get("sale_price", 0))
+                    precio_costo = lente.get("cost_price", 0)
+                    total_ingresos += precio_venta
+                    total_costos += precio_costo
+                    desglose_categorias["lentes_contacto"]["ingresos"] += precio_venta
+                    desglose_categorias["lentes_contacto"]["costos"] += precio_costo
+                    desglose_categorias["lentes_contacto"]["cantidad"] += 1
+
+            for item in venta.get("lens_items", []):
+                tipo = tipos_lente.get(item.get("lens_type_id"))
+                if tipo:
+                    subtotal = item.get("subtotal", 0)
+                    cantidad = item.get("quantity", 1)
+                    costo_unitario = tipo.get("cost_price", tipo.get("default_price", 0) * 0.5)
+                    total_ingresos += subtotal
+                    total_costos += costo_unitario * cantidad
+                    desglose_categorias["tipos_lente"]["ingresos"] += subtotal
+                    desglose_categorias["tipos_lente"]["costos"] += costo_unitario * cantidad
+                    desglose_categorias["tipos_lente"]["cantidad"] += cantidad
     
     ganancia = total_ingresos - total_costos
     margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0
@@ -2132,29 +2136,56 @@ async def get_informe_mensual_optica(
         compras_por_categoria[cat]["total"] += c.get("total_amount", 0)
         compras_por_categoria[cat]["count"] += 1
     
-    # === TOP PRODUCTOS ===
+    # === TOP PRODUCTOS (todos los tipos vendidos) ===
     productos_vendidos = {}
     frames_db = {f["id"]: f for f in await db.optica_frames.find({}, {"_id": 0}).to_list(1000)}
-    
+    lc_db = {l["id"]: l for l in await db.optica_contact_lenses.find({}, {"_id": 0}).to_list(1000)}
+    tipos_db = {t["id"]: t for t in await db.optica_lens_types.find({}, {"_id": 0}).to_list(1000)}
+    acc_db = {a["id"]: a for a in await db.optica_accessories.find({}, {"_id": 0}).to_list(1000)}
+
+    def _acumular(key, cantidad, total):
+        if key not in productos_vendidos:
+            productos_vendidos[key] = {"cantidad": 0, "total": 0}
+        productos_vendidos[key]["cantidad"] += cantidad
+        productos_vendidos[key]["total"] += total
+
     for v in ventas:
-        if v.get("frame_id"):
-            frame = frames_db.get(v["frame_id"])
-            if frame:
-                key = f"ARO: {frame.get('brand', '')} {frame.get('model', '')}"
-                if key not in productos_vendidos:
-                    productos_vendidos[key] = {"cantidad": 0, "total": 0}
-                productos_vendidos[key]["cantidad"] += 1
-                productos_vendidos[key]["total"] += v.get("frame_price", 0)
-        
-        for item in v.get("items", []):
-            if item.get("type") == "frame":
-                frame = frames_db.get(item.get("product_id"))
+        items_v2 = v.get("items_v2", [])
+        if items_v2:
+            for item in items_v2:
+                tipo_item = item.get("type")
+                pid = item.get("product_id")
+                cant = item.get("quantity", 1)
+                sub = item.get("subtotal", 0)
+                if tipo_item == "frame":
+                    frame = frames_db.get(pid)
+                    nombre = f"ARO: {frame.get('brand', '')} {frame.get('model', '')}".strip() if frame else f"ARO: {item.get('name', 'Armazón')}"
+                elif tipo_item == "contact_lens":
+                    lc = lc_db.get(pid)
+                    nombre = f"LC: {lc.get('brand', '')} {lc.get('name', '')}".strip() if lc else f"LC: {item.get('name', 'Lente contacto')}"
+                elif tipo_item == "lens_type":
+                    tipo = tipos_db.get(pid)
+                    nombre = f"LENTE: {tipo.get('name', '')}".strip() if tipo else f"LENTE: {item.get('name', 'Lente')}"
+                elif tipo_item == "accessory":
+                    acc = acc_db.get(pid)
+                    nombre = f"ACC: {acc.get('brand', '')} {acc.get('name', '')}".strip() if acc else f"ACC: {item.get('name', 'Accesorio')}"
+                else:
+                    nombre = item.get("name", "Otro")
+                _acumular(nombre, cant, sub)
+        else:
+            # Ventas legacy sin items_v2
+            if v.get("frame_id"):
+                frame = frames_db.get(v["frame_id"])
                 if frame:
-                    key = f"ARO: {frame.get('brand', '')} {frame.get('model', '')}"
-                    if key not in productos_vendidos:
-                        productos_vendidos[key] = {"cantidad": 0, "total": 0}
-                    productos_vendidos[key]["cantidad"] += item.get("quantity", 1)
-                    productos_vendidos[key]["total"] += item.get("subtotal", 0)
+                    _acumular(f"ARO: {frame.get('brand', '')} {frame.get('model', '')}".strip(), 1, v.get("frame_price", 0))
+            if v.get("contact_lens_id"):
+                lc = lc_db.get(v["contact_lens_id"])
+                if lc:
+                    _acumular(f"LC: {lc.get('brand', '')} {lc.get('name', '')}".strip(), 1, v.get("contact_lens_price", 0))
+            for item in v.get("lens_items", []):
+                tipo = tipos_db.get(item.get("lens_type_id"))
+                nombre = tipo.get("name", "Lente") if tipo else "Lente"
+                _acumular(f"LENTE: {nombre}", item.get("quantity", 1), item.get("subtotal", 0))
     
     top_productos = sorted(
         [{"nombre": k, **v} for k, v in productos_vendidos.items()],

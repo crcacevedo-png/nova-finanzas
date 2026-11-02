@@ -419,12 +419,18 @@ const OpticaDashboard = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {Object.entries(rentabilidad.desglose_categorias).map(([key, cat]) => (
+                          {Object.entries(rentabilidad.desglose_categorias)
+                            .filter(([_, cat]) => cat.cantidad > 0 || cat.ingresos > 0)
+                            .map(([key, cat]) => (
                             <tr key={key} className="hover:bg-gray-50">
                               <td className="px-4 py-3 font-medium capitalize">
-                                {key === 'aros' ? 'Aros/Monturas' : 
-                                 key === 'lentes_contacto' ? 'Lentes de Contacto' : 
-                                 'Tipos de Lente'}
+                                {{
+                                  aros: 'Aros/Monturas',
+                                  lentes_contacto: 'Lentes de Contacto',
+                                  tipos_lente: 'Tipos de Lente',
+                                  accesorios: 'Accesorios',
+                                  otros: 'Otros'
+                                }[key] || key}
                               </td>
                               <td className="px-4 py-3 text-center">{cat.cantidad}</td>
                               <td className="px-4 py-3 text-right">{formatCurrency(cat.ingresos)}</td>
