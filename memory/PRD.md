@@ -990,3 +990,21 @@ Destino: vista previa. Deduplicación por ID de Access (record_number). NO se to
 - Dedup por import_source_id (id_origen, ej. ACCESS-EVAL-<exp>-<fecha>). Cada eval marcada imported=True, import_batch=N.
 - 16,312 pacientes distintos con historial. Verificado: 16,312/16,312 paciente_id existen en patients; API GET /api/evaluaciones?paciente_id= devuelve el historial importado (expediente 1 → 12 evals).
 - La plantilla/esquema esperado está en GET /api/evaluaciones/import/template. El importador frontend (ImportarEvaluaciones.js) sigue oculto de la UI; la carga se hizo vía script+endpoint con credenciales superadmin.
+
+## Accesorios en Óptica + Punto de Venta (2026-06) — COMPLETADA y verificada
+Solicitud: "Agrega a optica, la opcion de accesorios, agrega las opciones al punto de ventas".
+
+### Backend (/app/backend/routes/optica.py)
+- Nuevos modelos Accessory (name, brand, description, cost_price, sale_price, stock) + CRUD en colección `optica_accessories`:
+  - GET /api/optica/accessories (search, low_stock; requiere view_optica)
+  - POST/PUT/DELETE /api/optica/accessories (soft-delete; requiere manage_optica_inventory)
+- SaleItemV2.type ahora admite "accessory"; create_optica_sale_v2 (POST /sales/v2) procesa items tipo accessory, valida y descuenta stock.
+- menu_config.py: AVAILABLE_MENUS y DEFAULT_MENU_CONFIG (rol optica) incluyen `optica_accesorios`.
+- server.py: migración idempotente agrega `optica_accesorios` a todo menu_configurations que ya tenga `optica_pos`.
+
+### Frontend
+- Nueva página /optica/accesorios (Accesorios.js) para gestión de inventario; ruta en App.js; nav item "Accesorios" (Layout.js, testId nav-optica-accesorios, icono Watch) condicionado a isMenuEnabled('optica_accesorios').
+- OpticaPOS.js: nueva categoría "Accesorios" (CATEGORIAS_OPTICA), fetch/render/carrito; mapeo tipo 'accesorios' -> 'accessory'. Tras venta exitosa ahora refresca stock (fetchProductos()).
+- POSProductCard.js: soporte de icono/nombre/stock para accesorios.
+
+Verificado: backend E2E vía curl (crear/listar/vender descontó stock 20->18, menú incluye optica_accesorios para rol optica). Testing agent frontend 100% (5/5 flujos: nav, CRUD accesorio, categoría POS con tarjetas, venta accessory ORD-202611-0002 stock 9->7, categorías existentes intactas). Issues restantes LOW y pre-existentes (sin cap de stock en cliente).

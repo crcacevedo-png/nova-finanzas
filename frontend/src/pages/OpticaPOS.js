@@ -537,8 +537,9 @@ const OpticaPOS = () => {
         dp: '', altura: '', observaciones: ''
       });
       
-      // Refrescar ventas del día
+      // Refrescar ventas del día y stock de productos
       fetchVentasHoy();
+      fetchProductos();
       
       toast.success('¡Venta registrada exitosamente!');
     } catch (error) {
