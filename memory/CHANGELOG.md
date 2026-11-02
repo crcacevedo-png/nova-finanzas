@@ -1,5 +1,16 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-11-02 — FIX: menú del rol óptica (POS, CxC ya por config; Caja por código)
+**Síntoma (producción):** el usuario óptica tenía permisos de POS óptica, Cuentas por Cobrar y Caja, pero no aparecían en el menú.
+**RCA (deployer, lectura de prod):** el menú se controla por `menu_configurations` (Menús por Rol), NO por permisos. POS óptica y CxC óptica YA estaban habilitados en la config de prod (editada por superadmin) → solo requieren re-login (los menús se cargan al iniciar sesión). 'Caja' NO podía aparecer para óptica por código: en `Layout.js` el bloque Finanzas (con Caja) está excluido para rol óptica y no existía ítem de Caja para óptica.
+**Fix de código:**
+- `frontend/src/components/Layout.js` — se agregó ítem 'Caja' (`/caja`, testid `nav-optica-caja`) en la sección Óptica, visible con `hasPermission('manage_caja')`. La ruta `/caja` ya está protegida por permiso (no por rol), así que óptica con manage_caja puede entrar.
+- `backend/server.py` — `_MODULE_PERMS['optica'].manage_caja` ahora True (antes False), para alinear el rol de sistema óptica con la intención/producción.
+**Verificado (preview):** login como óptica → `/auth/me` manage_caja=true; menú muestra Punto de Venta, Cuentas por Cobrar y Caja (nav-optica-pos/cxc/caja presentes).
+**IMPORTANTE:** requiere REDEPLOY para producción. Además, los usuarios óptica deben cerrar sesión y volver a entrar para que se recarguen los menús.
+
+
+
 ## 2026-11-02 — FIX producción: autoguardado y cambio de estado de citas (CORS PATCH)
 **Síntomas (solo producción):** (1) el autoguardado de expedientes no persistía; (2) al presionar "Iniciar" (Presente → En consulta) en Agenda salía "Error al cambiar estado".
 **Causa raíz (RCA del deployer):** el `CORSMiddleware` en `backend/server.py` NO incluía `PATCH` en `allow_methods`. Los endpoints afectados son PATCH (`/api/evaluaciones/{id}/autoguardar` y `/api/agenda/citas/{id}/estado`), por lo que el preflight OPTIONS del navegador era rechazado (400 'Disallowed CORS method') y la petición PATCH nunca llegaba al handler. El front caía a "guardado offline" / "Error al cambiar estado". En preview no se notaba por configuración de origin.
