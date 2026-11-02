@@ -25,7 +25,9 @@ export const NogSelector = ({ unitId, value, onChange, idSuffix = '' }) => {
     }
     try {
       const res = await igssNogApi.getActivos(unitId);
-      setNogs(res.data || []);
+      // Excluir NOGs sin número: un <SelectItem value=""> hace que Radix Select
+      // lance una excepción y rompa la página (ErrorBoundary).
+      setNogs((res.data || []).filter((n) => (n.numero || '').toString().trim() !== ''));
     } catch (e) {
       setNogs([]);
     }

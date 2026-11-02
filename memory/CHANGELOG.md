@@ -1,5 +1,16 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-11-02 — FIX: crash "Algo salió mal" al agregar orden NOG a un paciente
+**Síntoma:** al agregar una orden NOG en la ficha del paciente (IGSS) aparecía la página de error (ErrorBoundary).
+**Causa raíz:** el endpoint `GET /api/igss-units/{unit}/nogs-activos` devolvía NOGs con `numero` vacío. En el selector de NOG (`NogSelector`, Radix Select) un `<SelectItem value="">` lanza una excepción ("A <Select.Item /> must have a value prop that is not an empty string") → crash capturado por el ErrorBoundary. Verificado: la unidad 9d8260dc devolvía 11 NOGs, el primero con numero="".
+**Fix (doble capa):**
+- `backend/routes/igss_nogs.py` — `listar_nogs_activos` ahora excluye NOGs con numero null/"" (`numero: {$nin:[None,""]}`). Verificado: la unidad pasó de 11 a 10 NOGs, 0 vacíos. Cubre tanto el selector de la ficha como el filtro de NOG de la lista (ambos usan este endpoint).
+- `frontend/src/components/NogSelector.js` — filtra NOGs sin número antes de renderizar (defensa adicional).
+**Verificado:** API sin NOGs vacíos; el formulario de paciente IGSS renderiza y permite agregar orden sin ErrorBoundary.
+**IMPORTANTE:** requiere REDEPLOY para producción.
+
+
+
 ## 2026-11-02 — Rol óptica: acceso al Punto de Venta de CLÍNICA
 **Pedido:** el usuario óptica ya tenía Caja, pero faltaba el Punto de Venta de clínica (`/punto-venta`).
 **Causa:** el POS de clínica exige el permiso `manage_sales` (ventas.py `get_current_user_dependency`), que el rol óptica no tenía; y no había ítem de menú de POS clínica para óptica.

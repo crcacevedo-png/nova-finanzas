@@ -414,7 +414,7 @@ async def listar_nogs_activos(
     """Lista ligera para el selector de NOG en la ficha del paciente.
     Devuelve los NOG activos con su estado y disponibilidad."""
     nogs_docs = await db.igss_nogs.find(
-        {"unidad_id": unit_id, "is_active": True}, {"_id": 0}
+        {"unidad_id": unit_id, "is_active": True, "numero": {"$nin": [None, ""]}}, {"_id": 0}
     ).sort("numero", 1).to_list(1000)
     # Conteo de pacientes activos asignados a cada NOG de esta unidad (una sola agregación)
     conteo_docs = await db.patients.aggregate([
