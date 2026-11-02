@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only test of the Óptica Dashboard as role 'optica' (optica / Optica2024$). All 4 requested features PASS: (1) the nav-optica-dashboard item shows under the Óptica sidebar group (the group is collapsed by default and has to be expanded first). Clicking it, or opening /optica/dashboard directly, loads the dashboard with no redirect and no API errors (0 responses >=400). (2) Summary cards: Ventas Hoy Q150.00 (2 órdenes), Cobrado Hoy Q150.00, Pendiente Q0.00, Margen 66.7%, Ingresos (mes) Q150.00. In the Ventas del Día table the Pagado column shows the real amounts (Q60.00, Q90.00), not Q0 or NaN. (3) The Rentabilidad tab table has exactly one row: Accesorios, 4 units, Q150.00 ingresos, Q50.00 costos, Q100.00 ganancia, 66.7%. No rows with cantidad 0 appear, and total ingresos Q150 matches the sales. (4) In Informes (Noviembre 2026), clicking Generar shows Ventas Q150 (cobrado Q150), Balance +Q150, and Top 10 Productos lists 'ACC: NovaVision Estuche rígido' (2, Q90) and 'ACC: TESTBrand TEST_Estuche_1793643810' (2, Q60).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Optica Dashboard - Informes", "issues": ["The year dropdown is hardcoded to [2024, 2025, 2026], so it will break in 2027. Build the list from new Date().getFullYear()."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: build the Informes year options dynamically instead of the hardcoded [2024, 2025, 2026]",
+    "Optional: add data-testid to the dashboard tabs (Resumen/Rentabilidad/Por Origen/Informes), the Generar/Exportar CSV/Actualizar buttons, the summary cards and the rentabilidad category rows"
+  ],
+  "critical_code_review_comments": [
+    "OpticaDashboard.js is 740 lines, over the 700-line guideline. Consider splitting each tab into its own component.",
+    "The tabs, the Generar/Exportar buttons and the KPI values have no data-testid attributes."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100%"},
+  "seed_data_creation": "None. Used the existing November 2026 accessory sales (ORD-202611-0001, ORD-202611-0002).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "For the optica role, the Dashboard nav item sits inside the collapsible 'Óptica' sidebar group: click the text 'Óptica' to expand it, then click [data-testid=nav-optica-dashboard]. The tabs have no testids; use get_by_role('tab', name=...) and get_by_role('tabpanel', name='Informes')."
+}

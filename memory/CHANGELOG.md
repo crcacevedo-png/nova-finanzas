@@ -1,5 +1,25 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-06 — FIX: reportes/dashboard de Óptica deben incluir TODO lo vendido y comprado
+**Solicitud:** "todo lo que se vende en la optica debe aparecer en el reporte de rentabilidad... todo debe aparecer en el dashboard de la optica, ventas, compras, de todos los insumos".
+**Causas raíz encontradas (bugs preexistentes):**
+1. Las ventas del POS v2 guardan los ítems en `items_v2`, pero `rentabilidad` e `informe-mensual` leían `venta.get("items", [])` (campo inexistente). Resultado: accesorios (y cualquier ítem no-legacy) quedaban fuera de rentabilidad y de Top Productos.
+2. Los endpoints de dashboard (`stats`, `ventas-dia`, `rentabilidad`, `informe-mensual`, `historial-mensual`) leían `paid_amount`, pero las ventas almacenan `total_paid`. Resultado: "Cobrado/Pagado" salía Q0.
+3. La ruta `/optica/dashboard` era `requiredRole="superadmin"` y el item de menú exigía `isSuperAdmin`, así que el rol **optica no podía abrir su propio dashboard**.
+**Fix (backend `routes/optica.py`):**
+- `rentabilidad`: se reescribió el bucle para usar `items_v2` cuando existe (frame/contact_lens/lens_type/accessory + catch-all `otros`), con fallback a campos legacy si no hay `items_v2` (evita doble conteo). Se agregaron categorías `accesorios` y `otros` a `desglose_categorias`.
+- `informe-mensual` Top Productos: misma lógica items_v2/legacy → lista todos los tipos vendidos.
+- `replace_all` `paid_amount` → `total_paid` en todas las agregaciones/proyecciones de reportes.
+**Fix (menú/acceso):**
+- `menu_config.py` default rol optica + migración idempotente en `server.py`: agregan `optica_dashboard` a roles con `optica_pos`.
+- `App.js`: `/optica/dashboard` ahora `requiredPermission="view_optica"`.
+- `Layout.js`: item `nav-optica-dashboard` visible con `isMenuEnabled('optica_dashboard')` (sin gate superadmin).
+**Fix (frontend `OpticaDashboard.js`):** columna Pagado usa `venta.total_paid`; tabla rentabilidad con mapa de etiquetas {aros, lentes_contacto, tipos_lente, accesorios, otros}, oculta filas con cantidad 0; selector de año en Informes ahora dinámico (getFullYear-2..+1).
+**Verificado:** backend por curl (stats.cobrado_mes=150, ventas-dia cobrado=150, rentabilidad incluye Accesorios Q150/Q100 ganancia, año muestra las 4 categorías). Frontend rol `optica` por testing agent (iteration_112.json, 100%): abre dashboard, Cobrado Q150, fila Accesorios, Top Productos lista accesorios.
+**IMPORTANTE:** requiere REDEPLOY para producción.
+
+
+
 ## 2026-11-02 — FIX: óptica no podía cobrar en POS de clínica ("Sin permisos para realizar ventas")
 **Síntoma:** el usuario óptica ya veía el menú de Punto de Venta de clínica, pero al cobrar: "Sin permisos para realizar ventas".
 **Causa:** `routes/ventas.py` `crear_venta` tenía un chequeo HARDCODEADO por rol (`if role not in ["superadmin","admin","usuario"]: 403`) además de la dependencia que ya valida `manage_sales`. Ese check excluía a óptica (y a cualquier rol personalizado con el permiso).
