@@ -1,6 +1,6 @@
 // Componente de tarjeta de producto para POS de Óptica
 import React from 'react';
-import { Glasses, Eye, CircleDot, Plus } from 'lucide-react';
+import { Glasses, Eye, CircleDot, Plus, Watch } from 'lucide-react';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -14,10 +14,14 @@ const POSProductCard = ({
 }) => {
   const esLenteContacto = tipoProducto === 'lentes_contacto';
   const esLenteOftalmico = tipoProducto === 'tipos_lente';
+  const esAccesorio = categoriaActiva === 'accesorios';
 
   const getProductIcon = () => {
     if (categoriaActiva === 'armazones') {
       return <Glasses className="h-10 w-10 text-teal-500" />;
+    }
+    if (esAccesorio) {
+      return <Watch className="h-10 w-10 text-amber-500" />;
     }
     if (esLenteContacto) {
       return <CircleDot className="h-10 w-10 text-green-500" />;
@@ -29,13 +33,16 @@ const POSProductCard = ({
     if (categoriaActiva === 'armazones') {
       return `${producto.brand} ${producto.model}`;
     }
+    if (esAccesorio) {
+      return `${producto.brand || ''} ${producto.name || ''}`.trim();
+    }
     if (esLenteContacto) {
       return `${producto.brand || ''} ${producto.name || ''}`.trim();
     }
     return producto.name;
   };
 
-  const showStock = categoriaActiva === 'armazones' || esLenteContacto;
+  const showStock = categoriaActiva === 'armazones' || esLenteContacto || esAccesorio;
 
   return (
     <Card 

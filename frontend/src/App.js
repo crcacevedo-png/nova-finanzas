@@ -22,6 +22,7 @@ import OpticaDashboard from './pages/OpticaDashboard';
 import Medicos from './pages/Medicos';
 import TiposLente from './pages/TiposLente';
 import LentesContacto from './pages/LentesContacto';
+import Accesorios from './pages/Accesorios';
 import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import SalaOperaciones from './pages/SalaOperaciones';
 import AuditLogs from './pages/AuditLogs';
@@ -285,6 +286,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="view_optica">
             <LentesContacto />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/optica/accesorios" 
+        element={
+          <ProtectedRoute requiredPermission="view_optica">
+            <Accesorios />
           </ProtectedRoute>
         } 
       />

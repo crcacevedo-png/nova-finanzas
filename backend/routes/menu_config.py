@@ -136,6 +136,14 @@ AVAILABLE_MENUS = {
         "category": "optica",
         "description": "Catálogo de tipos de lentes"
     },
+    "optica_accesorios": {
+        "id": "optica_accesorios",
+        "label": "Accesorios",
+        "path": "/optica/accesorios",
+        "icon": "Watch",
+        "category": "optica",
+        "description": "Inventario de accesorios de óptica"
+    },
     "optica_pos": {
         "id": "optica_pos",
         "label": "Punto de Venta",
@@ -360,7 +368,7 @@ DEFAULT_MENU_CONFIG = {
     ],
     "optica": [
         "pacientes", "optica_armazones", "optica_lentes_contacto",
-        "optica_tipos_lente", "optica_pos", "optica_cxc", "optica_compras"
+        "optica_tipos_lente", "optica_accesorios", "optica_pos", "optica_cxc", "optica_compras"
     ],
     "administrador_igss": [
         "pacientes", "unidades_igss", "gestion_nog"

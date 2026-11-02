@@ -190,6 +190,46 @@ class LensTypeListResponse(BaseModel):
     data: List[LensTypeResponse]
     total: int
 
+# Accesorios
+class AccessoryBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=150)
+    brand: Optional[str] = ""
+    description: Optional[str] = ""
+    cost_price: float = Field(ge=0, default=0)
+    sale_price: float = Field(ge=0)
+    stock: int = Field(ge=0, default=0)
+
+class AccessoryCreate(AccessoryBase):
+    pass
+
+class AccessoryUpdate(BaseModel):
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    description: Optional[str] = None
+    cost_price: Optional[float] = None
+    sale_price: Optional[float] = None
+    stock: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class AccessoryResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    brand: Optional[str] = ""
+    description: Optional[str] = ""
+    cost_price: Optional[float] = 0
+    sale_price: Optional[float] = 0
+    price: Optional[float] = 0
+    stock: int = 0
+    is_active: bool = True
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class AccessoryListResponse(BaseModel):
+    data: List[AccessoryResponse]
+    total: int
+
 # Ventas
 class SaleLineItem(BaseModel):
     lens_type_id: str
@@ -202,7 +242,7 @@ class SaleLineItem(BaseModel):
 # Modelo V2 para ventas desde el POS (formato genérico con items[])
 class SaleItemV2(BaseModel):
     """Item genérico para venta desde POS"""
-    type: Literal["frame", "contact_lens", "lens_type"]
+    type: Literal["frame", "contact_lens", "lens_type", "accessory"]
     product_id: str
     quantity: int = Field(ge=1, default=1)
     unit_price: float = Field(ge=0)
@@ -869,6 +909,81 @@ async def delete_lens_type(lens_type_id: str, current_user: dict = Depends(requi
     return {"message": "Tipo de lente eliminado correctamente"}
 
 
+# ==================== ACCESSORIES ROUTES ====================
+
+@router.get("/accessories", response_model=AccessoryListResponse)
+async def get_accessories(
+    search: Optional[str] = None,
+    low_stock: Optional[bool] = None,
+    current_user: dict = Depends(require_permission("view_optica"))
+):
+    """Listar inventario de accesorios"""
+    query = {"is_active": True}
+    if search:
+        search_regex = {"$regex": search, "$options": "i"}
+        query["$or"] = [{"name": search_regex}, {"brand": search_regex}, {"description": search_regex}]
+    if low_stock:
+        query["stock"] = {"$lte": 5}
+    accessories = await db.optica_accessories.find(query, {"_id": 0}).sort("name", 1).to_list(1000)
+    for a in accessories:
+        a["price"] = a.get("sale_price", 0) or 0
+    return AccessoryListResponse(data=accessories, total=len(accessories))
+
+
+@router.post("/accessories", response_model=AccessoryResponse)
+async def create_accessory(accessory_data: AccessoryCreate, current_user: dict = Depends(require_permission("manage_optica_inventory"))):
+    """Crear nuevo accesorio"""
+    now = datetime.now(timezone.utc).isoformat()
+    accessory_doc = {
+        "id": str(uuid.uuid4()),
+        "name": accessory_data.name.strip(),
+        "brand": accessory_data.brand or "",
+        "description": accessory_data.description or "",
+        "cost_price": accessory_data.cost_price,
+        "sale_price": accessory_data.sale_price,
+        "stock": accessory_data.stock,
+        "entry_date": now[:10],
+        "is_active": True,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_at": now
+    }
+    await db.optica_accessories.insert_one(accessory_doc)
+    if "_id" in accessory_doc:
+        del accessory_doc["_id"]
+    accessory_doc["price"] = accessory_doc["sale_price"]
+    return AccessoryResponse(**accessory_doc)
+
+
+@router.put("/accessories/{accessory_id}", response_model=AccessoryResponse)
+async def update_accessory(accessory_id: str, accessory_data: AccessoryUpdate, current_user: dict = Depends(require_permission("manage_optica_inventory"))):
+    """Actualizar accesorio"""
+    accessory = await db.optica_accessories.find_one({"id": accessory_id, "is_active": True})
+    if not accessory:
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado")
+    update_data = {k: v for k, v in accessory_data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.optica_accessories.update_one({"id": accessory_id}, {"$set": update_data})
+    updated = await db.optica_accessories.find_one({"id": accessory_id}, {"_id": 0})
+    updated["price"] = updated.get("sale_price", 0) or 0
+    return AccessoryResponse(**updated)
+
+
+@router.delete("/accessories/{accessory_id}")
+async def delete_accessory(accessory_id: str, current_user: dict = Depends(require_permission("manage_optica_inventory"))):
+    """Eliminar accesorio (soft delete)"""
+    accessory = await db.optica_accessories.find_one({"id": accessory_id, "is_active": True})
+    if not accessory:
+        raise HTTPException(status_code=404, detail="Accesorio no encontrado")
+    await db.optica_accessories.update_one(
+        {"id": accessory_id},
+        {"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Accesorio eliminado correctamente"}
+
+
 # ==================== SALES ROUTES ====================
 
 @router.get("/sales", response_model=OpticaSaleListResponse)
@@ -1235,6 +1350,27 @@ async def create_optica_sale_v2(sale_data: OpticaSaleCreateV2, current_user: dic
                 "type": "lens_type",
                 "product_id": item.product_id,
                 "name": lens_type["name"],
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "subtotal": item.subtotal
+            })
+
+        elif item.type == "accessory":
+            accessory = await db.optica_accessories.find_one({"id": item.product_id, "is_active": True})
+            if not accessory:
+                raise HTTPException(status_code=400, detail=f"Accesorio no encontrado: {item.product_id}")
+            if accessory["stock"] < item.quantity:
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente para: {accessory.get('name', '')}")
+
+            subtotal += item.subtotal
+
+            # Descontar stock
+            await db.optica_accessories.update_one({"id": item.product_id}, {"$inc": {"stock": -item.quantity}})
+
+            processed_items.append({
+                "type": "accessory",
+                "product_id": item.product_id,
+                "name": f"{accessory.get('brand', '')} {accessory.get('name', '')}".strip(),
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
                 "subtotal": item.subtotal

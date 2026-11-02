@@ -4480,6 +4480,16 @@ async def startup_event():
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+
+    # Migración idempotente: agregar el menú de Accesorios a los roles que ya
+    # tienen el POS de óptica habilitado (para que aparezca sin reconfigurar manualmente)
+    await db.menu_configurations.update_many(
+        {"$and": [
+            {"enabled_menus": "optica_pos"},
+            {"enabled_menus": {"$ne": "optica_accesorios"}}
+        ]},
+        {"$addToSet": {"enabled_menus": "optica_accesorios"}}
+    )
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
     # Índice único por token de la blacklist

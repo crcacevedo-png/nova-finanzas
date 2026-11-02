@@ -15,7 +15,8 @@ import {
   Receipt,
   RefreshCw,
   Glasses,
-  Eye
+  Eye,
+  Watch
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -46,6 +47,7 @@ const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const CATEGORIAS_OPTICA = [
   { value: 'armazones', label: 'Armazones', icon: Glasses, color: 'bg-blue-500' },
   { value: 'lentes', label: 'Lentes', icon: Eye, color: 'bg-purple-500' },
+  { value: 'accesorios', label: 'Accesorios', icon: Watch, color: 'bg-amber-500' },
 ];
 
 // Tipos de lentes para el filtro
@@ -73,6 +75,7 @@ const OpticaPOS = () => {
   const [armazones, setArmazones] = useState([]);
   const [lentesContacto, setLentesContacto] = useState([]);
   const [tiposLente, setTiposLente] = useState([]);
+  const [accesorios, setAccesorios] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
   
   // Búsqueda
@@ -209,6 +212,11 @@ const OpticaPOS = () => {
         } else {
           setTiposLente([]);
         }
+      } else if (categoriaActiva === 'accesorios') {
+        const params = new URLSearchParams();
+        if (searchQuery) params.append('search', searchQuery);
+        const responseAcc = await axios.get(`${API_URL}/optica/accessories?${params}`, { headers });
+        setAccesorios(responseAcc.data?.data || responseAcc.data || []);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -261,7 +269,9 @@ const OpticaPOS = () => {
       ? `${producto.brand} ${producto.model}` 
       : tipo === 'lentes_contacto'
         ? `${producto.brand || ''} ${producto.name || ''}`.trim()
-        : producto.name;
+        : tipo === 'accesorios'
+          ? `${producto.brand || ''} ${producto.name || ''}`.trim()
+          : producto.name;
     
     const key = `${tipo}-${producto.id}`;
     const existente = carrito.find(item => item.key === key);
@@ -451,7 +461,7 @@ const OpticaPOS = () => {
       
       // Preparar items para el nuevo formato V2
       const items = carrito.map(item => ({
-        type: item.tipo === 'armazones' ? 'frame' : item.tipo === 'lentes_contacto' ? 'contact_lens' : 'lens_type',
+        type: item.tipo === 'armazones' ? 'frame' : item.tipo === 'lentes_contacto' ? 'contact_lens' : item.tipo === 'accesorios' ? 'accessory' : 'lens_type',
         product_id: item.producto_id,
         quantity: item.cantidad,
         unit_price: item.precio,
@@ -550,6 +560,8 @@ const OpticaPOS = () => {
       const contactoConTipo = lentesContacto.map(p => ({ ...p, _tipoInterno: 'lentes_contacto' }));
       const oftalmicosConTipo = tiposLente.map(p => ({ ...p, _tipoInterno: 'tipos_lente' }));
       productos = [...contactoConTipo, ...oftalmicosConTipo];
+    } else if (categoriaActiva === 'accesorios') {
+      productos = accesorios.map(p => ({ ...p, _tipoInterno: 'accesorios' }));
     }
     
     if (loadingProductos) {

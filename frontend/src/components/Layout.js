@@ -43,7 +43,8 @@ import {
   Tag,
   PieChart,
   KeyRound,
-  DatabaseBackup
+  DatabaseBackup,
+  Watch
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
@@ -214,6 +215,7 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('optica_armazones')) opticaItems.push({ path: '/optica/inventario', icon: Package, label: 'Armazones', testId: 'nav-optica-inventario' });
     if (isMenuEnabled('optica_lentes_contacto')) opticaItems.push({ path: '/optica/lentes-contacto', icon: CircleDot, label: 'Lentes de Contacto', testId: 'nav-optica-lentes-contacto' });
     if (isMenuEnabled('optica_tipos_lente')) opticaItems.push({ path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' });
+    if (isMenuEnabled('optica_accesorios')) opticaItems.push({ path: '/optica/accesorios', icon: Watch, label: 'Accesorios', testId: 'nav-optica-accesorios' });
     if (isMenuEnabled('optica_pos')) opticaItems.push({ path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' });
     if (isMenuEnabled('optica_cxc')) opticaItems.push({ path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' });
     if (hasPermission('manage_sales')) opticaItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta Clínica', testId: 'nav-optica-pos-clinica' });
