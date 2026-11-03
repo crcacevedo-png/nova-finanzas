@@ -453,3 +453,8 @@ Pendiente sugerido: no existe "Traslado entre bodegas" (el Kardex solo exporta i
 - api.js: inventarioApi.crearTraslado(data).
 - inventario/Bodegas.js: botón "Traslado" en header (solo admin, testId traslado-btn) + diálogo (traslado-dialog): select origen -> carga productos con stock de esa bodega -> select producto (muestra disponible) -> cantidad (máx=disponible, deshabilitada hasta elegir producto) -> select destino (excluye origen) -> motivo opcional. testIds: traslado-origen-select/-{id}, traslado-producto-select/-{id}, traslado-cantidad-input, traslado-destino-select/-{id}, traslado-motivo-input, traslado-guardar-btn. Header responsive (flex-col/flex-wrap en móvil).
 Verificado: curl (Prednisolona lote parcial General 31->28, Dispensario 15->18; reconcile preview=0; kardex con salida+entrada); UI e2e (24 productos, cantidad se habilita, toast "Traslado de 2 unidad(es)... realizado").
+
+## 2026-11-03 — Meta de Óptica: solo meta mensual (se quitó la diaria)
+- OpticaDashboard.js: eliminada la barra "Meta del Día" (meta-dia-progress) y el campo meta-diaria-input del diálogo; la "Meta del Mes" ocupa todo el ancho. handleSaveMetas envía meta_diaria:0; openMetasDialog y estado solo manejan meta mensual.
+- optica.py: MetasVentasUpdate.meta_diaria ahora opcional (default 0).
+Verificado: screenshot — solo aparece Meta del Mes y el diálogo solo pide "Meta mensual (Q)".

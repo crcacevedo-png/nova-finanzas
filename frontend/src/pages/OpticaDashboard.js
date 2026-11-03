@@ -47,7 +47,6 @@ const OpticaDashboard = () => {
 
   // Dialog de metas
   const [metasDialogOpen, setMetasDialogOpen] = useState(false);
-  const [metaDiariaInput, setMetaDiariaInput] = useState('');
   const [metaMensualInput, setMetaMensualInput] = useState('');
   const [savingMetas, setSavingMetas] = useState(false);
   
@@ -83,21 +82,19 @@ const OpticaDashboard = () => {
   }, [periodoRentabilidad]);
 
   const openMetasDialog = () => {
-    setMetaDiariaInput(metas?.meta_diaria ? String(metas.meta_diaria) : '');
     setMetaMensualInput(metas?.meta_mensual ? String(metas.meta_mensual) : '');
     setMetasDialogOpen(true);
   };
 
   const handleSaveMetas = async () => {
-    const diaria = parseFloat(metaDiariaInput) || 0;
     const mensual = parseFloat(metaMensualInput) || 0;
-    if (diaria < 0 || mensual < 0) {
-      toast.error('Las metas no pueden ser negativas');
+    if (mensual < 0) {
+      toast.error('La meta no puede ser negativa');
       return;
     }
     try {
       setSavingMetas(true);
-      await opticaSaleApi.setMetas({ meta_diaria: diaria, meta_mensual: mensual });
+      await opticaSaleApi.setMetas({ meta_diaria: 0, meta_mensual: mensual });
       toast.success('Metas de ventas actualizadas');
       setMetasDialogOpen(false);
       await loadDashboardData();
@@ -393,27 +390,8 @@ const OpticaDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {(metas.meta_diaria > 0 || metas.meta_mensual > 0) ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Meta del día */}
-                  <div data-testid="meta-dia-progress">
-                    <div className="flex items-baseline justify-between mb-1.5">
-                      <span className="text-sm font-medium text-slate-700">Meta del Día</span>
-                      <span className="text-sm font-semibold text-blue-600">{metas.progreso_dia}%</span>
-                    </div>
-                    <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ${metas.progreso_dia >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                        style={{ width: `${Math.min(metas.progreso_dia, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between mt-1.5 text-xs">
-                      <span className="text-slate-600">{formatCurrency(metas.ventas_hoy)} / {formatCurrency(metas.meta_diaria)}</span>
-                      {metas.progreso_dia >= 100
-                        ? <span className="text-emerald-600 font-medium">¡Meta alcanzada!</span>
-                        : <span className="text-slate-500">Faltan {formatCurrency(metas.falta_dia)}</span>}
-                    </div>
-                  </div>
+              {metas.meta_mensual > 0 ? (
+                <div>
                   {/* Meta del mes */}
                   <div data-testid="meta-mes-progress">
                     <div className="flex items-baseline justify-between mb-1.5">
@@ -453,23 +431,10 @@ const OpticaDashboard = () => {
             <DialogHeader>
               <DialogTitle>Definir metas de ventas</DialogTitle>
               <DialogDescription>
-                Establece el objetivo de ventas (en Quetzales) para el día y el mes.
+                Establece el objetivo de ventas del mes (en Quetzales).
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              <div>
-                <Label htmlFor="meta-diaria">Meta diaria (Q)</Label>
-                <Input
-                  id="meta-diaria"
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={metaDiariaInput}
-                  onChange={(e) => setMetaDiariaInput(e.target.value)}
-                  placeholder="Ej. 1500"
-                  data-testid="meta-diaria-input"
-                />
-              </div>
               <div>
                 <Label htmlFor="meta-mensual">Meta mensual (Q)</Label>
                 <Input

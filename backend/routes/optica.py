@@ -1864,7 +1864,7 @@ async def get_ventas_del_dia(current_user: dict = Depends(require_permission("vi
 
 
 class MetasVentasUpdate(BaseModel):
-    meta_diaria: float = Field(..., ge=0)
+    meta_diaria: float = Field(default=0, ge=0)
     meta_mensual: float = Field(..., ge=0)
 
 
