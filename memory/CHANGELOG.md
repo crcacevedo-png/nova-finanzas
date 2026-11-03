@@ -431,3 +431,13 @@ Nota: 1 producto (Acetazolamida) tiene drift real existencia(60) vs suma de lote
 - api.js: inventarioApi.reconciliarLotesPreview() y reconciliarLotes().
 - inventario/Bodegas.js: botón "Reconciliar lotes" en header solo para admin/superadmin (testId reconciliar-lotes-btn) usando useAuth; diálogo (reconciliar-dialog) con tabla de descuadres (existencia/lotes/ajuste), estado "Todo cuadra", y botón Reconciliar (reconciliar-aplicar-btn) que aplica y re-verifica.
 Verificado: curl preview(1: Acetazolamida 60 vs 28)→aplicar→preview(0); screenshots del flujo completo en UI (detectar y "Todo cuadra" tras reconciliar). Acetazolamida quedó corregida en preview.
+
+## 2026-11-03 — Selector de bodega en Punto de Venta (clínica)
+Problema (producción): el POS estaba fijo a una bodega (Dispensario); productos con stock en otra bodega mostraban "Bodega: 0" y no se podían vender.
+### Frontend (PuntoVenta.js)
+- Nuevo estado bodegasList; fetchBodegaPOS ahora también carga bodegas activas (inventarioApi.getBodegas({activo:true})).
+- Header: el texto fijo "Bodega: X" se reemplazó por un Select (testId pos-bodega-selector, opciones pos-bodega-option-{id}) cuando hay >1 bodega; cualquier usuario del POS puede cambiarla.
+- handleCambiarBodega: cambia bodegaPOS (dispara refetch de productos para la nueva bodega) y vacía el carrito para evitar vender stock de otra bodega.
+- La venta usa bodegaPOS.bodega_id de la bodega seleccionada.
+Verificado: screenshot — al cambiar de Dispensario a Bodega General, Acetazolamida pasó de "Bodega: 0 · Total: 28" a "Bodega: 28" (vendible). 3 bodegas (Bodega General, Dispensario, Quirófano). Móvil OK (overflow restante es layout pre-existente del POS).
+Pendiente sugerido: no existe "Traslado entre bodegas" (el Kardex solo exporta informe); el usuario lo mencionó.

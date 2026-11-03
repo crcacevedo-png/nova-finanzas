@@ -84,6 +84,7 @@ const PuntoVenta = () => {
   
   // Estado de la bodega POS
   const [bodegaPOS, setBodegaPOS] = useState(null);
+  const [bodegasList, setBodegasList] = useState([]);
   const [loadingBodega, setLoadingBodega] = useState(true);
   const [accesoDenegado, setAccesoDenegado] = useState(false);
   
@@ -211,6 +212,13 @@ const PuntoVenta = () => {
       const response = await ventasApi.getBodegaPOS();
       setBodegaPOS(response.data);
       setAccesoDenegado(false);
+      // Cargar lista de bodegas activas para permitir cambiar la bodega de venta
+      try {
+        const bodRes = await inventarioApi.getBodegas({ activo: true });
+        setBodegasList(bodRes.data?.data || []);
+      } catch (e) {
+        console.error('Error fetching bodegas list:', e);
+      }
     } catch (error) {
       console.error('Error fetching bodega POS:', error);
       if (error.response?.status === 403) {
@@ -221,6 +229,17 @@ const PuntoVenta = () => {
     } finally {
       setLoadingBodega(false);
     }
+  };
+
+  const handleCambiarBodega = (bodegaId) => {
+    const b = bodegasList.find(x => x.id === bodegaId);
+    if (!b) return;
+    // Limpiar carrito al cambiar de bodega para evitar vender stock de otra bodega
+    if (carrito.length > 0) {
+      setCarrito([]);
+      toast.info('Se vació el carrito al cambiar de bodega');
+    }
+    setBodegaPOS({ ...bodegaPOS, bodega_id: b.id, bodega_nombre: b.nombre });
   };
 
   const fetchCategorias = async () => {
@@ -1078,7 +1097,25 @@ const PuntoVenta = () => {
           <div className="flex items-center gap-4">
             <div>
               <h1 className="text-xl font-bold text-slate-800">Punto de Venta</h1>
-              <p className="text-sm text-slate-500">Bodega: {bodegaPOS.bodega_nombre}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-sm text-slate-500">Bodega:</span>
+                {bodegasList.length > 1 ? (
+                  <Select value={bodegaPOS.bodega_id} onValueChange={handleCambiarBodega}>
+                    <SelectTrigger className="h-7 w-auto min-w-[150px] text-sm border-slate-300" data-testid="pos-bodega-selector">
+                      <SelectValue placeholder="Seleccionar bodega" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bodegasList.map((b) => (
+                        <SelectItem key={b.id} value={b.id} data-testid={`pos-bodega-option-${b.id}`}>
+                          {b.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="text-sm font-medium text-slate-700">{bodegaPOS.bodega_nombre}</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
