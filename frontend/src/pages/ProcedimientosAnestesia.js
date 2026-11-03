@@ -11,7 +11,7 @@ import { Badge } from '../components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '../components/ui/dialog';
-import { Plus, Pencil, Power, Syringe, Lock, CheckCircle } from 'lucide-react';
+import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileText } from 'lucide-react';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -119,6 +119,31 @@ const CierreTab = () => {
     } catch (e) { toast.error(e.response?.data?.detail || 'No se pudo cerrar el mes'); }
   };
 
+  const [exporting, setExporting] = useState(false);
+  const exportar = async (format) => {
+    setExporting(true);
+    try {
+      toast.info(`Generando ${format.toUpperCase()}...`);
+      const res = await axios.get(`${API_URL}/quirofano/anesthesia/closure/export?month=${month}&format=${format}`, { responseType: 'blob' });
+      const blob = new Blob([res.data], {
+        type: format === 'xlsx'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'application/pdf',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `anestesia_${month}.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`${format.toUpperCase()} descargado`);
+    } catch (e) {
+      toast.error('No se pudo exportar el cierre');
+    } finally { setExporting(false); }
+  };
+
   return (
     <div data-testid="anesthesia-closure-tab">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -127,6 +152,12 @@ const CierreTab = () => {
           <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-44" data-testid="anesthesia-closure-month" />
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportar('xlsx')} disabled={exporting || !data?.num_registros} data-testid="anesthesia-export-xlsx">
+            <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600" />Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportar('pdf')} disabled={exporting || !data?.num_registros} data-testid="anesthesia-export-pdf">
+            <FileText className="w-4 h-4 mr-2 text-red-600" />PDF
+          </Button>
           {data?.closed ? (
             <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700 py-1.5 px-3" data-testid="anesthesia-month-closed"><Lock className="w-3.5 h-3.5 mr-1" />Mes cerrado (pagado)</Badge>
           ) : (

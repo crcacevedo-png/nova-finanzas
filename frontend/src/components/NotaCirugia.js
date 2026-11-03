@@ -7,7 +7,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import { Bold, Italic, List, Lock, Save, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Bold, Italic, List, Lock, Save, CheckCircle2, ShieldAlert, Printer } from 'lucide-react';
 import { surgeryNoteApi } from '../services/api';
 
 const formatFecha = (f) => {
@@ -67,6 +67,38 @@ export const NotaCirugia = ({ note, isSuperadmin, onUpdated }) => {
     }
   };
 
+  const imprimir = () => {
+    const contenido = editable ? (editorRef.current?.innerHTML || '') : (estado.contenido || '');
+    const win = window.open('', '_blank', 'width=800,height=900');
+    if (!win) { toast.error('Habilita las ventanas emergentes para imprimir'); return; }
+    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Nota operatoria — ${estado.procedure || ''}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; margin: 40px; line-height: 1.5; }
+        h1 { font-size: 20px; margin: 0 0 4px; color: #0F6E56; }
+        .meta { font-size: 13px; color: #475569; margin-bottom: 4px; }
+        .divider { border: none; border-top: 2px solid #0F6E56; margin: 16px 0; }
+        .label { font-weight: bold; }
+        .content { font-size: 14px; margin-top: 10px; }
+        .content ul { margin: 6px 0 6px 20px; }
+        .firma { margin-top: 60px; font-size: 13px; }
+        .firma-line { border-top: 1px solid #334155; width: 280px; padding-top: 4px; }
+        @media print { body { margin: 20px; } }
+      </style></head><body>
+      <h1>Nota operatoria</h1>
+      <div class="meta"><span class="label">Procedimiento:</span> ${estado.procedure || '—'}</div>
+      <div class="meta"><span class="label">Paciente:</span> ${estado.patient_name || estado.patient || '—'}</div>
+      <div class="meta"><span class="label">Fecha:</span> ${formatFecha(estado.fecha)} &nbsp;·&nbsp; <span class="label">Ojo:</span> ${estado.eye || '—'}</div>
+      <div class="meta"><span class="label">Cirujano:</span> ${estado.surgeon || '—'} &nbsp;·&nbsp; <span class="label">Institución:</span> ${estado.institution || '—'}</div>
+      <hr class="divider" />
+      <div class="content">${contenido || '<em style="color:#94a3b8">(Sin contenido)</em>'}</div>
+      <div class="firma"><div class="firma-line">${estado.surgeon || 'Firma del cirujano'}</div></div>
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 300);
+  };
+
   const renderEstadoBadge = () => {
     if (estado.estado === 'cerrada') {
       return <Badge className="bg-red-100 text-red-700"><Lock className="mr-1 h-3 w-3" />Cerrada</Badge>;
@@ -82,7 +114,12 @@ export const NotaCirugia = ({ note, isSuperadmin, onUpdated }) => {
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h4 className="text-sm font-semibold text-slate-800">{estado.procedure}</h4>
-          {renderEstadoBadge()}
+          <div className="flex items-center gap-2">
+            {renderEstadoBadge()}
+            <Button type="button" variant="outline" size="sm" onClick={imprimir} className="h-7 gap-1.5 text-xs" data-testid="nota-imprimir">
+              <Printer className="h-3.5 w-3.5" />Imprimir
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-slate-500 mt-1">
           {formatFecha(estado.fecha)} · {estado.eye} · {estado.surgeon} · {estado.institution}

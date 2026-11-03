@@ -113,8 +113,8 @@ const Layout = ({ children }) => {
   
   // Sala de Operaciones ahora es un grupo colapsable (ver salaOpItems más abajo)
   
-  // CRM Cirugías - Admin/SuperAdmin y si está habilitado
-  if (isAdminOrSuperAdmin && isMenuEnabled('crm_cirugias')) {
+  // CRM Cirugías - Visible si el menú está habilitado (admin/superadmin por defecto; usuario por configuración)
+  if (isMenuEnabled('crm_cirugias')) {
     navItems.push({ path: '/crm-cirugias', icon: Stethoscope, label: 'CRM Cirugías', testId: 'nav-crm-cirugias' });
   }
   

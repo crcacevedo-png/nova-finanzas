@@ -379,7 +379,7 @@ DEFAULT_MENU_CONFIG = {
         "inventario_sociedades", "gestion_nog"
     ],
     "usuario": [
-        "pacientes", "evaluacion_oftalmologica", "agenda",
+        "pacientes", "evaluacion_oftalmologica", "crm_cirugias", "agenda",
         "inventario_panel", "inventario_productos", "inventario_lotes"
     ],
     "optica": [

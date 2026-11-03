@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from fastapi.responses import StreamingResponse
 
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -341,11 +342,8 @@ async def delete_anesthesia_record(
 
 
 # ==================== CIERRE MENSUAL ====================
-@router.get("/anesthesia/closure")
-async def get_monthly_closure(
-    month: str = Query(..., description="YYYY-MM"),
-    current_user: dict = Depends(require_role(["admin", "superadmin"])),
-):
+async def _build_closure(month: str) -> dict:
+    """Agrega los registros de anestesia del mes agrupados por anestesiólogo."""
     records = await db.anesthesia_records.find({"month": month}, {"_id": 0}).to_list(5000)
     por_anest = {}
     for r in records:
@@ -374,6 +372,155 @@ async def get_monthly_closure(
         "total_general": round(sum(g["total"] for g in resultado), 2),
         "num_registros": len(records),
     }
+
+
+@router.get("/anesthesia/closure")
+async def get_monthly_closure(
+    month: str = Query(..., description="YYYY-MM"),
+    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+):
+    return await _build_closure(month)
+
+
+@router.get("/anesthesia/closure/export")
+async def export_monthly_closure(
+    month: str = Query(..., description="YYYY-MM"),
+    format: str = Query("xlsx", description="xlsx | pdf"),
+    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+):
+    import io
+    data = await _build_closure(month)
+    grupos = data["por_anestesiologo"]
+    estado = "CERRADO (pagado)" if data["closed"] else "ABIERTO (pendiente)"
+
+    if format == "xlsx":
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"Anestesia {month}"
+        header_fill = PatternFill("solid", fgColor="4F46E5")
+        white_bold = Font(bold=True, color="FFFFFF")
+        bold = Font(bold=True)
+        thin = Side(style="thin", color="E2E8F0")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        ws["A1"] = "Novavisión — Cierre de Procedimientos de Anestesia"
+        ws["A1"].font = Font(bold=True, size=14, color="4F46E5")
+        ws["A2"] = f"Mes: {month}   |   Estado: {estado}   |   Total a pagar: Q {data['total_general']:,.2f}   |   Procedimientos: {data['num_registros']}"
+        ws["A3"] = ""
+
+        headers = ["Anestesiólogo", "Tipo de anestesia", "Cantidad", "Honorario unit.", "Subtotal"]
+        row = 4
+        for c, h in enumerate(headers, start=1):
+            cell = ws.cell(row=row, column=c, value=h)
+            cell.fill = header_fill
+            cell.font = white_bold
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = border
+        row += 1
+
+        for g in grupos:
+            first = True
+            for t in g["tipos"]:
+                ws.cell(row=row, column=1, value=g["anesthesiologist"] if first else "").border = border
+                ws.cell(row=row, column=2, value=t["tipo"]).border = border
+                ws.cell(row=row, column=3, value=t["count"]).border = border
+                ws.cell(row=row, column=4, value=round(t["value"], 2)).border = border
+                ws.cell(row=row, column=5, value=round(t["subtotal"], 2)).border = border
+                first = False
+                row += 1
+            # Subtotal por anestesiólogo
+            lbl = ws.cell(row=row, column=2, value=f"Total {g['anesthesiologist']} ({g['count']} proc.)")
+            lbl.font = bold
+            tot = ws.cell(row=row, column=5, value=round(g["total"], 2))
+            tot.font = bold
+            row += 1
+
+        row += 1
+        ws.cell(row=row, column=2, value="TOTAL GENERAL").font = Font(bold=True, size=12)
+        ws.cell(row=row, column=5, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
+
+        widths = [28, 24, 12, 16, 14]
+        for i, w in enumerate(widths, start=1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=anestesia_{month}.xlsx"},
+        )
+
+    # PDF
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=0.5 * inch,
+                            leftMargin=0.5 * inch, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('T', parent=styles['Heading1'], fontSize=15, alignment=TA_CENTER,
+                                 textColor=colors.HexColor('#4F46E5'), spaceAfter=6)
+    sub_style = ParagraphStyle('S', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER,
+                               textColor=colors.grey, spaceAfter=14)
+    elements = [
+        Paragraph("Novavisión — Cierre de Procedimientos de Anestesia", title_style),
+        Paragraph(f"Mes: {month} &nbsp;|&nbsp; Estado: {estado} &nbsp;|&nbsp; Total a pagar: Q {data['total_general']:,.2f} &nbsp;|&nbsp; Procedimientos: {data['num_registros']}", sub_style),
+    ]
+
+    table_data = [["Anestesiólogo", "Tipo de anestesia", "Cant.", "Honorario", "Subtotal"]]
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (1, 0), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#4F46E5')),
+    ]
+    r = 1
+    for g in grupos:
+        first = True
+        for t in g["tipos"]:
+            table_data.append([
+                g["anesthesiologist"] if first else "",
+                t["tipo"], str(t["count"]),
+                f"Q {t['value']:,.2f}", f"Q {t['subtotal']:,.2f}",
+            ])
+            first = False
+            r += 1
+        table_data.append(["", f"Total {g['anesthesiologist']} ({g['count']} proc.)", "", "", f"Q {g['total']:,.2f}"])
+        style_cmds.append(('FONTNAME', (0, r), (-1, r), 'Helvetica-Bold'))
+        style_cmds.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#EEF2FF')))
+        r += 1
+
+    table = Table(table_data, colWidths=[1.9 * inch, 2.2 * inch, 0.7 * inch, 1.1 * inch, 1.1 * inch])
+    table.setStyle(TableStyle(style_cmds))
+    elements.append(table)
+    elements.append(Spacer(1, 0.2 * inch))
+    total_style = ParagraphStyle('Tot', parent=styles['Normal'], fontSize=12, alignment=TA_RIGHT)
+    elements.append(Paragraph(f"<b>TOTAL GENERAL: Q {data['total_general']:,.2f}</b>", total_style))
+    if not grupos:
+        elements.append(Paragraph("Sin registros de anestesia este mes.", sub_style))
+
+    doc.build(elements)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=anestesia_{month}.pdf"},
+    )
 
 
 @router.post("/anesthesia/closure/close")

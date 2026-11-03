@@ -4513,6 +4513,12 @@ async def startup_event():
         {"$addToSet": {"enabled_menus": {"$each": ["quirofano_insumos", "quirofano_anestesia"]}}}
     )
 
+    # Migración: habilitar CRM Cirugías al rol "usuario" (revisión del CRM)
+    await db.menu_configurations.update_one(
+        {"role": "usuario"},
+        {"$addToSet": {"enabled_menus": "crm_cirugias"}}
+    )
+
     # Migración: corregir el 'concepto' de CxC de clínica generadas por ventas
     # (antes mostraba "Venta VTA-..."; ahora muestra los items vendidos)
     try:
