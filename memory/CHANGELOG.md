@@ -458,3 +458,8 @@ Verificado: curl (Prednisolona lote parcial General 31->28, Dispensario 15->18; 
 - OpticaDashboard.js: eliminada la barra "Meta del Día" (meta-dia-progress) y el campo meta-diaria-input del diálogo; la "Meta del Mes" ocupa todo el ancho. handleSaveMetas envía meta_diaria:0; openMetasDialog y estado solo manejan meta mensual.
 - optica.py: MetasVentasUpdate.meta_diaria ahora opcional (default 0).
 Verificado: screenshot — solo aparece Meta del Mes y el diálogo solo pide "Meta mensual (Q)".
+
+## 2026-11-03 — Proyección de cierre de mes (Meta de Óptica)
+- optica.py GET /dashboard/metas: agrega proyeccion_mes = ventas_mes / dias_transcurridos * dias_mes (hora Guatemala), más dias_transcurridos y dias_mes.
+- OpticaDashboard.js: bajo la barra de Meta del Mes, línea (testId meta-mes-proyeccion) "A este ritmo cerrarás el mes en Q X" con color verde si proyeccion>=meta o ámbar si por debajo (icono TrendingUp).
+Verificado: curl (195 en día 3/30 -> proyección 1950) y screenshot de la línea en la UI.

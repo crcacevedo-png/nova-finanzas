@@ -410,6 +410,18 @@ const OpticaDashboard = () => {
                         ? <span className="text-emerald-600 font-medium">¡Meta alcanzada!</span>
                         : <span className="text-slate-500">Faltan {formatCurrency(metas.falta_mes)}</span>}
                     </div>
+                    {metas.proyeccion_mes != null && (
+                      <div
+                        className={`mt-2 flex items-center gap-1.5 text-xs rounded-md px-2.5 py-1.5 ${metas.proyeccion_mes >= metas.meta_mensual ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
+                        data-testid="meta-mes-proyeccion"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          A este ritmo cerrarás el mes en <span className="font-semibold">{formatCurrency(metas.proyeccion_mes)}</span>
+                          {metas.proyeccion_mes >= metas.meta_mensual ? ' — ¡superarás la meta!' : ' — por debajo de la meta'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

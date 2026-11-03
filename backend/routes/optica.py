@@ -1898,6 +1898,13 @@ async def get_metas_ventas(current_user: dict = Depends(require_permission("view
     ]).to_list(1)
     ventas_mes = round(mes_result[0]["total"], 2) if mes_result else 0
 
+    # Proyección de cierre de mes al ritmo actual (hora de Guatemala)
+    import calendar
+    ahora_gt = now_gt()
+    dias_mes = calendar.monthrange(ahora_gt.year, ahora_gt.month)[1]
+    dia_actual = ahora_gt.day
+    proyeccion_mes = round(ventas_mes / dia_actual * dias_mes, 2) if dia_actual > 0 else ventas_mes
+
     meta_d = metas["meta_diaria"]
     meta_m = metas["meta_mensual"]
     return {
@@ -1909,6 +1916,9 @@ async def get_metas_ventas(current_user: dict = Depends(require_permission("view
         "progreso_mes": round(ventas_mes / meta_m * 100, 1) if meta_m > 0 else 0,
         "falta_dia": round(max(meta_d - ventas_hoy, 0), 2),
         "falta_mes": round(max(meta_m - ventas_mes, 0), 2),
+        "proyeccion_mes": proyeccion_mes,
+        "dias_transcurridos": dia_actual,
+        "dias_mes": dias_mes,
     }
 
 
