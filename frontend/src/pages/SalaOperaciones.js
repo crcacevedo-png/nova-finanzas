@@ -1069,12 +1069,11 @@ const SalaOperaciones = () => {
                       onChange={(e) => setFormData({ ...formData, procedure: e.target.value })}
                       list="procedures-list"
                       placeholder="Seleccione o escriba el procedimiento"
-                      readOnly={formData.institution === 'IGSS' && !!formData.igss_data.nog_id}
-                      disabled={formData.institution === 'IGSS' && !!formData.igss_data.nog_id}
-                      className={formData.institution === 'IGSS' && !!formData.igss_data.nog_id ? 'bg-slate-100 cursor-not-allowed text-slate-600' : ''}
+                      readOnly={formData.institution === 'IGSS' && !!formData.igss_data.nog_id && !!formData.procedure}
+                      className={formData.institution === 'IGSS' && !!formData.igss_data.nog_id && !!formData.procedure ? 'bg-slate-100 cursor-not-allowed font-medium' : ''}
                       data-testid="surgery-procedure-input"
                     />
-                    {formData.institution === 'IGSS' && !!formData.igss_data.nog_id && (
+                    {formData.institution === 'IGSS' && !!formData.igss_data.nog_id && !!formData.procedure && (
                       <p className="text-xs text-blue-600 mt-1">Llenado automáticamente desde el servicio del NOG (no editable)</p>
                     )}
                     <datalist id="procedures-list">
@@ -1249,6 +1248,7 @@ const SalaOperaciones = () => {
                           value={formData.igss_data.sps}
                           onChange={(e) => setFormData({ ...formData, igss_data: { ...formData.igss_data, sps: e.target.value } })}
                           placeholder="Número SPS"
+                          data-testid="surgery-igss-sps"
                         />
                       </div>
                       <div>
@@ -1257,6 +1257,7 @@ const SalaOperaciones = () => {
                           value={formData.igss_data.affiliation_number}
                           onChange={(e) => setFormData({ ...formData, igss_data: { ...formData.igss_data, affiliation_number: e.target.value } })}
                           placeholder="Número de afiliación"
+                          data-testid="surgery-igss-afiliacion"
                         />
                       </div>
                       <div>
@@ -1265,6 +1266,7 @@ const SalaOperaciones = () => {
                           value={formData.igss_data.code}
                           onChange={(e) => setFormData({ ...formData, igss_data: { ...formData.igss_data, code: e.target.value } })}
                           placeholder="Ej: OFT-001"
+                          data-testid="surgery-igss-codigo"
                         />
                       </div>
                       <div className="col-span-2">
@@ -1276,6 +1278,7 @@ const SalaOperaciones = () => {
                           value={formData.igss_data.procedure_cost}
                           onChange={(e) => setFormData({ ...formData, igss_data: { ...formData.igss_data, procedure_cost: e.target.value } })}
                           placeholder="0.00"
+                          data-testid="surgery-igss-costo"
                         />
                       </div>
                     </div>

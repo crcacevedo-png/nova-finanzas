@@ -1,5 +1,15 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-06 — Sala de Operaciones: captura de datos IGSS por cirugía (Fase 1 MVP)
+**Solicitud (plan aprobado):** al registrar/editar una cirugía con institución IGSS, pedir los mismos datos que un paciente IGSS (Unidad desde lista, NOG desde lista de la unidad + opción libre, SPS, No. afiliación, Código, Costo) y autollenar el Procedimiento desde el servicio del NOG, bloqueándolo mientras sea IGSS. Captura SOLO informativa: NO consume NOG ni crea registros en Producción IGSS.
+**Backend (`routes/surgeries.py`):** `IGSSData` ahora incluye `unit_id`, `nog_id`, `nog_number` (además de unit, sps, affiliation_number, code, procedure_cost). El flujo de cirugías solo inserta en `db.surgeries`; no toca contadores de NOG ni acreditaciones (verificado: acreditados 0→0 al crear cirugía IGSS).
+**Frontend (`SalaOperaciones.js`):** bloque IGSS con selects de Unidad (GET /igss-units) y NOG (GET /igss-units/{id}/nogs-activos, formato 'numero — servicio') + opción 'Escribir NOG libre…'. Al elegir NOG de la lista se autollena y bloquea el Procedimiento (si el servicio está vacío, no se bloquea para permitir escribirlo). Detalle de cirugía muestra Unidad y NOG. data-testids añadidos.
+**Verificado:** backend por curl (persistencia + NOG no consumido); frontend testing agent iteration_115.json 100% (9/9 flujos). Fixes menores aplicados tras el test (bloqueo condicionado a servicio no vacío, legibilidad del campo bloqueado, testids).
+**Fase 2/3 pendientes:** prefijar unidad/afiliación desde la ficha del paciente; columnas NOG/Código en tabla y export; validaciones obligatorias IGSS; reporte de cirugías por unidad/NOG.
+**IMPORTANTE:** requiere REDEPLOY para producción.
+
+
+
 ## 2026-06 — Cierre del Día: solo admin/superadmin + Clínica/Óptica separados + Concepto
 **Solicitud:** (1) el cierre del día solo para superadmin/administrador; (2) el cierre debe llevar separado Clínica de Óptica; (3) columna 'Concepto' en Ventas del día; (correo a dra.mpalma@novavision.me corregido).
 **Backend (`routes/caja.py` `calcular_cierre_diario`):** la respuesta ahora es `{general, clinica:{resumen,cobrado_por_metodo,por_usuario,ventas}, optica:{...}, conciliacion_cajas}`. Cada módulo calcula su propio ingreso facturado (devengado = cobrado + CxC), cobrado por método, abonos previos, egresos (solo clínica) y ventas por usuario. Cada venta incluye `concepto` (nombres de productos/servicios: clínica `items[].nombre`, óptica `items_v2[].name`). Se mantienen los filtros de T1 (excluye anuladas/canceladas, ajuste de vuelto, 400 en fecha inválida) y la exclusión de pagos de ventas óptica canceladas.

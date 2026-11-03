@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend E2E (Playwright, superadmin/nova2024) of Sala de Operaciones IGSS capture in the surgery form. All 9 requested features pass: Novavision -> procedure editable, no IGSS block; IGSS -> 'Datos IGSS' block with Unidad/NOG selects + SPS/Afiliación/Código/Costo; NOG disabled until a unit is chosen, then filled with 'numero — nombre_servicio' (HOSPITAL DE ESCUINTLA, 11 NOG + 'Escribir NOG libre…'); choosing NOG 29170966 autofilled procedure 'Bevacizumab, Triamcinolona intravítreo', input disabled + 'Llenado automáticamente...' hint shown; NOG libre input works, procedure editable again, 'Lista' button goes back to the select; saving an IGSS surgery showed toast 'Cirugía registrada' and the row shows IGSS with Q 1,500.50; detail dialog shows Unidad, NOG, SPS, Afiliación, Código, Costo; edit preloads unit, NOG (12 options reloaded) and the locked procedure, and saves with 'Cirugía actualizada' (SPS change persisted per API). NOG 29170966 counters stayed disponibles=5 / acreditados=0 / pacientes_asignados=0 before and after create+edit (informational only). Extra checks: switching IGSS->Novavision unlocks procedure; changing the unit resets the NOG and unlocks procedure; an IGSS surgery with a free NOG (LIBRE-555) saves and reopens in libre mode. Test surgeries were deleted afterwards.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SalaOperaciones handleSelectNog", "issue": "If a NOG has an empty nombre_servicio (e.g. 'QA-UI-38804' in unit Zona 11), the procedure keeps its old value (or stays empty) but is still LOCKED because nog_id is set. The user then can't type a procedure and gets 'Complete todos los campos obligatorios'. Only lock the field when nombre_servicio is not empty.", "selector": "[data-testid='surgery-procedure-input']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Registrar cirugía dialog", "issues": ["The locked procedure input (disabled + text-slate-600 on bg-slate-100) shows very faint text because of disabled opacity, so the autofilled service name is hard to read. Use readOnly without disabled, or drop the opacity.", "Hora/Fecha use the browser's native time/date pickers instead of the shadcn calendar (this was already the case before this change).", "SPS, Afiliación, Código, Costo inputs and the 'Guardar registro' and 'Lista' buttons have no data-testid."]},
+      {"screen": "Surgeries table", "issues": ["The Institución column shows 'IGSS' twice (plain text plus an IGSS badge)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/check_nog_counters.py"],
+  "action_items": [
+    "LOW: In handleSelectNog, don't lock the procedure when the NOG's nombre_servicio is empty",
+    "LOW: Make the locked procedure text easier to read (readOnly instead of disabled, or no opacity)",
+    "LOW: Add data-testid to the IGSS SPS/afiliación/código/costo inputs, the Lista button and the save button",
+    "COSMETIC: Remove the duplicate 'IGSS' text/badge in the table's Institución column"
+  ],
+  "critical_code_review_comments": [
+    "SalaOperaciones.js is about 1700 lines. Split it into the form dialog, the detail dialog and the table.",
+    "Initial formData igss_data (line ~183) lacks unit_id/nog_id/nog_number; it should use EMPTY_IGSS for consistency.",
+    "Save validation does not require a NOG for IGSS surgeries (fine if that is intended)."
+  ],
+  "updated_files": ["/app/backend/tests/check_nog_counters.py"],
+  "success_rate": {"backend": "N/A (frontend only; NOG counter API spot-checked OK)", "frontend": "100% (9/9 requested features)"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Created TEST_IGSS Paciente UI and TEST_IGSS Libre UI surgeries; both deleted after testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "/api/igss-units returns {data:[...]}; /api/igss-units/{id}/nogs-activos returns a list. HOSPITAL DE ESCUINTLA (73b4d247...) NOG 29170966 (id 65b02191...) used as the reference: disponibles=5, acreditados=0. Dialog comboboxes in order: surgeon, assistant, anesthesia type, institution."
+}
