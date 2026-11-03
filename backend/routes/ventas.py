@@ -125,6 +125,7 @@ class ProductoPOSResponse(BaseModel):
     precio_compra: float = 0
     afecto_iva: bool
     existencia: int
+    existencia_total: int = 0
     controla_inventario: bool = True
     controla_lotes: bool
     requiere_receta: bool
@@ -256,12 +257,17 @@ async def buscar_productos_pos(
             "origen": "clinica"
         }).to_list(1000)
         existencias_map = {e["producto_id"]: e.get("cantidad", 0) for e in existencias}
-    
+
+    # Existencia TOTAL (todas las bodegas) para cada producto
+    from routes.inventario import obtener_existencias_totales
+    totales_map = await obtener_existencias_totales(db, [p["id"] for p in productos])
+
     resultado = []
     for p in productos:
         controla_inv = p.get("controla_inventario", True)
         # Si no controla inventario, mostrar existencia como -1 (ilimitado)
         existencia = existencias_map.get(p["id"], 0) if bodega_id and controla_inv else (-1 if not controla_inv else 0)
+        existencia_total = totales_map.get(p["id"], 0) if controla_inv else -1
         
         resultado.append(ProductoPOSResponse(
             id=p["id"],
@@ -272,6 +278,7 @@ async def buscar_productos_pos(
             precio_compra=p.get("precio_compra", 0) or 0,
             afecto_iva=p.get("afecto_iva", True),
             existencia=existencia,
+            existencia_total=existencia_total,
             controla_inventario=controla_inv,
             controla_lotes=p.get("controla_lotes", False),
             requiere_receta=p.get("requiere_receta", False),
@@ -350,12 +357,17 @@ async def obtener_productos_rapidos(
             "origen": "clinica"
         }).to_list(1000)
         existencias_map = {e["producto_id"]: e.get("cantidad", 0) for e in existencias}
-    
+
+    # Existencia TOTAL (todas las bodegas)
+    from routes.inventario import obtener_existencias_totales
+    totales_map = await obtener_existencias_totales(db, [p["id"] for p in productos[:limit]])
+
     resultado = []
     for p in productos[:limit]:
         controla_inv = p.get("controla_inventario", True)
         # Si no controla inventario, mostrar existencia como -1 (ilimitado)
         existencia = existencias_map.get(p["id"], 0) if bodega_id and controla_inv else (-1 if not controla_inv else 0)
+        existencia_total = totales_map.get(p["id"], 0) if controla_inv else -1
         
         resultado.append(ProductoPOSResponse(
             id=p["id"],
@@ -366,6 +378,7 @@ async def obtener_productos_rapidos(
             precio_compra=p.get("precio_compra", 0) or 0,
             afecto_iva=p.get("afecto_iva", True),
             existencia=existencia,
+            existencia_total=existencia_total,
             controla_inventario=controla_inv,
             controla_lotes=p.get("controla_lotes", False),
             requiere_receta=p.get("requiere_receta", False),

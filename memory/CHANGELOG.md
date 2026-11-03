@@ -410,3 +410,14 @@ Verificado: curl GET/PUT OK (195/1500=13%, 195/40000=0.5%); screenshot desktop (
 - Añadido /cuentas-cobrar-finanzas a paths de estado activo y a init de finanzasOpen.
 - Rol optica tiene manage_sales y manage_caja (confirmado vía login). Sin cambios de backend ni de permisos.
 Verificado: screenshot — grupo Óptica sin ítems de clínica; grupo Finanzas con los 3 ítems presentes.
+
+## 2026-11-03 — Inventario vs POS clínica: stock por bodega + total, y productos por bodega
+Causa raíz: el panel de Inventario suma TODAS las bodegas (6 bodegas; 19/24 productos en varias), mientras el POS mostraba solo la bodega de venta → descuadre aparente en productos multi-bodega.
+### Backend (routes/ventas.py)
+- ProductoPOSResponse: nuevo campo existencia_total (suma todas las bodegas).
+- buscar_productos_pos y obtener_productos_rapidos: calculan existencia_total con obtener_existencias_totales (reusado de inventario.py). Servicios (controla_inventario=False) -> -1.
+### Frontend
+- PuntoVenta.js: cada tarjeta de producto muestra línea "Bodega: X · Total: Y" (testId stock-detalle-{id}) cuando el total difiere de la bodega.
+- inventario/Bodegas.js: botón "Ver productos" por bodega (testId ver-productos-{id}) abre diálogo (bodega-productos-dialog) con tabla de productos + cantidad, buscador y total; usa GET /inventario/existencias?bodega_id.
+Verificado: curl (Acetazolamida bodega=0/total=60, BSS Plus 3/31); screenshots desktop+móvil (POS sin overflow a 390px) y diálogo de bodega con 24 productos.
+Nota: 1 producto (Acetazolamida) tiene drift real existencia(60) vs suma de lotes(28); el usuario pidió NO corregir históricos.

@@ -78,6 +78,36 @@ const Bodegas = () => {
   // Formulario
   const [form, setForm] = useState(FORM_INICIAL);
 
+  // Diálogo "Ver productos" por bodega
+  const [productosDialogOpen, setProductosDialogOpen] = useState(false);
+  const [bodegaSeleccionada, setBodegaSeleccionada] = useState(null);
+  const [bodegaProductos, setBodegaProductos] = useState([]);
+  const [loadingProductos, setLoadingProductos] = useState(false);
+  const [buscarProducto, setBuscarProducto] = useState('');
+
+  const handleVerProductos = async (bodega) => {
+    setBodegaSeleccionada(bodega);
+    setBuscarProducto('');
+    setProductosDialogOpen(true);
+    setLoadingProductos(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/inventario/existencias?bodega_id=${bodega.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = (response.data?.data || [])
+        .filter(e => (e.cantidad || 0) !== 0)
+        .sort((a, b) => (a.producto_nombre || '').localeCompare(b.producto_nombre || ''));
+      setBodegaProductos(data);
+    } catch (error) {
+      console.error('Error fetching existencias:', error);
+      toast.error('Error al cargar productos de la bodega');
+      setBodegaProductos([]);
+    } finally {
+      setLoadingProductos(false);
+    }
+  };
+
   // ==================== FETCH DATA ====================
 
   const fetchBodegas = useCallback(async () => {
@@ -418,6 +448,15 @@ const Bodegas = () => {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => handleVerProductos(bodega)}
+                            title="Ver productos"
+                            data-testid={`ver-productos-${bodega.id}`}
+                          >
+                            <Package className="h-4 w-4 text-indigo-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleOpenDialog(bodega)}
                             title="Editar"
                           >
@@ -529,6 +568,88 @@ const Bodegas = () => {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo Ver Productos de la Bodega */}
+      <Dialog open={productosDialogOpen} onOpenChange={setProductosDialogOpen}>
+        <DialogContent className="sm:max-w-2xl" data-testid="bodega-productos-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-indigo-600" />
+              Productos en {bodegaSeleccionada?.nombre}
+            </DialogTitle>
+            <DialogDescription>
+              Existencias actuales de esta bodega. Solo se muestran productos con stock.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="relative mb-2">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Buscar producto..."
+              value={buscarProducto}
+              onChange={(e) => setBuscarProducto(e.target.value)}
+              className="pl-10"
+              data-testid="buscar-producto-bodega"
+            />
+          </div>
+
+          <div className="max-h-[50vh] overflow-auto">
+            {loadingProductos ? (
+              <div className="space-y-2 py-4">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : (() => {
+              const term = buscarProducto.trim().toLowerCase();
+              const filtrados = term
+                ? bodegaProductos.filter(p =>
+                    (p.producto_nombre || '').toLowerCase().includes(term) ||
+                    (p.producto_codigo || '').toLowerCase().includes(term))
+                : bodegaProductos;
+              if (filtrados.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                    <Package className="h-10 w-10 mb-2 opacity-50" />
+                    <p>{bodegaProductos.length === 0 ? 'Esta bodega no tiene productos con stock' : 'Sin coincidencias'}</p>
+                  </div>
+                );
+              }
+              return (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-right">Cantidad</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtrados.map((p) => (
+                      <TableRow key={`${p.producto_id}-${p.bodega_id}`} data-testid={`bodega-producto-row-${p.producto_id}`}>
+                        <TableCell className="font-mono text-xs text-slate-500">{p.producto_codigo || '-'}</TableCell>
+                        <TableCell className="font-medium">{p.producto_nombre}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={p.cantidad > 5 ? 'outline' : 'destructive'} className="font-semibold">
+                            {p.cantidad}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              );
+            })()}
+          </div>
+
+          <DialogFooter>
+            <div className="flex items-center justify-between w-full">
+              <span className="text-sm text-slate-500" data-testid="bodega-productos-total">
+                {bodegaProductos.length} producto{bodegaProductos.length !== 1 ? 's' : ''} con stock
+              </span>
+              <Button variant="outline" onClick={() => setProductosDialogOpen(false)}>Cerrar</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

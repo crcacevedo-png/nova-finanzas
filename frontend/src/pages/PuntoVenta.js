@@ -1277,6 +1277,14 @@ const PuntoVenta = () => {
                         <p className="text-lg font-bold text-blue-600">
                           {formatCurrency(producto.precio_venta)}
                         </p>
+                        {producto.controla_inventario && producto.existencia >= 0 && (
+                          <p className="text-[10px] text-slate-500 mt-0.5" data-testid={`stock-detalle-${producto.id}`}>
+                            Bodega: <span className="font-semibold text-slate-700">{producto.existencia}</span>
+                            {producto.existencia_total >= 0 && producto.existencia_total !== producto.existencia && (
+                              <> · Total: <span className="font-semibold text-slate-700">{producto.existencia_total}</span></>
+                            )}
+                          </p>
+                        )}
                       </button>
                     ))}
                   </div>
