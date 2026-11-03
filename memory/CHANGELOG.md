@@ -441,3 +441,15 @@ Problema (producción): el POS estaba fijo a una bodega (Dispensario); productos
 - La venta usa bodegaPOS.bodega_id de la bodega seleccionada.
 Verificado: screenshot — al cambiar de Dispensario a Bodega General, Acetazolamida pasó de "Bodega: 0 · Total: 28" a "Bodega: 28" (vendible). 3 bodegas (Bodega General, Dispensario, Quirófano). Móvil OK (overflow restante es layout pre-existente del POS).
 Pendiente sugerido: no existe "Traslado entre bodegas" (el Kardex solo exporta informe); el usuario lo mencionó.
+
+## 2026-11-03 — Traslado entre bodegas (clínica)
+### Backend (routes/inventario.py)
+- POST /inventario/traslados (admin/superadmin): mueve N unidades de un producto entre bodegas.
+  - Valida existencia en origen; actualiza existencias agregadas de ambas bodegas.
+  - Productos con lotes (FEFO): lote completo -> reasigna bodega_id; parcial -> reduce origen y crea/mezcla lote en destino con número sufijado "-{codigo_destino}" (índice único producto_id+numero_lote impide duplicar el mismo número).
+  - Registra en kardex: transferencia_salida (origen) + transferencia_entrada (destino), referencia_tipo="traslado".
+- Modelo TrasladoRequest(producto_id, bodega_origen_id, bodega_destino_id, cantidad>0, motivo?).
+### Frontend
+- api.js: inventarioApi.crearTraslado(data).
+- inventario/Bodegas.js: botón "Traslado" en header (solo admin, testId traslado-btn) + diálogo (traslado-dialog): select origen -> carga productos con stock de esa bodega -> select producto (muestra disponible) -> cantidad (máx=disponible, deshabilitada hasta elegir producto) -> select destino (excluye origen) -> motivo opcional. testIds: traslado-origen-select/-{id}, traslado-producto-select/-{id}, traslado-cantidad-input, traslado-destino-select/-{id}, traslado-motivo-input, traslado-guardar-btn. Header responsive (flex-col/flex-wrap en móvil).
+Verificado: curl (Prednisolona lote parcial General 31->28, Dispensario 15->18; reconcile preview=0; kardex con salida+entrada); UI e2e (24 productos, cantidad se habilita, toast "Traslado de 2 unidad(es)... realizado").

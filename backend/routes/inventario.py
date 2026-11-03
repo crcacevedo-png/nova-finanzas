@@ -2346,6 +2346,113 @@ async def reconciliar_lotes(current_user: dict = Depends(get_current_user_depend
     }
 
 
+# ==================== TRASLADOS ENTRE BODEGAS ====================
+
+class TrasladoRequest(BaseModel):
+    producto_id: str
+    bodega_origen_id: str
+    bodega_destino_id: str
+    cantidad: int = Field(gt=0)
+    motivo: Optional[str] = None
+
+
+@router.post("/traslados")
+async def crear_traslado(data: TrasladoRequest, current_user: dict = Depends(get_current_user_dependency())):
+    """Mueve unidades de un producto de una bodega a otra. Registra en el kardex
+    (transferencia_salida / transferencia_entrada). Solo Administradores."""
+    if current_user.get("role") not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo Administradores pueden trasladar entre bodegas")
+    db = get_db()
+
+    if data.bodega_origen_id == data.bodega_destino_id:
+        raise HTTPException(status_code=400, detail="La bodega de origen y destino deben ser diferentes")
+
+    producto = await db.productos_inventario.find_one({"id": data.producto_id, "origen": "clinica"})
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    origen = await db.bodegas_inventario.find_one({"id": data.bodega_origen_id, "origen": "clinica"})
+    destino = await db.bodegas_inventario.find_one({"id": data.bodega_destino_id, "origen": "clinica"})
+    if not origen or not destino:
+        raise HTTPException(status_code=404, detail="Bodega no encontrada")
+
+    exist_origen = await obtener_existencia(db, data.producto_id, data.bodega_origen_id)
+    if data.cantidad > exist_origen:
+        raise HTTPException(status_code=400, detail=f"Existencia insuficiente en {origen['nombre']} (disponible: {exist_origen})")
+
+    costo = producto.get("costo_promedio", 0) or 0
+
+    # Mover lotes (FEFO) si el producto controla lotes
+    if producto.get("controla_lotes", False):
+        lotes = await obtener_lotes_fefo(db, data.producto_id, data.bodega_origen_id, data.cantidad)
+        if sum(l["cantidad"] for l in lotes) < data.cantidad:
+            raise HTTPException(status_code=400, detail=f"No hay lotes disponibles suficientes en {origen['nombre']}")
+        destino_cod = destino.get("codigo") or data.bodega_destino_id[:4]
+        for l in lotes:
+            lote_doc = await db.lotes_inventario.find_one({"id": l["lote_id"]})
+            if l["cantidad"] >= lote_doc.get("cantidad_disponible", 0):
+                # Mover el lote completo: reasignar su bodega (conserva número de lote)
+                await db.lotes_inventario.update_one(
+                    {"id": l["lote_id"]}, {"$set": {"bodega_id": data.bodega_destino_id}}
+                )
+            else:
+                # Movimiento parcial: reducir origen y crear/mezclar lote en destino.
+                # El índice (producto_id, numero_lote) es único, por eso el destino usa un sufijo.
+                await db.lotes_inventario.update_one(
+                    {"id": l["lote_id"]}, {"$inc": {"cantidad_disponible": -l["cantidad"]}}
+                )
+                dest_num = f"{lote_doc['numero_lote']}-{destino_cod}"
+                lote_dest = await db.lotes_inventario.find_one({
+                    "producto_id": data.producto_id, "bodega_id": data.bodega_destino_id,
+                    "numero_lote": dest_num, "origen": "clinica"
+                })
+                if lote_dest:
+                    await db.lotes_inventario.update_one(
+                        {"id": lote_dest["id"]}, {"$inc": {"cantidad_disponible": l["cantidad"]}}
+                    )
+                else:
+                    await db.lotes_inventario.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "producto_id": data.producto_id,
+                        "bodega_id": data.bodega_destino_id,
+                        "numero_lote": dest_num,
+                        "fecha_vencimiento": lote_doc["fecha_vencimiento"],
+                        "cantidad_inicial": l["cantidad"],
+                        "cantidad_disponible": l["cantidad"],
+                        "costo_unitario": lote_doc.get("costo_unitario", costo),
+                        "proveedor_id": lote_doc.get("proveedor_id"),
+                        "estado": "disponible",
+                        "origen": "clinica",
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    })
+
+    # Actualizar existencias agregadas
+    exist_destino_antes = await obtener_existencia(db, data.producto_id, data.bodega_destino_id)
+    await actualizar_existencia(db, data.producto_id, data.bodega_origen_id, -data.cantidad)
+    await actualizar_existencia(db, data.producto_id, data.bodega_destino_id, data.cantidad)
+
+    # Kardex: salida en origen, entrada en destino
+    await crear_movimiento_kardex(
+        db=db, producto_id=data.producto_id, bodega_id=data.bodega_origen_id,
+        tipo="transferencia_salida", cantidad=data.cantidad, costo_unitario=costo,
+        usuario_id=current_user["id"], referencia_tipo="traslado",
+        motivo=data.motivo or f"Traslado a {destino['nombre']}", existencia_anterior=exist_origen
+    )
+    await crear_movimiento_kardex(
+        db=db, producto_id=data.producto_id, bodega_id=data.bodega_destino_id,
+        tipo="transferencia_entrada", cantidad=data.cantidad, costo_unitario=costo,
+        usuario_id=current_user["id"], referencia_tipo="traslado",
+        motivo=data.motivo or f"Traslado desde {origen['nombre']}", existencia_anterior=exist_destino_antes
+    )
+
+    return {
+        "message": f"Traslado de {data.cantidad} unidad(es) de {origen['nombre']} a {destino['nombre']} realizado",
+        "producto_nombre": producto.get("nombre"),
+        "cantidad": data.cantidad,
+        "existencia_origen": exist_origen - data.cantidad,
+        "existencia_destino": exist_destino_antes + data.cantidad
+    }
+
+
 
 # ==================== REPORTE DE RENTABILIDAD POR CATEGORÍA ====================
 

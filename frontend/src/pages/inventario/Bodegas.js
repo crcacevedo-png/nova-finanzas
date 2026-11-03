@@ -13,7 +13,8 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Scale
+  Scale,
+  ArrowLeftRight
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -23,6 +24,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
 import { Switch } from '../../components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -148,6 +156,91 @@ const Bodegas = () => {
       toast.error(error.response?.data?.detail || 'Error al reconciliar');
     } finally {
       setReconcileApplying(false);
+    }
+  };
+
+  // Traslado entre bodegas (solo admin)
+  const [trasladoOpen, setTrasladoOpen] = useState(false);
+  const [trasladoOrigen, setTrasladoOrigen] = useState('');
+  const [trasladoDestino, setTrasladoDestino] = useState('');
+  const [trasladoProductoId, setTrasladoProductoId] = useState('');
+  const [trasladoCantidad, setTrasladoCantidad] = useState('');
+  const [trasladoMotivo, setTrasladoMotivo] = useState('');
+  const [productosOrigen, setProductosOrigen] = useState([]);
+  const [loadingProductosOrigen, setLoadingProductosOrigen] = useState(false);
+  const [trasladoSaving, setTrasladoSaving] = useState(false);
+
+  const abrirTraslado = () => {
+    setTrasladoOrigen('');
+    setTrasladoDestino('');
+    setTrasladoProductoId('');
+    setTrasladoCantidad('');
+    setTrasladoMotivo('');
+    setProductosOrigen([]);
+    setTrasladoOpen(true);
+  };
+
+  const handleOrigenChange = async (bodegaId) => {
+    setTrasladoOrigen(bodegaId);
+    setTrasladoProductoId('');
+    setTrasladoCantidad('');
+    if (trasladoDestino === bodegaId) setTrasladoDestino('');
+    setLoadingProductosOrigen(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/inventario/existencias?bodega_id=${bodegaId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = (res.data?.data || [])
+        .filter(e => (e.cantidad || 0) > 0)
+        .sort((a, b) => (a.producto_nombre || '').localeCompare(b.producto_nombre || ''));
+      setProductosOrigen(data);
+    } catch (error) {
+      console.error('Error fetching productos origen:', error);
+      toast.error('Error al cargar productos de la bodega origen');
+      setProductosOrigen([]);
+    } finally {
+      setLoadingProductosOrigen(false);
+    }
+  };
+
+  const productoTrasladoSel = productosOrigen.find(p => p.producto_id === trasladoProductoId);
+  const disponibleOrigen = productoTrasladoSel?.cantidad || 0;
+
+  const handleGuardarTraslado = async () => {
+    const cant = parseInt(trasladoCantidad, 10);
+    if (!trasladoOrigen || !trasladoDestino || !trasladoProductoId) {
+      toast.error('Completa origen, destino y producto');
+      return;
+    }
+    if (trasladoOrigen === trasladoDestino) {
+      toast.error('La bodega de origen y destino deben ser diferentes');
+      return;
+    }
+    if (!cant || cant <= 0) {
+      toast.error('Ingresa una cantidad válida');
+      return;
+    }
+    if (cant > disponibleOrigen) {
+      toast.error(`Solo hay ${disponibleOrigen} disponibles en la bodega de origen`);
+      return;
+    }
+    try {
+      setTrasladoSaving(true);
+      const res = await inventarioApi.crearTraslado({
+        producto_id: trasladoProductoId,
+        bodega_origen_id: trasladoOrigen,
+        bodega_destino_id: trasladoDestino,
+        cantidad: cant,
+        motivo: trasladoMotivo || null
+      });
+      toast.success(res.data?.message || 'Traslado realizado');
+      setTrasladoOpen(false);
+    } catch (error) {
+      console.error('Error en traslado:', error);
+      toast.error(error.response?.data?.detail || 'Error al realizar el traslado');
+    } finally {
+      setTrasladoSaving(false);
     }
   };
 
@@ -309,7 +402,7 @@ const Bodegas = () => {
       <Toaster position="top-right" richColors />
       <div className="p-6 space-y-6" data-testid="bodegas-page">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-indigo-500/20">
               <Warehouse className="h-6 w-6 text-indigo-500" />
@@ -324,7 +417,18 @@ const Bodegas = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {esAdmin && (
+              <Button
+                variant="outline"
+                onClick={abrirTraslado}
+                data-testid="traslado-btn"
+                title="Mover unidades de una bodega a otra"
+              >
+                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                Traslado
+              </Button>
+            )}
             {esAdmin && (
               <Button
                 variant="outline"
@@ -706,6 +810,120 @@ const Bodegas = () => {
               </span>
               <Button variant="outline" onClick={() => setProductosDialogOpen(false)}>Cerrar</Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo Traslado entre Bodegas */}
+      <Dialog open={trasladoOpen} onOpenChange={setTrasladoOpen}>
+        <DialogContent className="sm:max-w-lg" data-testid="traslado-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-indigo-600" />
+              Traslado entre bodegas
+            </DialogTitle>
+            <DialogDescription>
+              Mueve unidades de un producto de una bodega a otra. Queda registrado en el kardex.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Bodega de origen *</Label>
+              <Select value={trasladoOrigen} onValueChange={handleOrigenChange}>
+                <SelectTrigger data-testid="traslado-origen-select">
+                  <SelectValue placeholder="Selecciona la bodega de origen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bodegas.filter(b => b.activo).map((b) => (
+                    <SelectItem key={b.id} value={b.id} data-testid={`traslado-origen-${b.id}`}>{b.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Producto *</Label>
+              <Select
+                value={trasladoProductoId}
+                onValueChange={(v) => { setTrasladoProductoId(v); setTrasladoCantidad(''); }}
+                disabled={!trasladoOrigen || loadingProductosOrigen}
+              >
+                <SelectTrigger data-testid="traslado-producto-select">
+                  <SelectValue placeholder={
+                    !trasladoOrigen ? 'Primero elige la bodega de origen'
+                      : loadingProductosOrigen ? 'Cargando productos...'
+                      : productosOrigen.length === 0 ? 'Esta bodega no tiene productos con stock'
+                      : 'Selecciona un producto'
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {productosOrigen.map((p) => (
+                    <SelectItem key={p.producto_id} value={p.producto_id} data-testid={`traslado-producto-${p.producto_id}`}>
+                      {p.producto_nombre} ({p.cantidad} disp.)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Cantidad a trasladar *</Label>
+              <Input
+                type="number"
+                min="1"
+                max={disponibleOrigen}
+                value={trasladoCantidad}
+                onChange={(e) => setTrasladoCantidad(e.target.value)}
+                placeholder="0"
+                disabled={!trasladoProductoId}
+                data-testid="traslado-cantidad-input"
+              />
+              {trasladoProductoId && (
+                <p className="text-xs text-slate-500 mt-1">Disponible en origen: <span className="font-semibold">{disponibleOrigen}</span></p>
+              )}
+            </div>
+
+            <div>
+              <Label>Bodega de destino *</Label>
+              <Select value={trasladoDestino} onValueChange={setTrasladoDestino}>
+                <SelectTrigger data-testid="traslado-destino-select">
+                  <SelectValue placeholder="Selecciona la bodega de destino" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bodegas.filter(b => b.activo && b.id !== trasladoOrigen).map((b) => (
+                    <SelectItem key={b.id} value={b.id} data-testid={`traslado-destino-${b.id}`}>{b.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Motivo (opcional)</Label>
+              <Textarea
+                value={trasladoMotivo}
+                onChange={(e) => setTrasladoMotivo(e.target.value)}
+                placeholder="Ej. Reabastecer dispensario"
+                rows={2}
+                data-testid="traslado-motivo-input"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrasladoOpen(false)}>Cancelar</Button>
+            <Button
+              className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={handleGuardarTraslado}
+              disabled={trasladoSaving}
+              data-testid="traslado-guardar-btn"
+            >
+              {trasladoSaving ? (
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Trasladando...</>
+              ) : (
+                <><ArrowLeftRight className="h-4 w-4 mr-2" />Realizar traslado</>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
