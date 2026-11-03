@@ -383,6 +383,8 @@ export const opticaSaleApi = {
   },
   getInformeMensual: (year, month) => axios.get(`${API_URL}/optica/dashboard/informe-mensual?year=${year}&month=${month}`),
   getHistorialMensual: (meses = 12) => axios.get(`${API_URL}/optica/dashboard/historial-mensual?meses=${meses}`),
+  getMetas: () => axios.get(`${API_URL}/optica/dashboard/metas`),
+  setMetas: (data) => axios.put(`${API_URL}/optica/dashboard/metas`, data),
   // Reports
   getMonthlyReport: (year, month, format = 'json') => {
     const url = `${API_URL}/optica/reports/monthly?year=${year}&month=${month}&format=${format}`;

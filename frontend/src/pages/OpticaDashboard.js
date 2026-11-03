@@ -18,8 +18,12 @@ import { Label } from '../components/ui/label';
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Calendar,
   RefreshCw, Download, Eye, Package, Users, Building2, FileText,
-  BarChart3, PieChart, Clock, CreditCard, Percent, ArrowUpRight, ArrowDownRight
+  BarChart3, PieChart, Clock, CreditCard, Percent, ArrowUpRight, ArrowDownRight, Target, Pencil
 } from 'lucide-react';
+import { Input } from '../components/ui/input';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from '../components/ui/dialog';
 import { opticaSaleApi, formatCurrency, formatDate, getGuatemalaDate } from '../services/api';
 import { toast } from 'sonner';
 import {
@@ -39,6 +43,13 @@ const OpticaDashboard = () => {
   const [ventasOrigen, setVentasOrigen] = useState(null);
   const [informeMensual, setInformeMensual] = useState(null);
   const [historialMensual, setHistorialMensual] = useState(null);
+  const [metas, setMetas] = useState(null);
+
+  // Dialog de metas
+  const [metasDialogOpen, setMetasDialogOpen] = useState(false);
+  const [metaDiariaInput, setMetaDiariaInput] = useState('');
+  const [metaMensualInput, setMetaMensualInput] = useState('');
+  const [savingMetas, setSavingMetas] = useState(false);
   
   // Filtros
   const [periodoRentabilidad, setPeriodoRentabilidad] = useState('mes');
@@ -49,17 +60,19 @@ const OpticaDashboard = () => {
     try {
       setLoading(true);
       
-      const [ventasDiaRes, rentabilidadRes, ventasOrigenRes, historialRes] = await Promise.all([
+      const [ventasDiaRes, rentabilidadRes, ventasOrigenRes, historialRes, metasRes] = await Promise.all([
         opticaSaleApi.getVentasDelDia(),
         opticaSaleApi.getRentabilidad(periodoRentabilidad),
         opticaSaleApi.getVentasPorOrigen(),
-        opticaSaleApi.getHistorialMensual(12)
+        opticaSaleApi.getHistorialMensual(12),
+        opticaSaleApi.getMetas()
       ]);
       
       setVentasDia(ventasDiaRes.data);
       setRentabilidad(rentabilidadRes.data);
       setVentasOrigen(ventasOrigenRes.data);
       setHistorialMensual(historialRes.data);
+      setMetas(metasRes.data);
       
     } catch (error) {
       console.error('Error cargando dashboard:', error);
@@ -68,6 +81,33 @@ const OpticaDashboard = () => {
       setLoading(false);
     }
   }, [periodoRentabilidad]);
+
+  const openMetasDialog = () => {
+    setMetaDiariaInput(metas?.meta_diaria ? String(metas.meta_diaria) : '');
+    setMetaMensualInput(metas?.meta_mensual ? String(metas.meta_mensual) : '');
+    setMetasDialogOpen(true);
+  };
+
+  const handleSaveMetas = async () => {
+    const diaria = parseFloat(metaDiariaInput) || 0;
+    const mensual = parseFloat(metaMensualInput) || 0;
+    if (diaria < 0 || mensual < 0) {
+      toast.error('Las metas no pueden ser negativas');
+      return;
+    }
+    try {
+      setSavingMetas(true);
+      await opticaSaleApi.setMetas({ meta_diaria: diaria, meta_mensual: mensual });
+      toast.success('Metas de ventas actualizadas');
+      setMetasDialogOpen(false);
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error guardando metas:', error);
+      toast.error(error.response?.data?.detail || 'Error al guardar las metas');
+    } finally {
+      setSavingMetas(false);
+    }
+  };
 
   const loadInformeMensual = useCallback(async () => {
     try {
@@ -331,6 +371,129 @@ const OpticaDashboard = () => {
             </Card>
           </div>
         )}
+
+        {/* Meta de Ventas */}
+        {metas && (
+          <Card className="border-slate-200" data-testid="metas-ventas-card">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-indigo-600" />
+                  Meta de Ventas
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openMetasDialog}
+                  data-testid="edit-metas-btn"
+                >
+                  <Pencil className="w-4 h-4 mr-1.5" />
+                  Definir metas
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(metas.meta_diaria > 0 || metas.meta_mensual > 0) ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Meta del día */}
+                  <div data-testid="meta-dia-progress">
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <span className="text-sm font-medium text-slate-700">Meta del Día</span>
+                      <span className="text-sm font-semibold text-blue-600">{metas.progreso_dia}%</span>
+                    </div>
+                    <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${metas.progreso_dia >= 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                        style={{ width: `${Math.min(metas.progreso_dia, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5 text-xs">
+                      <span className="text-slate-600">{formatCurrency(metas.ventas_hoy)} / {formatCurrency(metas.meta_diaria)}</span>
+                      {metas.progreso_dia >= 100
+                        ? <span className="text-emerald-600 font-medium">¡Meta alcanzada!</span>
+                        : <span className="text-slate-500">Faltan {formatCurrency(metas.falta_dia)}</span>}
+                    </div>
+                  </div>
+                  {/* Meta del mes */}
+                  <div data-testid="meta-mes-progress">
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <span className="text-sm font-medium text-slate-700">Meta del Mes</span>
+                      <span className="text-sm font-semibold text-amber-600">{metas.progreso_mes}%</span>
+                    </div>
+                    <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ${metas.progreso_mes >= 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                        style={{ width: `${Math.min(metas.progreso_mes, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5 text-xs">
+                      <span className="text-slate-600">{formatCurrency(metas.ventas_mes)} / {formatCurrency(metas.meta_mensual)}</span>
+                      {metas.progreso_mes >= 100
+                        ? <span className="text-emerald-600 font-medium">¡Meta alcanzada!</span>
+                        : <span className="text-slate-500">Faltan {formatCurrency(metas.falta_mes)}</span>}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center" data-testid="metas-empty-state">
+                  <Target className="w-8 h-8 text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-500">Aún no has definido metas de ventas.</p>
+                  <Button variant="link" className="text-indigo-600" onClick={openMetasDialog} data-testid="metas-empty-define-btn">
+                    Definir metas ahora
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dialog Definir Metas */}
+        <Dialog open={metasDialogOpen} onOpenChange={setMetasDialogOpen}>
+          <DialogContent data-testid="metas-dialog">
+            <DialogHeader>
+              <DialogTitle>Definir metas de ventas</DialogTitle>
+              <DialogDescription>
+                Establece el objetivo de ventas (en Quetzales) para el día y el mes.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div>
+                <Label htmlFor="meta-diaria">Meta diaria (Q)</Label>
+                <Input
+                  id="meta-diaria"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={metaDiariaInput}
+                  onChange={(e) => setMetaDiariaInput(e.target.value)}
+                  placeholder="Ej. 1500"
+                  data-testid="meta-diaria-input"
+                />
+              </div>
+              <div>
+                <Label htmlFor="meta-mensual">Meta mensual (Q)</Label>
+                <Input
+                  id="meta-mensual"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={metaMensualInput}
+                  onChange={(e) => setMetaMensualInput(e.target.value)}
+                  placeholder="Ej. 40000"
+                  data-testid="meta-mensual-input"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMetasDialogOpen(false)} data-testid="metas-cancel-btn">
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveMetas} disabled={savingMetas} data-testid="metas-save-btn">
+                {savingMetas ? 'Guardando...' : 'Guardar metas'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Tabs de Contenido */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

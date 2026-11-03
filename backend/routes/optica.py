@@ -1863,6 +1863,74 @@ async def get_ventas_del_dia(current_user: dict = Depends(require_permission("vi
     }
 
 
+class MetasVentasUpdate(BaseModel):
+    meta_diaria: float = Field(..., ge=0)
+    meta_mensual: float = Field(..., ge=0)
+
+
+async def _get_metas_doc() -> dict:
+    doc = await db.optica_dashboard_config.find_one({"_id": "metas_ventas"})
+    return {
+        "meta_diaria": (doc or {}).get("meta_diaria", 0),
+        "meta_mensual": (doc or {}).get("meta_mensual", 0),
+    }
+
+
+@router.get("/dashboard/metas")
+async def get_metas_ventas(current_user: dict = Depends(require_permission("view_optica"))):
+    """Metas de ventas (día y mes) con el progreso actual en hora de Guatemala."""
+    metas = await _get_metas_doc()
+
+    # Ventas de hoy (día local de Guatemala)
+    inicio_dia_utc, fin_dia_utc = dia_gt_a_rango_utc(today_str_gt())
+    dia_result = await db.optica_sales.aggregate([
+        {"$match": {"created_at": {"$gte": inicio_dia_utc, "$lte": fin_dia_utc}, "status": {"$ne": "cancelado"}}},
+        {"$group": {"_id": None, "total": {"$sum": "$total"}}}
+    ]).to_list(1)
+    ventas_hoy = round(dia_result[0]["total"], 2) if dia_result else 0
+
+    # Ventas del mes en curso (día 1 local de Guatemala -> ahora)
+    inicio_mes_str = now_gt().date().replace(day=1).strftime("%Y-%m-%d")
+    inicio_mes_utc, _ = dia_gt_a_rango_utc(inicio_mes_str)
+    mes_result = await db.optica_sales.aggregate([
+        {"$match": {"created_at": {"$gte": inicio_mes_utc}, "status": {"$ne": "cancelado"}}},
+        {"$group": {"_id": None, "total": {"$sum": "$total"}}}
+    ]).to_list(1)
+    ventas_mes = round(mes_result[0]["total"], 2) if mes_result else 0
+
+    meta_d = metas["meta_diaria"]
+    meta_m = metas["meta_mensual"]
+    return {
+        "meta_diaria": meta_d,
+        "meta_mensual": meta_m,
+        "ventas_hoy": ventas_hoy,
+        "ventas_mes": ventas_mes,
+        "progreso_dia": round(ventas_hoy / meta_d * 100, 1) if meta_d > 0 else 0,
+        "progreso_mes": round(ventas_mes / meta_m * 100, 1) if meta_m > 0 else 0,
+        "falta_dia": round(max(meta_d - ventas_hoy, 0), 2),
+        "falta_mes": round(max(meta_m - ventas_mes, 0), 2),
+    }
+
+
+@router.put("/dashboard/metas")
+async def set_metas_ventas(
+    data: MetasVentasUpdate,
+    current_user: dict = Depends(require_permission("manage_optica_sales"))
+):
+    """Definir las metas de ventas (día y mes)."""
+    await db.optica_dashboard_config.update_one(
+        {"_id": "metas_ventas"},
+        {"$set": {
+            "meta_diaria": round(data.meta_diaria, 2),
+            "meta_mensual": round(data.meta_mensual, 2),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": current_user.get("id"),
+        }},
+        upsert=True
+    )
+    return {"meta_diaria": round(data.meta_diaria, 2), "meta_mensual": round(data.meta_mensual, 2)}
+
+
 @router.get("/dashboard/rentabilidad")
 async def get_rentabilidad_optica(
     periodo: str = Query("mes", description="dia, semana, mes, año"),

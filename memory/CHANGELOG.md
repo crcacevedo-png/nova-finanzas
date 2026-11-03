@@ -392,3 +392,14 @@
 - Backend: ventas-dia agrega cuentas_por_cobrar y cuentas_por_cobrar_count; rentabilidad agrega total_compras, num_compras, utilidad.
 - Rentabilidad ahora calcula los límites de período (día/semana/mes/año) en hora de Guatemala; filtro de compras compara contra fecha-only para incluir el día 1 del período.
 - Archivos: backend/routes/optica.py (get_ventas_del_dia, get_rentabilidad_optica), frontend/src/pages/OpticaDashboard.js.
+
+## 2026-11-03 — Meta de Ventas en Dashboard de Óptica
+### Backend (routes/optica.py)
+- Nuevo modelo MetasVentasUpdate (meta_diaria, meta_mensual >= 0).
+- GET /api/optica/dashboard/metas (perm view_optica): devuelve meta_diaria, meta_mensual, ventas_hoy, ventas_mes (hora Guatemala), progreso_dia, progreso_mes, falta_dia, falta_mes. Guard de división por cero (meta 0 -> 0%).
+- PUT /api/optica/dashboard/metas (perm manage_optica_sales): guarda metas en colección optica_dashboard_config (_id="metas_ventas", upsert).
+- ventas_hoy usa dia_gt_a_rango_utc(today_str_gt()); ventas_mes desde día 1 del mes local GT.
+### Frontend
+- api.js: opticaSaleApi.getMetas() y setMetas(data).
+- OpticaDashboard.js: nueva tarjeta "Meta de Ventas" (testId metas-ventas-card) con 2 barras de progreso personalizadas (día azul/mes ámbar, verde al 100%), estado vacío, y diálogo "Definir metas" (testIds edit-metas-btn, metas-dialog, meta-diaria-input, meta-mensual-input, metas-save-btn). Carga en loadDashboardData.
+Verificado: curl GET/PUT OK (195/1500=13%, 195/40000=0.5%); screenshot desktop (barras + 7 tarjetas) y móvil (diálogo con inputs). Preview URL real: novavision-finanzas.preview.emergentagent.com.
