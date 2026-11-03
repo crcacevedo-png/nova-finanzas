@@ -149,7 +149,7 @@ const CierreTab = () => {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Label className="text-sm">Mes:</Label>
-          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-44" data-testid="anesthesia-closure-month" />
+          <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-56 min-w-[14rem]" data-testid="anesthesia-closure-month" />
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => exportar('xlsx')} disabled={exporting || !data?.num_registros} data-testid="anesthesia-export-xlsx">
