@@ -403,3 +403,10 @@
 - api.js: opticaSaleApi.getMetas() y setMetas(data).
 - OpticaDashboard.js: nueva tarjeta "Meta de Ventas" (testId metas-ventas-card) con 2 barras de progreso personalizadas (día azul/mes ámbar, verde al 100%), estado vacío, y diálogo "Definir metas" (testIds edit-metas-btn, metas-dialog, meta-diaria-input, meta-mensual-input, metas-save-btn). Carga en loadDashboardData.
 Verificado: curl GET/PUT OK (195/1500=13%, 195/40000=0.5%); screenshot desktop (barras + 7 tarjetas) y móvil (diálogo con inputs). Preview URL real: novavision-finanzas.preview.emergentagent.com.
+
+## 2026-11-03 — Reorganización menú rol Óptica (Layout.js)
+- Quitados del grupo "Óptica" los ítems de clínica: "Punto de Venta Clínica" (/punto-venta) y "Caja" (/caja).
+- Nuevo grupo "Finanzas" para rol optica (rama else en finanzasItems) con ítems de clínica: Punto de Venta (/punto-venta, gate manage_sales), Cuentas por Cobrar (/cuentas-cobrar-finanzas, gate manage_sales), Caja (/caja, gate manage_caja). testIds: nav-punto-venta, nav-cxc-finanzas, nav-caja.
+- Añadido /cuentas-cobrar-finanzas a paths de estado activo y a init de finanzasOpen.
+- Rol optica tiene manage_sales y manage_caja (confirmado vía login). Sin cambios de backend ni de permisos.
+Verificado: screenshot — grupo Óptica sin ítems de clínica; grupo Finanzas con los 3 ítems presentes.

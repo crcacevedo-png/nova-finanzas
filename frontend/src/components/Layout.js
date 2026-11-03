@@ -68,7 +68,7 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
   const [finanzasOpen, setFinanzasOpen] = useState(
-    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta', '/cierre-diario'].some(p => location.pathname.startsWith(p))
+    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario'].some(p => location.pathname.startsWith(p))
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
   const [igssOpen, setIgssOpen] = useState(location.pathname.startsWith('/igss'));
@@ -150,6 +150,11 @@ const Layout = ({ children }) => {
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_autorizaciones')) finanzasItems.push({ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' });
     if (isAdminOrSuperAdmin) finanzasItems.push({ path: '/cierre-diario', icon: Calculator, label: 'Cierre del Día', testId: 'nav-cierre-diario' });
+  } else {
+    // Finanzas para óptica: Punto de Venta, Cuentas por Cobrar y Caja de la clínica
+    if (hasPermission('manage_sales')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
+    if (hasPermission('manage_sales')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
+    if (hasPermission('manage_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
   }
   
   // Inventario sub-items - Filtrados por configuración de menús
@@ -227,8 +232,6 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('optica_accesorios')) opticaItems.push({ path: '/optica/accesorios', icon: Watch, label: 'Accesorios', testId: 'nav-optica-accesorios' });
     if (isMenuEnabled('optica_pos')) opticaItems.push({ path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' });
     if (isMenuEnabled('optica_cxc')) opticaItems.push({ path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' });
-    if (hasPermission('manage_sales')) opticaItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta Clínica', testId: 'nav-optica-pos-clinica' });
-    if (hasPermission('manage_caja')) opticaItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-optica-caja' });
     if (isMenuEnabled('optica_compras')) opticaItems.push({ path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' });
   }
 
@@ -358,18 +361,18 @@ const Layout = ({ children }) => {
             </div>
           )}
 
-          {/* 4. Finanzas Section - NO para optica */}
+          {/* 4. Finanzas Section */}
           {finanzasItems.length > 0 && (
             <div className="mt-4">
               <button
                 onClick={() => setFinanzasOpen(!finanzasOpen)}
                 className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cierre-diario'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
                 }`}
                 data-testid="nav-finanzas"
               >
                 <div className="flex items-center gap-3">
-                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cierre-diario'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
                   <span className="font-medium text-sm">Finanzas</span>
                 </div>
                 {finanzasOpen ? (
