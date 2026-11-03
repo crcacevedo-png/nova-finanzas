@@ -1,5 +1,16 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-06 — Cierre del Día: solo admin/superadmin + Clínica/Óptica separados + Concepto
+**Solicitud:** (1) el cierre del día solo para superadmin/administrador; (2) el cierre debe llevar separado Clínica de Óptica; (3) columna 'Concepto' en Ventas del día; (correo a dra.mpalma@novavision.me corregido).
+**Backend (`routes/caja.py` `calcular_cierre_diario`):** la respuesta ahora es `{general, clinica:{resumen,cobrado_por_metodo,por_usuario,ventas}, optica:{...}, conciliacion_cajas}`. Cada módulo calcula su propio ingreso facturado (devengado = cobrado + CxC), cobrado por método, abonos previos, egresos (solo clínica) y ventas por usuario. Cada venta incluye `concepto` (nombres de productos/servicios: clínica `items[].nombre`, óptica `items_v2[].name`). Se mantienen los filtros de T1 (excluye anuladas/canceladas, ajuste de vuelto, 400 en fecha inválida) y la exclusión de pagos de ventas óptica canceladas.
+**Acceso (ya aplicado y verificado):** ruta `/cierre-diario` con `requiredRole={['admin','superadmin']}` (ProtectedRoute ahora acepta lista), backend `require_role(['admin','superadmin'])`, menú solo `isAdminOrSuperAdmin`. Rol óptica recibe 403 y no ve el item.
+**Frontend (`CierreDiario.js`):** rediseño con Resumen General + secciones separadas Clínica y Óptica (cada una con tarjetas, métodos, usuarios y tabla de ventas con columna Concepto) + Conciliación de cajas.
+**Email (`email_service.py`):** plantilla reconstruida con resumen general + bloques Clínica/Óptica (cada uno con métodos, usuarios y ventas con concepto) + conciliación. Destinatarios corregidos: cacevedo@novavision.me, dra.mpalma@novavision.me.
+**Verificado:** backend por curl (general 955 = clínica 805 + óptica 150; concepto poblado; correo enviado a ambos sin errores). Frontend testing agent iteration_114.json 100% (secciones separadas, columna Concepto, control de acceso óptica bloqueado).
+**IMPORTANTE:** requiere REDEPLOY para producción.
+
+
+
 ## 2026-06 — FIX: reportes/dashboard de Óptica deben incluir TODO lo vendido y comprado
 **Solicitud:** "todo lo que se vende en la optica debe aparecer en el reporte de rentabilidad... todo debe aparecer en el dashboard de la optica, ventas, compras, de todos los insumos".
 **Causas raíz encontradas (bugs preexistentes):**

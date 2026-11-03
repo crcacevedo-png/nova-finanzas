@@ -1,7 +1,7 @@
 # PRD - NovaVision ERP Oftalmológico
 
 ## Descripción General
-Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
+Sistema ERP completo para clínicas oftalmológicas con módulos de: Dashboard, Pacientes, Agenda, Evaluación Oftalmológica, Inventario FEFO, POS, Caja, Cierre del Día (diagnóstico/conciliación consolidado Clínica+Óptica con envío por correo, solo admin/superadmin), CRM Cirugías, Óptica, y Laboratorio de Pruebas E2E.
 
 ## Estado Actual del Proyecto
 ### Sesión 52 — NOG: monto total + monto individual por servicio (2026-06)
