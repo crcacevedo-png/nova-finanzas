@@ -2241,6 +2241,112 @@ async def registrar_ajuste(
     }
 
 
+# ==================== RECONCILIACIÓN DE LOTES ====================
+
+async def _detectar_discrepancias_lotes(db) -> list:
+    """Detecta productos con control de lotes cuya existencia agregada no coincide
+    con la suma de cantidad_disponible de sus lotes, por bodega."""
+    lote_prods = await db.productos_inventario.find(
+        {"origen": "clinica", "controla_lotes": True}
+    ).to_list(5000)
+    prod_map = {p["id"]: p for p in lote_prods}
+    if not prod_map:
+        return []
+
+    bodegas = {b["id"]: b.get("nombre", "") for b in await db.bodegas_inventario.find({"origen": "clinica"}).to_list(200)}
+
+    # Suma de lotes por (producto, bodega)
+    suma_lotes = {}
+    async for l in db.lotes_inventario.aggregate([
+        {"$match": {"producto_id": {"$in": list(prod_map.keys())}, "origen": "clinica"}},
+        {"$group": {"_id": {"p": "$producto_id", "b": "$bodega_id"}, "s": {"$sum": "$cantidad_disponible"}}}
+    ]):
+        suma_lotes[(l["_id"]["p"], l["_id"]["b"])] = l["s"]
+
+    # Existencias actuales por (producto, bodega)
+    existencias = {}
+    async for e in db.existencias_inventario.find(
+        {"producto_id": {"$in": list(prod_map.keys())}, "origen": "clinica"}
+    ):
+        existencias[(e["producto_id"], e["bodega_id"])] = e.get("cantidad", 0)
+
+    claves = set(suma_lotes.keys()) | set(existencias.keys())
+    discrepancias = []
+    for (pid, bid) in claves:
+        actual = existencias.get((pid, bid), 0)
+        correcto = suma_lotes.get((pid, bid), 0)
+        if actual != correcto:
+            discrepancias.append({
+                "producto_id": pid,
+                "producto_nombre": prod_map.get(pid, {}).get("nombre", ""),
+                "producto_codigo": prod_map.get(pid, {}).get("codigo", ""),
+                "bodega_id": bid,
+                "bodega_nombre": bodegas.get(bid, ""),
+                "existencia_actual": actual,
+                "suma_lotes": correcto,
+                "diferencia": correcto - actual,
+            })
+    discrepancias.sort(key=lambda d: d["producto_nombre"])
+    return discrepancias
+
+
+@router.get("/reconciliar-lotes/preview")
+async def reconciliar_lotes_preview(current_user: dict = Depends(get_current_user_dependency())):
+    """Lista los productos con descuadre entre existencia y suma de lotes (solo detecta)."""
+    if current_user.get("role") not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo Administradores pueden reconciliar lotes")
+    db = get_db()
+    discrepancias = await _detectar_discrepancias_lotes(db)
+    return {"discrepancias": discrepancias, "total": len(discrepancias)}
+
+
+@router.post("/reconciliar-lotes")
+async def reconciliar_lotes(current_user: dict = Depends(get_current_user_dependency())):
+    """Corrige la existencia agregada para que coincida con la suma de lotes.
+    Deja traza en el kardex. Solo Administradores."""
+    if current_user.get("role") not in ["superadmin", "admin"]:
+        raise HTTPException(status_code=403, detail="Solo Administradores pueden reconciliar lotes")
+    db = get_db()
+    discrepancias = await _detectar_discrepancias_lotes(db)
+
+    corregidos = []
+    for d in discrepancias:
+        pid, bid = d["producto_id"], d["bodega_id"]
+        actual, correcto = d["existencia_actual"], d["suma_lotes"]
+        diferencia = correcto - actual
+        producto = await db.productos_inventario.find_one({"id": pid, "origen": "clinica"})
+        costo = (producto or {}).get("costo_promedio", 0)
+
+        # Traza en kardex (snapshot anterior explícito)
+        await crear_movimiento_kardex(
+            db=db,
+            producto_id=pid,
+            bodega_id=bid,
+            tipo="ajuste_positivo" if diferencia > 0 else "ajuste_negativo",
+            cantidad=abs(diferencia),
+            costo_unitario=costo,
+            usuario_id=current_user["id"],
+            referencia_tipo="reconciliacion_lotes",
+            motivo="Reconciliación automática: existencia ajustada a la suma de lotes",
+            existencia_anterior=actual,
+        )
+
+        # Fijar existencia = suma de lotes
+        await db.existencias_inventario.update_one(
+            {"producto_id": pid, "bodega_id": bid, "origen": "clinica"},
+            {"$set": {"cantidad": correcto, "ultima_actualizacion": datetime.now(timezone.utc).isoformat()}},
+            upsert=True
+        )
+        corregidos.append(d)
+
+    return {
+        "corregidos": corregidos,
+        "total": len(corregidos),
+        "message": f"{len(corregidos)} producto(s) reconciliado(s)" if corregidos else "No había descuadres que corregir"
+    }
+
+
+
 # ==================== REPORTE DE RENTABILIDAD POR CATEGORÍA ====================
 
 class RentabilidadCategoriaItem(BaseModel):

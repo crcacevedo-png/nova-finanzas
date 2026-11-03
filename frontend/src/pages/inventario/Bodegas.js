@@ -12,7 +12,8 @@ import {
   Package,
   CheckCircle,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Scale
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -49,7 +50,8 @@ import {
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
 import { toast, Toaster } from 'sonner';
-import { formatDate } from '../../services/api';
+import { formatDate, inventarioApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -62,6 +64,9 @@ const FORM_INICIAL = {
 };
 
 const Bodegas = () => {
+  const { user } = useAuth();
+  const esAdmin = ['superadmin', 'admin'].includes(user?.role);
+
   // Estado principal
   const [bodegas, setBodegas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +110,44 @@ const Bodegas = () => {
       setBodegaProductos([]);
     } finally {
       setLoadingProductos(false);
+    }
+  };
+
+  // Reconciliación de lotes (solo admin)
+  const [reconcileOpen, setReconcileOpen] = useState(false);
+  const [reconcileData, setReconcileData] = useState([]);
+  const [reconcileLoading, setReconcileLoading] = useState(false);
+  const [reconcileApplying, setReconcileApplying] = useState(false);
+
+  const handleAbrirReconcile = async () => {
+    setReconcileOpen(true);
+    setReconcileLoading(true);
+    try {
+      const res = await inventarioApi.reconciliarLotesPreview();
+      setReconcileData(res.data?.discrepancias || []);
+    } catch (error) {
+      console.error('Error preview reconciliación:', error);
+      toast.error(error.response?.data?.detail || 'Error al detectar descuadres');
+      setReconcileData([]);
+    } finally {
+      setReconcileLoading(false);
+    }
+  };
+
+  const handleAplicarReconcile = async () => {
+    setReconcileApplying(true);
+    try {
+      const res = await inventarioApi.reconciliarLotes();
+      toast.success(res.data?.message || 'Reconciliación completada');
+      // Confirmar que ya no quedan descuadres
+      const prev = await inventarioApi.reconciliarLotesPreview();
+      setReconcileData(prev.data?.discrepancias || []);
+      fetchBodegas();
+    } catch (error) {
+      console.error('Error aplicando reconciliación:', error);
+      toast.error(error.response?.data?.detail || 'Error al reconciliar');
+    } finally {
+      setReconcileApplying(false);
     }
   };
 
@@ -281,13 +324,26 @@ const Bodegas = () => {
             </div>
           </div>
           
-          <Button 
-            className="bg-indigo-600 hover:bg-indigo-700"
-            onClick={() => handleOpenDialog()}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Bodega
-          </Button>
+          <div className="flex items-center gap-2">
+            {esAdmin && (
+              <Button
+                variant="outline"
+                onClick={handleAbrirReconcile}
+                data-testid="reconciliar-lotes-btn"
+                title="Corrige productos cuya existencia no coincide con la suma de sus lotes"
+              >
+                <Scale className="h-4 w-4 mr-2" />
+                Reconciliar lotes
+              </Button>
+            )}
+            <Button 
+              className="bg-indigo-600 hover:bg-indigo-700"
+              onClick={() => handleOpenDialog()}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Bodega
+            </Button>
+          </div>
         </div>
 
         {/* Tarjetas de resumen */}
@@ -649,6 +705,89 @@ const Bodegas = () => {
                 {bodegaProductos.length} producto{bodegaProductos.length !== 1 ? 's' : ''} con stock
               </span>
               <Button variant="outline" onClick={() => setProductosDialogOpen(false)}>Cerrar</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo Reconciliar Lotes */}
+      <Dialog open={reconcileOpen} onOpenChange={setReconcileOpen}>
+        <DialogContent className="sm:max-w-2xl" data-testid="reconciliar-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5 text-indigo-600" />
+              Reconciliar lotes
+            </DialogTitle>
+            <DialogDescription>
+              Productos con control de lotes cuya existencia no coincide con la suma de sus lotes.
+              Al reconciliar, la existencia se ajusta a la suma de los lotes y queda registrado en el kardex.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[50vh] overflow-auto">
+            {reconcileLoading ? (
+              <div className="space-y-2 py-4">
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : reconcileData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-green-600" data-testid="reconciliar-sin-descuadres">
+                <CheckCircle className="h-10 w-10 mb-2" />
+                <p className="font-medium">Todo cuadra</p>
+                <p className="text-sm text-slate-500">No hay descuadres entre existencias y lotes.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>Bodega</TableHead>
+                    <TableHead className="text-right">Existencia</TableHead>
+                    <TableHead className="text-right">Lotes</TableHead>
+                    <TableHead className="text-right">Ajuste</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reconcileData.map((d) => (
+                    <TableRow key={`${d.producto_id}-${d.bodega_id}`} data-testid={`reconciliar-row-${d.producto_id}`}>
+                      <TableCell className="font-medium">
+                        {d.producto_nombre}
+                        <span className="block text-xs font-mono text-slate-400">{d.producto_codigo}</span>
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500">{d.bodega_nombre}</TableCell>
+                      <TableCell className="text-right">{d.existencia_actual}</TableCell>
+                      <TableCell className="text-right font-semibold">{d.suma_lotes}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={d.diferencia < 0 ? 'destructive' : 'outline'}>
+                          {d.diferencia > 0 ? '+' : ''}{d.diferencia}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          <DialogFooter>
+            <div className="flex items-center justify-between w-full">
+              <span className="text-sm text-slate-500" data-testid="reconciliar-total">
+                {reconcileData.length} descuadre{reconcileData.length !== 1 ? 's' : ''} detectado{reconcileData.length !== 1 ? 's' : ''}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setReconcileOpen(false)}>Cerrar</Button>
+                <Button
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                  onClick={handleAplicarReconcile}
+                  disabled={reconcileApplying || reconcileLoading || reconcileData.length === 0}
+                  data-testid="reconciliar-aplicar-btn"
+                >
+                  {reconcileApplying ? (
+                    <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Reconciliando...</>
+                  ) : (
+                    <><Scale className="h-4 w-4 mr-2" />Reconciliar</>
+                  )}
+                </Button>
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>

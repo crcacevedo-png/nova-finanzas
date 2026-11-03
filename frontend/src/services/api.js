@@ -679,6 +679,8 @@ export const inventarioApi = {
   // Entrada y Ajuste
   registrarEntrada: (data) => axios.post(`${API_URL}/inventario/entrada`, data),
   registrarAjuste: (data) => axios.post(`${API_URL}/inventario/ajuste`, data),
+  reconciliarLotesPreview: () => axios.get(`${API_URL}/inventario/reconciliar-lotes/preview`),
+  reconciliarLotes: () => axios.post(`${API_URL}/inventario/reconciliar-lotes`),
   
   // Órdenes de Compra
   getOrdenes: (params) => axios.get(`${API_URL}/inventario/ordenes`, { params }),

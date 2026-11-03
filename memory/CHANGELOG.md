@@ -421,3 +421,13 @@ Causa raíz: el panel de Inventario suma TODAS las bodegas (6 bodegas; 19/24 pro
 - inventario/Bodegas.js: botón "Ver productos" por bodega (testId ver-productos-{id}) abre diálogo (bodega-productos-dialog) con tabla de productos + cantidad, buscador y total; usa GET /inventario/existencias?bodega_id.
 Verificado: curl (Acetazolamida bodega=0/total=60, BSS Plus 3/31); screenshots desktop+móvil (POS sin overflow a 390px) y diálogo de bodega con 24 productos.
 Nota: 1 producto (Acetazolamida) tiene drift real existencia(60) vs suma de lotes(28); el usuario pidió NO corregir históricos.
+
+## 2026-11-03 — Botón "Reconciliar lotes" (solo admin)
+### Backend (routes/inventario.py)
+- Helper _detectar_discrepancias_lotes: compara existencias_inventario.cantidad vs suma de lotes_inventario.cantidad_disponible por (producto,bodega) para productos controla_lotes.
+- GET /inventario/reconciliar-lotes/preview (admin/superadmin): lista descuadres.
+- POST /inventario/reconciliar-lotes (admin/superadmin): fija existencia = suma de lotes y registra movimiento en kardex (referencia_tipo=reconciliacion_lotes).
+### Frontend
+- api.js: inventarioApi.reconciliarLotesPreview() y reconciliarLotes().
+- inventario/Bodegas.js: botón "Reconciliar lotes" en header solo para admin/superadmin (testId reconciliar-lotes-btn) usando useAuth; diálogo (reconciliar-dialog) con tabla de descuadres (existencia/lotes/ajuste), estado "Todo cuadra", y botón Reconciliar (reconciliar-aplicar-btn) que aplica y re-verifica.
+Verificado: curl preview(1: Acetazolamida 60 vs 28)→aplicar→preview(0); screenshots del flujo completo en UI (detectar y "Todo cuadra" tras reconciliar). Acetazolamida quedó corregida en preview.
