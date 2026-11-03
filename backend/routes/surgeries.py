@@ -21,6 +21,9 @@ reports_router = APIRouter(prefix="/reports", tags=["Reportes"])
 
 class IGSSData(BaseModel):
     unit: Optional[str] = None
+    unit_id: Optional[str] = None
+    nog_id: Optional[str] = None
+    nog_number: Optional[str] = None
     sps: Optional[str] = None
     affiliation_number: Optional[str] = None
     code: Optional[str] = None

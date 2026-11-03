@@ -2,6 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { surgeryApi, formatCurrency, doctorApi, patientApi, getGuatemalaDate, getGuatemalaTimeHM } from '../services/api';
+import axios from 'axios';
+
+const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const EMPTY_IGSS = { unit: '', unit_id: '', nog_id: '', nog_number: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' };
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Pencil, Trash2, X, Calendar, Clock, User, Building2,
@@ -133,6 +137,9 @@ const SalaOperaciones = () => {
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState({ surgeons: [], institutions: [], anesthesiologists: [] });
   const [doctorsList, setDoctorsList] = useState([]);
+  const [igssUnits, setIgssUnits] = useState([]);
+  const [nogsList, setNogsList] = useState([]);
+  const [nogLibre, setNogLibre] = useState(false);
   const [patientResults, setPatientResults] = useState([]);
   const [showPatientResults, setShowPatientResults] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});
@@ -234,6 +241,57 @@ const SalaOperaciones = () => {
     cargarMedicos();
   }, []);
 
+  // Cargar unidades IGSS para el selector del formulario de cirugía
+  useEffect(() => {
+    const cargarUnidades = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/igss-units`);
+        setIgssUnits(res.data.data || []);
+      } catch (e) {
+        console.error('Error cargando unidades IGSS:', e);
+      }
+    };
+    cargarUnidades();
+  }, []);
+
+  const fetchNogs = async (unitId) => {
+    if (!unitId) { setNogsList([]); return; }
+    try {
+      const res = await axios.get(`${API_URL}/igss-units/${unitId}/nogs-activos`);
+      setNogsList(res.data || []);
+    } catch (e) {
+      console.error('Error cargando NOG de la unidad:', e);
+      setNogsList([]);
+    }
+  };
+
+  // Al elegir unidad: guarda id+nombre y resetea el NOG
+  const handleSelectUnidad = (unitId) => {
+    const unidad = igssUnits.find(u => u.id === unitId);
+    setNogLibre(false);
+    setFormData(prev => ({
+      ...prev,
+      igss_data: { ...prev.igss_data, unit_id: unitId, unit: unidad?.name || '', nog_id: '', nog_number: '' }
+    }));
+    fetchNogs(unitId);
+  };
+
+  // Al elegir NOG de la lista: autollena el procedimiento y lo bloquea
+  const handleSelectNog = (value) => {
+    if (value === '__libre__') {
+      setNogLibre(true);
+      setFormData(prev => ({ ...prev, igss_data: { ...prev.igss_data, nog_id: '', nog_number: '' } }));
+      return;
+    }
+    const nog = nogsList.find(n => n.id === value);
+    setNogLibre(false);
+    setFormData(prev => ({
+      ...prev,
+      procedure: nog?.nombre_servicio || prev.procedure,
+      igss_data: { ...prev.igss_data, nog_id: value, nog_number: nog?.numero || '' }
+    }));
+  };
+
   const buscarPacientes = async (texto) => {
     if (!texto || texto.length < 2) { setPatientResults([]); setShowPatientResults(false); return; }
     try {
@@ -279,6 +337,8 @@ const SalaOperaciones = () => {
   // Surgery CRUD
   const openCreateDialog = () => {
     setEditMode(false);
+    setNogLibre(false);
+    setNogsList([]);
     setFormData({
       date: getGuatemalaDate(),
       time: getGuatemalaTimeHM(),
@@ -290,7 +350,7 @@ const SalaOperaciones = () => {
       anesthesia_type: '',
       anesthesiologist: '',
       institution: '',
-      igss_data: { unit: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' },
+      igss_data: { ...EMPTY_IGSS },
       insurance_name: '',
       observations: '',
     });
@@ -300,6 +360,7 @@ const SalaOperaciones = () => {
   const openEditDialog = (surgery) => {
     setEditMode(true);
     setSelectedSurgery(surgery);
+    const igss = { ...EMPTY_IGSS, ...(surgery.igss_data || {}) };
     setFormData({
       date: surgery.date,
       time: surgery.time,
@@ -312,10 +373,17 @@ const SalaOperaciones = () => {
       anesthesia_type: surgery.anesthesia_type,
       anesthesiologist: surgery.anesthesiologist,
       institution: surgery.institution,
-      igss_data: surgery.igss_data || { unit: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' },
+      igss_data: igss,
       insurance_name: surgery.insurance_name || '',
       observations: surgery.observations || '',
     });
+    // Si es IGSS con unidad, cargar sus NOG; marcar NOG libre si no vino de la lista
+    setNogLibre(!!(igss.nog_number && !igss.nog_id));
+    if (surgery.institution === 'IGSS' && igss.unit_id) {
+      fetchNogs(igss.unit_id);
+    } else {
+      setNogsList([]);
+    }
     setSurgeryDialogOpen(true);
   };
 
@@ -1001,7 +1069,14 @@ const SalaOperaciones = () => {
                       onChange={(e) => setFormData({ ...formData, procedure: e.target.value })}
                       list="procedures-list"
                       placeholder="Seleccione o escriba el procedimiento"
+                      readOnly={formData.institution === 'IGSS' && !!formData.igss_data.nog_id}
+                      disabled={formData.institution === 'IGSS' && !!formData.igss_data.nog_id}
+                      className={formData.institution === 'IGSS' && !!formData.igss_data.nog_id ? 'bg-slate-100 cursor-not-allowed text-slate-600' : ''}
+                      data-testid="surgery-procedure-input"
                     />
+                    {formData.institution === 'IGSS' && !!formData.igss_data.nog_id && (
+                      <p className="text-xs text-blue-600 mt-1">Llenado automáticamente desde el servicio del NOG (no editable)</p>
+                    )}
                     <datalist id="procedures-list">
                       {PROCEDURES_SUGGESTIONS.map(p => <option key={p} value={p} />)}
                     </datalist>
@@ -1129,11 +1204,44 @@ const SalaOperaciones = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Unidad *</Label>
-                        <Input
-                          value={formData.igss_data.unit}
-                          onChange={(e) => setFormData({ ...formData, igss_data: { ...formData.igss_data, unit: e.target.value } })}
-                          placeholder="Ej: Consulta Externa Z.9"
-                        />
+                        <Select value={formData.igss_data.unit_id || ''} onValueChange={handleSelectUnidad}>
+                          <SelectTrigger data-testid="surgery-igss-unidad">
+                            <SelectValue placeholder="Seleccione unidad" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {igssUnits.map(u => (
+                              <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>NOG {nogLibre && <span className="text-slate-400">(libre)</span>}</Label>
+                        {!nogLibre ? (
+                          <Select value={formData.igss_data.nog_id || ''} onValueChange={handleSelectNog} disabled={!formData.igss_data.unit_id}>
+                            <SelectTrigger data-testid="surgery-igss-nog">
+                              <SelectValue placeholder={formData.igss_data.unit_id ? 'Seleccione NOG' : 'Elija unidad primero'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {nogsList.map(n => (
+                                <SelectItem key={n.id} value={n.id}>{n.numero} — {n.nombre_servicio}</SelectItem>
+                              ))}
+                              <SelectItem value="__libre__">Escribir NOG libre…</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Input
+                              value={formData.igss_data.nog_number}
+                              onChange={(e) => setFormData({ ...formData, igss_data: { ...formData.igss_data, nog_number: e.target.value, nog_id: '' } })}
+                              placeholder="Número de NOG"
+                              data-testid="surgery-igss-nog-libre"
+                            />
+                            <Button type="button" variant="outline" size="sm" onClick={() => { setNogLibre(false); setFormData(prev => ({ ...prev, igss_data: { ...prev.igss_data, nog_number: '', nog_id: '' } })); }}>
+                              Lista
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <Label>SPS *</Label>
@@ -1259,6 +1367,7 @@ const SalaOperaciones = () => {
                       <Badge className="bg-blue-100 text-blue-700 border-0 mb-3">Datos IGSS</Badge>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><span className="text-slate-500">Unidad:</span> <span className="font-medium">{selectedSurgery.igss_data.unit}</span></div>
+                        <div><span className="text-slate-500">NOG:</span> <span className="font-medium">{selectedSurgery.igss_data.nog_number || '—'}</span></div>
                         <div><span className="text-slate-500">SPS:</span> <span className="font-medium">{selectedSurgery.igss_data.sps}</span></div>
                         <div><span className="text-slate-500">No. afiliación:</span> <span className="font-medium">{selectedSurgery.igss_data.affiliation_number}</span></div>
                         <div><span className="text-slate-500">Código:</span> <span className="font-medium">{selectedSurgery.igss_data.code}</span></div>
