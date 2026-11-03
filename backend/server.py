@@ -4648,8 +4648,8 @@ async def startup_event():
     await db.surgeries.create_index([("surgeon", 1)])
     await db.surgeries.create_index([("institution", 1)])
     await db.surgeries.create_index([("patient_name", "text"), ("procedure", "text")])
-    # Seed de cirugías
-    await seed_surgeries_data()
+    # NOTA: el seed de cirugías de ejemplo fue DESHABILITADO a petición del usuario
+    # (recargaba datos de muestra en Sala de Operaciones en cada deploy). No reactivar.
     
     # Índices de Evaluaciones Oftalmológicas (con manejo de conflictos)
     try:
