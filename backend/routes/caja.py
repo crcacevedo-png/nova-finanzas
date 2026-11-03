@@ -470,22 +470,21 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
     except ValueError:
         raise HTTPException(status_code=400, detail="Fecha inválida, use formato YYYY-MM-DD")
 
-    facturado = 0.0
-    cxc_generada = 0.0
-    cobrado_de_ventas_hoy = 0.0
-    por_usuario = {}
-    ventas_detalle = []
-
-    def _usr(uid, nombre):
+    def _acc_usr(d, uid, nombre):
         key = uid or "—"
-        if key not in por_usuario:
-            por_usuario[key] = {
-                "usuario_id": key, "usuario_nombre": nombre or "—",
-                "facturado": 0.0, "cobrado": 0.0, "cxc_generada": 0.0, "num_ventas": 0
-            }
-        return por_usuario[key]
+        if key not in d:
+            d[key] = {"usuario_id": key, "usuario_nombre": nombre or "—",
+                      "facturado": 0.0, "cobrado": 0.0, "cxc_generada": 0.0, "num_ventas": 0}
+        return d[key]
 
-    # ===== CLÍNICA: ventas del día (campo fecha = ISO UTC -> rango del día GT) =====
+    def _metodos_cero():
+        m = {k: 0.0 for k in _METODOS_CAJA}
+        m["otro"] = 0.0
+        return m
+
+    # ===================== CLÍNICA =====================
+    cli_fact = cli_cxc = cli_cobrado_ventas = 0.0
+    cli_usuarios, cli_ventas = {}, []
     ventas_cli = await db.ventas.find(
         {"origen": "clinica", "estado": {"$ne": "anulada"}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
     ).to_list(5000)
@@ -494,22 +493,36 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
         formas = v.get("formas_pago", [])
         cobrado_v = sum((fp.get("monto", 0) or 0) for fp in formas if fp.get("metodo") != "Cuenta por Cobrar")
         cxc_v = sum((fp.get("monto", 0) or 0) for fp in formas if fp.get("metodo") == "Cuenta por Cobrar")
-        # formas_pago guarda el efectivo RECIBIDO (incluye vuelto): limitar a lo aplicado a la venta
         cxc_v = min(cxc_v, total)
         cobrado_v = max(0.0, min(cobrado_v, total - cxc_v))
-        facturado += total
-        cxc_generada += cxc_v
-        cobrado_de_ventas_hoy += cobrado_v
-        u = _usr(v.get("vendedor_id"), v.get("vendedor_nombre"))
+        cli_fact += total; cli_cxc += cxc_v; cli_cobrado_ventas += cobrado_v
+        u = _acc_usr(cli_usuarios, v.get("vendedor_id"), v.get("vendedor_nombre"))
         u["facturado"] += total; u["cobrado"] += cobrado_v; u["cxc_generada"] += cxc_v; u["num_ventas"] += 1
-        ventas_detalle.append({
+        cli_ventas.append({
             "modulo": "Clínica", "numero": v.get("numero_venta"),
             "usuario": v.get("vendedor_nombre") or "—",
             "cliente": v.get("paciente_nombre") or "Cliente General",
+            "concepto": ", ".join(it.get("nombre", "") for it in v.get("items", [])) or "—",
             "total": round(total, 2), "cobrado": round(cobrado_v, 2), "pendiente": round(cxc_v, 2),
         })
 
-    # ===== ÓPTICA: ventas del día (created_at ISO) =====
+    cli_metodos = _metodos_cero()
+    movs = await db.caja_movimientos.find(
+        {"origen": "clinica", "tipo": "Ingreso", "anulado": {"$ne": True}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(10000)
+    for m in movs:
+        k = _norm_metodo_cierre(m.get("metodo_pago"))
+        cli_metodos[k] = cli_metodos.get(k, 0.0) + (m.get("monto", 0) or 0)
+    movs_eg = await db.caja_movimientos.find(
+        {"origen": "clinica", "tipo": "Egreso", "anulado": {"$ne": True}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
+    ).to_list(10000)
+    cli_egresos = sum((m.get("monto", 0) or 0) for m in movs_eg)
+    cli_total_cobrado = sum(cli_metodos.values())
+    cli_abonos_prev = max(0.0, round(cli_total_cobrado - cli_cobrado_ventas, 2))
+
+    # ===================== ÓPTICA =====================
+    opt_fact = opt_cxc = opt_cobrado_ventas = 0.0
+    opt_usuarios, opt_ventas = {}, []
     ventas_opt = await db.optica_sales.find(
         {"created_at": {"$gte": inicio, "$lte": fin}, "status": {"$ne": "cancelado"}}, {"_id": 0}
     ).to_list(5000)
@@ -525,31 +538,21 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
         total = s.get("total", 0) or 0
         cobrado_v = pagos_hoy_por_venta.get(s["id"], 0.0)
         cxc_v = max(0.0, round(total - cobrado_v, 2))
-        facturado += total
-        cxc_generada += cxc_v
-        cobrado_de_ventas_hoy += cobrado_v
-        u = _usr(s.get("created_by"), s.get("created_by_name"))
+        opt_fact += total; opt_cxc += cxc_v; opt_cobrado_ventas += cobrado_v
+        u = _acc_usr(opt_usuarios, s.get("created_by"), s.get("created_by_name"))
         u["facturado"] += total; u["cobrado"] += cobrado_v; u["cxc_generada"] += cxc_v; u["num_ventas"] += 1
-        ventas_detalle.append({
+        opt_ventas.append({
             "modulo": "Óptica", "numero": s.get("order_number"),
             "usuario": s.get("created_by_name") or "—",
             "cliente": s.get("patient_name") or "Cliente",
+            "concepto": ", ".join(it.get("name", "") for it in s.get("items_v2", [])) or "—",
             "total": round(total, 2), "cobrado": round(cobrado_v, 2), "pendiente": cxc_v,
         })
 
-    # ===== COBRADO DEL DÍA por método (dinero real recibido) =====
-    cobrado_metodos = {m: 0.0 for m in _METODOS_CAJA}
-    cobrado_metodos["otro"] = 0.0
-    movs = await db.caja_movimientos.find(
-        {"origen": "clinica", "tipo": "Ingreso", "anulado": {"$ne": True}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
-    ).to_list(10000)
-    for m in movs:
-        k = _norm_metodo_cierre(m.get("metodo_pago"))
-        cobrado_metodos[k] = cobrado_metodos.get(k, 0.0) + (m.get("monto", 0) or 0)
+    opt_metodos = _metodos_cero()
     pagos_opt_hoy = await db.optica_sale_payments.find(
         {"created_at": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
     ).to_list(10000)
-    # Excluir pagos de ventas de óptica canceladas
     pago_sale_ids = list({p.get("sale_id") for p in pagos_opt_hoy if p.get("sale_id")})
     canceladas = set()
     if pago_sale_ids:
@@ -561,17 +564,11 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
         if p.get("sale_id") in canceladas:
             continue
         k = _norm_metodo_cierre(p.get("payment_method"))
-        cobrado_metodos[k] = cobrado_metodos.get(k, 0.0) + (p.get("amount", 0) or 0)
+        opt_metodos[k] = opt_metodos.get(k, 0.0) + (p.get("amount", 0) or 0)
+    opt_total_cobrado = sum(opt_metodos.values())
+    opt_abonos_prev = max(0.0, round(opt_total_cobrado - opt_cobrado_ventas, 2))
 
-    movs_eg = await db.caja_movimientos.find(
-        {"origen": "clinica", "tipo": "Egreso", "anulado": {"$ne": True}, "fecha": {"$gte": inicio, "$lte": fin}}, {"_id": 0}
-    ).to_list(10000)
-    egresos_total = sum((m.get("monto", 0) or 0) for m in movs_eg)
-
-    total_cobrado_dia = sum(cobrado_metodos.values())
-    abonos_cuentas_previas = max(0.0, round(total_cobrado_dia - cobrado_de_ventas_hoy, 2))
-
-    # ===== CONCILIACIÓN DE CAJAS (clínica) =====
+    # ===================== CONCILIACIÓN DE CAJAS (clínica) =====================
     cajas = await db.caja_cierres.find(
         {"origen": "clinica", "fecha": fecha_dia}, {"_id": 0}
     ).sort("fecha_apertura", 1).to_list(500)
@@ -590,26 +587,48 @@ async def calcular_cierre_diario(fecha_dia: str) -> dict:
             "diferencia": diferencia,
         })
 
-    por_usuario_list = sorted(por_usuario.values(), key=lambda x: x["facturado"], reverse=True)
-    for u in por_usuario_list:
-        for k in ("facturado", "cobrado", "cxc_generada"):
-            u[k] = round(u[k], 2)
+    def _resumen(fact, total_cobrado, cxc, cobrado_ventas, abonos, egresos, nventas):
+        return {
+            "ingreso_facturado": round(fact, 2),
+            "total_cobrado": round(total_cobrado, 2),
+            "cxc_generada_hoy": round(cxc, 2),
+            "cobrado_de_ventas_hoy": round(cobrado_ventas, 2),
+            "abonos_cuentas_previas": round(abonos, 2),
+            "egresos": round(egresos, 2),
+            "num_ventas": nventas,
+        }
+
+    def _usr_list(d):
+        lst = sorted(d.values(), key=lambda x: x["facturado"], reverse=True)
+        for u in lst:
+            for k in ("facturado", "cobrado", "cxc_generada"):
+                u[k] = round(u[k], 2)
+        return lst
+
+    clinica = {
+        "resumen": _resumen(cli_fact, cli_total_cobrado, cli_cxc, cli_cobrado_ventas, cli_abonos_prev, cli_egresos, len(cli_ventas)),
+        "cobrado_por_metodo": {k: round(v, 2) for k, v in cli_metodos.items()},
+        "por_usuario": _usr_list(cli_usuarios),
+        "ventas": sorted(cli_ventas, key=lambda x: x["total"], reverse=True),
+    }
+    optica = {
+        "resumen": _resumen(opt_fact, opt_total_cobrado, opt_cxc, opt_cobrado_ventas, opt_abonos_prev, 0.0, len(opt_ventas)),
+        "cobrado_por_metodo": {k: round(v, 2) for k, v in opt_metodos.items()},
+        "por_usuario": _usr_list(opt_usuarios),
+        "ventas": sorted(opt_ventas, key=lambda x: x["total"], reverse=True),
+    }
+    general = _resumen(
+        cli_fact + opt_fact, cli_total_cobrado + opt_total_cobrado, cli_cxc + opt_cxc,
+        cli_cobrado_ventas + opt_cobrado_ventas, cli_abonos_prev + opt_abonos_prev,
+        cli_egresos, len(cli_ventas) + len(opt_ventas)
+    )
 
     return {
         "fecha": fecha_dia,
-        "resumen": {
-            "ingreso_facturado": round(facturado, 2),
-            "total_cobrado": round(total_cobrado_dia, 2),
-            "cxc_generada_hoy": round(cxc_generada, 2),
-            "cobrado_de_ventas_hoy": round(cobrado_de_ventas_hoy, 2),
-            "abonos_cuentas_previas": abonos_cuentas_previas,
-            "egresos": round(egresos_total, 2),
-            "num_ventas": len(ventas_detalle),
-        },
-        "cobrado_por_metodo": {k: round(v, 2) for k, v in cobrado_metodos.items()},
-        "por_usuario": por_usuario_list,
+        "general": general,
+        "clinica": clinica,
+        "optica": optica,
         "conciliacion_cajas": conciliacion,
-        "ventas": sorted(ventas_detalle, key=lambda x: x["total"], reverse=True),
     }
 
 

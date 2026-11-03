@@ -163,50 +163,93 @@ _METODO_LABEL = {"efectivo": "Efectivo", "tarjeta": "Tarjeta", "transferencia": 
                  "cheque": "Cheque", "otro": "Otro"}
 
 
-def build_cierre_html(data: dict) -> str:
-    r = data.get("resumen", {})
-    fecha = escape(str(data.get("fecha", "")))
+def _cards_row(resumen: dict, with_egresos: bool = True) -> str:
     cards = [
-        ("Ingreso facturado del día", _q(r.get("ingreso_facturado")), "#1e3a8a", "Incluye cuentas por cobrar generadas hoy"),
-        ("Cobrado del día", _q(r.get("total_cobrado")), "#047857", "Dinero realmente recibido"),
-        ("Cuentas por cobrar (hoy)", _q(r.get("cxc_generada_hoy")), "#b45309", "Pendiente de ventas de hoy"),
-        ("Abonos de días previos", _q(r.get("abonos_cuentas_previas")), "#6d28d9", "Cobros de cuentas anteriores"),
-        ("Egresos del día", _q(r.get("egresos")), "#b91c1c", "Salidas de caja clínica"),
+        ("Ingreso facturado", _q(resumen.get("ingreso_facturado")), "#1e3a8a", "Incluye cuentas por cobrar"),
+        ("Cobrado", _q(resumen.get("total_cobrado")), "#047857", "Dinero recibido"),
+        ("Cuentas por cobrar", _q(resumen.get("cxc_generada_hoy")), "#b45309", "Pendiente de hoy"),
+        ("Abonos previos", _q(resumen.get("abonos_cuentas_previas")), "#6d28d9", "Cuentas anteriores"),
     ]
-    cards_html = ""
+    if with_egresos:
+        cards.append(("Egresos", _q(resumen.get("egresos")), "#b91c1c", "Salidas de caja"))
+    out = ""
     for titulo, valor, color, sub in cards:
-        cards_html += (
-            f'<td style="padding:8px;" valign="top"><div style="border:1px solid #e5e7eb;border-radius:10px;'
-            f'padding:14px 16px;background:#ffffff">'
-            f'<div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">{escape(titulo)}</div>'
-            f'<div style="font-size:22px;font-weight:700;color:{color};margin-top:4px">{escape(valor)}</div>'
-            f'<div style="font-size:11px;color:#9ca3af;margin-top:4px">{escape(sub)}</div></div></td>'
+        out += (
+            f'<td style="padding:6px;" valign="top"><div style="border:1px solid #e5e7eb;border-radius:10px;'
+            f'padding:12px 14px;background:#ffffff">'
+            f'<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">{escape(titulo)}</div>'
+            f'<div style="font-size:19px;font-weight:700;color:{color};margin-top:3px">{escape(valor)}</div>'
+            f'<div style="font-size:10px;color:#9ca3af;margin-top:3px">{escape(sub)}</div></div></td>'
         )
+    return out
 
-    metodos = data.get("cobrado_por_metodo", {})
-    metodos_rows = ""
+
+def _metodos_rows(metodos: dict) -> str:
+    rows = ""
     for k in ("efectivo", "tarjeta", "transferencia", "cheque", "otro"):
-        val = metodos.get(k, 0) or 0
+        val = (metodos or {}).get(k, 0) or 0
         if val == 0 and k == "otro":
             continue
-        metodos_rows += (
+        rows += (
             f'<tr><td style="padding:6px 12px;border-bottom:1px solid #f1f5f9">{escape(_METODO_LABEL.get(k, k))}</td>'
             f'<td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:600">{escape(_q(val))}</td></tr>'
         )
+    return rows or '<tr><td colspan="2" style="padding:10px;text-align:center;color:#9ca3af">Sin cobros</td></tr>'
 
-    usuarios = data.get("por_usuario", [])
-    usr_rows = ""
-    for u in usuarios:
-        usr_rows += (
+
+def _ventas_rows(ventas: list) -> str:
+    rows = ""
+    for v in (ventas or []):
+        rows += (
+            f'<tr><td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap">{escape(str(v.get("numero", "—")))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9">{escape(str(v.get("usuario", "—")))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9">{escape(str(v.get("cliente", "—")))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#6b7280">{escape(str(v.get("concepto", "—")))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap">{escape(_q(v.get("total")))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;color:#047857;white-space:nowrap">{escape(_q(v.get("cobrado")))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;color:#b45309;white-space:nowrap">{escape(_q(v.get("pendiente")))}</td></tr>'
+        )
+    return rows or '<tr><td colspan="7" style="padding:12px;text-align:center;color:#9ca3af">Sin ventas este día</td></tr>'
+
+
+def _usuarios_rows(usuarios: list) -> str:
+    rows = ""
+    for u in (usuarios or []):
+        rows += (
             f'<tr><td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">{escape(str(u.get("usuario_nombre", "—")))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center">{escape(str(u.get("num_ventas", 0)))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right">{escape(_q(u.get("facturado")))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right;color:#047857">{escape(_q(u.get("cobrado")))}</td>'
             f'<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right;color:#b45309">{escape(_q(u.get("cxc_generada")))}</td></tr>'
         )
-    if not usr_rows:
-        usr_rows = '<tr><td colspan="5" style="padding:12px;text-align:center;color:#9ca3af">Sin ventas registradas</td></tr>'
+    return rows or '<tr><td colspan="5" style="padding:12px;text-align:center;color:#9ca3af">Sin ventas registradas</td></tr>'
 
+
+def _modulo_block(titulo: str, color: str, mod: dict, with_egresos: bool) -> str:
+    resumen = (mod or {}).get("resumen", {})
+    return (
+        f'<tr><td style="padding:18px 24px 4px"><div style="font-size:16px;font-weight:700;color:{color};'
+        f'border-left:4px solid {color};padding-left:10px">{escape(titulo)}</div></td></tr>'
+        f'<tr><td style="padding:6px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{_cards_row(resumen, with_egresos)}</tr></table></td></tr>'
+        f'<tr><td style="padding:6px 24px 2px"><div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:4px">Cobrado por método</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">{_metodos_rows((mod or {}).get("cobrado_por_metodo", {}))}</table></td></tr>'
+        f'<tr><td style="padding:10px 24px 2px"><div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:4px">Ventas por usuario</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">'
+        f'<tr style="background:#f8fafc"><th style="padding:6px 10px;text-align:left">Usuario</th><th style="padding:6px 10px;text-align:center">Ventas</th>'
+        f'<th style="padding:6px 10px;text-align:right">Facturado</th><th style="padding:6px 10px;text-align:right">Cobrado</th><th style="padding:6px 10px;text-align:right">CxC</th></tr>'
+        f'{_usuarios_rows((mod or {}).get("por_usuario", []))}</table></td></tr>'
+        f'<tr><td style="padding:10px 24px 6px"><div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:4px">Ventas del día</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:11px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">'
+        f'<tr style="background:#f8fafc"><th style="padding:6px 8px;text-align:left">Documento</th><th style="padding:6px 8px;text-align:left">Usuario</th>'
+        f'<th style="padding:6px 8px;text-align:left">Cliente</th><th style="padding:6px 8px;text-align:left">Concepto</th>'
+        f'<th style="padding:6px 8px;text-align:right">Total</th><th style="padding:6px 8px;text-align:right">Cobrado</th><th style="padding:6px 8px;text-align:right">Pendiente</th></tr>'
+        f'{_ventas_rows((mod or {}).get("ventas", []))}</table></td></tr>'
+    )
+
+
+def build_cierre_html(data: dict) -> str:
+    fecha = escape(str(data.get("fecha", "")))
+    general = data.get("general", {})
     conc = data.get("conciliacion_cajas", [])
     conc_rows = ""
     for c in conc:
@@ -229,25 +272,16 @@ def build_cierre_html(data: dict) -> str:
 
     return (
         f'<div style="background:#f3f4f6;padding:24px 0;font-family:Arial,Helvetica,sans-serif">'
-        f'<table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" '
-        f'style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb">'
+        f'<table role="presentation" width="720" align="center" cellpadding="0" cellspacing="0" '
+        f'style="max-width:720px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb">'
         f'<tr><td style="background:#0f172a;padding:22px 28px">'
         f'<div style="color:#ffffff;font-size:20px;font-weight:700">NovaVisión — Cierre del Día</div>'
         f'<div style="color:#94a3b8;font-size:13px;margin-top:2px">Diagnóstico de cierre · {fecha}</div></td></tr>'
-        f'<tr><td style="padding:16px 20px">'
-        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{cards_html}</tr></table>'
-        f'</td></tr>'
-        f'<tr><td style="padding:8px 28px 4px"><div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Cobrado por método de pago</div>'
-        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">'
-        f'{metodos_rows}</table></td></tr>'
-        f'<tr><td style="padding:16px 28px 4px"><div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Ventas por usuario</div>'
-        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">'
-        f'<tr style="background:#f8fafc"><th style="padding:7px 10px;text-align:left">Usuario</th>'
-        f'<th style="padding:7px 10px;text-align:center">Ventas</th>'
-        f'<th style="padding:7px 10px;text-align:right">Facturado</th>'
-        f'<th style="padding:7px 10px;text-align:right">Cobrado</th>'
-        f'<th style="padding:7px 10px;text-align:right">CxC</th></tr>{usr_rows}</table></td></tr>'
-        f'<tr><td style="padding:16px 28px 10px"><div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:6px">Conciliación de cajas (clínica)</div>'
+        f'<tr><td style="padding:16px 18px 2px"><div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;padding-left:6px">Resumen general (Clínica + Óptica)</div></td></tr>'
+        f'<tr><td style="padding:4px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{_cards_row(general, True)}</tr></table></td></tr>'
+        f'{_modulo_block("Clínica", "#2563eb", data.get("clinica", {}), True)}'
+        f'{_modulo_block("Óptica", "#4f46e5", data.get("optica", {}), False)}'
+        f'<tr><td style="padding:16px 24px 10px"><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Conciliación de cajas (Clínica)</div>'
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">'
         f'<tr style="background:#f8fafc"><th style="padding:7px 10px;text-align:left">Cajero</th>'
         f'<th style="padding:7px 10px;text-align:center">Estado</th>'
@@ -277,7 +311,7 @@ async def enviar_cierre_diario(fecha_dia: str) -> dict:
             errores.append({"to": correo, "error": e.detail})
         except Exception as e:
             errores.append({"to": correo, "error": str(e)})
-    return {"fecha": fecha_dia, "enviados": enviados, "errores": errores, "resumen": data.get("resumen")}
+    return {"fecha": fecha_dia, "enviados": enviados, "errores": errores, "resumen": data.get("general")}
 
 
 # ==================== ENDPOINTS ====================
