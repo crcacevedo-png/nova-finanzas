@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend E2E (Playwright, superadmin/nova2024) of Quirófano Fase 1. All 7 requested flows PASS: sidebar items + routes, Insumos/Equipos catalog (create/edit/deactivate, no price field, both tabs), anesthesia types CRUD (Tópica Q300, General Q800, new type Q450 created then deactivated), monthly closure (2026-11 total Q2,500 with 3 cards; 2026-10 closed -> 'Mes cerrado (pagado)' badge, button gone, persists after reload, 2026-11 still open; empty month 2026-12 button disabled), supplies-status for Alquiler (Diego Armando Castillo: pendiente -> registrados, badge 'Insumos: listos' persists after reload; block not shown for IGSS), catalog SELECTs for supply/equipment (no unit-cost field; Viscoelástico x2 and Facoemulsificador added), IGSS detail renders structured block (no regression), new surgery creation (Alquiler/Tópica) works and auto-creates anesthesia record shown in closure. One functional bug: deleting a surgery leaves its anesthesia record (orphan still counted in closure).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "DELETE /api/surgeries/{id}", "issue": "Does not delete/void the linked anesthesia_records doc. Reproduced: created TEST surgery (Tópica, TEST_Anest QA) -> Nov closure rose 2500->2800; after DELETE (200) closure stayed 2800 with 'TEST_Anest QA' card. Orphan would be paid at month close. (Tester removed the orphan manually from Mongo.) Same likely for POST /api/surgeries/{id}/cancel (no anesthesia handling in code).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "upsert_anesthesia_from_surgery / closure", "issue": "Surgery anesthesia types 'Local' and 'Local Asistida' have no matching type in the catalog, so they show up in closure as 'Local asistida 1 × Q0.00' without any warning. Records with anesthesiologist 'N/A' are counted as a payee ('N/A' card, Q300)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Registrar cirugía -> Tipo de anestesia", "issue": "SalaOperaciones uses a hardcoded ANESTHESIA_TYPES list (topica/local/local_asistida/general). It does not come from /api/quirofano/anesthesia/types, so new types created in 'Tipos de anestesia' can't be selected, and Local/Local Asistida get Q0 fees.", "affected_selectors": ["SalaOperaciones.js ANESTHESIA_TYPES"]}
+    ],
+    "design_issues": [
+      {"screen": "Sala de Operaciones detail + table", "issues": ["Spec says supply cost/total was removed, but the detail still shows Unitario/Total columns, a 'TOTAL:' row and 'Total insumos' in the summary (always Q0.00). The table also still has the 'INSUMOS' cost column."]},
+      {"screen": "Procedimientos de Anestesia > Cierre", "issues": ["'Mes cerrado (pagado)' badge renders red text on a blue (primary) background, so contrast is low. The Badge default variant overrides bg-red-100; use variant='outline' or similar.", "The month selector is the browser's native input type=month."]},
+      {"screen": "Tipos de anestesia", "issues": ["The activate/deactivate (Power) button has no data-testid."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "On surgery delete (and cancel), delete or void the anesthesia_records doc for that surgery_id, but only if its month is not closed",
+    "Fill the surgery form 'Tipo de anestesia' options from /api/quirofano/anesthesia/types (active ones), or at least warn when a type has no fee",
+    "Remove the remaining supply cost UI (Unitario/Total/TOTAL/Total insumos, and the table INSUMOS column) as the spec says",
+    "Fix 'Mes cerrado (pagado)' badge contrast; add data-testid to the anesthesia type toggle button",
+    "Decide whether to skip 'N/A' anesthesiologist records in the closure"
+  ],
+  "critical_code_review_comments": [
+    "SalaOperaciones.js is 1730 lines; split the detail and dialogs into components",
+    "Supply select sets category = catalog note (it?.note || 'otro'), so category is free text with no validation",
+    "Catalog select uses name as the value; two catalog items with the same name would collide. Use the id as the value"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% of requested flows pass; 1 related backend bug found"},
+  "test_credentials": "superadmin / nova2024",
+  "seed_data_creation": "Catalog insumo 'TEST_Insumo_<ts>_ED' (inactive); anesthesia type 'TEST_Local_<ts>' Q450 (inactive); month 2026-10 CLOSED; Diego Armando Castillo supplies_status=registrados plus Viscoelástico x2 and Facoemulsificador x1 added; TEST surgery created and deleted (orphan anesthesia record removed manually).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "2026-10 anesthesia month is closed (reopen via superadmin API if needed). 2026-11 closure baseline is Q2,500 (6 records). Use window.confirm auto-accept (import asyncio) for the close-month button. The surgery form save button is 'Guardar registro'.",
+  "rca of the issue": "routes/surgeries.py delete_surgery only calls db.surgeries.delete_one; upsert_anesthesia_from_surgery is called only on create/update, and nothing removes anesthesia_records on delete/cancel. Fix: in delete/cancel, call await db.anesthesia_records.delete_many({'surgery_id': id}) (or mark it voided), guarded by _month_closed."
+}

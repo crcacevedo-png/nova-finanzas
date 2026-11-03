@@ -190,6 +190,7 @@ const SalaOperaciones = () => {
   const [supplyForm, setSupplyForm] = useState({ name: '', category: 'otro', quantity: 1, unit_cost: 0, notes: '' });
   const [catalogInsumos, setCatalogInsumos] = useState([]);
   const [catalogEquipos, setCatalogEquipos] = useState([]);
+  const [anesthesiaTypes, setAnesthesiaTypes] = useState([]);
 
   useEffect(() => {
     const cargarCatalogo = async () => {
@@ -200,6 +201,10 @@ const SalaOperaciones = () => {
         ]);
         setCatalogInsumos(ins.data.data || []);
         setCatalogEquipos(eq.data.data || []);
+        try {
+          const at = await axios.get(`${API_URL}/quirofano/anesthesia/types?active=true`);
+          setAnesthesiaTypes(at.data.data || []);
+        } catch (e) { /* opcional */ }
       } catch (e) { /* catálogo opcional */ }
     };
     cargarCatalogo();
@@ -770,8 +775,6 @@ const SalaOperaciones = () => {
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Anestesia</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Institución</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Costo Proc.</TableHead>
-                      <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Insumos</TableHead>
-                      <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Total</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -822,12 +825,6 @@ const SalaOperaciones = () => {
                           </TableCell>
                           <TableCell className="text-right text-sm">
                             {surgery.igss_data?.procedure_cost ? formatCurrency(surgery.igss_data.procedure_cost) : '—'}
-                          </TableCell>
-                          <TableCell className="text-right text-sm">
-                            {formatCurrency(getSuppliesTotal(surgery.supplies))}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-blue-600">
-                            {formatCurrency(getTotalGeneral(surgery))}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -985,24 +982,14 @@ const SalaOperaciones = () => {
                               </div>
                               
                               {/* Financial Summary */}
+                              {surgery.igss_data?.procedure_cost ? (
                               <div className="mx-4 mb-4 p-4 bg-slate-100 rounded-lg">
-                                <div className="grid grid-cols-3 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-slate-500">Costo procedimiento (IGSS):</span>
-                                    <span className="ml-2 font-medium">
-                                      {surgery.igss_data?.procedure_cost ? formatCurrency(surgery.igss_data.procedure_cost) : '—'}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-500">Total insumos:</span>
-                                    <span className="ml-2 font-medium">{formatCurrency(getSuppliesTotal(surgery.supplies))}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-500">TOTAL GENERAL:</span>
-                                    <span className="ml-2 font-bold text-lg text-blue-600">{formatCurrency(getTotalGeneral(surgery))}</span>
-                                  </div>
+                                <div className="text-sm">
+                                  <span className="text-slate-500">Costo procedimiento (IGSS):</span>
+                                  <span className="ml-2 font-bold text-blue-600">{formatCurrency(surgery.igss_data.procedure_cost)}</span>
                                 </div>
                               </div>
+                              ) : null}
                             </TableCell>
                           </TableRow>
                         )}
@@ -1188,7 +1175,10 @@ const SalaOperaciones = () => {
                         <SelectValue placeholder="Seleccione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {ANESTHESIA_TYPES.map(t => (
+                        {(anesthesiaTypes.length > 0
+                          ? anesthesiaTypes.map(t => ({ value: t.name, label: `${t.name} — ${formatCurrency(t.value)}` }))
+                          : ANESTHESIA_TYPES
+                        ).map(t => (
                           <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1519,22 +1509,15 @@ const SalaOperaciones = () => {
                     )}
                   </div>
                   
-                  {/* Financial Summary */}
+                  {/* Financial Summary (solo costo de procedimiento IGSS; los insumos no llevan precio) */}
+                  {selectedSurgery.igss_data?.procedure_cost ? (
                   <div className="p-4 bg-slate-100 rounded-xl">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span>Costo procedimiento (IGSS):</span>
-                      <span className="font-medium">{selectedSurgery.igss_data?.procedure_cost ? formatCurrency(selectedSurgery.igss_data.procedure_cost) : '—'}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span>Total insumos:</span>
-                      <span className="font-medium">{formatCurrency(getSuppliesTotal(selectedSurgery.supplies))}</span>
-                    </div>
-                    <div className="h-px bg-slate-300 my-2"></div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">TOTAL GENERAL:</span>
-                      <span className="text-xl font-bold text-blue-600">{formatCurrency(getTotalGeneral(selectedSurgery))}</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-semibold">Costo procedimiento (IGSS):</span>
+                      <span className="text-xl font-bold text-blue-600">{formatCurrency(selectedSurgery.igss_data.procedure_cost)}</span>
                     </div>
                   </div>
+                  ) : null}
                   
                   {/* Observations */}
                   {selectedSurgery.observations && (

@@ -238,6 +238,16 @@ async def _month_closed(month: Optional[str]) -> bool:
     return c is not None
 
 
+async def delete_anesthesia_for_surgery(surgery_id: str):
+    """Elimina el registro de anestesia de una cirugía si su mes no está cerrado."""
+    rec = await db.anesthesia_records.find_one({"surgery_id": surgery_id}, {"_id": 0})
+    if not rec:
+        return
+    if await _month_closed(rec.get("month")):
+        return
+    await db.anesthesia_records.delete_one({"surgery_id": surgery_id})
+
+
 @router.get("/anesthesia/records")
 async def list_anesthesia_records(
     month: Optional[str] = Query(None),
@@ -339,7 +349,9 @@ async def get_monthly_closure(
     records = await db.anesthesia_records.find({"month": month}, {"_id": 0}).to_list(5000)
     por_anest = {}
     for r in records:
-        key = r.get("anesthesiologist") or "—"
+        key = r.get("anesthesiologist") or ""
+        if key.strip().upper() in ("", "N/A", "NA", "—"):
+            continue
         grp = por_anest.setdefault(key, {"anesthesiologist": key, "count": 0, "total": 0.0, "tipos": {}})
         grp["count"] += 1
         grp["total"] += (r.get("value") or 0)

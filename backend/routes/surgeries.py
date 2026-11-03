@@ -345,6 +345,11 @@ async def delete_surgery(
         raise HTTPException(status_code=404, detail="Cirugía no encontrada")
     
     await db.surgeries.delete_one({"id": surgery_id})
+    try:
+        from routes.quirofano import delete_anesthesia_for_surgery
+        await delete_anesthesia_for_surgery(surgery_id)
+    except Exception:
+        pass
     return {"message": "Cirugía eliminada correctamente"}
 
 
@@ -368,6 +373,12 @@ async def cancel_surgery(
     }
     
     await db.surgeries.update_one({"id": surgery_id}, {"$set": update_data})
+    try:
+        from routes.quirofano import delete_anesthesia_for_surgery
+        await delete_anesthesia_for_surgery(surgery_id)
+    except Exception:
+        pass
+
     
     updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     enriched = await enrich_surgery(updated)

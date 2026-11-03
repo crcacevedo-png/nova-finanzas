@@ -1,5 +1,19 @@
 # CHANGELOG — NovaVisión ERP
 
+## 2026-06 — Sala de Operaciones: Insumos/Equipos, Estado para caja, Nota operatoria y Anestesia (Fase 1 MVP)
+**Backend (`routes/quirofano.py` nuevo):**
+- Catálogo `surgery_catalog` (insumos/equipos, SIN precio): CRUD + desactivar.
+- `anesthesia_types` (honorario fijo por tipo): CRUD.
+- `anesthesia_records`: auto-generados desde cada cirugía (crear/editar) + manuales; se eliminan al borrar/cancelar la cirugía si el mes no está cerrado.
+- Cierre mensual `/anesthesia/closure`: agrupa por anestesiólogo (cuenta, tipos, total), cerrar mes = marca pagado y solo lectura; reabrir (superadmin). Omite anestesiólogo 'N/A'.
+**Backend (`routes/surgeries.py`):** PATCH `/surgeries/{id}/supplies-status` (pendiente/registrados/sin_adicionales, solo Alquiler); add_equipment/add_supply aceptan `catalog_id`; nota operatoria guarda `firma`=cirujano y su PUT edita procedimiento+firma; `supplies_status` en SurgeryResponse.
+**Frontend:** páginas nuevas `InsumosEquiposQuirurgicos.js` (2 pestañas CRUD) y `ProcedimientosAnestesia.js` (tipos + cierre mensual); rutas `/quirofano/*` + 2 items de sidebar (menú `quirofano_insumos`, `quirofano_anestesia`, con migración para roles con sala_operaciones). SalaOperaciones: insumos/equipos ahora por Select del catálogo, tipo de anestesia desde el catálogo de tipos, bloque de Estado de insumos para caja (Alquiler) + etiqueta en tabla; se eliminaron los totales por precio de insumos (Total insumos/Total general y columnas de la tabla principal).
+**Verificado:** backend por curl (catálogo, tipos, cierre 2026-11, auto-registros, borrado de huérfanos, omisión N/A); frontend testing agent iteration_116.json 100% de flujos solicitados + fixes posteriores (huérfano al eliminar/cancelar, tipo de anestesia desde catálogo, contraste de badge, limpieza de totales). Datos de ejemplo solo en preview.
+**Pendiente menor:** dentro de la lista de insumos de cada cirugía aún aparecen columnas unitario/total en Q0.00 (secundario). Fase 2: exportar cierre/nota a PDF-Excel, integrar estado en pantalla de cobro de caja, categorías/filtros de catálogo.
+**IMPORTANTE:** requiere REDEPLOY para producción.
+
+
+
 ## 2026-06 — Sala de Operaciones: captura de datos IGSS por cirugía (Fase 1 MVP)
 **Solicitud (plan aprobado):** al registrar/editar una cirugía con institución IGSS, pedir los mismos datos que un paciente IGSS (Unidad desde lista, NOG desde lista de la unidad + opción libre, SPS, No. afiliación, Código, Costo) y autollenar el Procedimiento desde el servicio del NOG, bloqueándolo mientras sea IGSS. Captura SOLO informativa: NO consume NOG ni crea registros en Producción IGSS.
 **Backend (`routes/surgeries.py`):** `IGSSData` ahora incluye `unit_id`, `nog_id`, `nog_number` (además de unit, sps, affiliation_number, code, procedure_cost). El flujo de cirugías solo inserta en `db.surgeries`; no toca contadores de NOG ni acreditaciones (verificado: acreditados 0→0 al crear cirugía IGSS).

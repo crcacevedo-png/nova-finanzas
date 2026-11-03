@@ -128,7 +128,7 @@ const CierreTab = () => {
         </div>
         <div className="flex items-center gap-2">
           {data?.closed ? (
-            <Badge className="bg-red-100 text-red-700 py-1.5 px-3"><Lock className="w-3.5 h-3.5 mr-1" />Mes cerrado (pagado)</Badge>
+            <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700 py-1.5 px-3" data-testid="anesthesia-month-closed"><Lock className="w-3.5 h-3.5 mr-1" />Mes cerrado (pagado)</Badge>
           ) : (
             <Button onClick={cerrarMes} disabled={loading || !data?.num_registros} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="anesthesia-close-month-btn">
               <CheckCircle className="w-4 h-4 mr-2" />Cerrar mes y marcar pagado
