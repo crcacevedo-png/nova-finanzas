@@ -31,6 +31,7 @@ class IGSSData(BaseModel):
 
 class EquipmentItem(BaseModel):
     id: Optional[str] = None
+    catalog_id: Optional[str] = None
     name: str
     quantity: int = 1
     notes: Optional[str] = ""
@@ -39,6 +40,7 @@ class EquipmentItem(BaseModel):
 
 class SupplyItem(BaseModel):
     id: Optional[str] = None
+    catalog_id: Optional[str] = None
     name: str
     category: str = "otro"  # lente, medicamento, material, descartable, sutura, viscoelastico, otro
     quantity: int = 1
@@ -104,6 +106,7 @@ class SurgeryResponse(BaseModel):
     observations: Optional[str] = ""
     equipment: List[EquipmentItem] = []
     supplies: List[SupplyItem] = []
+    supplies_status: Optional[str] = None
     status: str = "activo"
     cancellation_reason: Optional[str] = None
     rescheduled_to: Optional[str] = None
@@ -245,6 +248,7 @@ async def create_surgery(
         **surgery.model_dump(),
         "equipment": [],
         "supplies": [],
+        "supplies_status": "pendiente" if surgery.institution == "Alquiler" else None,
         "status": "activo",
         "cancellation_reason": None,
         "rescheduled_to": None,
@@ -258,6 +262,13 @@ async def create_surgery(
     # Crear evento/nota de cirugía en el historial clínico si hay paciente registrado
     if surgery.patient_id:
         await crear_nota_cirugia(surgery_doc, current_user)
+
+    # Crear registro de anestesia asociado (control de honorarios)
+    try:
+        from routes.quirofano import upsert_anesthesia_from_surgery
+        await upsert_anesthesia_from_surgery(surgery_doc)
+    except Exception as _e:
+        pass
     
     created = await db.surgeries.find_one({"id": surgery_doc["id"]}, {"_id": 0})
     enriched = await enrich_surgery(created)
@@ -291,6 +302,33 @@ async def update_surgery(
     
     await db.surgeries.update_one({"id": surgery_id}, {"$set": update_data})
     
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    # Sincronizar registro de anestesia (tipo/anestesiólogo/fecha)
+    try:
+        from routes.quirofano import upsert_anesthesia_from_surgery
+        await upsert_anesthesia_from_surgery(updated)
+    except Exception:
+        pass
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+
+@router.patch("/{surgery_id}/supplies-status")
+async def set_supplies_status(
+    surgery_id: str,
+    estado: str = Body(..., embed=True),
+    current_user: dict = Depends(require_permission("edit_expenses"))
+):
+    """Estado de insumos para caja (solo aplica a cirugías de Alquiler)."""
+    if estado not in ("pendiente", "registrados", "sin_adicionales"):
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {"$set": {"supplies_status": estado, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
     updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     enriched = await enrich_surgery(updated)
     return SurgeryResponse(**enriched)
@@ -344,6 +382,7 @@ async def add_equipment(
     name: str = Body(...),
     quantity: int = Body(1),
     notes: str = Body(""),
+    catalog_id: str = Body(None),
     current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Agregar equipo a una cirugía"""
@@ -353,6 +392,7 @@ async def add_equipment(
     
     equipment_item = {
         "id": str(uuid.uuid4()),
+        "catalog_id": catalog_id,
         "name": name,
         "quantity": quantity,
         "notes": notes,
@@ -407,6 +447,7 @@ async def add_supply(
     quantity: int = Body(1),
     unit_cost: float = Body(0),
     notes: str = Body(""),
+    catalog_id: str = Body(None),
     current_user: dict = Depends(require_permission("edit_expenses"))
 ):
     """Agregar insumo a una cirugía"""
@@ -416,6 +457,7 @@ async def add_supply(
     
     supply_item = {
         "id": str(uuid.uuid4()),
+        "catalog_id": catalog_id,
         "name": name,
         "category": category,
         "quantity": quantity,
@@ -858,6 +900,7 @@ async def crear_nota_cirugia(surgery_doc: dict, user: dict):
         "assistant_surgeon": surgery_doc.get("assistant_surgeon"),
         "institution": surgery_doc.get("institution"),
         "contenido": "",
+        "firma": surgery_doc.get("surgeon") or "",
         "estado": "abierta",
         "bloqueo_fecha": (now + timedelta(days=30)).isoformat(),
         "created_at": now.isoformat(),
@@ -911,6 +954,8 @@ async def actualizar_nota_cirugia(
         {"id": note_id},
         {"$set": {
             "contenido": body.get("contenido", ""),
+            "firma": body.get("firma", note.get("firma", "")),
+            "procedure": body.get("procedure", note.get("procedure")),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "actualizada_por": current_user.get("id"),
         }}

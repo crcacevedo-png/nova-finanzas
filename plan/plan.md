@@ -1,63 +1,84 @@
-# Sala de Operaciones — Captura de datos IGSS en cada cirugía
+# Sala de Operaciones — Insumos/Equipos, Nota Operatoria y Anestesia
 
-Al registrar una cirugía con institución IGSS, el formulario pedirá los mismos datos que un paciente IGSS (unidad, afiliación, NOG, SPS, código) y llenará el procedimiento automáticamente desde el servicio del NOG. Esta captura es solo informativa: no consume NOG ni crea registros en Producción IGSS.
+Amplía el módulo de Sala de Operaciones con un catálogo de insumos y equipos quirúrgicos (sin precio), un estado de insumos para que caja sepa si hay cobro adicional en alquileres, notas operatorias que se guardan en el expediente del paciente, y un módulo de Procedimientos de Anestesia con control financiero mensual de honorarios.
 
 ## Para quién es
-- Personal de clínica que registra cirugías en el módulo Sala de Operaciones (roles con acceso a ese módulo).
-- Administración IGSS, que necesita que la cirugía quede documentada con su unidad, NOG, SPS y código, sin que eso afecte los contadores ni la producción de IGSS.
+- Personal de quirófano/clínica que registra cirugías y los insumos/equipos que se usaron.
+- Usuarios de caja, que necesitan saber si una cirugía de alquiler ya tiene definidos sus insumos para hacer el cobro adicional.
+- Médicos cirujanos, que firman y adjuntan la nota operatoria al expediente del paciente.
+- Administración y anestesiólogos, que necesitan llevar el record mensual de anestesias y el pago de honorarios.
 
-## Funcionalidad y experiencia
-Hoy, al elegir institución "IGSS" en una cirugía, aparece un bloque con Unidad, SPS, No. de afiliación, Código y Costo, todos como texto libre. El cambio reemplaza ese bloque por una captura guiada equivalente a la de un paciente IGSS:
+## Funcionalidades y experiencia
 
-- **Unidad**: se elige de la lista de unidades IGSS ya existente en el sistema (en vez de texto libre).
-- **NOG**: una vez elegida la unidad, se selecciona el NOG de la lista de esa unidad (mismos NOG que se ven en la ficha del paciente). También se permite escribir un NOG libre si no está en la lista.
-- **Procedimiento**: se llena automáticamente con el nombre del servicio contratado del NOG elegido y queda **bloqueado** (no editable) mientras la institución sea IGSS.
-- **SPS** y **Código**: se capturan a mano.
-- **No. de afiliación** y **Costo del procedimiento**: se conservan como hoy.
-- Todos estos datos se guardan en el registro de la cirugía y se muestran en el detalle de la cirugía.
+### 1. Submenú "Insumos y Equipos Quirúrgicos"
+- Nuevo submenú dentro de Sala de Operaciones para administrar dos listas: **Insumos quirúrgicos** y **Equipos quirúrgicos**.
+- Cada elemento del catálogo tiene nombre y una nota/categoría opcional. **No llevan precio.**
+- Se pueden crear, editar y desactivar elementos. Esta lista es la que alimenta el registro de cada cirugía.
 
-Comportamiento clave (sin efectos sobre IGSS):
-- Ingresar o elegir un NOG aquí **no** descuenta el cupo del NOG ni cambia sus contadores.
-- La cirugía **no** aparece en el módulo de Producción IGSS ni genera acreditaciones.
-- La producción y el consumo de NOG siguen funcionando exactamente igual que hoy (se alimentan desde pacientes y evaluaciones, no desde cirugías).
+### 2. Registro de insumos/equipos en la cirugía desde el catálogo
+- En el detalle de la cirugía, "Agregar insumo" y "Agregar equipo" ya **no** serán texto libre: se eligen de las listas del catálogo anterior, indicando cantidad y una nota opcional.
+- Como los insumos no llevan precio, el detalle de la cirugía deja de mostrar "Total insumos / Total general" basado en precios de insumos (para IGSS se conserva el costo del procedimiento tal como hoy).
 
-Si la institución no es IGSS, el formulario se comporta igual que hoy (incluido "Seguro Privado" con su nombre de seguro, y el procedimiento como campo escribible normal).
+### 3. Estado de insumos para caja (solo Alquiler)
+- Las cirugías con institución **Alquiler** llevan un estado operativo que indica una de tres situaciones: **pendiente de revisar**, **insumos registrados (listo)** o **sin insumos adicionales**.
+- El personal de quirófano marca el estado. Caja ve ese estado claramente para decidir el cobro adicional del alquiler.
+- Para instituciones distintas de Alquiler se pueden registrar insumos/equipos igual, pero sin este énfasis de estado para caja.
+
+### 4. Nota operatoria
+- Un ícono en cada cirugía abre la "Nota operatoria".
+- El **nombre del procedimiento** se copia automáticamente del procedimiento con el que se programó la cirugía (editable).
+- Permite escribir el contenido de la nota y una **firma del médico en texto**, autollenada con el nombre del cirujano programado (editable).
+- Al guardar, la nota queda en el **expediente del paciente** y aparece en su **historial de consultas** etiquetada como "Nota operatoria — [nombre del procedimiento]".
+- Requiere que la cirugía tenga un paciente registrado; si no lo tiene, primero se solicita vincular/seleccionar al paciente.
+
+### 5. Submenú "Procedimientos de Anestesia"
+- **Tipos de anestesia**: catálogo donde se crean varios tipos (p. ej. tópica, local, local asistida, general…), cada uno con su **valor/honorario fijo** (igual para todos los anestesiólogos).
+- **Registro de anestesias**: cada cirugía genera automáticamente un registro de anestesia (tipo, anestesiólogo y fecha tomados de la cirugía), editable; además se pueden agregar registros manuales.
+- **Cierre mensual**: por mes, el sistema agrupa las anestesias por anestesiólogo, mostrando cantidad de procedimientos, el valor por tipo y el **monto total a pagar** a cada anestesiólogo.
+- Permite **cerrar el mes** y marcar los honorarios como pagados, para un control financiero completo del pago de anestesias.
 
 ## Flujo de uso
-1. El usuario abre "Registrar cirugía" (o edita una existente).
-2. Llena fecha, hora, paciente, cirujano, ojo y anestesia como hoy; el procedimiento es escribible.
-3. En Institución elige "IGSS". Aparece el bloque IGSS.
-4. Elige la **Unidad** de la lista.
-5. Elige el **NOG** de la lista de esa unidad (o escribe uno libre). El **Procedimiento** de la cirugía se llena solo con el servicio de ese NOG y queda bloqueado.
-6. Escribe **SPS**, **Código**, **No. de afiliación** y **Costo**.
-7. Guarda. La cirugía queda con todos los datos IGSS; no se toca ningún contador de NOG ni la Producción IGSS.
-8. Si luego cambia la institución a una distinta de IGSS, el procedimiento vuelve a ser escribible.
+1. Administración carga en "Insumos y Equipos Quirúrgicos" los insumos y equipos disponibles (sin precio) y los tipos de anestesia con su valor.
+2. Se registra o edita una cirugía como hoy; su tipo de anestesia y anestesiólogo quedan capturados.
+3. En el detalle de la cirugía, el personal agrega los insumos/equipos usados eligiéndolos de la lista.
+4. Si la cirugía es de Alquiler, marca el estado: "insumos registrados" o "sin insumos adicionales".
+5. Caja abre la cirugía de alquiler, ve el estado y realiza (o no) el cobro adicional.
+6. El cirujano abre la nota operatoria, revisa el procedimiento autollenado, redacta la nota, confirma su firma y guarda; la nota aparece en el expediente del paciente.
+7. Al cierre de mes, administración entra a "Procedimientos de Anestesia", revisa el consolidado por anestesiólogo, cierra el mes y marca los pagos.
 
 ## Sensación visual (UI/UX)
-- Mantiene el bloque "Datos IGSS" actual (tarjeta azul con su etiqueta), respetando el estilo del formulario existente.
-- Unidad y NOG como menús desplegables; el NOG muestra número y nombre del servicio, igual que en la ficha del paciente.
-- El campo Procedimiento, cuando es IGSS, se ve claramente como "lleno automáticamente / no editable".
-- Sin pantallas nuevas: todo ocurre dentro del formulario de cirugía ya existente (crear y editar).
+- Respeta el estilo actual de Sala de Operaciones (tarjetas, diálogos y tablas existentes).
+- Catálogos con listas simples de alta/edición; selección de insumos/equipos mediante menús/búsqueda dentro del detalle de la cirugía.
+- Estado de insumos como etiqueta de color visible en la tabla/detalle de cirugías de alquiler.
+- Nota operatoria dentro de un diálogo, con el procedimiento y la firma prellenados.
+- Módulo de anestesia con una vista de tipos/tarifas y una vista de cierre mensual con totales por anestesiólogo.
 
 ## Fases de implementación
-**Fase 1 (MVP, lo que se construye ahora):**
-- Reemplazar en el formulario de cirugía el bloque IGSS por: Unidad (lista), NOG (lista de la unidad + opción libre), SPS, Código, No. de afiliación, Costo.
-- Autollenar el Procedimiento con el servicio del NOG elegido y bloquearlo mientras la institución sea IGSS.
-- Guardar y mostrar estos datos en el registro y el detalle de la cirugía, en crear y editar.
-- Garantizar que no hay consumo de NOG ni alta en Producción IGSS.
 
-**Fase 2 (después):**
-- Prefijar unidad y afiliación desde la ficha del paciente IGSS seleccionado (cuando exista).
-- Mostrar NOG y Código como columnas en la tabla de cirugías y en la exportación a Excel.
-- Validaciones de campos obligatorios para cirugía IGSS.
+### Fase 1 (MVP, lo que se construye ahora)
+- Submenú "Insumos y Equipos Quirúrgicos" con las dos listas (sin precio): crear, editar, desactivar.
+- Selección de insumos/equipos en la cirugía desde el catálogo (reemplaza el texto libre); se retira el total por precio de insumos.
+- Estado de insumos para caja en cirugías de Alquiler (pendiente / insumos registrados / sin insumos adicionales), visible para caja.
+- Nota operatoria con procedimiento autollenado y firma en texto (cirujano), guardada en el expediente del paciente y marcada en el historial de consultas.
+- Submenú "Procedimientos de Anestesia": tipos de anestesia con valor, registros automáticos desde cada cirugía + manuales, y cierre mensual por anestesiólogo con monto a pagar y marcado de pago.
 
-**Fase 3 (después):**
-- Reporte de cirugías por unidad/NOG (solo lectura), independiente de Producción IGSS.
+### Fase 2 (después)
+- Exportación a Excel/PDF del cierre mensual de anestesia y de la nota operatoria (nota imprimible).
+- Integración directa del estado/insumos en la pantalla de cobro de caja para alquileres.
+- Categorías y filtros en el catálogo de insumos; reporte de uso de insumos por cirugía.
+
+### Fase 3 (después)
+- Firma dibujada en pantalla (además de texto) para la nota operatoria.
+- Tarifas de anestesia por anestesiólogo (además del valor fijo por tipo).
+- Tableros/analítica de anestesia e insumos y, opcionalmente, descuento de insumos del inventario.
 
 ## Supuestos
-- "Los mismos datos de un paciente IGSS" = unidad, No. de afiliación, NOG, SPS y código; se agregan NOG (nuevo) y se cambia Unidad de texto libre a lista. El Costo del procedimiento se mantiene.
-- La Unidad pasa a elegirse del catálogo de unidades IGSS existente; se permite NOG libre por compatibilidad, pero el autollenado del procedimiento solo ocurre cuando el NOG viene de la lista (un NOG libre no tiene servicio asociado).
-- El procedimiento bloqueado aplica solo cuando la institución es IGSS; en las demás instituciones sigue siendo campo escribible.
-- Se reutilizan las listas de unidades y NOG que ya usa la ficha del paciente; no se crea ningún catálogo nuevo de códigos.
-- Las cirugías IGSS ya registradas con el formato anterior se conservan tal cual; el cambio aplica a nuevas capturas y ediciones.
-- Nada de lo anterior modifica el consumo de NOG ni la Producción IGSS, que siguen alimentándose desde pacientes y evaluaciones como hasta hoy.
+- "No llevan precio": el catálogo de insumos/equipos no maneja precios; cualquier cobro adicional lo decide y registra caja, no este módulo. Por eso el detalle de la cirugía deja de sumar precios de insumos (el costo de procedimiento IGSS se mantiene como hoy).
+- Insumos y equipos se administran en un mismo submenú con dos secciones, y ambos se eligen de catálogo al registrarlos en la cirugía.
+- El estado de insumos para caja aplica solo a cirugías de institución "Alquiler"; las demás pueden registrar insumos/equipos sin ese estado.
+- La nota operatoria requiere un paciente registrado para adjuntarse al expediente; si la cirugía no tiene paciente vinculado, se pide vincularlo primero. El nombre del procedimiento y la firma se prellenan (procedimiento de la cirugía y nombre del cirujano) y son editables.
+- Los registros de anestesia se crean y mantienen sincronizados desde la cirugía (tipo, anestesiólogo y fecha) y son editables; también se permiten registros manuales.
+- El honorario es un valor fijo por tipo de anestesia (igual para todos los anestesiólogos) y se pueden crear varios tipos; el monto mensual a pagar a cada anestesiólogo es la suma de los valores de los tipos de sus procedimientos del mes.
+- Un mes cerrado puede marcarse como pagado y queda de solo lectura tras el cierre.
+- La administración de catálogos y el cierre mensual de anestesia (financiero) quedan disponibles para los roles administrativos; el registro operativo (insumos, estado, nota operatoria) para los roles con acceso a Sala de Operaciones.
+- Todo el trabajo y los datos de ejemplo permanecen solo en el entorno de preview.

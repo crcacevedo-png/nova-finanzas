@@ -3146,12 +3146,14 @@ api_router.include_router(catalogos_router, tags=["Catálogos - Evaluaciones"])
 
 # ==================== MÓDULO DE CIRUGÍAS (Refactorizado) ====================
 from routes.surgeries import router as surgeries_router, reports_router as surgeries_reports_router, notas_router as surgery_notes_router
+from routes.quirofano import router as quirofano_router
 from routes.surgery_crm import router as surgery_crm_router
 
 # Incluir routers de cirugías
 api_router.include_router(surgeries_router, tags=["Cirugías"])
 api_router.include_router(surgeries_reports_router, tags=["Reportes de Cirugías"])
 api_router.include_router(surgery_notes_router, tags=["Notas de Cirugía"])
+api_router.include_router(quirofano_router, tags=["Quirófano"])
 api_router.include_router(surgery_crm_router, tags=["CRM Cirugías"])
 
 # ==================== MÓDULO DE GASTOS Y PAGOS (Refactorizado) ====================
@@ -4503,6 +4505,12 @@ async def startup_event():
             {"enabled_menus": {"$ne": "optica_dashboard"}}
         ]},
         {"$addToSet": {"enabled_menus": "optica_dashboard"}}
+    )
+
+    # Migración: habilitar submenús de Quirófano a roles con sala_operaciones
+    await db.menu_configurations.update_many(
+        {"enabled_menus": "sala_operaciones"},
+        {"$addToSet": {"enabled_menus": {"$each": ["quirofano_insumos", "quirofano_anestesia"]}}}
     )
 
     # Migración: corregir el 'concepto' de CxC de clínica generadas por ventas

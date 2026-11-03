@@ -87,6 +87,22 @@ AVAILABLE_MENUS = {
         "category": "clinica",
         "description": "Seguimiento de pacientes de cirugía"
     },
+    "quirofano_insumos": {
+        "id": "quirofano_insumos",
+        "label": "Insumos y Equipos Quirúrgicos",
+        "path": "/quirofano/insumos-equipos",
+        "icon": "Package",
+        "category": "clinica",
+        "description": "Catálogo de insumos y equipos quirúrgicos"
+    },
+    "quirofano_anestesia": {
+        "id": "quirofano_anestesia",
+        "label": "Procedimientos de Anestesia",
+        "path": "/quirofano/anestesia",
+        "icon": "Syringe",
+        "category": "clinica",
+        "description": "Tipos de anestesia y cierre mensual de honorarios"
+    },
     "agenda": {
         "id": "agenda",
         "label": "Agenda",
@@ -355,7 +371,7 @@ DEFAULT_MENU_CONFIG = {
     "superadmin": list(AVAILABLE_MENUS.keys()),  # Todos los menús
     "admin": [
         "pacientes", "importar_pacientes", "evaluacion_oftalmologica",
-        "sala_operaciones", "crm_cirugias", "agenda", "medicos",
+        "sala_operaciones", "crm_cirugias", "quirofano_insumos", "quirofano_anestesia", "agenda", "medicos",
         "finanzas_pos", "finanzas_caja", "finanzas_cxc", "finanzas_gastos", 
         "finanzas_pagos", "finanzas_proveedores", "finanzas_gastos_fijos", "finanzas_autorizaciones",
         "inventario_panel", "inventario_bodegas", "inventario_productos",

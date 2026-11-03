@@ -23,6 +23,7 @@ import {
   Stethoscope,
   Eye,
   Package,
+  Syringe,
   Wallet,
   Calculator,
   ClipboardCheck,
@@ -110,6 +111,12 @@ const Layout = ({ children }) => {
   // Sala de Operaciones - Visible si está habilitado
   if (isMenuEnabled('sala_operaciones')) {
     navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
+  }
+  if (isMenuEnabled('quirofano_insumos')) {
+    navItems.push({ path: '/quirofano/insumos-equipos', icon: Package, label: 'Insumos y Equipos Qx', testId: 'nav-quirofano-insumos' });
+  }
+  if (isMenuEnabled('quirofano_anestesia')) {
+    navItems.push({ path: '/quirofano/anestesia', icon: Syringe, label: 'Proced. de Anestesia', testId: 'nav-quirofano-anestesia' });
   }
   
   // CRM Cirugías - Admin/SuperAdmin y si está habilitado

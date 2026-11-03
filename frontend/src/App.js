@@ -25,6 +25,8 @@ import LentesContacto from './pages/LentesContacto';
 import Accesorios from './pages/Accesorios';
 import AutorizacionesPendientes from './pages/AutorizacionesPendientes';
 import SalaOperaciones from './pages/SalaOperaciones';
+import InsumosEquiposQuirurgicos from './pages/InsumosEquiposQuirurgicos';
+import ProcedimientosAnestesia from './pages/ProcedimientosAnestesia';
 import AuditLogs from './pages/AuditLogs';
 import Respaldos from './pages/Respaldos';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
@@ -336,6 +338,23 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredMenu="sala_operaciones">
             <SalaOperaciones />
+          </ProtectedRoute>
+        } 
+      />
+
+      <Route 
+        path="/quirofano/insumos-equipos" 
+        element={
+          <ProtectedRoute requiredMenu="quirofano_insumos">
+            <InsumosEquiposQuirurgicos />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/quirofano/anestesia" 
+        element={
+          <ProtectedRoute requiredMenu="quirofano_anestesia">
+            <ProcedimientosAnestesia />
           </ProtectedRoute>
         } 
       />

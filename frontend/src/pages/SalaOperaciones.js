@@ -188,6 +188,32 @@ const SalaOperaciones = () => {
   // Equipment/Supply form
   const [equipmentForm, setEquipmentForm] = useState({ name: '', quantity: 1, notes: '' });
   const [supplyForm, setSupplyForm] = useState({ name: '', category: 'otro', quantity: 1, unit_cost: 0, notes: '' });
+  const [catalogInsumos, setCatalogInsumos] = useState([]);
+  const [catalogEquipos, setCatalogEquipos] = useState([]);
+
+  useEffect(() => {
+    const cargarCatalogo = async () => {
+      try {
+        const [ins, eq] = await Promise.all([
+          axios.get(`${API_URL}/quirofano/catalog?tipo=insumo&active=true`),
+          axios.get(`${API_URL}/quirofano/catalog?tipo=equipo&active=true`),
+        ]);
+        setCatalogInsumos(ins.data.data || []);
+        setCatalogEquipos(eq.data.data || []);
+      } catch (e) { /* catálogo opcional */ }
+    };
+    cargarCatalogo();
+  }, []);
+
+  const setSuppliesStatus = async (surgeryId, estado) => {
+    try {
+      await axios.patch(`${API_URL}/surgeries/${surgeryId}/supplies-status`, { estado });
+      toast.success('Estado de insumos actualizado');
+      fetchSurgeries();
+      setSelectedSurgery((prev) => (prev && prev.id === surgeryId ? { ...prev, supplies_status: estado } : prev));
+    } catch (e) { toast.error('No se pudo actualizar el estado'); }
+  };
+
   const [cancelForm, setCancelForm] = useState({ reason: '', reschedule_date: '' });
 
   // Fetch data
@@ -778,11 +804,20 @@ const SalaOperaciones = () => {
                           <TableCell>{getEyeBadge(surgery.eye)}</TableCell>
                           <TableCell className="text-sm">{getAnesthesiaLabel(surgery.anesthesia_type)}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
                               <span className="text-sm">{surgery.institution}</span>
                               {surgery.institution === 'IGSS' && (
                                 <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">IGSS</Badge>
                               )}
+                              {surgery.institution === 'Alquiler' && (() => {
+                                const st = surgery.supplies_status || 'pendiente';
+                                const map = {
+                                  pendiente: ['bg-amber-100 text-amber-800', 'Insumos: pendiente'],
+                                  registrados: ['bg-emerald-100 text-emerald-700', 'Insumos: listos'],
+                                  sin_adicionales: ['bg-slate-100 text-slate-600', 'Sin insumos adic.'],
+                                };
+                                return <Badge className={`${map[st][0]} border-0 text-xs`} data-testid={`supplies-badge-${surgery.id}`}>{map[st][1]}</Badge>;
+                              })()}
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm">
@@ -1363,6 +1398,32 @@ const SalaOperaciones = () => {
                       <div><span className="text-xs uppercase text-slate-400">Seguro</span><p className="font-medium">{selectedSurgery.insurance_name}</p></div>
                     )}
                   </div>
+                  {selectedSurgery.institution === 'Alquiler' && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4" data-testid="supplies-status-block">
+                      <p className="text-sm font-semibold text-amber-800 mb-2">Estado de insumos (para caja)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { v: 'pendiente', l: 'Pendiente de revisar', c: 'bg-amber-100 text-amber-800 border-amber-300' },
+                          { v: 'registrados', l: 'Insumos registrados (listo)', c: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+                          { v: 'sin_adicionales', l: 'Sin insumos adicionales', c: 'bg-slate-100 text-slate-700 border-slate-300' },
+                        ].map((opt) => {
+                          const active = (selectedSurgery.supplies_status || 'pendiente') === opt.v;
+                          return (
+                            <button
+                              key={opt.v}
+                              type="button"
+                              onClick={() => setSuppliesStatus(selectedSurgery.id, opt.v)}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-all ${active ? opt.c + ' ring-2 ring-offset-1 ring-amber-400 font-semibold' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+                              data-testid={`supplies-status-${opt.v}`}
+                            >
+                              {opt.l}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   
                   {/* IGSS Data */}
                   {selectedSurgery.institution === 'IGSS' && selectedSurgery.igss_data && (
@@ -1517,15 +1578,12 @@ const SalaOperaciones = () => {
             <div className="space-y-4">
               <div>
                 <Label>Equipo utilizado *</Label>
-                <Input
-                  value={equipmentForm.name}
-                  onChange={(e) => setEquipmentForm({ ...equipmentForm, name: e.target.value })}
-                  list="equipment-list"
-                  placeholder="Seleccione o escriba el equipo"
-                />
-                <datalist id="equipment-list">
-                  {EQUIPMENT_SUGGESTIONS.map(e => <option key={e} value={e} />)}
-                </datalist>
+                <Select value={equipmentForm.name} onValueChange={(v) => { const it = catalogEquipos.find(c => c.name === v); setEquipmentForm({ ...equipmentForm, name: v, catalog_id: it?.id || null }); }}>
+                  <SelectTrigger data-testid="equipment-select"><SelectValue placeholder={catalogEquipos.length ? 'Seleccione el equipo' : 'Sin equipos en catálogo'} /></SelectTrigger>
+                  <SelectContent>
+                    {catalogEquipos.map(it => <SelectItem key={it.id} value={it.name}>{it.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Cantidad</Label>
@@ -1563,56 +1621,22 @@ const SalaOperaciones = () => {
             <div className="space-y-4">
               <div>
                 <Label>Insumo *</Label>
-                <Input
-                  value={supplyForm.name}
-                  onChange={(e) => setSupplyForm({ ...supplyForm, name: e.target.value })}
-                  list="supply-list"
-                  placeholder="Seleccione o escriba el insumo"
-                />
-                <datalist id="supply-list">
-                  {SUPPLY_SUGGESTIONS.map(s => <option key={s} value={s} />)}
-                </datalist>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Categoría *</Label>
-                  <Select value={supplyForm.category} onValueChange={(v) => setSupplyForm({ ...supplyForm, category: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUPPLY_CATEGORIES.map(c => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Cantidad *</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={supplyForm.quantity}
-                    onChange={(e) => setSupplyForm({ ...supplyForm, quantity: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
+                <Select value={supplyForm.name} onValueChange={(v) => { const it = catalogInsumos.find(c => c.name === v); setSupplyForm({ ...supplyForm, name: v, catalog_id: it?.id || null, category: it?.note || 'otro' }); }}>
+                  <SelectTrigger data-testid="supply-select"><SelectValue placeholder={catalogInsumos.length ? 'Seleccione el insumo' : 'Sin insumos en catálogo'} /></SelectTrigger>
+                  <SelectContent>
+                    {catalogInsumos.map(it => <SelectItem key={it.id} value={it.name}>{it.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label>Costo unitario (GTQ) *</Label>
+                <Label>Cantidad *</Label>
                 <Input
                   type="number"
-                  step="0.01"
-                  min="0"
-                  value={supplyForm.unit_cost}
-                  onChange={(e) => setSupplyForm({ ...supplyForm, unit_cost: parseFloat(e.target.value) || 0 })}
-                  placeholder="0.00"
+                  min="1"
+                  value={supplyForm.quantity}
+                  onChange={(e) => setSupplyForm({ ...supplyForm, quantity: parseInt(e.target.value) || 1 })}
+                  data-testid="supply-quantity"
                 />
-              </div>
-              <div className="p-3 bg-slate-100 rounded-lg">
-                <span className="text-sm text-slate-500">Total calculado:</span>
-                <span className="ml-2 font-semibold text-lg text-blue-600">
-                  {formatCurrency(supplyForm.quantity * supplyForm.unit_cost)}
-                </span>
               </div>
               <div>
                 <Label>Notas</Label>
