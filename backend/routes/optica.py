@@ -1870,20 +1870,25 @@ async def get_rentabilidad_optica(
 ):
     """Calcular rentabilidad entre precio costo y precio venta de productos vendidos"""
     now = datetime.now(timezone.utc)
-    
-    # Determinar rango de fechas según período
+    hoy_gt = now_gt()
+
+    # Determinar fecha de inicio (día local de Guatemala) según período
     if periodo == "dia":
-        fecha_inicio = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        inicio_date_gt = hoy_gt.date()
     elif periodo == "semana":
-        fecha_inicio = now - timedelta(days=7)
+        inicio_date_gt = (hoy_gt - timedelta(days=7)).date()
     elif periodo == "año":
-        fecha_inicio = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        inicio_date_gt = hoy_gt.date().replace(month=1, day=1)
     else:  # mes
-        fecha_inicio = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        inicio_date_gt = hoy_gt.date().replace(day=1)
+    inicio_str = inicio_date_gt.strftime("%Y-%m-%d")
+    # Inicio del día local de Guatemala expresado en UTC ISO
+    inicio_utc, _ = dia_gt_a_rango_utc(inicio_str)
+    fecha_inicio = datetime.fromisoformat(inicio_utc)
     
     # Obtener todas las ventas del período
     ventas = await db.optica_sales.find({
-        "created_at": {"$gte": fecha_inicio.isoformat()},
+        "created_at": {"$gte": inicio_utc},
         "status": {"$ne": "cancelado"}
     }, {"_id": 0}).to_list(5000)
     
@@ -1980,8 +1985,10 @@ async def get_rentabilidad_optica(
     margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0
 
     # Compras/pagos de óptica del mismo período (egresos)
+    # purchase_date puede estar en formato 'YYYY-MM-DD' o ISO; comparar contra
+    # la fecha-only garantiza incluir compras del primer día del período.
     compras_result = await db.optica_purchases.aggregate([
-        {"$match": {"purchase_date": {"$gte": fecha_inicio.isoformat()}}},
+        {"$match": {"purchase_date": {"$gte": inicio_str}}},
         {"$group": {"_id": None, "total": {"$sum": "$total_amount"}, "count": {"$sum": 1}}}
     ]).to_list(1)
     total_compras = compras_result[0]["total"] if compras_result else 0

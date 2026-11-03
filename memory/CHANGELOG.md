@@ -385,3 +385,10 @@
 - Nota operatoria imprimible: botón "Imprimir" (data-testid nota-imprimir) en NotaCirugia.js abre ventana de impresión formateada (paciente, procedimiento, fecha, ojo, cirujano, institución, contenido, firma), visible en notas abiertas y cerradas.
 - Fix: num_registros del cierre ahora cuenta solo registros agrupados (excluye sin anestesiólogo) para consistencia entre header, Excel y PDF.
 - Verificado: testing_agent iteration_117 (3 flujos frontend OK); exports curl-validados.
+
+## 2026-11 — Dashboard Óptica: fix ventas del día (zona horaria) + reorganización de cards
+- BUG FIX: "Ventas Hoy" mostraba Q0 aunque había ventas del día. Causa: /optica/dashboard/ventas-dia usaba medianoche UTC en vez del día local de Guatemala (GMT-6). Ahora usa today_str_gt() + dia_gt_a_rango_utc(). Verificado end-to-end (testing_agent iter_118): venta creada a las 22:17 GT se registró como venta de hoy.
+- Dashboard reorganizado a 7 cards: Ventas Hoy, Cobrado Hoy, Cuentas por Cobrar (nuevo, saldo pendiente global), Rentabilidad (mes), Pagos de Óptica (nuevo, compras/egresos del período), Ingresos (mes, sin cambios), Utilidad (nuevo = Ingresos − Pagos).
+- Backend: ventas-dia agrega cuentas_por_cobrar y cuentas_por_cobrar_count; rentabilidad agrega total_compras, num_compras, utilidad.
+- Rentabilidad ahora calcula los límites de período (día/semana/mes/año) en hora de Guatemala; filtro de compras compara contra fecha-only para incluir el día 1 del período.
+- Archivos: backend/routes/optica.py (get_ventas_del_dia, get_rentabilidad_optica), frontend/src/pages/OpticaDashboard.js.

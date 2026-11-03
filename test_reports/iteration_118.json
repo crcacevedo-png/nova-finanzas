@@ -1,0 +1,36 @@
+{
+  "summary": "Verified Óptica dashboard timezone fix end-to-end. Server time during test: 2026-11-03 04:17 UTC = 2026-11-02 22:17 Guatemala, which is exactly the window where the old UTC-midnight logic would have failed. Baseline ventas-dia (2 orders, Q150) -> created a POS V2 sale (accessory 'Estuche rígido' Q45, Efectivo, Consumidor Final) -> ORD-202611-0003. ventas-dia then returned total_ventas +45, num_ordenes +1, total_cobrado +45, and the order_number was in the ventas array, with fecha 2026-11-02 (GT). cuentas_por_cobrar = Q10,350 / 10, which matches the DB sum of balance_due for status=pendiente. rentabilidad returns total_compras, num_compras and utilidad, and utilidad == total_ingresos - total_compras for dia/semana/mes/año. On the UI, all 7 cards render with Quetzal values (Ventas Hoy Q195 / 3 órdenes after the new sale) and the Ventas del Día (3) table lists ORD-202611-0003. 7/7 pytest passed. UI checks passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/optica/dashboard/rentabilidad", "issue": "Period start is still in UTC (now.replace(day=1...) on datetime.now(timezone.utc)). The month, day and year cards therefore use UTC boundaries, not GT ones. Example: sales from 18:00-23:59 GT on the last day of a month are counted in the next month, and periodo=dia starts at 18:00 GT of the previous day. It should use rango_gt_a_utc / now_gt like ventas-dia does. ventas-por-origen has the same UTC default."},
+      {"endpoint": "/api/optica/dashboard/rentabilidad", "issue": "The total_compras filter compares purchase_date >= fecha_inicio.isoformat() ('2026-11-01T00:00:00+00:00'). If purchase_date is stored date-only ('2026-11-01'), purchases dated the 1st of the month are left out, because a string compare puts '2026-11-01' before '2026-11-01T...'. Not verified with data: optica_purchases is empty in preview. Use a GT date string such as today_gt().replace(day=1).isoformat() for the comparison."},
+      {"endpoint": "/api/optica/dashboard/rentabilidad", "issue": "total_ingresos (used by the Ingresos and Utilidad cards) sums item subtotals before the sale discount, so revenue is overstated whenever discounts are applied. Consider subtracting discount_amount or using sale.total."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/optica/dashboard summary cards", "issues": ["7 cards in a lg:grid-cols-4 grid leave an empty slot on row 2. Cosmetic: use grid-cols-7, 4+3 centered, or add an 8th card.", "Card labels say '(mes)' using the raw periodoRentabilidad value and change with the selector, while the data-testids say '-mes'. Cosmetic only."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_optica_dashboard_timezone.py", "/app/test_reports/pytest/pytest_optica_dashboard_tz.xml"],
+  "action_items": [
+    "Optional: make rentabilidad and ventas-por-origen period boundaries Guatemala-based, as ventas-dia is now",
+    "Optional: fix the purchase_date string compare for the first day of the period",
+    "Optional: decide whether Ingresos/Utilidad should be net of discounts"
+  ],
+  "critical_code_review_comments": [
+    "routes/optica.py is 2321 lines; consider splitting the dashboard endpoints into their own module",
+    "OpticaDashboard.js is about 806 lines; the 7 cards are near-duplicate markup and could be one SummaryCard component",
+    "The 'Actualizar' button has no data-testid"
+  ],
+  "updated_files": ["/app/backend/tests/test_optica_dashboard_timezone.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "superadmin / nova2024 (preview)",
+  "seed_data_creation": "Created 1 preview sale ORD-202611-0003 (Consumidor Final, accessory Estuche rígido 1x Q45, paid Efectivo, notes TEST_timezone_sale). Accessory stock went down by 1. Nothing was cancelled or deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Re-run tests/test_optica_dashboard_timezone.py to verify. Each run creates a Q45 sale and uses accessory id 1cedd3ef-7840-4c2a-8b3a-b5ac49d2b293 (stock 17 after this run). The POS V2 payload format is in the test file."
+}
