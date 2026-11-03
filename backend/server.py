@@ -3101,6 +3101,10 @@ api_router.include_router(medicos_agenda_router, tags=["Agenda - Médicos"])
 api_router.include_router(agenda_config_router, tags=["Agenda - Configuración"])
 api_router.include_router(agenda_external_router, tags=["Agenda - Agente Externo"])
 
+# ==================== MÓDULO FEL (Facturación Electrónica) ====================
+from routes.fel import router as fel_router
+api_router.include_router(fel_router, tags=["FEL"])
+
 # ==================== MÓDULO DE ADMINISTRACIÓN Y DASHBOARD ====================
 from routes.admin import router as admin_router
 from routes.dashboard_financiero import router as dashboard_financiero_router

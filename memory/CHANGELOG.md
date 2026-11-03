@@ -463,3 +463,20 @@ Verificado: screenshot — solo aparece Meta del Mes y el diálogo solo pide "Me
 - optica.py GET /dashboard/metas: agrega proyeccion_mes = ventas_mes / dias_transcurridos * dias_mes (hora Guatemala), más dias_transcurridos y dias_mes.
 - OpticaDashboard.js: bajo la barra de Meta del Mes, línea (testId meta-mes-proyeccion) "A este ritmo cerrarás el mes en Q X" con color verde si proyeccion>=meta o ámbar si por debajo (icono TrendingUp).
 Verificado: curl (195 en día 3/30 -> proyección 1950) y screenshot de la línea en la UI.
+
+## 2026-11-03 — Facturación FEL (Digifact / Guatemala SAT) — Fase 1
+Alcance: Régimen General (FACT, IVA 12% incluido), ventas de clínica y óptica, ambiente PRUEBAS primero, receptor CF por defecto o NIT+nombre, con anulación (admin).
+### Backend (routes/fel.py, registrado en server.py)
+- Cliente Digifact: _get_token (login/get_token), _certificar_nuc (v2/transform/nuc_json), CancelFelGT, GetDocument.
+- Credenciales: DIGIFACT_USERNAME (usuario corto) + DIGIFACT_PASSWORD en secretos; NIT del emisor en config FEL -> usuario completo GT.NIT12.usuario.
+- Config en colección fel_config (GET/PUT /api/fel/config, admin): enabled, environment(test/prod), nit, emisor_nombre, afiliacion_iva(GEN), establecimiento, direccion/municipio/depto/cp, frase_tipo/escenario.
+- _build_nuc: NUC-JSON FACT (Seller con AfiliacionIVA y frase ISR, BranchInfo, Buyer CF/NIT, Items con IVA 12% hacia adentro, Totals, AdditionalDocumentInfo/ADENDA GUID).
+- Endpoints: POST /fel/certificar {origen,sale_id,receptor_nit,receptor_nombre}; POST /fel/anular (admin); GET /fel/documento; GET /fel/estado. Guarda en fel_documents y campo fel en la venta (ventas / optica_sales).
+- IMPORTANTE: errores de Digifact se devuelven como 400 (no 5xx) porque Cloudflare reemplaza 5xx con su página de error.
+### Frontend
+- services/api.js: felApi.
+- components/FELButton.jsx: dialogo certificar (CF/NIT), ver/descargar PDF, anular (admin). Badges de estado.
+- pages/FELConfig.js: pantalla admin de configuración (ruta /fel/configuracion, menú Finanzas, testId fel-config-page).
+- Integrado en OpticaVentas.js (detalle de venta) y PuntoVenta.js (modal post-venta).
+Verificado: config GET/PUT OK; pipeline certify llega a Digifact (login + NUC) y retorna error JSON limpio (401 con NIT ficticio, esperado); pantalla de config renderiza con credenciales detectadas.
+PENDIENTE para completar prueba real: el usuario debe ingresar su NIT real de emisor en Configuración FEL (va ligado a las credenciales TESTUSER), habilitar FEL y certificar una venta. No se pudo certificar exitosamente sin el NIT correcto.

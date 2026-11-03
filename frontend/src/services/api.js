@@ -627,6 +627,15 @@ export const auditActionLabels = {
 };
 
 // ==================== API DE INVENTARIO ====================
+export const felApi = {
+  getConfig: () => axios.get(`${API_URL}/fel/config`),
+  setConfig: (data) => axios.put(`${API_URL}/fel/config`, data),
+  certificar: (data) => axios.post(`${API_URL}/fel/certificar`, data),
+  anular: (data) => axios.post(`${API_URL}/fel/anular`, data),
+  getDocumento: (origen, saleId) => axios.get(`${API_URL}/fel/documento`, { params: { origen, sale_id: saleId } }),
+  getEstado: (origen, saleId) => axios.get(`${API_URL}/fel/estado`, { params: { origen, sale_id: saleId } }),
+};
+
 export const inventarioApi = {
   // Panel / Dashboard
   getPanel: () => axios.get(`${API_URL}/inventario/panel`),

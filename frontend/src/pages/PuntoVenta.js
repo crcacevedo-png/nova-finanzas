@@ -6,6 +6,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { ventasApi, inventarioApi, doctorApi, formatCurrency, formatDate, formatTime } from '../services/api';
+import { felApi } from '../services/api';
+import { FELButton } from '../components/FELButton';
 import { agendaApi } from '../services/agendaApi';
 import axios from 'axios';
 import { 
@@ -1900,7 +1902,23 @@ const PuntoVenta = () => {
               </div>
             )}
           </div>
-          
+
+          {ventaExitosa && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 mt-2">
+              <span className="text-sm font-medium text-slate-600">Factura electrónica (FEL)</span>
+              <FELButton
+                origen="clinica"
+                sale={ventaExitosa}
+                onUpdated={async () => {
+                  try {
+                    const r = await felApi.getEstado('clinica', ventaExitosa.id);
+                    setVentaExitosa((p) => ({ ...p, fel: r.data }));
+                  } catch (e) { /* noop */ }
+                }}
+              />
+            </div>
+          )}
+
           <DialogFooter className="gap-2">
             <Button
               variant="outline"

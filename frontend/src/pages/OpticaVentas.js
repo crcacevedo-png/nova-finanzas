@@ -51,6 +51,7 @@ import {
 } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
+import { FELButton } from '../components/FELButton';
 import { toast, Toaster } from 'sonner';
 import { 
   opticaSaleApi, 
@@ -1106,6 +1107,21 @@ const OpticaVentas = () => {
                   <Badge className={getStatusBadgeClass(selectedSale.status)}>
                     {saleStatusLabels[selectedSale.status]}
                   </Badge>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span className="text-sm font-medium text-slate-600">Factura electrónica (FEL)</span>
+                  <FELButton
+                    origen="optica"
+                    sale={selectedSale}
+                    defaultNombre={selectedSale.patient_name}
+                    onUpdated={async () => {
+                      try {
+                        const r = await opticaSaleApi.getById(selectedSale.id);
+                        setSelectedSale(r.data);
+                      } catch (e) { /* noop */ }
+                    }}
+                  />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">

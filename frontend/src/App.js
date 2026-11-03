@@ -44,6 +44,7 @@ import ProductosInventario from './pages/inventario/Productos';
 import LotesInventario from './pages/inventario/Lotes';
 import MovimientosInventario from './pages/inventario/Movimientos';
 import BodegasInventario from './pages/inventario/Bodegas';
+import FELConfig from './pages/FELConfig';
 import CategoriasInventario from './pages/inventario/Categorias';
 import ReporteRentabilidad from './pages/inventario/ReporteRentabilidad';
 import Sociedades from './pages/inventario/Sociedades';
@@ -468,6 +469,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <BodegasInventario />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/fel/configuracion" 
+        element={
+          <ProtectedRoute>
+            <FELConfig />
           </ProtectedRoute>
         } 
       />

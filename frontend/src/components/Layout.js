@@ -150,6 +150,7 @@ const Layout = ({ children }) => {
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_autorizaciones')) finanzasItems.push({ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' });
     if (isAdminOrSuperAdmin) finanzasItems.push({ path: '/cierre-diario', icon: Calculator, label: 'Cierre del Día', testId: 'nav-cierre-diario' });
+    if (isAdminOrSuperAdmin) finanzasItems.push({ path: '/fel/configuracion', icon: FileText, label: 'Facturación FEL', testId: 'nav-fel-config' });
   } else {
     // Finanzas para óptica: Punto de Venta, Cuentas por Cobrar y Caja de la clínica
     if (hasPermission('manage_sales')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
