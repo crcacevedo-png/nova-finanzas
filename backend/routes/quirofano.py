@@ -370,7 +370,7 @@ async def _build_closure(month: str) -> dict:
         "closed_at": closure.get("closed_at") if closure else None,
         "por_anestesiologo": resultado,
         "total_general": round(sum(g["total"] for g in resultado), 2),
-        "num_registros": len(records),
+        "num_registros": sum(g["count"] for g in resultado),
     }
 
 

@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend testing of (1) usuario access to CRM Cirugías, (2) Anesthesia monthly closure Excel/PDF export, (3) printable operative note. All requested flows pass. usuario sees nav-crm-cirugias, /crm-cirugias loads list + stats without redirect. Superadmin: /quirofano/anestesia Cierre mensual 2026-11 shows 6 procedimientos / Q2,200; Excel and PDF buttons visible+enabled, each triggered a real download (anestesia_2026-11.xlsx 5491 bytes, anestesia_2026-11.pdf 2413 bytes), API 200, success toasts 'XLSX descargado'/'PDF descargado'. Month 2026-01 -> both buttons disabled. Nota operatoria (Pacientes > historial of EXP-000017 Ana Morales, closed note): 'Imprimir' (nota-imprimir) visible next to 'Cerrada' badge; clicking opened a new window with formatted note (procedure, patient, date, eye, surgeon, institution, content, signature). No page/console errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/quirofano/anesthesia/closure (and export)", "issue": "num_registros = len(all records) includes records with anesthesiologist ''/N/A that are skipped in grouping. For 2026-11 header shows '6 procedimientos' but per-anesthesiologist breakdown sums to 5 (2+3). Same count is printed in the Excel/PDF header. Consider counting only payable records or showing 'N sin anestesiólogo'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Minor) Align num_registros with grouped records in _build_closure (routes/quirofano.py ~line 373) or show the excluded N/A count explicitly."
+  ],
+  "critical_code_review_comments": [
+    "NotaCirugia.imprimir() interpolates estado.procedure/patient_name/surgeon/institution and contenido directly into document.write HTML without escaping - HTML injection risk in the print window (low risk, internal staff data). Escape plain-text fields.",
+    "Open-note print path not exercised in UI: the only 'abierta' note in preview belongs to an inactive patient (TEST_IGSS Paciente_CURL, is_active=false) so it is not reachable from Pacientes. Code renders the Imprimir button unconditionally in the header, and imprimir() reads editorRef innerHTML when editable, so it should work."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Operative notes live in Pacientes > historial button data-testid=evaluaciones-patient-{id} > nota-cirugia-item-{id} (EvaluacionesPacienteDialog), not in /sala-operaciones. Pacientes search requires clicking 'Buscar'; search by record number (EXP-000017) works. Anesthesia data in 2026-10/2026-11."
+}

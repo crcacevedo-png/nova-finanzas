@@ -378,3 +378,10 @@
 - Layout.js: "Sala de operaciones", "Insumos y Equipos Qx" y "Proced. de Anestesia" dejan de ser ítems planos y ahora son subítems de un grupo colapsable "Sala de Operaciones" (ícono Scissors), igual que Óptica/Finanzas/Inventario.
 - Subítems: Cirugías (/sala-operaciones), Insumos y Equipos Qx (/quirofano/insumos-equipos), Proced. de Anestesia (/quirofano/anestesia). Cada uno respeta su isMenuEnabled.
 - El grupo se auto-expande/resalta en rutas /sala-operaciones o /quirofano/*. Sin cambios de rutas ni funcionalidad. Orden especial del rol médico intacto.
+
+## 2026-06 — Acceso CRM a rol "usuario" + Exportación de Anestesia
+- Rol `usuario` ahora puede revisar el CRM de Cirugías: `crm_cirugias` agregado a DEFAULT_MENU_CONFIG['usuario'] (menu_config.py) y migración de startup en server.py ($addToSet a db.menu_configurations). Layout.js: el ítem CRM ahora se rige por isMenuEnabled('crm_cirugias') en vez de admin-only.
+- Cierre mensual de anestesia exportable: nuevo endpoint GET /api/quirofano/anesthesia/closure/export?month=YYYY-MM&format=xlsx|pdf (require_role admin/superadmin), con openpyxl/reportlab. Botones Excel/PDF en el tab "Cierre mensual" (ProcedimientosAnestesia.js).
+- Nota operatoria imprimible: botón "Imprimir" (data-testid nota-imprimir) en NotaCirugia.js abre ventana de impresión formateada (paciente, procedimiento, fecha, ojo, cirujano, institución, contenido, firma), visible en notas abiertas y cerradas.
+- Fix: num_registros del cierre ahora cuenta solo registros agrupados (excluye sin anestesiólogo) para consistencia entre header, Excel y PDF.
+- Verificado: testing_agent iteration_117 (3 flujos frontend OK); exports curl-validados.
