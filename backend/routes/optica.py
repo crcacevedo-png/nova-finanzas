@@ -1817,13 +1817,12 @@ async def delete_optica_purchase(
 
 @router.get("/dashboard/ventas-dia")
 async def get_ventas_del_dia(current_user: dict = Depends(require_permission("view_optica"))):
-    """Obtener ventas del día actual con desglose"""
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+    """Obtener ventas del día actual (hora de Guatemala) con desglose"""
+    inicio_utc, fin_utc = dia_gt_a_rango_utc(today_str_gt())
+
     pipeline = [
         {"$match": {
-            "created_at": {"$gte": today_start.isoformat()},
+            "created_at": {"$gte": inicio_utc, "$lte": fin_utc},
             "status": {"$ne": "cancelado"}
         }},
         {"$group": {
@@ -1840,17 +1839,26 @@ async def get_ventas_del_dia(current_user: dict = Depends(require_permission("vi
     
     # Obtener ventas individuales del día
     ventas_dia = await db.optica_sales.find(
-        {"created_at": {"$gte": today_start.isoformat()}, "status": {"$ne": "cancelado"}},
+        {"created_at": {"$gte": inicio_utc, "$lte": fin_utc}, "status": {"$ne": "cancelado"}},
         {"_id": 0, "id": 1, "order_number": 1, "patient_name": 1, "total": 1, "total_paid": 1, "status": 1, "created_at": 1}
     ).sort("created_at", -1).to_list(100)
-    
+
+    # Cuentas por cobrar (saldo pendiente global, no solo del día)
+    pend_result = await db.optica_sales.aggregate([
+        {"$match": {"status": "pendiente", "balance_due": {"$gt": 0}}},
+        {"$group": {"_id": None, "total": {"$sum": "$balance_due"}, "count": {"$sum": 1}}}
+    ]).to_list(1)
+    cxc = pend_result[0] if pend_result else {"total": 0, "count": 0}
+
     return {
-        "fecha": today_start.isoformat(),
-        "total_ventas": stats.get("total_ventas", 0),
-        "total_cobrado": stats.get("total_cobrado", 0),
-        "total_descuentos": stats.get("total_descuentos", 0),
+        "fecha": today_str_gt(),
+        "total_ventas": round(stats.get("total_ventas", 0), 2),
+        "total_cobrado": round(stats.get("total_cobrado", 0), 2),
+        "total_descuentos": round(stats.get("total_descuentos", 0), 2),
         "num_ordenes": stats.get("num_ordenes", 0),
-        "saldo_pendiente": stats.get("total_ventas", 0) - stats.get("total_cobrado", 0),
+        "saldo_pendiente": round(stats.get("total_ventas", 0) - stats.get("total_cobrado", 0), 2),
+        "cuentas_por_cobrar": round(cxc.get("total", 0), 2),
+        "cuentas_por_cobrar_count": cxc.get("count", 0),
         "ventas": ventas_dia
     }
 
@@ -1970,6 +1978,15 @@ async def get_rentabilidad_optica(
     
     ganancia = total_ingresos - total_costos
     margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0
+
+    # Compras/pagos de óptica del mismo período (egresos)
+    compras_result = await db.optica_purchases.aggregate([
+        {"$match": {"purchase_date": {"$gte": fecha_inicio.isoformat()}}},
+        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}, "count": {"$sum": 1}}}
+    ]).to_list(1)
+    total_compras = compras_result[0]["total"] if compras_result else 0
+    num_compras = compras_result[0]["count"] if compras_result else 0
+    utilidad = total_ingresos - total_compras
     
     # Calcular margen por categoría
     for cat in desglose_categorias:
@@ -1986,6 +2003,9 @@ async def get_rentabilidad_optica(
         "total_costos": round(total_costos, 2),
         "ganancia_bruta": round(ganancia, 2),
         "margen_porcentaje": round(margen, 2),
+        "total_compras": round(total_compras, 2),
+        "num_compras": num_compras,
+        "utilidad": round(utilidad, 2),
         "desglose_categorias": desglose_categorias,
         "num_ventas": len(ventas)
     }

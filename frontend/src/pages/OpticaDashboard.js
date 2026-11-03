@@ -180,9 +180,9 @@ const OpticaDashboard = () => {
 
         {/* Tarjetas de Resumen Principal */}
         {ventasDia && rentabilidad && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="optica-summary-cards">
             {/* Ventas del Día */}
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200" data-testid="card-ventas-hoy">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -202,7 +202,7 @@ const OpticaDashboard = () => {
             </Card>
 
             {/* Cobrado Hoy */}
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200" data-testid="card-cobrado-hoy">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -211,7 +211,7 @@ const OpticaDashboard = () => {
                       {formatCurrency(ventasDia.total_cobrado)}
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      Pendiente: {formatCurrency(ventasDia.saldo_pendiente)}
+                      Pendiente hoy: {formatCurrency(ventasDia.saldo_pendiente)}
                     </p>
                   </div>
                   <div className="p-3 bg-green-200 rounded-full">
@@ -221,12 +221,32 @@ const OpticaDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Margen de Rentabilidad */}
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            {/* Cuentas por Cobrar */}
+            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200" data-testid="card-cuentas-por-cobrar">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-600 font-medium">Margen ({periodoRentabilidad})</p>
+                    <p className="text-sm text-amber-700 font-medium">Cuentas por Cobrar</p>
+                    <p className="text-2xl font-bold text-amber-800 mt-1">
+                      {formatCurrency(ventasDia.cuentas_por_cobrar)}
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      {ventasDia.cuentas_por_cobrar_count} órdenes pendientes
+                    </p>
+                  </div>
+                  <div className="p-3 bg-amber-200 rounded-full">
+                    <CreditCard className="w-6 h-6 text-amber-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Rentabilidad / Margen del Mes */}
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200" data-testid="card-rentabilidad-mes">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600 font-medium">Rentabilidad ({periodoRentabilidad})</p>
                     <p className={`text-2xl font-bold mt-1 ${
                       rentabilidad.margen_porcentaje >= 30 ? 'text-green-600' : 
                       rentabilidad.margen_porcentaje >= 20 ? 'text-amber-600' : 'text-red-600'
@@ -244,21 +264,67 @@ const OpticaDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Ventas del Mes */}
-            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+            {/* Pagos de Óptica (compras/egresos) */}
+            <Card className="bg-gradient-to-br from-rose-50 to-rose-100 border-rose-200" data-testid="card-pagos-optica">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-amber-600 font-medium">Ingresos ({periodoRentabilidad})</p>
-                    <p className="text-2xl font-bold text-amber-800 mt-1">
+                    <p className="text-sm text-rose-600 font-medium">Pagos de Óptica ({periodoRentabilidad})</p>
+                    <p className="text-2xl font-bold text-rose-800 mt-1">
+                      {formatCurrency(rentabilidad.total_compras)}
+                    </p>
+                    <p className="text-xs text-rose-600 mt-1">
+                      {rentabilidad.num_compras} compras
+                    </p>
+                  </div>
+                  <div className="p-3 bg-rose-200 rounded-full">
+                    <ArrowDownRight className="w-6 h-6 text-rose-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Ingresos del Mes */}
+            <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200" data-testid="card-ingresos-mes">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-cyan-700 font-medium">Ingresos ({periodoRentabilidad})</p>
+                    <p className="text-2xl font-bold text-cyan-800 mt-1">
                       {formatCurrency(rentabilidad.total_ingresos)}
                     </p>
-                    <p className="text-xs text-amber-600 mt-1">
+                    <p className="text-xs text-cyan-600 mt-1">
                       {rentabilidad.num_ventas} ventas
                     </p>
                   </div>
-                  <div className="p-3 bg-amber-200 rounded-full">
-                    <TrendingUp className="w-6 h-6 text-amber-700" />
+                  <div className="p-3 bg-cyan-200 rounded-full">
+                    <TrendingUp className="w-6 h-6 text-cyan-700" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Utilidad del Mes */}
+            <Card className={`bg-gradient-to-br border ${
+              rentabilidad.utilidad >= 0 ? 'from-emerald-50 to-emerald-100 border-emerald-200' : 'from-red-50 to-red-100 border-red-200'
+            }`} data-testid="card-utilidad-mes">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-medium ${rentabilidad.utilidad >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                      Utilidad ({periodoRentabilidad})
+                    </p>
+                    <p className={`text-2xl font-bold mt-1 ${rentabilidad.utilidad >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
+                      {rentabilidad.utilidad >= 0 ? '' : '-'}{formatCurrency(Math.abs(rentabilidad.utilidad))}
+                    </p>
+                    <p className={`text-xs mt-1 ${rentabilidad.utilidad >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      Ingresos − Pagos
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-full ${rentabilidad.utilidad >= 0 ? 'bg-emerald-200' : 'bg-red-200'}`}>
+                    {rentabilidad.utilidad >= 0
+                      ? <ArrowUpRight className="w-6 h-6 text-emerald-700" />
+                      : <ArrowDownRight className="w-6 h-6 text-red-700" />}
                   </div>
                 </div>
               </CardContent>
