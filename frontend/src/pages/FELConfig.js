@@ -163,6 +163,16 @@ const FELConfig = () => {
               <Label>Código postal</Label>
               <Input value={cfg.codigo_postal || ''} onChange={(e) => set('codigo_postal', e.target.value)} />
             </div>
+            <div>
+              <Label>Frase tributaria - Tipo</Label>
+              <Input type="number" value={cfg.frase_tipo} onChange={(e) => set('frase_tipo', e.target.value)} data-testid="fel-frase-tipo-input" />
+              <p className="text-xs text-slate-400 mt-1">Según tu régimen SAT. General/ISR suele ser Tipo 1.</p>
+            </div>
+            <div>
+              <Label>Frase tributaria - Escenario</Label>
+              <Input type="number" value={cfg.frase_escenario} onChange={(e) => set('frase_escenario', e.target.value)} data-testid="fel-frase-escenario-input" />
+              <p className="text-xs text-slate-400 mt-1">Escenario del catálogo de frases (confírmalo con tu contador).</p>
+            </div>
           </CardContent>
         </Card>
 

@@ -68,6 +68,11 @@ def _build_auth(cfg: dict):
     pwd = os.environ.get("DIGIFACT_PASSWORD", "").strip()
     if not user or not pwd:
         raise HTTPException(status_code=400, detail="Credenciales de Digifact no configuradas. Agrégalas en la configuración de secretos.")
+    # Si el usuario ya viene en formato completo GT.NIT.usuario, usarlo tal cual
+    partes = user.split(".")
+    if len(partes) >= 3 and partes[0].upper() == "GT" and partes[1].isdigit():
+        taxid_12 = partes[1].zfill(12)
+        return user, pwd, taxid_12, ".".join(partes[2:])
     nit = (cfg.get("nit") or "").strip().replace("-", "")
     if not nit or not nit.isdigit():
         raise HTTPException(status_code=400, detail="Falta el NIT del emisor en Configuración FEL (solo dígitos).")
@@ -83,7 +88,8 @@ async def _get_token(base: str, full: str, pwd: str) -> str:
                               headers={"Content-Type": "application/json"})
         if r.status_code != 200:
             raise HTTPException(status_code=400, detail=f"Error de autenticación con Digifact ({r.status_code}): {r.text[:300]}")
-        token = r.json().get("token")
+        data = r.json()
+        token = data.get("token") or data.get("Token")
         if not token:
             raise HTTPException(status_code=400, detail="Digifact no devolvió token")
         return token
@@ -215,7 +221,7 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
             "Description": str(it["descripcion"])[:500],
             "Qty": it["cantidad"],
             "Price": it["precio_unitario"],
-            "Taxes": {"Tax": [{"Code": 1, "Description": "IVA", "TaxableAmount": base, "Amount": iva}]},
+            "Taxes": {"Tax": [{"Code": "1", "Description": "IVA", "TaxableAmount": base, "Amount": iva}]},
             "Totals": {"TotalItem": total_item},
         }
         items_nuc.append(item_obj)
@@ -224,8 +230,7 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
     rec_nombre = (receptor.get("nombre") or ("Consumidor Final" if rec_taxid == "CF" else "")).strip() or "Consumidor Final"
 
     nuc = {
-        "NUC": {
-            "Version": "1.0",
+            "Version": "1.00",
             "CountryCode": "GT",
             "Header": {
                 "DocType": "FACT",
@@ -237,11 +242,12 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
                 "TaxIDAdditionalInfo": [{"Name": "AfiliacionIVA", "Data": None, "Value": cfg.get("afiliacion_iva", "GEN")}],
                 "Name": cfg.get("emisor_nombre", ""),
                 "AdditionlInfo": [
-                    {"Name": "TipoFrase", "Data": 1, "Value": cfg.get("frase_tipo", 1)},
-                    {"Name": "CodigoEscenario", "Data": 1, "Value": cfg.get("frase_escenario", 1)},
+                    {"Name": "TipoFrase", "Data": "1", "Value": str(cfg.get("frase_tipo", 1))},
+                    {"Name": "Escenario", "Data": "1", "Value": str(cfg.get("frase_escenario", 1))},
                 ],
                 "BranchInfo": {
-                    "Code": cfg.get("establecimiento_codigo", 1),
+                    "Code": str(cfg.get("establecimiento_codigo", 1)),
+                    "Name": cfg.get("nombre_comercial") or cfg.get("emisor_nombre", ""),
                     "AddressInfo": {
                         "Address": cfg.get("direccion", "Ciudad"),
                         "City": cfg.get("codigo_postal", "01001"),
@@ -270,7 +276,6 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
             "AdditionalDocumentInfo": {
                 "AdditionalInfo": [{"Code": str(uuid.uuid4()), "Type": "ADENDA"}]
             },
-        }
     }
     return nuc
 
@@ -325,7 +330,7 @@ async def certificar(data: CertificarRequest, current_user: dict = Depends(auth_
 
     code = str(resp.get("code", ""))
     if code != "1":
-        msg = resp.get("message") or resp.get("description") or "Error al certificar"
+        msg = resp.get("description") or resp.get("message") or "Error al certificar"
         logger.error(f"FEL certificar fallo: {resp}")
         raise HTTPException(status_code=400, detail=f"Digifact rechazó la factura: {msg}")
 

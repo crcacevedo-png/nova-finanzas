@@ -480,3 +480,10 @@ Alcance: Régimen General (FACT, IVA 12% incluido), ventas de clínica y óptica
 - Integrado en OpticaVentas.js (detalle de venta) y PuntoVenta.js (modal post-venta).
 Verificado: config GET/PUT OK; pipeline certify llega a Digifact (login + NUC) y retorna error JSON limpio (401 con NIT ficticio, esperado); pantalla de config renderiza con credenciales detectadas.
 PENDIENTE para completar prueba real: el usuario debe ingresar su NIT real de emisor en Configuración FEL (va ligado a las credenciales TESTUSER), habilitar FEL y certificar una venta. No se pudo certificar exitosamente sin el NIT correcto.
+
+## 2026-11-03 — FEL Digifact: integración funcional, bloqueo del lado Digifact
+- Autenticación OK (token). Respuesta de token viene como "Token" (mayúscula) -> _get_token lee ambos.
+- Errores de Digifact ahora usan campo "description" (field-level) y se devuelven como 400 (Cloudflare bloquea 5xx).
+- Esquema NUC corregido: SIN wrapper {"NUC":...} (raíz directa), Version "1.00", y campos tipo código como STRING (Tax.Code, BranchInfo.Code, frase Value). BranchInfo requiere "Name" (nombre comercial).
+- Frase tributaria: Data string, y Name debe ser "TipoFrase" + "Escenario" (NO "CodigoEscenario") para que el transform la empareje. frase_tipo/frase_escenario configurables en la UI.
+- Estado actual: la certificación pasa validación de esquema y de frase; falla en paso Digifact "PrepareEmisorForTOSIGN" con "Root element is missing" (3064). Es del lado Digifact: el emisor de PRUEBAS (NIT 90042247, establecimiento 1) requiere aprovisionamiento/plantilla de firma en su ambiente TEST. Pendiente confirmar con soporte Digifact (soporte-gt@digifact.com).
