@@ -4504,6 +4504,24 @@ async def startup_event():
         ]},
         {"$addToSet": {"enabled_menus": "optica_dashboard"}}
     )
+
+    # Migración: corregir el 'concepto' de CxC de clínica generadas por ventas
+    # (antes mostraba "Venta VTA-..."; ahora muestra los items vendidos)
+    try:
+        cxc_a_corregir = await db.cuentas_por_cobrar.find(
+            {"origen": "clinica", "venta_id": {"$ne": None}, "concepto": {"$regex": "^Venta "}},
+            {"_id": 0, "id": 1, "venta_id": 1}
+        ).to_list(5000)
+        for _cxc in cxc_a_corregir:
+            _venta = await db.ventas.find_one({"id": _cxc["venta_id"]}, {"_id": 0, "items": 1})
+            if _venta and _venta.get("items"):
+                _concepto = ", ".join(it.get("nombre", "") for it in _venta["items"]).strip(", ")
+                if _concepto:
+                    await db.cuentas_por_cobrar.update_one(
+                        {"id": _cxc["id"]}, {"$set": {"concepto": _concepto, "descripcion": None}}
+                    )
+    except Exception as _e:
+        logger.warning(f"Backfill concepto CxC clínica: {_e}")
     
     # ==================== ÍNDICES DE SEGURIDAD ====================
     # Índice único por token de la blacklist

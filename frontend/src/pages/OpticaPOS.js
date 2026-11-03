@@ -502,8 +502,8 @@ const OpticaPOS = () => {
           await axios.post(`${API_URL}/cuentas-cobrar/optica`, {
             paciente_id: paciente.id,
             paciente_nombre: `${paciente.primer_nombre} ${paciente.primer_apellido}`,
-            concepto: `Venta Óptica #${ventaCreada.order_number || ventaCreada.id}`,
-            descripcion: carrito.map(i => i.nombre).join(', '),
+            concepto: carrito.map(i => i.nombre).join(', ') || `Venta Óptica #${ventaCreada.order_number || ventaCreada.id}`,
+            descripcion: null,
             monto_total: montoCxC,
             fecha_vencimiento: null,
             venta_origen_id: ventaCreada.id,

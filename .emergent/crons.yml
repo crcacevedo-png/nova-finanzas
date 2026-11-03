@@ -8,8 +8,8 @@ crons:
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     enabled: true
   - name: cierre-diario
-    description: "Envia por correo el cierre/diagnostico del dia (21:00 Guatemala)"
-    cron: "0 21 * * *"
+    description: "Envia por correo el cierre/diagnostico del dia (18:00 Guatemala)"
+    cron: "0 18 * * *"
     timezone: "America/Guatemala"
     endpoint: "{{BASE_URL}}/api/cron/cierre-diario"
     method: POST
