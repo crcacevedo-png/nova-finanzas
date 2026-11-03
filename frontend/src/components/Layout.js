@@ -72,6 +72,9 @@ const Layout = ({ children }) => {
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
   const [igssOpen, setIgssOpen] = useState(location.pathname.startsWith('/igss'));
+  const [salaOpOpen, setSalaOpOpen] = useState(
+    location.pathname.startsWith('/sala-operaciones') || location.pathname.startsWith('/quirofano')
+  );
   
   // Estado para menús habilitados del usuario
   const [changePwdOpen, setChangePwdOpen] = useState(false);
@@ -108,16 +111,7 @@ const Layout = ({ children }) => {
     navItems.push({ path: '/evaluacion-oftalmologica', icon: Eye, label: 'Evaluación Oftalmológica', testId: 'nav-evaluacion' });
   }
   
-  // Sala de Operaciones - Visible si está habilitado
-  if (isMenuEnabled('sala_operaciones')) {
-    navItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Sala de operaciones', testId: 'nav-sala-operaciones' });
-  }
-  if (isMenuEnabled('quirofano_insumos')) {
-    navItems.push({ path: '/quirofano/insumos-equipos', icon: Package, label: 'Insumos y Equipos Qx', testId: 'nav-quirofano-insumos' });
-  }
-  if (isMenuEnabled('quirofano_anestesia')) {
-    navItems.push({ path: '/quirofano/anestesia', icon: Syringe, label: 'Proced. de Anestesia', testId: 'nav-quirofano-anestesia' });
-  }
+  // Sala de Operaciones ahora es un grupo colapsable (ver salaOpItems más abajo)
   
   // CRM Cirugías - Admin/SuperAdmin y si está habilitado
   if (isAdminOrSuperAdmin && isMenuEnabled('crm_cirugias')) {
@@ -138,6 +132,12 @@ const Layout = ({ children }) => {
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
   }
+
+  // Sala de Operaciones sub-items - Filtrados por configuración de menús
+  const salaOpItems = [];
+  if (isMenuEnabled('sala_operaciones')) salaOpItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Cirugías', testId: 'nav-sala-operaciones' });
+  if (isMenuEnabled('quirofano_insumos')) salaOpItems.push({ path: '/quirofano/insumos-equipos', icon: Package, label: 'Insumos y Equipos Qx', testId: 'nav-quirofano-insumos' });
+  if (isMenuEnabled('quirofano_anestesia')) salaOpItems.push({ path: '/quirofano/anestesia', icon: Syringe, label: 'Proced. de Anestesia', testId: 'nav-quirofano-anestesia' });
 
   // Finanzas sub-items - Filtrados por configuración de menús
   const finanzasItems = [];
@@ -295,6 +295,37 @@ const Layout = ({ children }) => {
           {navItems.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
+
+          {/* Sala de Operaciones Section - grupo colapsable */}
+          {salaOpItems.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setSalaOpOpen(!salaOpOpen)}
+                className={`sidebar-item flex items-center justify-between w-full mx-2 ${
+                  (location.pathname.startsWith('/sala-operaciones') || location.pathname.startsWith('/quirofano')) ? 'active' : ''
+                }`}
+                data-testid="nav-sala-operaciones-group"
+              >
+                <div className="flex items-center gap-3">
+                  <Scissors className={`w-5 h-5 icon ${(location.pathname.startsWith('/sala-operaciones') || location.pathname.startsWith('/quirofano')) ? 'opacity-100' : 'opacity-60'}`} />
+                  <span className="font-medium text-sm">Sala de Operaciones</span>
+                </div>
+                {salaOpOpen ? (
+                  <ChevronDown className="w-4 h-4 opacity-60" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-60" />
+                )}
+              </button>
+
+              {salaOpOpen && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {salaOpItems.map((item) => (
+                    <NavLink key={item.path} item={item} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 3. Optica Section - Solo para optica y superadmin */}
           {canViewOptica && opticaItems.length > 0 && (

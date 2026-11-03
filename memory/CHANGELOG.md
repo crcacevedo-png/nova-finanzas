@@ -373,3 +373,8 @@
 - Producción oculta autorizaciones por SPS que un comodín legado (acreditación sin SPS del mismo paciente/NOG) ya absorbió. DECISIÓN DEL USUARIO: una autorización que no descontó cupo por NOG al 100% SÍ aparece en Producción.
 - Hook de acreditación en evaluaciones.py ahora registra los fallos (logging) en vez de ignorarlos.
 - Pruebas: tests/test_nog_por_autorizacion.py -> 16/16 PASS (antes 13/16). Suite autolimpia datos TEST_.
+
+## 2026-06 — Menú lateral: Sala de Operaciones como grupo colapsable
+- Layout.js: "Sala de operaciones", "Insumos y Equipos Qx" y "Proced. de Anestesia" dejan de ser ítems planos y ahora son subítems de un grupo colapsable "Sala de Operaciones" (ícono Scissors), igual que Óptica/Finanzas/Inventario.
+- Subítems: Cirugías (/sala-operaciones), Insumos y Equipos Qx (/quirofano/insumos-equipos), Proced. de Anestesia (/quirofano/anestesia). Cada uno respeta su isMenuEnabled.
+- El grupo se auto-expande/resalta en rutas /sala-operaciones o /quirofano/*. Sin cambios de rutas ni funcionalidad. Orden especial del rol médico intacto.
