@@ -334,6 +334,7 @@ class OpticaSaleResponse(BaseModel):
     contact_lens_price: float = 0
     lens_items: List[SaleLineItem] = []
     lens_total: float = 0
+    items_v2: List[dict] = []
     subtotal: float
     discount_percent: float
     discount_amount: float
@@ -349,6 +350,9 @@ class OpticaSaleResponse(BaseModel):
     created_by_name: Optional[str] = ""
     created_at: str
     updated_at: Optional[str] = None
+    cancelled_by: Optional[str] = ""
+    cancelled_by_name: Optional[str] = ""
+    cancelled_at: Optional[str] = None
 
 class OpticaSaleListResponse(BaseModel):
     data: List[OpticaSaleResponse]
@@ -427,21 +431,25 @@ async def get_next_order_number() -> str:
 
 async def enrich_sale(sale: dict) -> dict:
     """Enriquece la venta con datos relacionados"""
-    # Paciente
-    patient = await db.patients.find_one({"id": sale["patient_id"]}, {"_id": 0})
+    # Paciente: no sobreescribir el nombre guardado cuando la venta es de
+    # Consumidor Final / walk-in (sin patient_id vinculado).
+    patient = await db.patients.find_one({"id": sale["patient_id"]}, {"_id": 0}) if sale.get("patient_id") else None
     if patient:
         sale["patient_name"] = f"{patient['first_name']} {patient['last_name']}"
         sale["patient_phone"] = patient.get("phone", "")
-    else:
+    elif sale.get("patient_id"):
         sale["patient_name"] = "Paciente no encontrado"
         sale["patient_phone"] = ""
+    else:
+        sale["patient_name"] = sale.get("patient_name") or "Consumidor Final"
+        sale["patient_phone"] = sale.get("patient_phone", "")
     
-    # Médico
+    # Médico: conservar el doctor_name guardado si no hay doctor_id vinculado
     if sale.get("doctor_id"):
         doctor = await db.doctors.find_one({"id": sale["doctor_id"]}, {"_id": 0})
-        sale["doctor_name"] = doctor["name"] if doctor else ""
+        sale["doctor_name"] = doctor["name"] if doctor else sale.get("doctor_name", "")
     else:
-        sale["doctor_name"] = ""
+        sale["doctor_name"] = sale.get("doctor_name", "")
     
     # Aro
     if sale.get("frame_id"):
@@ -1003,9 +1011,9 @@ async def get_optica_sales(
     if date_from or date_to:
         date_query = {}
         if date_from:
-            date_query["$gte"] = date_from
+            date_query["$gte"] = dia_gt_a_rango_utc(date_from)[0]
         if date_to:
-            date_query["$lte"] = date_to + "T23:59:59"
+            date_query["$lte"] = dia_gt_a_rango_utc(date_to)[1]
         if date_query:
             query["created_at"] = date_query
     
@@ -1053,16 +1061,22 @@ async def get_pending_sales(current_user: dict = Depends(require_permission("vie
 
 async def _resumen_ventas(cajero_id: Optional[str], inicio: str, fin: str) -> dict:
     """Resumen de ventas de óptica en un rango: total vendido, cobrado y desglose por método."""
-    sales_query = {"created_at": {"$gte": inicio, "$lte": fin}}
+    sales_query = {"created_at": {"$gte": inicio, "$lte": fin}, "status": {"$ne": "cancelado"}}
     if cajero_id:
         sales_query["created_by"] = cajero_id
     sales = await db.optica_sales.find(sales_query, {"_id": 0}).to_list(5000)
     cantidad = len(sales)
     total_vendido = sum(s.get("total", 0) for s in sales)
 
+    # Excluir pagos de ventas canceladas
+    cancel_ids = await db.optica_sales.distinct(
+        "id", {"created_at": {"$gte": inicio, "$lte": fin}, "status": "cancelado"}
+    )
     pay_query = {"created_at": {"$gte": inicio, "$lte": fin}}
     if cajero_id:
         pay_query["created_by"] = cajero_id
+    if cancel_ids:
+        pay_query["sale_id"] = {"$nin": cancel_ids}
     pagos = await db.optica_sale_payments.find(pay_query, {"_id": 0}).to_list(10000)
     por_metodo = {"Efectivo": 0, "Tarjeta": 0, "Transferencia": 0, "Cheque": 0}
     total_cobrado = 0

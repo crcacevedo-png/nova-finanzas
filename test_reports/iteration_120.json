@@ -1,0 +1,46 @@
+{
+  "summary": "Tested the 3 approved changes. All the flows asked for work end to end. Backend: 5 of 5 pytest tests pass. They cover cancel returning 403 for optica and usuario and 404 for superadmin with an unknown id, a V2 sale (qty 2) that lowers frame stock and gets it back exactly on cancel, a second cancel returning 400 without restoring stock twice, and optica creating and editing an IGSS patient with NOG discounts. UI checks: (F3) superadmin sees the Ventas menu item, the date/status/search filters, row and detail buttons for detail, reprint and cancel, the reprint popup opens with the ticket, and cancelling from the UI works (confirm dialog -> toast -> status Cancelado, stock restored 8->9). Optica sees detail and reprint with 0 cancel buttons. (F2) Optica created an IGSS patient in Pacientes using the catalog NOG selector (acreditados 0->1), then edited it adding a 2nd order through the free-text 'Otro' input (acreditados ->2). (F1) In Agenda, Marcar llegada on an incomplete patient opens the Completar modal. The cf-igss-ordenes section appears for IGSS, Agregar orden stays disabled until a unit is chosen, and NOG, SPS, Código and Procedimiento can be filled. Saving updated the patient's igss_ordenes, set the appointment to Presente and discounted the NOG (0->1). All test data was cleaned up and NOG 28017447 is back to acreditados=0.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/optica/sales (OpticaSaleResponse)", "issue": "The response model drops items_v2, so the Ventas detail 'Productos' section and the reprinted ticket show NO product lines for POS (V2) sales, which are most sales. Seen on ORD-202611-0003: the ticket table is empty. This hurts the new 'reimprimir ticket' feature. Fix: add items_v2 (and discount fields) to OpticaSaleResponse."},
+      {"endpoint": "enrich_sale() in routes/optica.py ~431", "issue": "When patient_id is empty (Consumidor Final / walk-in name), patient_name is overwritten with 'Paciente no encontrado'. As a result the list, detail and ticket show 'Paciente no encontrado', and searching by client name for walk-in sales returns 0 (searching 'TEST_UICancel' found nothing, while searching by order number worked). doctor_name is also wiped when doctor_id is empty even though V2 stores doctor_name. Fix: only override when the patient is found; otherwise keep the stored patient_name/doctor_name."},
+      {"endpoint": "GET /api/optica/sales dateFrom/dateTo", "issue": "The date filter compares raw UTC created_at strings with local dates. Sales made after 18:00 Guatemala time fall on the next UTC day, so they are excluded from 'Hasta' on their real day and included on the following day. Convert the GT day range to a UTC range, as caja/dashboard already do."},
+      {"endpoint": "GET /api/optica/sales/resumen-dia (+ /consolidado), _resumen_ventas ~1054", "issue": "Does not exclude cancelled sales or their payments. After a cancel, the POS daily summary (OpticaPOS) still counts the sale's total and cash. The cierre in caja.py does exclude them, so the two disagree."},
+      {"endpoint": "PUT /api/optica/sales/{id}/cancel", "issue": "The sale's payment records stay in place with no refund/egreso entry. Totals are only excluded wherever a report filters status!=cancelado (see resumen-dia above). Confirm whether a cash refund movement is expected when a paid sale is cancelled."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpticaVentas handleCancelSale", "issue": "After a cancel only fetchSales() runs, not fetchDashboard(), so the KPI cards stay stale. 'Ventas del Mes' showed Q245 / 4 órdenes while the API returned Q195 / 3.", "selector": "optica-ventas-page KPI cards", "priority": "LOW"},
+      {"component": "OpticaVentas detalle / ticket", "issue": "Products list empty and client shown as 'Paciente no encontrado' (both caused by the backend issues above)", "selector": "ventas-detalle-print", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/optica/ventas filters", "issues": ["Desde/Hasta use the browser's native date picker (input type=date) instead of the shadcn Calendar used elsewhere", "Search input and status Select have no data-testid", "Payment history row shows an empty '()' when the method/creator is blank"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_optica_ventas_cancel_nog.py", "/app/test_reports/pytest/pytest_results_iter120.xml"],
+  "action_items": [
+    "Add items_v2 to OpticaSaleResponse so the Ventas detail and reprinted ticket list the products",
+    "Fix enrich_sale so it does not overwrite patient_name/doctor_name when there is no linked patient/doctor (this also fixes search by client name)",
+    "Make the dateFrom/dateTo filter in GET /optica/sales use a Guatemala-day to UTC range",
+    "Exclude cancelled sales and their payments in _resumen_ventas (POS resumen-dia and consolidado)",
+    "Call fetchDashboard() after a successful cancel in OpticaVentas",
+    "Optional: add data-testid to the Ventas search input and status select; use the shadcn date picker"
+  ],
+  "critical_code_review_comments": [
+    "OpticaVentas.js handlePrintTicket inserts patient_name, doctor_name and item names into document.write HTML without escaping (possible XSS/HTML injection from patient names)",
+    "GET /optica/sales loads up to 1000 sales and enriches each one (several DB lookups per sale, N+1) before filtering by search in Python. It is slow and silently caps results at 1000.",
+    "Layout.js always adds 'Ventas' for any user with canViewOptica, without an isMenuEnabled check, unlike the other optica menu items",
+    "OpticaVentas.js (1456 lines) and Agenda.js (3009 lines) are far over the 700-line guideline. The órdenes IGSS block is duplicated between Pacientes.js and Agenda.js and could be one OrdenesIgssEditor component.",
+    "The NOG selector testid in Agenda is patient-igss-nog-select-cf-{idx} (idSuffix '-cf-idx'), not cf-orden-nog-{idx}"
+  ],
+  "updated_files": ["/app/backend/tests/test_optica_ventas_cancel_nog.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% of the requested flows work; 2 display bugs caused by the backend response model"},
+  "test_credentials": "superadmin/nova2024, optica/Optica2024$, usuario/user2024 (from /app/memory/test_credentials.md) all work",
+  "seed_data_creation": "Temporary only, all cleaned up: patients TEST_Nog/TEST_UINog/TEST_Llegada (soft-deleted via API to release NOG, then hard-deleted along with their acreditaciones), appointment 89b800bf (deleted via API), sales ORD-202611-0004 and one pytest sale (cancelled, then deleted along with their payments; stock restored). Side effects: record_number counters (EXP-202611-0003/0004) and order_number counters were used up, so there are gaps in numbering.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "IGSS test unit 37e430e9-4e82-43ce-ac98-28347b7c21e4, NOG 28017447 (id 78351bc6-...), cantidad 43, acreditados 0. Dr. Carlos Méndez only works Mondays; to create test appointments use Dra. María Fernández (d4295f63-...), who has no schedule. Patient create for IGSS needs a 13-digit DPI. Agenda: open the appointment card's first button (dropdown) and then marcar-llegada-cita-{id}. Ventas cancel uses window.confirm, so accept the dialog with an async handler. Retest: ticket items, walk-in client name, and search after the backend fixes."
+}

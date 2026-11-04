@@ -176,12 +176,14 @@ const OpticaVentas = () => {
       toast.success('Venta anulada. Inventario restaurado.');
       setDetailDialogOpen(false);
       fetchSales();
+      fetchDashboard();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'No se pudo anular la venta');
     }
   };
 
   const handlePrintTicket = (sale) => {
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const items = (sale.items_v2 && sale.items_v2.length > 0)
       ? sale.items_v2
       : [
@@ -189,20 +191,20 @@ const OpticaVentas = () => {
           ...(sale.contact_lens_id ? [{ name: 'Lente de contacto', quantity: 1, subtotal: sale.contact_lens_price }] : []),
           ...((sale.lens_items || []).map(li => ({ name: li.lens_type_name, quantity: li.quantity, subtotal: li.subtotal }))),
         ];
-    const rows = items.map(it => `<tr><td>${it.name || ''}</td><td style="text-align:center">${it.quantity || 1}</td><td style="text-align:right">${formatCurrency(it.subtotal || 0)}</td></tr>`).join('');
+    const rows = items.map(it => `<tr><td>${esc(it.name)}</td><td style="text-align:center">${it.quantity || 1}</td><td style="text-align:right">${formatCurrency(it.subtotal || 0)}</td></tr>`).join('');
     const win = window.open('', '_blank', 'width=400,height=600');
     if (!win) { toast.error('Permite las ventanas emergentes para imprimir'); return; }
     win.document.write(`
-      <html><head><title>Ticket ${sale.order_number}</title>
+      <html><head><title>Ticket ${esc(sale.order_number)}</title>
       <style>body{font-family:monospace;font-size:12px;padding:12px;color:#111}h2{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:8px}td,th{padding:3px 0;border-bottom:1px dashed #ccc}.tot{font-weight:bold;font-size:14px}</style>
       </head><body>
       <h2>NovaVisión Óptica</h2>
       <div style="text-align:center">Comprobante de Venta</div>
       <hr/>
-      <div>Orden: <b>${sale.order_number}</b></div>
-      <div>Fecha: ${formatDate(sale.created_at)}</div>
-      <div>Cliente: ${sale.patient_name || ''}</div>
-      ${sale.doctor_name ? `<div>Médico: ${sale.doctor_name}</div>` : ''}
+      <div>Orden: <b>${esc(sale.order_number)}</b></div>
+      <div>Fecha: ${esc(formatDate(sale.created_at))}</div>
+      <div>Cliente: ${esc(sale.patient_name)}</div>
+      ${sale.doctor_name ? `<div>Médico: ${esc(sale.doctor_name)}</div>` : ''}
       ${sale.status === 'cancelado' ? '<div style="color:#b91c1c;font-weight:bold">** ANULADA **</div>' : ''}
       <table><thead><tr><th style="text-align:left">Detalle</th><th>Cant</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>${rows}</tbody></table>
       <hr/>
@@ -1235,18 +1237,35 @@ const OpticaVentas = () => {
 
                 <div className="border-t pt-4 space-y-2">
                   <p className="font-semibold">Productos</p>
-                  {selectedSale.frame_info && (
-                    <div className="flex justify-between text-sm">
-                      <span>Aro: {selectedSale.frame_info}</span>
-                      <span>{formatCurrency(selectedSale.frame_price)}</span>
-                    </div>
+                  {(selectedSale.items_v2 && selectedSale.items_v2.length > 0) ? (
+                    selectedSale.items_v2.map((item, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span>{item.name} x{item.quantity || 1}</span>
+                        <span>{formatCurrency(item.subtotal || 0)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      {selectedSale.frame_info && (
+                        <div className="flex justify-between text-sm">
+                          <span>Aro: {selectedSale.frame_info}</span>
+                          <span>{formatCurrency(selectedSale.frame_price)}</span>
+                        </div>
+                      )}
+                      {selectedSale.contact_lens_info && (
+                        <div className="flex justify-between text-sm">
+                          <span>Lente de contacto: {selectedSale.contact_lens_info}</span>
+                          <span>{formatCurrency(selectedSale.contact_lens_price)}</span>
+                        </div>
+                      )}
+                      {selectedSale.lens_items?.map((item, i) => (
+                        <div key={i} className="flex justify-between text-sm">
+                          <span>{item.lens_type_name} x{item.quantity}</span>
+                          <span>{formatCurrency(item.subtotal)}</span>
+                        </div>
+                      ))}
+                    </>
                   )}
-                  {selectedSale.lens_items?.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span>{item.lens_type_name} x{item.quantity}</span>
-                      <span>{formatCurrency(item.subtotal)}</span>
-                    </div>
-                  ))}
                 </div>
 
                 <div className="border-t pt-4 space-y-1 text-sm">
