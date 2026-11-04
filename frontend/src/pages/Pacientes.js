@@ -193,6 +193,16 @@ const Pacientes = () => {
     fetchPatients();
   }, [fetchPatients]);
 
+  // Abrir el expediente directamente al llegar con ?id= (p.ej. desde la Agenda "Ver paciente")
+  useEffect(() => {
+    const pid = new URLSearchParams(window.location.search).get('id');
+    if (pid) {
+      patientApi.getById(pid)
+        .then(res => { setSelectedPatient(res.data); setDetailDialogOpen(true); })
+        .catch(() => {});
+    }
+  }, []);
+
   // Detección de pacientes nuevos creados por otros usuarios (aviso discreto)
   const knownPatientIdsRef = useRef(new Set());
   useEffect(() => {
