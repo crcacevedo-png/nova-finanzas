@@ -220,14 +220,22 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
             "Type": "B",
             "Description": str(it["descripcion"])[:500],
             "Qty": it["cantidad"],
+            "UnitOfMeasure": "UND",
             "Price": it["precio_unitario"],
-            "Taxes": {"Tax": [{"Code": "1", "Description": "IVA", "TaxableAmount": base, "Amount": iva}]},
+            "Taxes": {"Tax": [{"Code": "1", "Description": "IVA", "TaxableAmount": base, "Rate": 12, "Amount": iva}]},
             "Totals": {"TotalItem": total_item},
         }
         items_nuc.append(item_obj)
 
     rec_taxid = (receptor.get("nit") or "CF").strip().upper().replace("-", "") or "CF"
     rec_nombre = (receptor.get("nombre") or ("Consumidor Final" if rec_taxid == "CF" else "")).strip() or "Consumidor Final"
+
+    buyer = {"TaxID": rec_taxid, "Name": rec_nombre}
+    if rec_taxid != "CF":
+        buyer["AddressInfo"] = {
+            "Address": "Ciudad", "City": "01001", "District": "Guatemala",
+            "State": "Guatemala", "Country": "GT",
+        }
 
     nuc = {
             "Version": "1.00",
@@ -246,7 +254,7 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
                     {"Name": "Escenario", "Data": "1", "Value": str(cfg.get("frase_escenario", 1))},
                 ],
                 "BranchInfo": {
-                    "Code": str(cfg.get("establecimiento_codigo", 1)),
+                    "Code": str(cfg.get("establecimiento_codigo", 1) or 1),
                     "Name": cfg.get("nombre_comercial") or cfg.get("emisor_nombre", ""),
                     "AddressInfo": {
                         "Address": cfg.get("direccion", "Ciudad"),
@@ -257,17 +265,7 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
                     },
                 },
             },
-            "Buyer": {
-                "TaxID": rec_taxid,
-                "Name": rec_nombre,
-                "AddressInfo": {
-                    "Address": "Ciudad",
-                    "City": "01001",
-                    "District": "Guatemala",
-                    "State": "Guatemala",
-                    "Country": "GT",
-                },
-            },
+            "Buyer": buyer,
             "Items": items_nuc,
             "Totals": {
                 "TotalTaxes": {"TotalTax": [{"Description": "IVA", "Amount": suma_iva}]},
