@@ -46,6 +46,7 @@ import {
   PieChart,
   KeyRound,
   DatabaseBackup,
+  BarChart3,
   Watch
 } from 'lucide-react';
 import { Badge } from './ui/badge';
@@ -68,7 +69,7 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
   const [finanzasOpen, setFinanzasOpen] = useState(
-    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario'].some(p => location.pathname.startsWith(p))
+    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p))
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
   const [igssOpen, setIgssOpen] = useState(location.pathname.startsWith('/igss'));
@@ -150,6 +151,7 @@ const Layout = ({ children }) => {
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_autorizaciones')) finanzasItems.push({ path: '/autorizaciones-pendientes', icon: ClipboardCheck, label: 'Autorizaciones', testId: 'nav-autorizaciones' });
     if (isAdminOrSuperAdmin) finanzasItems.push({ path: '/cierre-diario', icon: Calculator, label: 'Cierre del Día', testId: 'nav-cierre-diario' });
+    if (isSuperAdmin) finanzasItems.push({ path: '/analisis-produccion', icon: BarChart3, label: 'Análisis de Producción', testId: 'nav-analisis-produccion' });
     if (isAdminOrSuperAdmin) finanzasItems.push({ path: '/fel/configuracion', icon: FileText, label: 'Facturación FEL', testId: 'nav-fel-config' });
   } else {
     // Finanzas para óptica: Punto de Venta, Cuentas por Cobrar y Caja de la clínica
@@ -368,12 +370,12 @@ const Layout = ({ children }) => {
               <button
                 onClick={() => setFinanzasOpen(!finanzasOpen)}
                 className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
                 }`}
                 data-testid="nav-finanzas"
               >
                 <div className="flex items-center gap-3">
-                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
                   <span className="font-medium text-sm">Finanzas</span>
                 </div>
                 {finanzasOpen ? (

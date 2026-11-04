@@ -1,84 +1,64 @@
-# Sala de Operaciones — Insumos/Equipos, Nota Operatoria y Anestesia
+# NovaVisión ERP — Ventas por área, Historial de Cierres y Análisis de Producción
 
-Amplía el módulo de Sala de Operaciones con un catálogo de insumos y equipos quirúrgicos (sin precio), un estado de insumos para que caja sepa si hay cobro adicional en alquileres, notas operatorias que se guardan en el expediente del paciente, y un módulo de Procedimientos de Anestesia con control financiero mensual de honorarios.
+Tres mejoras para que la administración entienda y audite las ventas de la clínica:
+separar las ventas del día por área, convertir el historial de cierres en una herramienta de comparación entre cajeros, y crear un área de análisis de producción.
 
 ## Para quién es
-- Personal de quirófano/clínica que registra cirugías y los insumos/equipos que se usaron.
-- Usuarios de caja, que necesitan saber si una cirugía de alquiler ya tiene definidos sus insumos para hacer el cobro adicional.
-- Médicos cirujanos, que firman y adjuntan la nota operatoria al expediente del paciente.
-- Administración y anestesiólogos, que necesitan llevar el record mensual de anestesias y el pago de honorarios.
+Para el superadministrador de la clínica, que necesita ver de dónde viene cada quetzal, comparar el desempeño de los cajeros y analizar qué se vende. El personal de caja y los demás usuarios no entran a estas vistas de análisis.
 
-## Funcionalidades y experiencia
+## Funciones principales y experiencia
 
-### 1. Submenú "Insumos y Equipos Quirúrgicos"
-- Nuevo submenú dentro de Sala de Operaciones para administrar dos listas: **Insumos quirúrgicos** y **Equipos quirúrgicos**.
-- Cada elemento del catálogo tiene nombre y una nota/categoría opcional. **No llevan precio.**
-- Se pueden crear, editar y desactivar elementos. Esta lista es la que alimenta el registro de cada cirugía.
+### 1. Ventas del Día por área (Dashboard)
+- La tarjeta "Ventas del Día" del Dashboard se divide en dos cifras: **Clínica** y **Óptica**, además del total.
+- Cada cifra muestra su monto y la cantidad de ventas, para identificar rápidamente la fuente.
 
-### 2. Registro de insumos/equipos en la cirugía desde el catálogo
-- En el detalle de la cirugía, "Agregar insumo" y "Agregar equipo" ya **no** serán texto libre: se eligen de las listas del catálogo anterior, indicando cantidad y una nota opcional.
-- Como los insumos no llevan precio, el detalle de la cirugía deja de mostrar "Total insumos / Total general" basado en precios de insumos (para IGSS se conserva el costo del procedimiento tal como hoy).
+### 2. Historial de Cierres con comparación de cajeros (solo superadmin)
+- El superadministrador ve los cierres de **todos los cajeros** (hoy solo ve los suyos), no solo los propios.
+- Cada fila muestra fecha, cajero, estado, apertura, ingresos, egresos, efectivo contado y diferencia de arqueo.
+- **Corrección del "no cuadra":** la columna de ingresos se recalcula a partir de los movimientos reales de caja de ese cajero en ese día (la misma fuente que el resumen de "Todas las cajas"), en lugar de un valor guardado que quedaba en cero o desfasado. Las cajas aún abiertas muestran su total en vivo en lugar de Q0.00.
+- Cada cierre se puede abrir para ver un detalle con el desglose por tipo de ingreso (efectivo vs. otros métodos), para que el número sea verificable.
+- Un resumen comparativo arriba de la tabla: por cada cajero, total vendido, número de ventas y diferencia acumulada de arqueo.
 
-### 3. Estado de insumos para caja (solo Alquiler)
-- Las cirugías con institución **Alquiler** llevan un estado operativo que indica una de tres situaciones: **pendiente de revisar**, **insumos registrados (listo)** o **sin insumos adicionales**.
-- El personal de quirófano marca el estado. Caja ve ese estado claramente para decidir el cobro adicional del alquiler.
-- Para instituciones distintas de Alquiler se pueden registrar insumos/equipos igual, pero sin este énfasis de estado para caja.
-
-### 4. Nota operatoria
-- Un ícono en cada cirugía abre la "Nota operatoria".
-- El **nombre del procedimiento** se copia automáticamente del procedimiento con el que se programó la cirugía (editable).
-- Permite escribir el contenido de la nota y una **firma del médico en texto**, autollenada con el nombre del cirujano programado (editable).
-- Al guardar, la nota queda en el **expediente del paciente** y aparece en su **historial de consultas** etiquetada como "Nota operatoria — [nombre del procedimiento]".
-- Requiere que la cirugía tenga un paciente registrado; si no lo tiene, primero se solicita vincular/seleccionar al paciente.
-
-### 5. Submenú "Procedimientos de Anestesia"
-- **Tipos de anestesia**: catálogo donde se crean varios tipos (p. ej. tópica, local, local asistida, general…), cada uno con su **valor/honorario fijo** (igual para todos los anestesiólogos).
-- **Registro de anestesias**: cada cirugía genera automáticamente un registro de anestesia (tipo, anestesiólogo y fecha tomados de la cirugía), editable; además se pueden agregar registros manuales.
-- **Cierre mensual**: por mes, el sistema agrupa las anestesias por anestesiólogo, mostrando cantidad de procedimientos, el valor por tipo y el **monto total a pagar** a cada anestesiólogo.
-- Permite **cerrar el mes** y marcar los honorarios como pagados, para un control financiero completo del pago de anestesias.
+### 3. Área de Análisis de Producción (nuevo menú, solo superadmin)
+Nueva sección en el menú de Finanzas, enfocada en las ventas de clínica (Punto de Venta). Incluye un selector de período: **Hoy / Esta semana / Este mes / Rango personalizado**. Dentro:
+- **Indicadores clave:** total vendido, número de ventas y ticket promedio del período.
+- **Top productos** en dos vistas: por ingresos (Q) y por unidades vendidas.
+- **Ventas por cajero / vendedor:** ranking con monto y número de ventas por persona.
+- **Ventas por médico que refiere:** monto y número de ventas asociadas a cada médico.
+- **Ventas por categoría de producto:** distribución del total entre categorías.
+- **Tendencia por día:** gráfica de la evolución de las ventas en el período seleccionado.
 
 ## Flujo de uso
-1. Administración carga en "Insumos y Equipos Quirúrgicos" los insumos y equipos disponibles (sin precio) y los tipos de anestesia con su valor.
-2. Se registra o edita una cirugía como hoy; su tipo de anestesia y anestesiólogo quedan capturados.
-3. En el detalle de la cirugía, el personal agrega los insumos/equipos usados eligiéndolos de la lista.
-4. Si la cirugía es de Alquiler, marca el estado: "insumos registrados" o "sin insumos adicionales".
-5. Caja abre la cirugía de alquiler, ve el estado y realiza (o no) el cobro adicional.
-6. El cirujano abre la nota operatoria, revisa el procedimiento autollenado, redacta la nota, confirma su firma y guarda; la nota aparece en el expediente del paciente.
-7. Al cierre de mes, administración entra a "Procedimientos de Anestesia", revisa el consolidado por anestesiólogo, cierra el mes y marca los pagos.
+- **Dashboard:** el superadministrador abre el Dashboard y ve de inmediato cuánto se vendió en clínica y cuánto en óptica.
+- **Cierres:** en Mi Caja → Historial de Cierres, el superadministrador revisa los cierres de todos los cajeros, compara su desempeño y verifica que los ingresos coincidan con lo esperado.
+- **Análisis:** desde el menú de Finanzas entra a Análisis de Producción, elige un período y revisa qué se vende más, quién vende más, qué médico refiere más y cómo evolucionan las ventas.
 
 ## Sensación visual (UI/UX)
-- Respeta el estilo actual de Sala de Operaciones (tarjetas, diálogos y tablas existentes).
-- Catálogos con listas simples de alta/edición; selección de insumos/equipos mediante menús/búsqueda dentro del detalle de la cirugía.
-- Estado de insumos como etiqueta de color visible en la tabla/detalle de cirugías de alquiler.
-- Nota operatoria dentro de un diálogo, con el procedimiento y la firma prellenados.
-- Módulo de anestesia con una vista de tipos/tarifas y una vista de cierre mensual con totales por anestesiólogo.
+Se mantiene el estilo actual del ERP (marca NovaVisión, tarjetas limpias, tablas claras, acentos en azul). Las cifras clave se destacan en tarjetas; los rankings se muestran como tablas ordenables; la tendencia como una gráfica sencilla. Todo en español, con montos en quetzales (Q).
 
 ## Fases de implementación
 
-### Fase 1 (MVP, lo que se construye ahora)
-- Submenú "Insumos y Equipos Quirúrgicos" con las dos listas (sin precio): crear, editar, desactivar.
-- Selección de insumos/equipos en la cirugía desde el catálogo (reemplaza el texto libre); se retira el total por precio de insumos.
-- Estado de insumos para caja en cirugías de Alquiler (pendiente / insumos registrados / sin insumos adicionales), visible para caja.
-- Nota operatoria con procedimiento autollenado y firma en texto (cirujano), guardada en el expediente del paciente y marcada en el historial de consultas.
-- Submenú "Procedimientos de Anestesia": tipos de anestesia con valor, registros automáticos desde cada cirugía + manuales, y cierre mensual por anestesiólogo con monto a pagar y marcado de pago.
+### Fase 1 — MVP (se construye ahora)
+- Dashboard: ventas del día separadas en Clínica y Óptica (con total).
+- Historial de Cierres para superadmin: ver todos los cajeros, ingresos recalculados de forma correcta (arreglo del "no cuadra"), detalle con desglose por tipo de ingreso y resumen comparativo por cajero.
+- Área Análisis de Producción (solo superadmin, menú Finanzas) con filtro de período y: indicadores clave (total, # ventas, ticket promedio), top productos (por ingresos y por unidades), ventas por cajero/vendedor, ventas por médico, ventas por categoría, y gráfica de tendencia por día. Solo ventas de clínica.
 
-### Fase 2 (después)
-- Exportación a Excel/PDF del cierre mensual de anestesia y de la nota operatoria (nota imprimible).
-- Integración directa del estado/insumos en la pantalla de cobro de caja para alquileres.
-- Categorías y filtros en el catálogo de insumos; reporte de uso de insumos por cirugía.
+### Fase 2 — Futuro
+- Análisis por método de pago (efectivo vs. tarjeta vs. otros) y desglose de cobrado vs. crédito.
+- Exportar reportes a Excel/PDF e impresión de los cierres y del análisis.
+- Comparativa entre períodos (p. ej. este mes vs. mes anterior) y metas de venta.
 
-### Fase 3 (después)
-- Firma dibujada en pantalla (además de texto) para la nota operatoria.
-- Tarifas de anestesia por anestesiólogo (además del valor fijo por tipo).
-- Tableros/analítica de anestesia e insumos y, opcionalmente, descuento de insumos del inventario.
+### Fase 3 — Futuro
+- Incluir óptica en el área de análisis.
+- Rentabilidad/márgenes (costo vs. precio) por producto y categoría.
+- Análisis por responsable de cuentas por cobrar y alertas automáticas de desempeño.
 
 ## Supuestos
-- "No llevan precio": el catálogo de insumos/equipos no maneja precios; cualquier cobro adicional lo decide y registra caja, no este módulo. Por eso el detalle de la cirugía deja de sumar precios de insumos (el costo de procedimiento IGSS se mantiene como hoy).
-- Insumos y equipos se administran en un mismo submenú con dos secciones, y ambos se eligen de catálogo al registrarlos en la cirugía.
-- El estado de insumos para caja aplica solo a cirugías de institución "Alquiler"; las demás pueden registrar insumos/equipos sin ese estado.
-- La nota operatoria requiere un paciente registrado para adjuntarse al expediente; si la cirugía no tiene paciente vinculado, se pide vincularlo primero. El nombre del procedimiento y la firma se prellenan (procedimiento de la cirugía y nombre del cirujano) y son editables.
-- Los registros de anestesia se crean y mantienen sincronizados desde la cirugía (tipo, anestesiólogo y fecha) y son editables; también se permiten registros manuales.
-- El honorario es un valor fijo por tipo de anestesia (igual para todos los anestesiólogos) y se pueden crear varios tipos; el monto mensual a pagar a cada anestesiólogo es la suma de los valores de los tipos de sus procedimientos del mes.
-- Un mes cerrado puede marcarse como pagado y queda de solo lectura tras el cierre.
-- La administración de catálogos y el cierre mensual de anestesia (financiero) quedan disponibles para los roles administrativos; el registro operativo (insumos, estado, nota operatoria) para los roles con acceso a Sala de Operaciones.
-- Todo el trabajo y los datos de ejemplo permanecen solo en el entorno de preview.
+- El área de análisis cubre **solo ventas de clínica** (Punto de Venta); se excluye óptica (reservada para una fase posterior). *(Confirmado por el usuario.)*
+- El acceso al análisis y a la comparación de cajeros es **exclusivo del superadmin**. *(Confirmado por el usuario.)*
+- Las métricas incluidas son: top productos (ingresos y unidades), ventas por cajero/vendedor, tendencia por día + ticket promedio + # de ventas, ventas por médico que refiere y por categoría. **No** se incluye "ventas por método de pago" en la Fase 1 (pasa a Fase 2). *(Según la selección del usuario.)*
+- El problema de "ingresos que no cuadran" se resuelve recalculando en vivo los ingresos de cada cierre a partir de los movimientos reales de caja (misma fuente que el consolidado "Todas las cajas"), que es la cifra de referencia correcta.
+- Para "ventas por categoría" se toma la categoría desde el catálogo de productos (las ventas guardan el producto, no la categoría directamente); los productos sin categoría se agrupan como "Sin categoría".
+- "Vendedor" y "cajero" se tratan como la misma persona (quien registra la venta en el POS), ya que así se registra hoy en el sistema.
+- El historial de cierres sigue mostrando los cierres de clínica; cada cajero no-superadmin sigue viendo solo los suyos.
+- Los montos se muestran en quetzales y las fechas usan la zona horaria de Guatemala, como en el resto del sistema.

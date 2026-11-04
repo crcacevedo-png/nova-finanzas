@@ -190,6 +190,7 @@ const Caja = () => {
   
   // Historial de cierres
   const [historialCierres, setHistorialCierres] = useState([]);
+  const [resumenCajeros, setResumenCajeros] = useState([]);
   const [historialDialogOpen, setHistorialDialogOpen] = useState(false);
 
   // Vista consolidada (Admin/SuperAdmin): todas las cajas del día
@@ -334,6 +335,7 @@ const Caja = () => {
     try {
       const response = await axios.get(`${API_URL}/caja/cierres?limit=30`);
       setHistorialCierres(response.data?.data || response.data || []);
+      setResumenCajeros(response.data?.resumen_cajeros || []);
     } catch (error) {
       console.error('Error fetching historial cierres:', error);
     }
@@ -1844,14 +1846,34 @@ const Caja = () => {
 
       {/* Dialog: Historial de Cierres */}
       <Dialog open={historialDialogOpen} onOpenChange={setHistorialDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Historial de Cierres</DialogTitle>
           </DialogHeader>
+
+          {isSuperAdmin && resumenCajeros.length > 0 && (
+            <div className="mb-4" data-testid="resumen-comparativo-cajeros">
+              <p className="text-sm font-semibold text-slate-600 mb-2">Comparativo por cajero</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {resumenCajeros.map(r => (
+                  <div key={r.cajero_id} className="rounded-lg border bg-slate-50 p-3" data-testid={`resumen-cajero-${r.cajero_id}`}>
+                    <p className="font-medium text-slate-800 truncate">{r.cajero_nombre}</p>
+                    <p className="text-lg font-bold text-green-600">{formatCurrency(r.total_ingresos)}</p>
+                    <p className="text-xs text-slate-500">{r.num_ventas} ventas · {r.num_cierres} cierres</p>
+                    <p className={`text-xs ${(r.diferencia_acumulada || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      Dif. arqueo: {formatCurrency(r.diferencia_acumulada)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
+                {isSuperAdmin && <TableHead>Cajero</TableHead>}
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Apertura</TableHead>
                 <TableHead className="text-right">Ingresos</TableHead>
@@ -1864,6 +1886,7 @@ const Caja = () => {
               {historialCierres.map(cierre => (
                 <TableRow key={cierre.id}>
                   <TableCell>{formatDate(cierre.fecha)}</TableCell>
+                  {isSuperAdmin && <TableCell className="font-medium">{cierre.cajero_nombre || cierre.abierto_por_nombre}</TableCell>}
                   <TableCell>
                     <Badge className={getEstadoBadge(cierre.estado)}>{cierre.estado}</Badge>
                   </TableCell>
@@ -1871,7 +1894,7 @@ const Caja = () => {
                   <TableCell className="text-right text-green-600">{formatCurrency(cierre.total_ingresos)}</TableCell>
                   <TableCell className="text-right text-red-600">{formatCurrency(cierre.total_egresos)}</TableCell>
                   <TableCell className={`text-right ${(cierre.diferencia || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {cierre.diferencia !== null ? formatCurrency(cierre.diferencia) : '-'}
+                    {cierre.diferencia !== null && cierre.diferencia !== undefined ? formatCurrency(cierre.diferencia) : '-'}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex justify-center gap-1">
@@ -1942,6 +1965,23 @@ const Caja = () => {
                 <div className="flex justify-between text-red-600">
                   <span>Total Egresos</span>
                   <span className="font-medium">-{formatCurrency(cierreDetalle.total_egresos)}</span>
+                </div>
+                <div className="border-t pt-2 space-y-1 text-sm text-slate-600" data-testid="desglose-ingresos">
+                  <p className="font-semibold text-slate-700">Desglose de ingresos ({cierreDetalle.num_ventas || 0} ventas)</p>
+                  <div className="flex justify-between">
+                    <span>Efectivo</span>
+                    <span>{formatCurrency(cierreDetalle.ingresos_efectivo || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Otros métodos</span>
+                    <span>{formatCurrency(cierreDetalle.ingresos_otros || 0)}</span>
+                  </div>
+                  {cierreDetalle.desglose_por_metodo && Object.entries(cierreDetalle.desglose_por_metodo).map(([m, v]) => (
+                    <div key={m} className="flex justify-between text-xs text-slate-400 pl-3">
+                      <span>· {m}</span>
+                      <span>{formatCurrency(v)}</span>
+                    </div>
+                  ))}
                 </div>
                 <div className="border-t pt-2 flex justify-between font-bold">
                   <span>Saldo Esperado (Efectivo)</span>

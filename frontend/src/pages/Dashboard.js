@@ -363,13 +363,29 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-            <StatCard
-              title={resumenDia?.fecha ? 'Ventas del Día' : 'Ventas'}
-              value={formatCurrency(resumenDia?.ventas?.total || 0)}
-              icon={ShoppingCart}
-              colorClass="metric-teal"
-              subtitle={`${resumenDia?.ventas?.cantidad || 0} ventas · Cobrado ${formatCurrency(resumenDia?.ventas?.cobrado || 0)}`}
-            />
+            <Card className="card-teal card-hover" data-testid="ventas-dia-card">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>{resumenDia?.fecha ? 'Ventas del Día' : 'Ventas'}</p>
+                    <p className="text-2xl font-bold metric-teal">{formatCurrency(resumenDia?.ventas?.total || 0)}</p>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center justify-between gap-3 text-xs" data-testid="ventas-clinica">
+                        <span style={{ color: 'var(--text-hint)' }}>Clínica</span>
+                        <span className="font-semibold text-slate-700">{formatCurrency(resumenDia?.ventas_clinica?.total || 0)} · {resumenDia?.ventas_clinica?.cantidad || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs" data-testid="ventas-optica">
+                        <span style={{ color: 'var(--text-hint)' }}>Óptica</span>
+                        <span className="font-semibold text-slate-700">{formatCurrency(resumenDia?.ventas_optica?.total || 0)} · {resumenDia?.ventas_optica?.cantidad || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl gradient-teal">
+                    <ShoppingCart className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             <StatCard
               title={resumenDia?.fecha ? 'Citas del Día' : 'Citas'}
               value={`${resumenDia?.citas?.total || 0}`}

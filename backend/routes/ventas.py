@@ -917,6 +917,156 @@ async def resumen_ventas_dia(
         productos_mas_vendidos=productos_ordenados
     )
 
+def require_superadmin_dep():
+    """Dependencia: solo superadmin."""
+    from server import get_current_user
+
+    async def _dep(current_user: dict = Depends(get_current_user)):
+        if current_user.get("role") != "superadmin":
+            raise HTTPException(status_code=403, detail="Solo el superadministrador puede ver este análisis")
+        return current_user
+
+    return _dep
+
+
+@router.get("/analisis")
+async def analisis_produccion(
+    periodo: str = Query("hoy"),
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    current_user: dict = Depends(require_superadmin_dep())
+):
+    """Análisis de producción de ventas de clínica (POS). Solo superadmin."""
+    db = get_db()
+    n = now_gt()
+    hoy = n.strftime("%Y-%m-%d")
+
+    if periodo == "semana":
+        start = n - timedelta(days=n.weekday())
+        f_desde, f_hasta = start.strftime("%Y-%m-%d"), hoy
+    elif periodo == "mes":
+        f_desde, f_hasta = n.strftime("%Y-%m-01"), hoy
+    elif periodo == "rango" and desde and hasta:
+        f_desde, f_hasta = desde, hasta
+    else:
+        f_desde, f_hasta = hoy, hoy
+    if f_desde > f_hasta:
+        f_desde, f_hasta = f_hasta, f_desde
+
+    ini = dia_gt_a_rango_utc(f_desde)[0]
+    fin = dia_gt_a_rango_utc(f_hasta)[1]
+
+    ventas = await db.ventas.find({
+        "origen": "clinica",
+        "estado": "completada",
+        "fecha": {"$gte": ini, "$lte": fin}
+    }, {"_id": 0}).to_list(20000)
+
+    num_ventas = len(ventas)
+    total_vendido = round(sum(v.get("total", 0) or 0 for v in ventas), 2)
+    ticket_promedio = round(total_vendido / num_ventas, 2) if num_ventas else 0.0
+
+    productos = {}
+    por_cajero = {}
+    por_medico = {}
+    tendencia = {}
+    producto_ids = set()
+
+    for v in ventas:
+        # Tendencia por día (hora Guatemala)
+        try:
+            dia = datetime.fromisoformat(v["fecha"]).astimezone(GUATEMALA_TZ).strftime("%Y-%m-%d")
+        except Exception:
+            dia = (v.get("fecha") or "")[:10]
+        t = tendencia.setdefault(dia, {"fecha": dia, "monto": 0.0, "num_ventas": 0})
+        t["monto"] += v.get("total", 0) or 0
+        t["num_ventas"] += 1
+
+        # Por cajero / vendedor
+        cid = v.get("vendedor_id") or "sin"
+        rc = por_cajero.setdefault(cid, {
+            "vendedor_id": cid,
+            "vendedor_nombre": v.get("vendedor_nombre") or "Sin vendedor",
+            "monto": 0.0, "num_ventas": 0
+        })
+        rc["monto"] += v.get("total", 0) or 0
+        rc["num_ventas"] += 1
+
+        # Por médico que refiere
+        mid = v.get("medico_id") or "sin"
+        rm = por_medico.setdefault(mid, {
+            "medico_id": mid,
+            "medico_nombre": v.get("medico_nombre") or "Sin médico",
+            "monto": 0.0, "num_ventas": 0
+        })
+        rm["monto"] += v.get("total", 0) or 0
+        rm["num_ventas"] += 1
+
+        # Productos
+        for item in v.get("items", []):
+            pid = item.get("producto_id")
+            if pid:
+                producto_ids.add(pid)
+            p = productos.setdefault(pid, {
+                "producto_id": pid,
+                "nombre": item.get("nombre", ""),
+                "cantidad": 0, "monto": 0.0
+            })
+            p["cantidad"] += item.get("cantidad", 0) or 0
+            p["monto"] += item.get("subtotal", 0) or 0
+
+    # Categorías: lookup producto -> categoria_id -> nombre
+    cat_de_producto = {}
+    if producto_ids:
+        async for pr in db.productos_inventario.find(
+            {"id": {"$in": list(producto_ids)}}, {"_id": 0, "id": 1, "categoria_id": 1}
+        ):
+            cat_de_producto[pr["id"]] = pr.get("categoria_id")
+    cat_ids = {c for c in cat_de_producto.values() if c}
+    nombre_categoria = {}
+    if cat_ids:
+        async for c in db.categorias_inventario.find(
+            {"id": {"$in": list(cat_ids)}}, {"_id": 0, "id": 1, "nombre": 1}
+        ):
+            nombre_categoria[c["id"]] = c.get("nombre")
+
+    por_categoria = {}
+    for p in productos.values():
+        cat_id = cat_de_producto.get(p["producto_id"])
+        cat_nombre = nombre_categoria.get(cat_id, "Sin categoría") if cat_id else "Sin categoría"
+        rcat = por_categoria.setdefault(cat_nombre, {"categoria": cat_nombre, "monto": 0.0, "cantidad": 0})
+        rcat["monto"] += p["monto"]
+        rcat["cantidad"] += p["cantidad"]
+
+    def _round_list(items, keys=("monto",)):
+        for it in items:
+            for k in keys:
+                if k in it:
+                    it[k] = round(it[k], 2)
+        return items
+
+    prod_list = list(productos.values())
+    top_ingresos = _round_list(sorted(prod_list, key=lambda x: x["monto"], reverse=True)[:10])
+    top_unidades = _round_list(sorted(prod_list, key=lambda x: x["cantidad"], reverse=True)[:10])
+
+    return {
+        "periodo": periodo,
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "kpis": {
+            "total_vendido": total_vendido,
+            "num_ventas": num_ventas,
+            "ticket_promedio": ticket_promedio,
+        },
+        "top_productos_ingresos": top_ingresos,
+        "top_productos_unidades": top_unidades,
+        "por_cajero": _round_list(sorted(por_cajero.values(), key=lambda x: x["monto"], reverse=True)),
+        "por_medico": _round_list(sorted(por_medico.values(), key=lambda x: x["monto"], reverse=True)),
+        "por_categoria": _round_list(sorted(por_categoria.values(), key=lambda x: x["monto"], reverse=True)),
+        "tendencia": _round_list(sorted(tendencia.values(), key=lambda x: x["fecha"])),
+    }
+
+
 @router.get("/{venta_id}", response_model=VentaResponse)
 async def obtener_venta(
     venta_id: str,

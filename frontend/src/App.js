@@ -50,6 +50,7 @@ import ReporteRentabilidad from './pages/inventario/ReporteRentabilidad';
 import Sociedades from './pages/inventario/Sociedades';
 // Punto de Venta (POS)
 import PuntoVenta from './pages/PuntoVenta';
+import AnalisisProduccion from './pages/AnalisisProduccion';
 import './App.css';
 
 // Protected Route Component
@@ -411,8 +412,18 @@ function AppRoutes() {
         } 
       />
 
+      {/* Análisis de Producción - Solo superadmin */}
+      <Route
+        path="/analisis-produccion"
+        element={
+          <ProtectedRoute requiredRole="superadmin">
+            <AnalisisProduccion />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Agenda - Citas de pacientes */}
-      <Route 
+      <Route
         path="/agenda" 
         element={
           <ProtectedRoute requiredPermission="view_agenda">

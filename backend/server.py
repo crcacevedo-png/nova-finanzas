@@ -3584,6 +3584,17 @@ async def get_dashboard_resumen_dia(
         sum(v.get("total_paid", 0) or 0 for v in ventas_op)
         + sum(_cobrado_clinica(v) for v in ventas_cl), 2)
 
+    ventas_optica = {
+        "cantidad": len(ventas_op),
+        "total": round(sum(v.get("total", 0) or 0 for v in ventas_op), 2),
+        "cobrado": round(sum(v.get("total_paid", 0) or 0 for v in ventas_op), 2),
+    }
+    ventas_clinica = {
+        "cantidad": len(ventas_cl),
+        "total": round(sum(v.get("total", 0) or 0 for v in ventas_cl), 2),
+        "cobrado": round(sum(_cobrado_clinica(v) for v in ventas_cl), 2),
+    }
+
     # Citas (fecha es string YYYY-MM-DD en hora Guatemala)
     citas = await db.citas.find({"fecha": fecha_filtro}, {"_id": 0, "estado": 1}).to_list(10000)
     citas_atendidas = sum(1 for c in citas if c.get("estado") in ["Atendida", "En consulta", "Presente"])
@@ -3618,6 +3629,8 @@ async def get_dashboard_resumen_dia(
         "desde": f_desde,
         "hasta": f_hasta,
         "ventas": {"cantidad": ventas_cantidad, "total": ventas_total, "cobrado": ventas_cobrado},
+        "ventas_clinica": ventas_clinica,
+        "ventas_optica": ventas_optica,
         "citas": {"total": len(citas), "atendidas": citas_atendidas, "canceladas": citas_canceladas},
         "evaluaciones": {"total": evaluaciones_total},
         "igss": {"servicios": len(acreditaciones), "total": igss_total},

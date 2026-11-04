@@ -98,6 +98,44 @@ async def calcular_totales_caja_dia(fecha_dia: str, cajero_id: Optional[str] = N
     return totales
 
 
+async def _desglose_ingresos_dia(fecha_dia: str, cajero_id: Optional[str] = None) -> dict:
+    """Desglose de ingresos/egresos reales de un día (misma fuente que el consolidado):
+    efectivo vs otros métodos, por método y número de ventas."""
+    inicio, fin = dia_gt_a_rango_utc(fecha_dia)
+    query = {"origen": "clinica", "fecha": {"$gte": inicio, "$lte": fin}}
+    if cajero_id:
+        query["cajero_id"] = cajero_id
+    movs = await db.caja_movimientos.find(query, {"_id": 0}).to_list(10000)
+
+    ing_efectivo = ing_otros = egr_efectivo = egresos = 0.0
+    num_ventas = 0
+    por_metodo = {}
+    for m in movs:
+        metodo = (m.get("metodo_pago") or "Efectivo")
+        monto = m.get("monto", 0) or 0
+        if m.get("tipo") == "Ingreso":
+            if metodo.lower() == "efectivo":
+                ing_efectivo += monto
+            else:
+                ing_otros += monto
+            por_metodo[metodo] = por_metodo.get(metodo, 0) + monto
+            if m.get("categoria") == "Venta":
+                num_ventas += 1
+        else:
+            egresos += monto
+            if metodo.lower() == "efectivo":
+                egr_efectivo += monto
+    return {
+        "ingresos_efectivo": round(ing_efectivo, 2),
+        "ingresos_otros": round(ing_otros, 2),
+        "total_ingresos": round(ing_efectivo + ing_otros, 2),
+        "total_egresos": round(egresos, 2),
+        "egresos_efectivo": round(egr_efectivo, 2),
+        "num_ventas": num_ventas,
+        "por_metodo": {k: round(v, 2) for k, v in por_metodo.items()},
+    }
+
+
 # ==================== ESTADO DE CAJA ====================
 
 @router.get("/estado", response_model=CajaEstadoResponse)
@@ -397,14 +435,58 @@ async def get_historial_cierres(
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Obtener historial de cierres del usuario actual"""
-    query = {"origen": "clinica", "abierto_por": current_user["id"]}
+    """Historial de cierres. El superadmin ve los de todos los cajeros (con ingresos
+    recalculados de los movimientos reales) y un resumen comparativo; el resto ve solo
+    los suyos."""
+    es_super = current_user.get("role") == "superadmin"
+    query = {"origen": "clinica"} if es_super else {"origen": "clinica", "abierto_por": current_user["id"]}
+
     total = await db.caja_cierres.count_documents(query)
     cierres = await db.caja_cierres.find(
         query, {"_id": 0}
     ).sort("fecha", -1).skip(offset).limit(limit).to_list(limit)
-    
-    return {"data": cierres, "total": total}
+
+    data = []
+    resumen = {}
+    for c in cierres:
+        d = await _desglose_ingresos_dia(c["fecha"], c.get("abierto_por"))
+        enriched = {
+            **c,
+            "cajero_nombre": c.get("abierto_por_nombre"),
+            "total_ingresos": d["total_ingresos"],
+            "total_egresos": d["total_egresos"],
+            "ingresos_efectivo": d["ingresos_efectivo"],
+            "ingresos_otros": d["ingresos_otros"],
+            "num_ventas": d["num_ventas"],
+        }
+        data.append(enriched)
+
+        uid = c.get("abierto_por")
+        r = resumen.setdefault(uid, {
+            "cajero_id": uid,
+            "cajero_nombre": c.get("abierto_por_nombre"),
+            "total_ingresos": 0.0,
+            "num_ventas": 0,
+            "num_cierres": 0,
+            "diferencia_acumulada": 0.0,
+        })
+        r["total_ingresos"] += d["total_ingresos"]
+        r["num_ventas"] += d["num_ventas"]
+        r["num_cierres"] += 1
+        if c.get("diferencia") is not None:
+            r["diferencia_acumulada"] += c.get("diferencia") or 0
+
+    resumen_cajeros = sorted(resumen.values(), key=lambda x: x["total_ingresos"], reverse=True)
+    for r in resumen_cajeros:
+        r["total_ingresos"] = round(r["total_ingresos"], 2)
+        r["diferencia_acumulada"] = round(r["diferencia_acumulada"], 2)
+
+    return {
+        "data": data,
+        "total": total,
+        "resumen_cajeros": resumen_cajeros,
+        "is_superadmin": es_super,
+    }
 
 
 @router.get("/consolidado")
@@ -659,16 +741,29 @@ async def cerrar_caja_supervisor(
     return await _aplicar_cierre(cierre, cierre_req.efectivo_contado, cierre_req.observaciones, current_user)
 
 
-@router.get("/cierres/{cierre_id}", response_model=CajaCierreResponse)
+@router.get("/cierres/{cierre_id}")
 async def get_cierre(
     cierre_id: str,
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Obtener detalle de un cierre"""
+    """Detalle de un cierre con ingresos recalculados y desglose por tipo (efectivo vs otros)."""
     cierre = await db.caja_cierres.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
     if not cierre:
         raise HTTPException(status_code=404, detail="Cierre no encontrado")
-    return cierre
+    d = await _desglose_ingresos_dia(cierre["fecha"], cierre.get("abierto_por"))
+    saldo_esperado = cierre.get("monto_apertura", 0) + d["ingresos_efectivo"] - d["egresos_efectivo"]
+    return {
+        **cierre,
+        "cajero_nombre": cierre.get("abierto_por_nombre"),
+        "total_ingresos": d["total_ingresos"],
+        "total_egresos": d["total_egresos"],
+        "ingresos_efectivo": d["ingresos_efectivo"],
+        "ingresos_otros": d["ingresos_otros"],
+        "num_ventas": d["num_ventas"],
+        "desglose_por_metodo": d["por_metodo"],
+        "saldo_esperado_efectivo": cierre.get("saldo_esperado_efectivo")
+            if cierre.get("estado") == "Cerrado" else round(saldo_esperado, 2),
+    }
 
 
 @router.post("/cierres/{cierre_id}/reabrir")
