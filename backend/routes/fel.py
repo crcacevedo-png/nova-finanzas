@@ -210,10 +210,12 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
     suma_iva = 0.0
     suma_total = 0.0
     for it in norm["items"]:
+        qty = it["cantidad"] or 1
         total_linea = _round2(it["total_linea"])
         iva = _round2(total_linea * 12.0 / 112.0)
         base = _round2(total_linea - iva)
         total_item = _round2(base + iva)
+        precio_unit_iva_incl = _round2(total_item / qty)
         suma_iva = _round2(suma_iva + iva)
         suma_total = _round2(suma_total + total_item)
         item_obj = {
@@ -221,7 +223,7 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
             "Description": str(it["descripcion"])[:500],
             "Qty": it["cantidad"],
             "UnitOfMeasure": "UND",
-            "Price": it["precio_unitario"],
+            "Price": precio_unit_iva_incl,
             "Taxes": {"Tax": [{"Code": "1", "Description": "IVA", "TaxableAmount": base, "Rate": 12, "Amount": iva}]},
             "Totals": {"TotalItem": total_item},
         }

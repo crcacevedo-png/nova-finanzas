@@ -511,3 +511,8 @@ PENDIENTE para completar prueba real: el usuario debe ingresar su NIT real de em
 ## 2026-11-04 — Fix "Ver paciente" (Agenda) + mejora "Copiar a receta de anteojos"
 - Agenda "Ver paciente" abría /pacientes?id= pero Pacientes.js no leía el id -> agregado useEffect que lee ?id= y abre el expediente (detailDialogOpen). Verificado en pantalla.
 - EvaluacionOftalmologica.js copiarRefraccionAReceta: el copiado desde Refracción ya funcionaba en preview (producción corre build anterior; requiere redeploy). Mejora: si Refracción está vacía, copia desde Lensometría/Autorefractómetro; si todo está vacío, NO crea receta vacía y muestra error. Verificado en preview (lensometría->receta OK; vacío->error).
+
+## 2026-11-04 — FEL Digifact: corrección estructura NUC + IVA incluido
+- routes/fel.py _build_nuc: corregida estructura NUC para pasar el esquema de Digifact (verificado contra ejemplo oficial FACT CF): Items como array, Taxes.Tax[].Code y BranchInfo.Code como String, frase con Name "TipoFrase"+"Escenario" (NO "CodigoEscenario"), agregado UnitOfMeasure "UND" y Rate 12.
+- IVA incluido: Price del ítem ahora = precio con IVA incluido (TotalItem/Qty); base=total/1.12, IVA=total-base. Clínica total ya traía iva aparte sumado al total; óptica total=subtotal IVA-incl. Verificado: clínica 168=150+18; óptica 680=607.15+72.85.
+- BLOQUEO RESTANTE (lado Digifact): certificación falla en PrepareEmisorForTOSIGN [3064] Root element is missing, idéntico para cualquier TipoFrase/Escenario -> el emisor NIT 000090042247 no está aprovisionado/habilitado para firmar en test. Requiere acción de Digifact. frase_tipo/frase_escenario configurables en Configuración FEL.
