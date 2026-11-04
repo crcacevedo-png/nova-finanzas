@@ -234,6 +234,7 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('optica_tipos_lente')) opticaItems.push({ path: '/optica/tipos-lente', icon: Eye, label: 'Lentes Oftálmicos', testId: 'nav-optica-tipos-lente' });
     if (isMenuEnabled('optica_accesorios')) opticaItems.push({ path: '/optica/accesorios', icon: Watch, label: 'Accesorios', testId: 'nav-optica-accesorios' });
     if (isMenuEnabled('optica_pos')) opticaItems.push({ path: '/optica/punto-venta', icon: ShoppingCart, label: 'Punto de Venta', testId: 'nav-optica-pos' });
+    opticaItems.push({ path: '/optica/ventas', icon: FileText, label: 'Ventas', testId: 'nav-optica-ventas' });
     if (isMenuEnabled('optica_cxc')) opticaItems.push({ path: '/optica/cuentas-cobrar', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-optica-cxc' });
     if (isMenuEnabled('optica_compras')) opticaItems.push({ path: '/optica/compras', icon: Receipt, label: 'Compras', testId: 'nav-optica-compras' });
   }

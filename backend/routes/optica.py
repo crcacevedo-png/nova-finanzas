@@ -1534,27 +1534,52 @@ async def add_sale_payment(sale_id: str, payment_data: SalePaymentCreate, curren
 
 
 @router.put("/sales/{sale_id}/cancel")
-async def cancel_optica_sale(sale_id: str, current_user: dict = Depends(require_permission("manage_optica_sales"))):
-    """Cancelar una venta y restaurar stock"""
+async def cancel_optica_sale(sale_id: str, current_user: dict = Depends(require_role(["admin", "superadmin"]))):
+    """Anular una venta de óptica y restaurar el inventario. Solo admin/superadmin.
+    Revierte el stock de armazones, lentes de contacto y accesorios según los items
+    de la venta; la caja/CxC de óptica se revierten al quedar la venta en estado
+    'cancelado' (queda excluida de saldos, pendientes y reportes)."""
     sale = await db.optica_sales.find_one({"id": sale_id})
     if not sale:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
-    
+
     if sale["status"] == "cancelado":
         raise HTTPException(status_code=400, detail="Esta venta ya está cancelada")
-    
-    if sale.get("frame_id"):
-        await db.optica_frames.update_one({"id": sale["frame_id"]}, {"$inc": {"stock": 1}})
-    
-    if sale.get("contact_lens_id"):
-        await db.optica_contact_lenses.update_one({"id": sale["contact_lens_id"]}, {"$inc": {"stock": 1}})
-    
+
+    # Revertir inventario a partir de los items V2 (respeta cantidades y tipo)
+    items_v2 = sale.get("items_v2") or []
+    if items_v2:
+        for it in items_v2:
+            qty = it.get("quantity", 1) or 1
+            pid = it.get("product_id")
+            if not pid:
+                continue
+            if it.get("type") == "frame":
+                await db.optica_frames.update_one({"id": pid}, {"$inc": {"stock": qty}})
+            elif it.get("type") == "contact_lens":
+                await db.optica_contact_lenses.update_one({"id": pid}, {"$inc": {"stock": qty}})
+            elif it.get("type") == "accessory":
+                await db.optica_accessories.update_one({"id": pid}, {"$inc": {"stock": qty}})
+            # lens_type no controla stock
+    else:
+        # Legacy: venta sin items_v2
+        if sale.get("frame_id"):
+            await db.optica_frames.update_one({"id": sale["frame_id"]}, {"$inc": {"stock": 1}})
+        if sale.get("contact_lens_id"):
+            await db.optica_contact_lenses.update_one({"id": sale["contact_lens_id"]}, {"$inc": {"stock": 1}})
+
     await db.optica_sales.update_one(
         {"id": sale_id},
-        {"$set": {"status": "cancelado", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "status": "cancelado",
+            "cancelled_by": current_user["id"],
+            "cancelled_by_name": current_user.get("name", current_user.get("username", "")),
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
     )
-    
-    return {"message": "Venta cancelada correctamente. Stock restaurado."}
+
+    return {"message": "Venta anulada correctamente. Inventario restaurado."}
 
 
 # ==================== DASHBOARD ROUTES ====================

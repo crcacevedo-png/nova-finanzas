@@ -49,6 +49,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { agendaApi } from '../services/agendaApi';
 import { patientApi, googleCalendarApi, getGuatemalaDate, igssUnitApi } from '../services/api';
+import { NogSelector } from '../components/NogSelector';
 import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
 import { BloqueosAgenda } from './AgendaBloqueos';
 
@@ -884,6 +885,9 @@ const Agenda = () => {
     dpi: p.dpi || '', address: p.address || '', referral_institution: p.referral_institution || '',
     igss_unit_id: p.igss_unit_id || '', igss_afiliacion: p.igss_afiliacion || '', igss_no_sps: p.igss_no_sps || '',
     igss_codigo: p.igss_codigo || '', igss_tipo_compra: p.igss_tipo_compra || '', igss_nog: p.igss_nog || '',
+    igss_ordenes: (p.igss_ordenes && p.igss_ordenes.length > 0)
+      ? p.igss_ordenes.map(o => ({ ...o }))
+      : [],
   });
 
   const emptyCompletarForm = () => ({
@@ -891,6 +895,22 @@ const Agenda = () => {
     dpi: '', address: '', referral_institution: '',
     igss_unit_id: '', igss_afiliacion: '', igss_no_sps: '',
     igss_codigo: '', igss_tipo_compra: '', igss_nog: '',
+    igss_ordenes: [],
+  });
+
+  // Gestión de órdenes IGSS en el modal de llegada (múltiples NOG/SPS por paciente)
+  const addOrdenCompletar = () => setCompletarForm(prev => ({
+    ...prev,
+    igss_ordenes: [...(prev.igss_ordenes || []), { id: `ord_${Date.now()}`, nog: '', no_sps: '', codigo: '', procedimiento: '' }]
+  }));
+  const removeOrdenCompletar = (idx) => setCompletarForm(prev => ({
+    ...prev,
+    igss_ordenes: (prev.igss_ordenes || []).filter((_, i) => i !== idx)
+  }));
+  const updateOrdenCompletar = (idx, field, value) => setCompletarForm(prev => {
+    const arr = [...(prev.igss_ordenes || [])];
+    arr[idx] = { ...arr[idx], [field]: value };
+    return { ...prev, igss_ordenes: arr };
   });
 
   // Vincular una cita sin expediente a un paciente existente
@@ -2749,8 +2769,56 @@ const Agenda = () => {
                     </Select>
                   </div>
                   <div><Label className="text-xs">Afiliación</Label><Input value={completarForm.igss_afiliacion} onChange={(e) => setCompletarForm(p => ({ ...p, igss_afiliacion: e.target.value }))} /></div>
-                  <div><Label className="text-xs">No. SPS</Label><Input value={completarForm.igss_no_sps} onChange={(e) => setCompletarForm(p => ({ ...p, igss_no_sps: e.target.value }))} /></div>
-                  <div><Label className="text-xs">Código</Label><Input value={completarForm.igss_codigo} onChange={(e) => setCompletarForm(p => ({ ...p, igss_codigo: e.target.value }))} /></div>
+                  <div className="col-span-2 space-y-2 pt-1" data-testid="cf-igss-ordenes">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold text-blue-700">Órdenes IGSS</Label>
+                      <Button
+                        type="button" variant="outline" size="sm"
+                        onClick={addOrdenCompletar}
+                        disabled={!completarForm.igss_unit_id}
+                        className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                        data-testid="cf-add-orden"
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Agregar orden
+                      </Button>
+                    </div>
+                    {!completarForm.igss_unit_id && (
+                      <p className="text-xs text-gray-500">Selecciona una unidad IGSS para agregar órdenes.</p>
+                    )}
+                    {(completarForm.igss_ordenes || []).length === 0 && completarForm.igss_unit_id && (
+                      <p className="text-xs text-gray-500">Opcional: agrega una orden con su NOG para descontar del servicio.</p>
+                    )}
+                    {(completarForm.igss_ordenes || []).map((orden, idx) => (
+                      <div key={orden.id || idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-2 bg-gray-50" data-testid={`cf-orden-row-${idx}`}>
+                        <div className="md:col-span-3 space-y-1">
+                          <Label className="text-xs">NOG {idx + 1}</Label>
+                          <NogSelector
+                            unitId={completarForm.igss_unit_id}
+                            value={orden.nog}
+                            onChange={(val) => updateOrdenCompletar(idx, 'nog', val)}
+                            idSuffix={`-cf-${idx}`}
+                          />
+                        </div>
+                        <div className="md:col-span-2 space-y-1">
+                          <Label className="text-xs">No. SPS</Label>
+                          <Input value={orden.no_sps || ''} onChange={(e) => updateOrdenCompletar(idx, 'no_sps', e.target.value)} placeholder="No. SPS" data-testid={`cf-orden-sps-${idx}`} />
+                        </div>
+                        <div className="md:col-span-2 space-y-1">
+                          <Label className="text-xs">Código</Label>
+                          <Input value={orden.codigo || ''} onChange={(e) => updateOrdenCompletar(idx, 'codigo', e.target.value)} placeholder="Código" data-testid={`cf-orden-codigo-${idx}`} />
+                        </div>
+                        <div className="md:col-span-4 space-y-1">
+                          <Label className="text-xs">Procedimiento / Estudio</Label>
+                          <Input value={orden.procedimiento || ''} onChange={(e) => updateOrdenCompletar(idx, 'procedimiento', e.target.value)} placeholder="Ej: Catarata OD" data-testid={`cf-orden-proc-${idx}`} />
+                        </div>
+                        <div className="md:col-span-1 flex justify-end">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeOrdenCompletar(idx)} className="h-8 w-8 p-0 text-red-500 hover:text-red-700" data-testid={`cf-orden-remove-${idx}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

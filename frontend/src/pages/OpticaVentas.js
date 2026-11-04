@@ -87,6 +87,8 @@ const OpticaVentas = () => {
   const [submitting, setSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   
   // Data for dropdowns
   const [patients, setPatients] = useState([]);
@@ -147,13 +149,16 @@ const OpticaVentas = () => {
   const [exportingReport, setExportingReport] = useState(false);
 
   const canManage = hasPermission('manage_optica_sales');
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const fetchSales = useCallback(async () => {
     try {
       setLoading(true);
       const response = await opticaSaleApi.getAll({ 
         status: statusFilter === 'all' ? undefined : statusFilter,
-        search: searchTerm 
+        search: searchTerm,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined
       });
       setSales(response.data.data || []);
     } catch (error) {
@@ -162,7 +167,54 @@ const OpticaVentas = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, dateFrom, dateTo]);
+
+  const handleCancelSale = async (sale) => {
+    if (!window.confirm(`¿Anular la venta ${sale.order_number}? Se restaurará el inventario y la venta dejará de contar en caja/CxC. Esta acción no se puede deshacer.`)) return;
+    try {
+      await opticaSaleApi.cancel(sale.id);
+      toast.success('Venta anulada. Inventario restaurado.');
+      setDetailDialogOpen(false);
+      fetchSales();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'No se pudo anular la venta');
+    }
+  };
+
+  const handlePrintTicket = (sale) => {
+    const items = (sale.items_v2 && sale.items_v2.length > 0)
+      ? sale.items_v2
+      : [
+          ...(sale.frame_id ? [{ name: 'Armazón', quantity: 1, subtotal: sale.frame_price }] : []),
+          ...(sale.contact_lens_id ? [{ name: 'Lente de contacto', quantity: 1, subtotal: sale.contact_lens_price }] : []),
+          ...((sale.lens_items || []).map(li => ({ name: li.lens_type_name, quantity: li.quantity, subtotal: li.subtotal }))),
+        ];
+    const rows = items.map(it => `<tr><td>${it.name || ''}</td><td style="text-align:center">${it.quantity || 1}</td><td style="text-align:right">${formatCurrency(it.subtotal || 0)}</td></tr>`).join('');
+    const win = window.open('', '_blank', 'width=400,height=600');
+    if (!win) { toast.error('Permite las ventanas emergentes para imprimir'); return; }
+    win.document.write(`
+      <html><head><title>Ticket ${sale.order_number}</title>
+      <style>body{font-family:monospace;font-size:12px;padding:12px;color:#111}h2{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:8px}td,th{padding:3px 0;border-bottom:1px dashed #ccc}.tot{font-weight:bold;font-size:14px}</style>
+      </head><body>
+      <h2>NovaVisión Óptica</h2>
+      <div style="text-align:center">Comprobante de Venta</div>
+      <hr/>
+      <div>Orden: <b>${sale.order_number}</b></div>
+      <div>Fecha: ${formatDate(sale.created_at)}</div>
+      <div>Cliente: ${sale.patient_name || ''}</div>
+      ${sale.doctor_name ? `<div>Médico: ${sale.doctor_name}</div>` : ''}
+      ${sale.status === 'cancelado' ? '<div style="color:#b91c1c;font-weight:bold">** ANULADA **</div>' : ''}
+      <table><thead><tr><th style="text-align:left">Detalle</th><th>Cant</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>${rows}</tbody></table>
+      <hr/>
+      <div style="text-align:right">Descuento: ${formatCurrency(sale.discount_amount || 0)}</div>
+      <div class="tot" style="text-align:right">TOTAL: ${formatCurrency(sale.total || 0)}</div>
+      <div style="text-align:right">Pagado: ${formatCurrency(sale.total_paid || 0)}</div>
+      <div style="text-align:right">Saldo: ${formatCurrency(sale.balance_due || 0)}</div>
+      <hr/><div style="text-align:center">¡Gracias por su compra!</div>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`);
+    win.document.close();
+  };
 
   const fetchLensTypes = useCallback(async () => {
     try {
@@ -678,6 +730,21 @@ const OpticaVentas = () => {
                   <SelectItem value="cancelado">Cancelados</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="flex items-center gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">Desde</Label>
+                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="input-teal" data-testid="ventas-date-from" />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Hasta</Label>
+                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="input-teal" data-testid="ventas-date-to" />
+                </div>
+                {(dateFrom || dateTo) && (
+                  <Button variant="ghost" size="sm" className="self-end h-9" onClick={() => { setDateFrom(''); setDateTo(''); }} data-testid="ventas-date-clear">
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -757,8 +824,19 @@ const OpticaVentas = () => {
                               size="sm"
                               onClick={() => { setSelectedSale(sale); setDetailDialogOpen(true); }}
                               className="h-8 w-8 p-0 hover:bg-[#E1F5EE] hover:text-[#0F6E56]"
+                              data-testid={`ventas-detalle-${sale.id}`}
                             >
                               <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePrintTicket(sale)}
+                              className="h-8 w-8 p-0 hover:bg-slate-100"
+                              title="Reimprimir ticket"
+                              data-testid={`ventas-print-${sale.id}`}
+                            >
+                              <FileText className="w-4 h-4" />
                             </Button>
                             {canManage && sale.status === 'pendiente' && (
                               <Button
@@ -772,6 +850,18 @@ const OpticaVentas = () => {
                                 className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-600"
                               >
                                 <CreditCard className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {isAdminOrSuperAdmin && sale.status !== 'cancelado' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCancelSale(sale)}
+                                className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                                title="Anular venta"
+                                data-testid={`ventas-anular-${sale.id}`}
+                              >
+                                <X className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
@@ -1213,6 +1303,18 @@ const OpticaVentas = () => {
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Registrar Abono
+                </Button>
+              )}
+              {selectedSale && (
+                <Button variant="outline" onClick={() => handlePrintTicket(selectedSale)} data-testid="ventas-detalle-print">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Reimprimir
+                </Button>
+              )}
+              {isAdminOrSuperAdmin && selectedSale && selectedSale.status !== 'cancelado' && (
+                <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleCancelSale(selectedSale)} data-testid="ventas-detalle-anular">
+                  <X className="w-4 h-4 mr-2" />
+                  Anular
                 </Button>
               )}
               <Button variant="outline" onClick={() => setDetailDialogOpen(false)} className="btn-outline">

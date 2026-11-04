@@ -1,64 +1,95 @@
-# NovaVisión ERP — Ventas por área, Historial de Cierres y Análisis de Producción
+# NovaVisión ERP — NOG en llegada de pacientes, NOG para óptica, y revisión de ventas de óptica
 
-Tres mejoras para que la administración entienda y audite las ventas de la clínica:
-separar las ventas del día por área, convertir el historial de cierres en una herramienta de comparación entre cajeros, y crear un área de análisis de producción.
+Tres ajustes que completan el manejo de órdenes IGSS (NOG) en el ingreso de pacientes
+y dan a óptica/administración una pantalla para revisar y anular ventas pasadas de óptica.
 
 ## Para quién es
-Para el superadministrador de la clínica, que necesita ver de dónde viene cada quetzal, comparar el desempeño de los cajeros y analizar qué se vende. El personal de caja y los demás usuarios no entran a estas vistas de análisis.
+Para el personal de recepción y clínico que marca la llegada de pacientes IGSS, para los
+usuarios de óptica que registran pacientes, y para óptica, administrador y superadministrador
+que necesitan consultar las ventas de óptica ya realizadas.
 
 ## Funciones principales y experiencia
 
-### 1. Ventas del Día por área (Dashboard)
-- La tarjeta "Ventas del Día" del Dashboard se divide en dos cifras: **Clínica** y **Óptica**, además del total.
-- Cada cifra muestra su monto y la cantidad de ventas, para identificar rápidamente la fuente.
+### 1. Agregar NOG al marcar la llegada del paciente (y descontar del NOG)
+- En el modal "Crear expediente del paciente" (el que aparece al marcar llegada desde la Agenda),
+  cuando la institución es **IGSS** y se elige una **Unidad**, aparece la misma sección de
+  **Órdenes IGSS** que ya existe en el módulo de Pacientes.
+- Se puede **elegir un NOG del catálogo de la unidad o escribir uno libre**, y **agregar más de
+  una orden**. Cada orden lleva su propio **No. SPS**, **Código** y **Procedimiento/Estudio**.
+- Al guardar, **se descuenta un servicio del NOG correspondiente en el módulo IGSS**, exactamente
+  igual que cuando el paciente se registra desde el módulo de Pacientes: respeta el cupo del
+  contrato, no duplica el descuento para la misma autorización y libera/ajusta el cupo si luego
+  se corrige la orden.
+- Las órdenes son opcionales: se puede marcar la llegada sin bloquear si aún no hay NOG.
+- Lo ingresado queda guardado en el expediente del paciente y se refleja igual que si se
+  hubiera capturado desde el módulo de Pacientes.
 
-### 2. Historial de Cierres con comparación de cajeros (solo superadmin)
-- El superadministrador ve los cierres de **todos los cajeros** (hoy solo ve los suyos), no solo los propios.
-- Cada fila muestra fecha, cajero, estado, apertura, ingresos, egresos, efectivo contado y diferencia de arqueo.
-- **Corrección del "no cuadra":** la columna de ingresos se recalcula a partir de los movimientos reales de caja de ese cajero en ese día (la misma fuente que el resumen de "Todas las cajas"), en lugar de un valor guardado que quedaba en cero o desfasado. Las cajas aún abiertas muestran su total en vivo en lugar de Q0.00.
-- Cada cierre se puede abrir para ver un detalle con el desglose por tipo de ingreso (efectivo vs. otros métodos), para que el número sea verificable.
-- Un resumen comparativo arriba de la tabla: por cada cajero, total vendido, número de ventas y diferencia acumulada de arqueo.
+### 2. Óptica puede elegir y editar NOG en el módulo de Pacientes
+- Hoy el usuario de óptica puede ingresar pacientes pero no logra elegir/editar los NOG; el
+  rol "Usuario" sí puede. Se corrige para que **todos los roles con permiso de crear/editar
+  pacientes** —incluido óptica— tengan exactamente la misma capacidad de elegir y editar las
+  órdenes IGSS (NOG, No. SPS, código, procedimiento), que se guarden correctamente y que
+  descuenten del NOG igual que para los demás usuarios.
 
-### 3. Área de Análisis de Producción (nuevo menú, solo superadmin)
-Nueva sección en el menú de Finanzas, enfocada en las ventas de clínica (Punto de Venta). Incluye un selector de período: **Hoy / Esta semana / Este mes / Rango personalizado**. Dentro:
-- **Indicadores clave:** total vendido, número de ventas y ticket promedio del período.
-- **Top productos** en dos vistas: por ingresos (Q) y por unidades vendidas.
-- **Ventas por cajero / vendedor:** ranking con monto y número de ventas por persona.
-- **Ventas por médico que refiere:** monto y número de ventas asociadas a cada médico.
-- **Ventas por categoría de producto:** distribución del total entre categorías.
-- **Tendencia por día:** gráfica de la evolución de las ventas en el período seleccionado.
+### 3. Revisar ventas pasadas de óptica (en el menú de Óptica)
+- Nueva entrada **"Ventas"** dentro del menú **Óptica**, visible para **óptica, administrador y
+  superadministrador**.
+- Permite **buscar y filtrar** ventas pasadas de óptica (por rango de fechas, paciente, número
+  de venta y estado), **abrir el detalle** de una venta y **reimprimir su ticket/comprobante**.
+- Permite **anular (cancelar)** una venta pasada, revirtiendo el **inventario** y los registros
+  de **caja / cuentas por cobrar** asociados.
+- La anulación es una acción sensible: **solo administrador y superadministrador** pueden
+  anular; óptica puede consultar y reimprimir.
 
-## Flujo de uso
-- **Dashboard:** el superadministrador abre el Dashboard y ve de inmediato cuánto se vendió en clínica y cuánto en óptica.
-- **Cierres:** en Mi Caja → Historial de Cierres, el superadministrador revisa los cierres de todos los cajeros, compara su desempeño y verifica que los ingresos coincidan con lo esperado.
-- **Análisis:** desde el menú de Finanzas entra a Análisis de Producción, elige un período y revisa qué se vende más, quién vende más, qué médico refiere más y cómo evolucionan las ventas.
+## User flow
+- **Llegada del paciente:** en la Agenda se marca la llegada → se abre "Crear expediente" →
+  se elige IGSS y la unidad → se agregan una o varias órdenes con su NOG, No. SPS y código →
+  se guarda y se marca la llegada → el servicio queda descontado del NOG correspondiente.
+- **Pacientes (óptica):** el usuario de óptica abre Pacientes → crea o edita un paciente IGSS →
+  elige/edita los NOG igual que cualquier otro usuario → guarda y se descuenta del NOG.
+- **Ventas de óptica:** óptica/administrador/superadmin entra a Óptica → Ventas → filtra por
+  fecha/paciente/estado → abre una venta para ver el detalle y reimprimir → si es admin o
+  superadmin, puede anularla (revierte inventario y caja/CxC).
 
-## Sensación visual (UI/UX)
-Se mantiene el estilo actual del ERP (marca NovaVisión, tarjetas limpias, tablas claras, acentos en azul). Las cifras clave se destacan en tarjetas; los rankings se muestran como tablas ordenables; la tendencia como una gráfica sencilla. Todo en español, con montos en quetzales (Q).
+## UI/UX feel
+Se mantiene el estilo actual del ERP (marca NovaVisión, tarjetas y tablas limpias, acentos en
+azul/teal, todo en español y montos en quetzales). La sección de Órdenes IGSS en el modal de
+llegada se ve y se comporta igual que en Pacientes. La pantalla de Ventas de óptica usa el
+mismo patrón de listado con filtros, detalle en diálogo y acciones por fila.
 
 ## Fases de implementación
 
 ### Fase 1 — MVP (se construye ahora)
-- Dashboard: ventas del día separadas en Clínica y Óptica (con total).
-- Historial de Cierres para superadmin: ver todos los cajeros, ingresos recalculados de forma correcta (arreglo del "no cuadra"), detalle con desglose por tipo de ingreso y resumen comparativo por cajero.
-- Área Análisis de Producción (solo superadmin, menú Finanzas) con filtro de período y: indicadores clave (total, # ventas, ticket promedio), top productos (por ingresos y por unidades), ventas por cajero/vendedor, ventas por médico, ventas por categoría, y gráfica de tendencia por día. Solo ventas de clínica.
+- Sección de Órdenes IGSS (NOG múltiple con No. SPS, código y procedimiento por orden) en el
+  modal de llegada/crear expediente, **con descuento del NOG correspondiente** al guardar.
+- Corrección para que óptica (y todo rol con permiso de pacientes) pueda elegir/editar NOG en
+  el módulo de Pacientes.
+- Entrada "Ventas" en el menú de Óptica con consulta, filtros, detalle, reimpresión y anulación
+  (anular restringido a administrador/superadmin), revirtiendo inventario y caja/CxC.
 
 ### Fase 2 — Futuro
-- Análisis por método de pago (efectivo vs. tarjeta vs. otros) y desglose de cobrado vs. crédito.
-- Exportar reportes a Excel/PDF e impresión de los cierres y del análisis.
-- Comparativa entre períodos (p. ej. este mes vs. mes anterior) y metas de venta.
+- Exportar el listado de ventas de óptica a Excel/PDF y totales por período.
+- Edición de una orden IGSS directamente desde la lista de llegadas/agenda sin abrir el
+  expediente completo.
 
 ### Fase 3 — Futuro
-- Incluir óptica en el área de análisis.
-- Rentabilidad/márgenes (costo vs. precio) por producto y categoría.
-- Análisis por responsable de cuentas por cobrar y alertas automáticas de desempeño.
+- Incluir la revisión de ventas del Punto de Venta de clínica con el mismo patrón.
+- Historial/auditoría visible de anulaciones (quién anuló, cuándo y por qué).
 
-## Supuestos
-- El área de análisis cubre **solo ventas de clínica** (Punto de Venta); se excluye óptica (reservada para una fase posterior). *(Confirmado por el usuario.)*
-- El acceso al análisis y a la comparación de cajeros es **exclusivo del superadmin**. *(Confirmado por el usuario.)*
-- Las métricas incluidas son: top productos (ingresos y unidades), ventas por cajero/vendedor, tendencia por día + ticket promedio + # de ventas, ventas por médico que refiere y por categoría. **No** se incluye "ventas por método de pago" en la Fase 1 (pasa a Fase 2). *(Según la selección del usuario.)*
-- El problema de "ingresos que no cuadran" se resuelve recalculando en vivo los ingresos de cada cierre a partir de los movimientos reales de caja (misma fuente que el consolidado "Todas las cajas"), que es la cifra de referencia correcta.
-- Para "ventas por categoría" se toma la categoría desde el catálogo de productos (las ventas guardan el producto, no la categoría directamente); los productos sin categoría se agrupan como "Sin categoría".
-- "Vendedor" y "cajero" se tratan como la misma persona (quien registra la venta en el POS), ya que así se registra hoy en el sistema.
-- El historial de cierres sigue mostrando los cierres de clínica; cada cajero no-superadmin sigue viendo solo los suyos.
-- Los montos se muestran en quetzales y las fechas usan la zona horaria de Guatemala, como en el resto del sistema.
+## Assumptions
+- La parte 3 cubre **solo ventas de óptica** (no clínica), según lo indicado.
+- **Anular** queda restringido a **administrador y superadministrador**; el rol óptica solo
+  consulta y reimprime. (Según la opción elegida.)
+- La nueva función de ventas se ubica en el **menú de Óptica**. (Indicado por el usuario.)
+- Las órdenes IGSS en el modal de llegada son **opcionales** y usan el mismo selector de NOG del
+  módulo de Pacientes (catálogo de la unidad o texto libre), con No. SPS y código **por cada
+  orden**, permitiendo varias órdenes por paciente.
+- El descuento del NOG desde el modal de llegada reutiliza la **misma lógica de consumo/
+  conciliación** que ya usa el módulo de Pacientes (una acreditación por autorización, respeta
+  el cupo, no duplica y libera al corregir), para mantener los contadores del módulo IGSS
+  consistentes sin dobles descuentos.
+- La anulación de una venta de óptica revierte el inventario y los movimientos de caja/CxC
+  asociados, reutilizando el comportamiento de cancelación ya existente y ajustándolo si hace
+  falta para dejar inventario y caja consistentes.
+- Todos los montos en quetzales y las fechas en zona horaria de Guatemala, como en el resto del
+  sistema.
