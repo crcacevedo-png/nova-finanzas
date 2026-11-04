@@ -517,18 +517,33 @@ const EvaluacionOftalmologica = () => {
     }
   };
 
-  // Copiar refracción a la primera receta de anteojos (crea si no existe, sobrescribe si ya tiene)
+  // Copiar refracción a la primera receta de anteojos (crea si no existe, sobrescribe si ya tiene).
+  // Si la Refracción está vacía, usa la Lensometría/Autorefractómetro como respaldo.
   const copiarRefraccionAReceta = () => {
     if (isReadOnly) return;
     const ex = formData.examen;
-    const od = {
-      esfera: ex.refraccion_od?.esfera || '', cilindro: ex.refraccion_od?.cilindro || '',
-      eje: ex.refraccion_od?.eje || '', adicion: ex.refraccion_od?.adicion || ''
-    };
-    const os = {
-      esfera: ex.refraccion_os?.esfera || '', cilindro: ex.refraccion_os?.cilindro || '',
-      eje: ex.refraccion_os?.eje || '', adicion: ex.refraccion_os?.adicion || ''
-    };
+    const limpiar = (o) => ({
+      esfera: o?.esfera || '', cilindro: o?.cilindro || '',
+      eje: o?.eje || '', adicion: o?.adicion || ''
+    });
+    const tieneDatos = (o) => !!(o.esfera || o.cilindro || o.eje || o.adicion);
+
+    let od = limpiar(ex.refraccion_od);
+    let os = limpiar(ex.refraccion_os);
+    let origen = 'Refracción';
+
+    // Respaldo: si no hay nada en Refracción, copiar desde Lensometría/Autorefractómetro
+    if (!tieneDatos(od) && !tieneDatos(os)) {
+      od = limpiar(ex.lensometria_od);
+      os = limpiar(ex.lensometria_os);
+      origen = ex.tipo_lensometria === 'Autorefractometro' ? 'Autorefractómetro' : 'Lensometría';
+    }
+
+    if (!tieneDatos(od) && !tieneDatos(os)) {
+      toast.error('No hay datos de Refracción ni Lensometría para copiar');
+      return;
+    }
+
     setFormData(prev => {
       const lista = [...(prev.recetas.anteojos_lista || [])];
       if (lista.length === 0) {
@@ -545,7 +560,7 @@ const EvaluacionOftalmologica = () => {
       }
       return { ...prev, recetas: { ...prev.recetas, anteojos_lista: lista } };
     });
-    toast.success('Refracción copiada a la primera receta de anteojos');
+    toast.success(`${origen} copiada a la primera receta de anteojos`);
   };
 
   // Fetch del historial: SOLO evaluaciones del paciente actual, ordenadas por fecha clínica
