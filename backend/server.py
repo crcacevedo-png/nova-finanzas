@@ -3560,12 +3560,29 @@ async def get_dashboard_resumen_dia(
     fecha_filtro = {"$gte": f_desde, "$lte": f_hasta}
 
     # Ventas de óptica
-    ventas = await db.optica_sales.find(
+    ventas_op = await db.optica_sales.find(
         {"created_at": {"$gte": inicio_utc, "$lte": fin_utc}},
         {"_id": 0, "total": 1, "total_paid": 1}
     ).to_list(5000)
-    ventas_total = round(sum(v.get("total", 0) or 0 for v in ventas), 2)
-    ventas_cobrado = round(sum(v.get("total_paid", 0) or 0 for v in ventas), 2)
+    # Ventas de clínica (Punto de Venta)
+    ventas_cl = await db.ventas.find(
+        {"origen": "clinica", "estado": {"$ne": "anulada"},
+         "fecha": {"$gte": inicio_utc, "$lte": fin_utc}},
+        {"_id": 0, "total": 1, "formas_pago": 1}
+    ).to_list(5000)
+
+    def _cobrado_clinica(v):
+        return sum((fp.get("monto", 0) or 0)
+                   for fp in (v.get("formas_pago") or [])
+                   if fp.get("metodo") != "Cuenta por Cobrar")
+
+    ventas_cantidad = len(ventas_op) + len(ventas_cl)
+    ventas_total = round(
+        sum(v.get("total", 0) or 0 for v in ventas_op)
+        + sum(v.get("total", 0) or 0 for v in ventas_cl), 2)
+    ventas_cobrado = round(
+        sum(v.get("total_paid", 0) or 0 for v in ventas_op)
+        + sum(_cobrado_clinica(v) for v in ventas_cl), 2)
 
     # Citas (fecha es string YYYY-MM-DD en hora Guatemala)
     citas = await db.citas.find({"fecha": fecha_filtro}, {"_id": 0, "estado": 1}).to_list(10000)
@@ -3600,7 +3617,7 @@ async def get_dashboard_resumen_dia(
         "fecha": f_desde if f_desde == f_hasta else None,
         "desde": f_desde,
         "hasta": f_hasta,
-        "ventas": {"cantidad": len(ventas), "total": ventas_total, "cobrado": ventas_cobrado},
+        "ventas": {"cantidad": ventas_cantidad, "total": ventas_total, "cobrado": ventas_cobrado},
         "citas": {"total": len(citas), "atendidas": citas_atendidas, "canceladas": citas_canceladas},
         "evaluaciones": {"total": evaluaciones_total},
         "igss": {"servicios": len(acreditaciones), "total": igss_total},

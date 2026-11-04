@@ -1172,6 +1172,7 @@ const Caja = () => {
                         <TableRow>
                           <TableHead>Hora</TableHead>
                           <TableHead>Categoría</TableHead>
+                          {isAdminOrSuperAdmin && <TableHead>Cajero</TableHead>}
                           <TableHead>Concepto</TableHead>
                           <TableHead>Paciente</TableHead>
                           <TableHead>Método</TableHead>
@@ -1188,6 +1189,11 @@ const Caja = () => {
                             <TableCell>
                               <Badge variant="outline">{mov.categoria}</Badge>
                             </TableCell>
+                            {isAdminOrSuperAdmin && (
+                              <TableCell className="text-sm" data-testid={`mov-cajero-${mov.id}`}>
+                                {mov.cajero_nombre || '-'}
+                              </TableCell>
+                            )}
                             <TableCell className="max-w-[200px] truncate">{mov.concepto}</TableCell>
                             <TableCell className="text-sm">{mov.paciente_nombre || '-'}</TableCell>
                             <TableCell>

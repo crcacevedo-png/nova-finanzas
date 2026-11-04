@@ -202,15 +202,16 @@ async def get_movimientos(
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(require_permission("manage_caja"))
 ):
-    """Listar movimientos del día (individuales del usuario actual)"""
+    """Listar movimientos del día. Admin/superadmin ven los de todas las cajas; el resto solo los propios."""
     fecha_hoy = fecha or today_str_gt()
     inicio, fin = dia_gt_a_rango_utc(fecha_hoy)
     
     query = {
         "origen": "clinica",
-        "cajero_id": current_user["id"],
         "fecha": {"$gte": inicio, "$lte": fin}
     }
+    if current_user.get("role") not in ("admin", "superadmin"):
+        query["cajero_id"] = current_user["id"]
     if tipo:
         query["tipo"] = tipo
     

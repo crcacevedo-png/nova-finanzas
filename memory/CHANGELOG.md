@@ -487,3 +487,7 @@ PENDIENTE para completar prueba real: el usuario debe ingresar su NIT real de em
 - Esquema NUC corregido: SIN wrapper {"NUC":...} (raíz directa), Version "1.00", y campos tipo código como STRING (Tax.Code, BranchInfo.Code, frase Value). BranchInfo requiere "Name" (nombre comercial).
 - Frase tributaria: Data string, y Name debe ser "TipoFrase" + "Escenario" (NO "CodigoEscenario") para que el transform la empareje. frase_tipo/frase_escenario configurables en la UI.
 - Estado actual: la certificación pasa validación de esquema y de frase; falla en paso Digifact "PrepareEmisorForTOSIGN" con "Root element is missing" (3064). Es del lado Digifact: el emisor de PRUEBAS (NIT 90042247, establecimiento 1) requiere aprovisionamiento/plantilla de firma en su ambiente TEST. Pendiente confirmar con soporte Digifact (soporte-gt@digifact.com).
+
+## 2026-11-03 — Fixes Caja + Dashboard (ventas del día)
+- Dashboard /dashboard/resumen-dia (server.py): "Ventas del Día" sumaba SOLO optica_sales. Ahora también suma ventas de clínica (db.ventas origen=clinica, estado!=anulada) por fecha (rango UTC del día GT). "Cobrado" clínica = formas_pago no "Cuenta por Cobrar". Verificado: Q0 -> Q300.
+- Caja /caja/movimientos (routes/caja.py): admin/superadmin ahora ven los movimientos de TODAS las cajas del día (no solo los propios); cajeros normales siguen viendo solo los suyos. Frontend Caja.js: columna "Cajero" visible solo para admin/superadmin en "Movimientos del Día".
