@@ -953,8 +953,11 @@ async def analisis_produccion(
     if f_desde > f_hasta:
         f_desde, f_hasta = f_hasta, f_desde
 
-    ini = dia_gt_a_rango_utc(f_desde)[0]
-    fin = dia_gt_a_rango_utc(f_hasta)[1]
+    try:
+        ini = dia_gt_a_rango_utc(f_desde)[0]
+        fin = dia_gt_a_rango_utc(f_hasta)[1]
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Fechas inválidas (use formato YYYY-MM-DD)")
 
     ventas = await db.ventas.find({
         "origen": "clinica",

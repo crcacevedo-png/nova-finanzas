@@ -750,6 +750,8 @@ async def get_cierre(
     cierre = await db.caja_cierres.find_one({"id": cierre_id, "origen": "clinica"}, {"_id": 0})
     if not cierre:
         raise HTTPException(status_code=404, detail="Cierre no encontrado")
+    if current_user.get("role") != "superadmin" and cierre.get("abierto_por") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="No tienes acceso a este cierre")
     d = await _desglose_ingresos_dia(cierre["fecha"], cierre.get("abierto_por"))
     saldo_esperado = cierre.get("monto_apertura", 0) + d["ingresos_efectivo"] - d["egresos_efectivo"]
     return {

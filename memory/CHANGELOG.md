@@ -491,3 +491,12 @@ PENDIENTE para completar prueba real: el usuario debe ingresar su NIT real de em
 ## 2026-11-03 — Fixes Caja + Dashboard (ventas del día)
 - Dashboard /dashboard/resumen-dia (server.py): "Ventas del Día" sumaba SOLO optica_sales. Ahora también suma ventas de clínica (db.ventas origen=clinica, estado!=anulada) por fecha (rango UTC del día GT). "Cobrado" clínica = formas_pago no "Cuenta por Cobrar". Verificado: Q0 -> Q300.
 - Caja /caja/movimientos (routes/caja.py): admin/superadmin ahora ven los movimientos de TODAS las cajas del día (no solo los propios); cajeros normales siguen viendo solo los suyos. Frontend Caja.js: columna "Cajero" visible solo para admin/superadmin en "Movimientos del Día".
+
+## 2026-11-03 — Ventas por área + Historial comparativo + Análisis de Producción (Fase 1)
+- Dashboard /dashboard/resumen-dia (server.py): añade ventas_clinica y ventas_optica {cantidad,total,cobrado} además del total combinado. Frontend Dashboard.js: tarjeta "Ventas del Día" muestra líneas Clínica y Óptica.
+- Caja /caja/cierres (caja.py): superadmin ve cierres de TODOS los cajeros con ingresos recalculados de movimientos reales (helper _desglose_ingresos_dia), + resumen_cajeros (total vendido, # ventas, # cierres, diferencia acumulada) y is_superadmin. No-superadmin solo ve los suyos. Frontend Caja.js: diálogo Historial con comparativo + columna Cajero + detalle con desglose por tipo (efectivo/otros/por método).
+- Caja /caja/cierres/{id}: detalle con ingresos_efectivo/otros, num_ventas, desglose_por_metodo. Fix IDOR: no-superadmin solo puede ver su propio cierre (403 si ajeno).
+- Ventas /ventas/analisis (ventas.py, solo superadmin): KPIs (total/num/ticket), top productos (ingresos y unidades), por_cajero, por_medico, por_categoria (lookup productos_inventario->categorias_inventario, "Sin categoría" si falta), tendencia por día GT. Período hoy/semana/mes/rango. Fecha inválida -> 400.
+- Nueva página AnalisisProduccion.js (/analisis-produccion, requiredRole superadmin), nav "Análisis de Producción" en Finanzas (solo superadmin).
+- Testing iteration_119: frontend 100%, backend fixes (IDOR, 400 fecha) verificados por curl.
+- PENDIENTE (preexistente, fuera de este plan): drift de permisos óptica entre config/permissions.py (manage_caja=False) y server.py (True) -> óptica recibe 403 en /api/caja/*. No modificado para no tocar la matriz de permisos.
