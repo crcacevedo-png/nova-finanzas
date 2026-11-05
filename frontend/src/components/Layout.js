@@ -144,7 +144,7 @@ const Layout = ({ children }) => {
   const finanzasItems = [];
   if (user?.role !== 'optica') {
     if (isMenuEnabled('finanzas_pos')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
-    if (hasPermission('manage_sales')) finanzasItems.push({ path: '/ventas-clinica', icon: TrendingUp, label: 'Ventas', testId: 'nav-ventas-clinica' });
+    if (isSuperAdmin) finanzasItems.push({ path: '/ventas-clinica', icon: TrendingUp, label: 'Ventas', testId: 'nav-ventas-clinica' });
     if (isMenuEnabled('finanzas_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
     if (isMenuEnabled('finanzas_cxc')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
     if (isMenuEnabled('finanzas_gastos')) finanzasItems.push({ path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' });

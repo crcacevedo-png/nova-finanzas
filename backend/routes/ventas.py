@@ -818,6 +818,9 @@ async def listar_ventas(
     """Lista ventas con filtros y paginación"""
     db = get_db()
     
+    if current_user.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo el superadministrador puede acceder a este módulo")
+    
     filtro = {"origen": "clinica"}
     
     if fecha_desde or fecha_hasta:
@@ -1100,7 +1103,7 @@ def _rango_mes_utc(year: int, month: int):
 
 @router.get("/filtros/opciones")
 async def ventas_filtros_opciones(
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Médicos y vendedores presentes en las ventas de clínica, para los filtros."""
     db = get_db()
@@ -1125,7 +1128,7 @@ async def ventas_filtros_opciones(
 
 @router.get("/dashboard/stats")
 async def ventas_dashboard_stats(
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Estadísticas del mes actual para el módulo de Ventas de Clínica."""
     db = get_db()
@@ -1165,7 +1168,7 @@ async def ventas_dashboard_stats(
 
 @router.get("/dashboard/monthly-chart")
 async def ventas_monthly_chart(
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Ventas de clínica de los últimos 6 meses."""
     db = get_db()
@@ -1207,7 +1210,7 @@ async def _ventas_mes_items(db):
 @router.get("/dashboard/top-medicos")
 async def ventas_top_medicos(
     limit: int = 5,
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Top médicos que refieren ventas en el mes actual."""
     db = get_db()
@@ -1228,7 +1231,7 @@ async def ventas_top_medicos(
 @router.get("/dashboard/top-productos")
 async def ventas_top_productos(
     limit: int = 5,
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Top productos más vendidos (por unidades) en el mes actual."""
     db = get_db()
@@ -1248,7 +1251,7 @@ async def ventas_top_productos(
 @router.get("/dashboard/top-categorias")
 async def ventas_top_categorias(
     limit: int = 5,
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Top categorías de producto por ventas en el mes actual."""
     db = get_db()
@@ -1293,7 +1296,7 @@ async def ventas_reporte_mensual(
     year: int,
     month: int,
     format: str = "excel",
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """Exporta el informe mensual de ventas de clínica en Excel o PDF."""
     import io
@@ -1422,16 +1425,13 @@ async def obtener_venta(
 async def anular_venta(
     venta_id: str,
     anulacion: AnularVentaRequest,
-    current_user: dict = Depends(get_current_user_dependency())
+    current_user: dict = Depends(require_superadmin_dep())
 ):
     """
-    Anula una venta. Solo administradores (admin/superadmin) pueden anular.
+    Anula una venta. Solo el superadministrador puede anular.
     Opcionalmente devuelve el inventario al stock.
     """
     db = get_db()
-    
-    if current_user.get("role") not in ("superadmin", "admin"):
-        raise HTTPException(status_code=403, detail="Solo administradores pueden anular ventas")
     
     venta = await db.ventas.find_one({"id": venta_id, "origen": "clinica"})
     if not venta:

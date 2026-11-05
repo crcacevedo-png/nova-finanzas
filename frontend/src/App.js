@@ -443,11 +443,11 @@ function AppRoutes() {
         } 
       />
 
-      {/* ==================== VENTAS DE CLÍNICA (revisión y análisis) ==================== */}
+      {/* ==================== VENTAS DE CLÍNICA (revisión y análisis - solo superadmin) ==================== */}
       <Route
         path="/ventas-clinica"
         element={
-          <ProtectedRoute requiredPermission="manage_sales">
+          <ProtectedRoute requiredRole="superadmin">
             <VentasClinica />
           </ProtectedRoute>
         }

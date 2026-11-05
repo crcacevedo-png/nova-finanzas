@@ -1035,3 +1035,8 @@ Verificado: curl (5 dashboards con datos reales, Excel 6KB/PDF válidos, list li
 - Backend: GET /api/ventas/filtros/opciones devuelve {medicos, vendedores} distintos presentes en ventas de clínica; listar_ventas acepta medico_id y vendedor_id.
 - Frontend (VentasClinica.js): dos Selects (ventas-medico-filter, ventas-vendedor-filter) + botón limpiar (ventas-filtros-clear) que reinicia todos los filtros; api.js ventasApi.getFilterOptions; fila de filtros con flex-wrap/items-end.
 - Verificado: curl (opciones=1 médico/2 vendedores; medico_id→4, vendedor_id→44) y UI (filtrar por Dr. Carlos Méndez → "Lista de Ventas (4)").
+
+### Ventas de Clínica — restringido SOLO a superadmin (2026-11) — confirmado por el usuario
+- Backend (ventas.py): listar_ventas (GET /api/ventas) con check superadmin inline; filtros/opciones, dashboard/stats, monthly-chart, top-medicos/productos/categorias, reports/monthly y anular usan Depends(require_superadmin_dep()). getById se dejó SIN restringir (lo comparte el POS/PuntoVenta). ventas/hoy y resumen-dia intactos para el POS.
+- Frontend: App.js ruta /ventas-clinica con ProtectedRoute requiredRole="superadmin"; Layout.js el ítem de menú "Ventas" ahora solo si isSuperAdmin.
+- Verificado: curl superadmin=200 en todos; usuario=403 en los endpoints del módulo pero 200 en ventas/hoy y resumen-dia (POS no afectado). UI: usuario no ve el menú y /ventas-clinica redirige a /pacientes.
