@@ -1054,3 +1054,8 @@ Problema: el módulo mostraba 0 consumos (leía de movimientos_inventario, que n
 - App.js: ruta /sociedades con ProtectedRoute requiredRole={['admin','superadmin']} (antes manage_users) → admin ya entra, no lo manda a Pacientes.
 
 Verificado: testing agent iteration_122 backend 22/22 (12 nuevos + 10 regresión CRUD), admin 200 y abre el módulo, usuario 403 + redirige a /pacientes; UI tarjetas Total Consumos 51 / Monto Vendido Q18,810.00, filtros y Excel/PDF OK. Pendiente opcional (no bloqueante): límites de mes/fechas en hora local GT (hoy en UTC, pequeño sesgo); date-picker shadcn y data-testids en tabs/filtros. Fase 2/3 (ranking por sociedad, comparación de meses, envío por correo) quedan pendientes.
+
+### Sociedades — columnas Paciente y Médico en Consumos (2026-11)
+- inventario.py: _recolectar_consumos_sociedad agrega medico_nombre; ConsumoSociedadItem gana paciente_nombre y medico_nombre; endpoint consumos los expone. Excel (cols Fecha/Código/Producto/Sociedad/Paciente/Médico/Cantidad/Monto Unit./Monto Total) y PDF (detalle con Paciente/Médico) actualizados.
+- Sociedades.js: tabla Consumos ahora Fecha/Producto/Sociedad/Paciente/Médico/Cantidad/Monto.
+- Verificado: curl (paciente/medico presentes), Excel/PDF 200, y UI muestra Paciente+Médico.

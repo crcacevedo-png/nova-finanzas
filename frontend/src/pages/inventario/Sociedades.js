@@ -668,6 +668,8 @@ const Sociedades = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sociedad</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paciente</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Médico</th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
                           </tr>
@@ -689,6 +691,12 @@ const Sociedades = () => {
                                   <Building2 className="w-3 h-3 mr-1" />
                                   {consumo.sociedad_nombre || 'Sin asignar'}
                                 </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                {consumo.paciente_nombre || 'Consumidor Final'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                {consumo.medico_nombre || '-'}
                               </td>
                               <td className="px-4 py-3 text-sm text-right font-medium">
                                 {consumo.cantidad}

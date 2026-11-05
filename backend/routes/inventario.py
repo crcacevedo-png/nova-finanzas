@@ -3080,6 +3080,8 @@ class ConsumoSociedadItem(BaseModel):
     producto_codigo: str
     producto_nombre: str
     sociedad_nombre: Optional[str] = None
+    paciente_nombre: Optional[str] = None
+    medico_nombre: Optional[str] = None
     bodega_id: str
     bodega_nombre: str
     cantidad: int
@@ -3152,6 +3154,7 @@ async def _recolectar_consumos_sociedad(db, sociedad_id=None, producto_id=None,
                 "monto_total": round(float(item.get("subtotal", 0) or 0), 2),
                 "numero_venta": v.get("numero_venta", ""),
                 "paciente_nombre": v.get("paciente_nombre") or "Consumidor Final",
+                "medico_nombre": v.get("medico_nombre") or "",
                 "vendedor_nombre": v.get("vendedor_nombre") or "",
             })
     return consumos
@@ -3199,6 +3202,8 @@ async def listar_consumos_sociedades(
         producto_codigo=c["producto_codigo"],
         producto_nombre=c["producto_nombre"],
         sociedad_nombre=c["sociedad_nombre"],
+        paciente_nombre=c["paciente_nombre"],
+        medico_nombre=c["medico_nombre"],
         bodega_id=c["bodega_id"],
         bodega_nombre=c["bodega_nombre"],
         cantidad=c["cantidad"],
@@ -3379,16 +3384,16 @@ async def exportar_sociedades_excel(
     border = Border(left=Side(style='thin'), right=Side(style='thin'),
                     top=Side(style='thin'), bottom=Side(style='thin'))
 
-    ws.merge_cells('A1:G1')
+    ws.merge_cells('A1:I1')
     ws['A1'] = "Reporte de Consumos - Sociedades Médicas"
     ws['A1'].font = Font(bold=True, size=14)
     ws['A1'].alignment = Alignment(horizontal='center')
 
-    ws.merge_cells('A2:G2')
+    ws.merge_cells('A2:I2')
     ws['A2'] = f"Período: {periodo_label}"
     ws['A2'].alignment = Alignment(horizontal='center')
 
-    headers = ["Fecha", "Código", "Producto", "Sociedad", "Cantidad", "Monto Unit.", "Monto Total"]
+    headers = ["Fecha", "Código", "Producto", "Sociedad", "Paciente", "Médico", "Cantidad", "Monto Unit.", "Monto Total"]
     for col, header in enumerate(headers, 1):
         cell = ws.cell(row=4, column=col, value=header)
         cell.font = header_font
@@ -3403,19 +3408,21 @@ async def exportar_sociedades_excel(
         ws.cell(row=row, column=2, value=c["producto_codigo"]).border = border
         ws.cell(row=row, column=3, value=c["producto_nombre"]).border = border
         ws.cell(row=row, column=4, value=c["sociedad_nombre"]).border = border
-        ws.cell(row=row, column=5, value=c["cantidad"]).border = border
-        ws.cell(row=row, column=6, value=c["monto_unitario"]).border = border
-        ws.cell(row=row, column=7, value=c["monto_total"]).border = border
+        ws.cell(row=row, column=5, value=c["paciente_nombre"]).border = border
+        ws.cell(row=row, column=6, value=c["medico_nombre"]).border = border
+        ws.cell(row=row, column=7, value=c["cantidad"]).border = border
+        ws.cell(row=row, column=8, value=c["monto_unitario"]).border = border
+        ws.cell(row=row, column=9, value=c["monto_total"]).border = border
         total_cantidad += c["cantidad"]
         total_monto += c["monto_total"]
 
     total_row = len(consumos) + 5
-    ws.merge_cells(f'A{total_row}:D{total_row}')
+    ws.merge_cells(f'A{total_row}:F{total_row}')
     ws.cell(row=total_row, column=1, value="TOTALES").font = Font(bold=True)
-    ws.cell(row=total_row, column=5, value=total_cantidad).font = Font(bold=True)
-    ws.cell(row=total_row, column=7, value=round(total_monto, 2)).font = Font(bold=True)
+    ws.cell(row=total_row, column=7, value=total_cantidad).font = Font(bold=True)
+    ws.cell(row=total_row, column=9, value=round(total_monto, 2)).font = Font(bold=True)
 
-    column_widths = [12, 14, 38, 24, 10, 14, 14]
+    column_widths = [12, 14, 34, 22, 26, 24, 10, 13, 13]
     for i, width in enumerate(column_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = width
 
@@ -3539,25 +3546,26 @@ async def exportar_sociedades_pdf(
         elements.append(Paragraph("<b>Detalle de Consumos por Venta</b>", styles['Heading2']))
         elements.append(Spacer(1, 10))
 
-        detail_data = [["Fecha", "Producto", "Sociedad", "Cant.", "Monto"]]
+        detail_data = [["Fecha", "Producto", "Sociedad", "Paciente", "Médico", "Cant.", "Monto"]]
         for c in consumos[:120]:
             detail_data.append([
                 (c["fecha"] or "")[:10],
-                c["producto_nombre"][:28],
-                (c["sociedad_nombre"] or "")[:20],
+                c["producto_nombre"][:24],
+                (c["sociedad_nombre"] or "")[:16],
+                (c["paciente_nombre"] or "")[:22],
+                (c["medico_nombre"] or "")[:22],
                 str(c["cantidad"]),
                 f"Q {c['monto_total']:,.2f}"
             ])
 
-        detail_table = Table(detail_data, colWidths=[70, 230, 150, 60, 90])
+        detail_table = Table(detail_data, colWidths=[60, 150, 95, 135, 125, 40, 75])
         detail_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6B21A8')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
-            ('ALIGN', (2, 1), (2, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (4, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAF5FF')])
