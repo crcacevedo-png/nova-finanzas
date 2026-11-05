@@ -1,0 +1,51 @@
+{
+  "summary": "Tested the new 'Ventas de Clínica' module (/ventas-clinica) end to end in the backend (20 pytest cases, 19 passed) and in the UI as superadmin, a TEST_ admin, usuario and optica. These all work: the dashboard stats, the 6-month chart (6 bars), the 3 ranking tabs (Médicos/Productos/Categorías), filters by search, estado and date, the detail dialog (products, totals, formas de pago, FEL button; the GET response includes 'fel'), Reimprimir (print window opens), the anular flow, and the Excel/PDF monthly export (files are valid xlsx and PDF). The anular flow covers: the motivo min-5 check (frontend toast and backend 422), the Devolver inventario checkbox, admin role allowed (200), usuario gets 403 and sees no anular buttons, and a second anular returns 400. GET /api/ventas?limit=200 returns 200 (regression fixed) and resumen-dia works. 4 issues found: a search regex 500, the FEL button showing on anulada sales, the optica role reaching the clinic sales route, and the date filter ignoring the Guatemala timezone.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/ventas?search=(", "issue": "500 Internal Server Error: the search text goes into the Mongo $regex without escaping. Typing '(' , '[' , '*' or '+' in the UI search box shows the toast 'Error al cargar las ventas'. Fix: use re.escape(search).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/ventas (fecha_desde/fecha_hasta)", "issue": "The date filter compares plain strings against UTC ISO fechas. It does not use dia_gt_a_rango_utc (Guatemala UTC-6), the way the dashboard does. Sales made after 18:00 GT on the 'hasta' day are left out, and sales from the evening before 'desde' are included."},
+      {"endpoint": "POST /api/fel/certificar", "issue": "Allows certifying a FEL invoice for a sale with estado='anulada'. There is no check on sale.estado."},
+      {"endpoint": "POST /api/ventas/{id}/anular", "issue": "Anulling a sale that already has a certified FEL does not void or warn about the FEL invoice. Consider blocking, warning, or chaining to /api/fel/anular."},
+      {"endpoint": "GET /api/ventas/* (manage_sales)", "issue": "The optica role has manage_sales=true (server.py:531). Optica users therefore can read all clinic sales, the dashboard and the reports through the API, and can open /ventas-clinica directly (verified: 50 rows shown). Only the sidebar hides it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VentasClinica detail dialog / FELButton", "issue": "The 'Facturar FEL' button still shows on sales with estado 'anulada'.", "selector": "[data-testid='ventas-detalle-<id>'] -> FEL button", "priority": "MEDIUM"},
+      {"component": "VentasClinica route", "issue": "The optica user can open /ventas-clinica by typing the URL. ProtectedRoute requiredPermission='manage_sales' lets them through. Add an exclusion for role !== 'optica' or a requiredMenu check.", "selector": "[data-testid='ventas-clinica-page']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Search", "issue": "Every keystroke fires GET /api/ventas (no debounce). Combined with the backend regex bug, special characters trigger an error toast.", "affected_selectors": ["[data-testid='ventas-search']"]}
+    ],
+    "design_issues": [
+      {"screen": "Ventas de Clínica filters", "issues": ["The search icon is vertically misaligned. It sits near the bottom-left of the input instead of centered (absolute top-1/2 inside a wrapper taller than the input)."]},
+      {"screen": "Export dialog", "issues": ["The year select is hardcoded to [2024, 2025, 2026]. In 2027 the default year is not in the list and the select shows blank."]},
+      {"screen": "Chart", "issues": ["The Y-axis uses Q{n}k, so small values look like Q0k / Q1k. Acceptable."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ventas_clinica_dashboard.py", "/app/test_reports/pytest/ventas_clinica_results.xml"],
+  "action_items": [
+    "Escape the search regex in listar_ventas (re.escape) so it no longer returns 500.",
+    "Hide or disable FELButton when sale.estado === 'anulada', and reject /api/fel/certificar for anulada sales.",
+    "Decide the FEL behaviour when anulling a sale that has a certified FEL (warn or chain the FEL anulación).",
+    "Block the optica role from /ventas-clinica (route guard) and from the clinic /api/ventas read endpoints if they should be clinic-only.",
+    "Use Guatemala-timezone day ranges (dia_gt_a_rango_utc) for fecha_desde/fecha_hasta in listar_ventas.",
+    "Minor: debounce the search input, make the year list dynamic, align the search icon."
+  ],
+  "critical_code_review_comments": [
+    "ventas.py is 1564 lines. Split dashboard/report endpoints into routes/ventas_dashboard.py.",
+    "The ranking/stat endpoints load up to 5000 docs into Python. A Mongo aggregation pipeline would scale better. The top-categorias query on productos_inventario has no origen filter (fine since ids are unique).",
+    "anular_venta docstring still says 'Solo SuperAdmin'. Also item['producto_id'] / venta['bodega_id'] KeyError is possible on legacy docs when devolver_inventario=True.",
+    "VentasClinica.js handles errors per call, but a dashboard fetch failure only does console.error with no user feedback."
+  ],
+  "updated_files": ["/app/backend/tests/test_ventas_clinica_dashboard.py"],
+  "success_rate": {"backend": "95% (19/20; failure = regex 500)", "frontend": "90% (all requested flows work; FEL-on-anulada and optica route access issues)"},
+  "test_credentials": "superadmin/nova2024, usuario/user2024, optica/Optica2024$ (from /app/memory/test_credentials.md). The admin role was tested via a temporary TEST_ admin user that was created and then deleted.",
+  "seed_data_creation": "Temporary TEST_ venta docs (origen clinica, nonexistent producto_id, no caja/cxc links) were inserted directly into Mongo for the anular tests, then deleted by id. Temporary test_admin_* users were created via /api/users and deleted. No real data was modified.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Today's caja (2026-11-05) is NOT open, so the POS crear_venta test in test_ventas_pos.py fails with 400 'La caja del día no está abierta' (environmental, not a bug). For anular tests, use the direct-Mongo TEST_ sale approach in test_ventas_clinica_dashboard.py. The Finanzas sidebar must be expanded (click 'Finanzas') before nav-ventas-clinica is visible.",
+  "rca of the issue": "Search 500: listar_ventas builds {'$regex': search} from raw user input. An unbalanced '(' raises a Mongo regex compile error, which is not caught, so the endpoint returns 500. Repro: GET /api/ventas?search=( . Fix: import re; pattern = re.escape(search)."
+}

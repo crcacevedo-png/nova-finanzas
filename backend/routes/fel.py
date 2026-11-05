@@ -320,6 +320,9 @@ async def certificar(data: CertificarRequest, current_user: dict = Depends(auth_
     if sale.get("fel") and sale["fel"].get("authNumber") and sale["fel"].get("estado") == "certificado":
         raise HTTPException(status_code=400, detail="Esta venta ya tiene una factura FEL certificada")
 
+    if sale.get("estado") == "anulada" or sale.get("status") == "cancelado":
+        raise HTTPException(status_code=400, detail="No se puede facturar una venta anulada")
+
     norm = _normalizar_venta(data.origen, sale)
     receptor = {"nit": data.receptor_nit, "nombre": data.receptor_nombre}
     nuc = _build_nuc(cfg, taxid_12, norm, receptor)

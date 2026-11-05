@@ -818,20 +818,26 @@ async def listar_ventas(
     
     filtro = {"origen": "clinica"}
     
-    if fecha_desde:
-        filtro["fecha"] = {"$gte": fecha_desde}
-    if fecha_hasta:
-        if "fecha" not in filtro:
-            filtro["fecha"] = {}
-        filtro["fecha"]["$lte"] = fecha_hasta + "T23:59:59"
+    if fecha_desde or fecha_hasta:
+        rango = {}
+        try:
+            if fecha_desde:
+                rango["$gte"] = dia_gt_a_rango_utc(fecha_desde)[0]
+            if fecha_hasta:
+                rango["$lte"] = dia_gt_a_rango_utc(fecha_hasta)[1]
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Fechas inválidas (use formato YYYY-MM-DD)")
+        filtro["fecha"] = rango
     if paciente_id:
         filtro["paciente_id"] = paciente_id
     if estado:
         filtro["estado"] = estado
     if search:
+        import re
+        patron = re.escape(search.strip())
         filtro["$or"] = [
-            {"numero_venta": {"$regex": search, "$options": "i"}},
-            {"paciente_nombre": {"$regex": search, "$options": "i"}}
+            {"numero_venta": {"$regex": patron, "$options": "i"}},
+            {"paciente_nombre": {"$regex": patron, "$options": "i"}}
         ]
     
     total = await db.ventas.count_documents(filtro)
@@ -1388,7 +1394,7 @@ async def anular_venta(
     current_user: dict = Depends(get_current_user_dependency())
 ):
     """
-    Anula una venta. Solo SuperAdmin puede anular.
+    Anula una venta. Solo administradores (admin/superadmin) pueden anular.
     Opcionalmente devuelve el inventario al stock.
     """
     db = get_db()
@@ -1405,21 +1411,24 @@ async def anular_venta(
     
     now = datetime.now(timezone.utc)
     
-    # Devolver inventario si se solicita
-    if anulacion.devolver_inventario:
+    # Devolver inventario si se solicita (solo si la venta tiene bodega registrada)
+    if anulacion.devolver_inventario and venta.get("bodega_id"):
         from routes.inventario import crear_movimiento_kardex, actualizar_existencia
         
         for item in venta.get("items", []):
+            producto_id = item.get("producto_id")
+            if not producto_id:
+                continue
             # Verificar si el producto controla inventario
-            producto = await db.productos_inventario.find_one({"id": item["producto_id"], "origen": "clinica"})
+            producto = await db.productos_inventario.find_one({"id": producto_id, "origen": "clinica"})
             if producto and producto.get("controla_inventario", True):
                 # Crear movimiento de devolución
                 await crear_movimiento_kardex(
                     db=db,
-                    producto_id=item["producto_id"],
+                    producto_id=producto_id,
                     bodega_id=venta["bodega_id"],
                     tipo="anulacion",
-                    cantidad=item["cantidad"],
+                    cantidad=item.get("cantidad", 0),
                     costo_unitario=producto.get("costo_promedio", 0),
                     usuario_id=current_user["id"],
                     referencia_tipo="anulacion_venta",
@@ -1428,7 +1437,7 @@ async def anular_venta(
                 )
                 
                 # Actualizar existencia (devolver stock)
-                await actualizar_existencia(db, item["producto_id"], venta["bodega_id"], item["cantidad"])
+                await actualizar_existencia(db, producto_id, venta["bodega_id"], item.get("cantidad", 0))
                 
                 # Si hay lotes consumidos, restaurarlos
                 for lote_info in item.get("lotes_consumidos", []):

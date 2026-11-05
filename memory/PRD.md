@@ -1008,3 +1008,25 @@ Solicitud: "Agrega a optica, la opcion de accesorios, agrega las opciones al pun
 - POSProductCard.js: soporte de icono/nombre/stock para accesorios.
 
 Verificado: backend E2E vía curl (crear/listar/vender descontó stock 20->18, menú incluye optica_accesorios para rol optica). Testing agent frontend 100% (5/5 flujos: nav, CRUD accesorio, categoría POS con tarjetas, venta accessory ORD-202611-0002 stock 9->7, categorías existentes intactas). Issues restantes LOW y pre-existentes (sin cap de stock en cliente).
+
+## Ventas de Clínica — módulo de revisión y análisis (2026-11) — COMPLETADA y verificada
+Solicitud: "el mismo modulo de ventas que creaste para optica, crealo para la clinica". Opciones del usuario: SOLO revisar/analizar (crear ventas sigue en el POS); mostrar los TRES rankings (Médicos, Productos, Categorías); incluir tarjetas de métricas, gráfico de 6 meses, exportar informe Excel+PDF, FEL desde el detalle, anular (admin/superadmin).
+
+### Backend (/app/backend/routes/ventas.py)
+- Nuevos endpoints (todos con dependencia manage_sales, registrados ANTES de /ventas/{venta_id} para evitar colisión de rutas):
+  - GET /api/ventas/dashboard/stats → ventas_mes, ordenes_mes, ticket_promedio, ventas_hoy, ordenes_hoy, anuladas_mes (mes actual, zona GT).
+  - GET /api/ventas/dashboard/monthly-chart → últimos 6 meses.
+  - GET /api/ventas/dashboard/top-medicos | top-productos | top-categorias (?limit, mes actual).
+  - GET /api/ventas/reports/monthly?year&month&format=excel|pdf → StreamingResponse (openpyxl / reportlab).
+- VentaResponse ahora incluye `fel` (para el FELButton) y los campos de anulación; además se hicieron tolerantes (defaults) los campos que faltaban en 2 ventas legacy (bodega_id, cantidad_items, subtotal, descuento_total, iva, formas_pago, vendedor_id, created_at) — esto corrigió un 500 en GET /api/ventas?limit=200.
+- anular_venta: ahora permite rol admin ADEMÁS de superadmin; guarda contra docs legacy sin bodega_id/producto_id al devolver inventario.
+- listar_ventas: búsqueda con re.escape (corrige 500 con caracteres como '(' '[' '*'); filtro de fechas usa dia_gt_a_rango_utc (zona GT).
+- fel.py certificar: rechaza facturar ventas con estado 'anulada' / status 'cancelado'.
+
+### Frontend
+- Nueva página /app/frontend/src/pages/VentasClinica.js (data-testid ventas-clinica-page): tarjetas, gráfico recharts, rankings en pestañas (tab-top-medicos/productos/categorias), filtros (búsqueda con debounce 400ms, estado, fechas), tabla, detalle con FELButton origen="clinica" (oculto si anulada), reimprimir ticket (print client-side), anular con motivo+devolver inventario, exportar informe Excel/PDF (años dinámicos).
+- api.js: ventasApi.getDashboardStats/getMonthlyChart/getTopMedicos/getTopProductos/getTopCategorias/getMonthlyReport.
+- App.js: ruta /ventas-clinica (ProtectedRoute requiredPermission="manage_sales").
+- Layout.js: ítem de menú Finanzas > "Ventas" (nav-ventas-clinica, icono TrendingUp, hasPermission('manage_sales')); añadido a arrays de resaltado.
+
+Verificado: curl (5 dashboards con datos reales, Excel 6KB/PDF válidos, list limit=200=200, getById incluye fel, search con '(' =200, rango fechas=200); testing agent iteration_121 (backend 19/20, frontend 90% — todos los flujos pedidos OK). Issues del reporte corregidos: search 500 (HIGH), FEL en anuladas (MEDIUM), fechas GT, docstring/guard anular, feedback de error. NO cambiado a propósito: el rol 'optica' puede abrir /ventas-clinica por URL (consistente con que óptica ya usa POS/CxC de clínica; el menú lo oculta).

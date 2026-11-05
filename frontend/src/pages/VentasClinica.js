@@ -75,6 +75,7 @@ const VentasClinica = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -102,6 +103,14 @@ const VentasClinica = () => {
   const [exportingReport, setExportingReport] = useState(false);
 
   const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const currentYear = parseInt(getGuatemalaDate().split('-')[0], 10);
+  const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
+
+  // Debounce del texto de búsqueda (evita una petición por cada tecla)
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTerm(searchInput), 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const fetchSales = useCallback(async () => {
     try {
@@ -139,6 +148,7 @@ const VentasClinica = () => {
       setTopCategorias(catRes.data);
     } catch (error) {
       console.error('Error fetching dashboard:', error);
+      toast.error('Error al cargar el panel de ventas');
     } finally {
       setLoadingDashboard(false);
     }
@@ -433,13 +443,13 @@ const VentasClinica = () => {
         {/* Filters */}
         <Card className="card-teal">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <Input
                   placeholder="Buscar por cliente o número de orden..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="input-teal pl-10"
                   data-testid="ventas-search"
                 />
@@ -556,12 +566,16 @@ const VentasClinica = () => {
 
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                   <span className="text-sm font-medium text-slate-600">Factura electrónica (FEL)</span>
-                  <FELButton
-                    origen="clinica"
-                    sale={selectedSale}
-                    defaultNombre={selectedSale.paciente_nombre}
-                    onUpdated={refreshDetail}
-                  />
+                  {selectedSale.estado === 'anulada' ? (
+                    <span className="text-xs text-red-600 font-medium">Venta anulada — no facturable</span>
+                  ) : (
+                    <FELButton
+                      origen="clinica"
+                      sale={selectedSale}
+                      defaultNombre={selectedSale.paciente_nombre}
+                      onUpdated={refreshDetail}
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -700,7 +714,7 @@ const VentasClinica = () => {
                   <Select value={reportYear.toString()} onValueChange={(v) => setReportYear(parseInt(v))}>
                     <SelectTrigger className="input-teal"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {[2024, 2025, 2026].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                      {yearOptions.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
