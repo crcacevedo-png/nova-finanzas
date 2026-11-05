@@ -168,7 +168,7 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('inventario_productos')) inventarioItems.push({ path: '/inventario/productos', icon: Package, label: 'Productos', testId: 'nav-inv-productos' });
     if (isMenuEnabled('inventario_lotes')) inventarioItems.push({ path: '/inventario/lotes', icon: AlertTriangle, label: 'Lotes y Vencimientos', testId: 'nav-inv-lotes' });
     if (isMenuEnabled('inventario_kardex')) inventarioItems.push({ path: '/inventario/movimientos', icon: FileText, label: 'Kardex', testId: 'nav-inv-movimientos' });
-    if (isAdminOrSuperAdmin && isMenuEnabled('inventario_categorias')) inventarioItems.push({ path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' });
+    if ((isAdminOrSuperAdmin || user?.role === 'usuario') && isMenuEnabled('inventario_categorias')) inventarioItems.push({ path: '/inventario/categorias', icon: Tag, label: 'Categorías', testId: 'nav-inv-categorias' });
     if (isSuperAdmin && isMenuEnabled('inventario_rentabilidad')) inventarioItems.push({ path: '/inventario/rentabilidad', icon: PieChart, label: 'Rentabilidad', testId: 'nav-inv-rentabilidad' });
     if (isAdminOrSuperAdmin && isMenuEnabled('inventario_sociedades')) inventarioItems.push({ path: '/sociedades', icon: Users, label: 'Sociedades', testId: 'nav-inv-sociedades' });
   }

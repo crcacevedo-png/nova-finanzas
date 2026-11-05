@@ -66,7 +66,7 @@ const getIconComponent = (iconName) => {
 
 const Categorias = () => {
   const { user } = useAuth();
-  const canManage = user?.role === 'superadmin' || user?.role === 'admin';
+  const canManage = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'usuario';
   
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState([]);

@@ -73,7 +73,7 @@ const FORM_INICIAL = {
 
 const Bodegas = () => {
   const { user } = useAuth();
-  const esAdmin = ['superadmin', 'admin'].includes(user?.role);
+  const esAdmin = ['superadmin', 'admin', 'usuario'].includes(user?.role);
 
   // Estado principal
   const [bodegas, setBodegas] = useState([]);

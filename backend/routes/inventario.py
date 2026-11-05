@@ -1055,7 +1055,7 @@ async def crear_categoria(
     """Crea una nueva categoría"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Sin permisos para crear categorías")
     
     nueva_categoria = {
@@ -1076,7 +1076,7 @@ async def actualizar_categoria(
     """Actualiza una categoría"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Sin permisos para editar categorías")
     
     existente = await db.categorias_inventario.find_one({"id": categoria_id, "origen": "clinica"})
@@ -1100,7 +1100,7 @@ async def eliminar_categoria(
     """Elimina una categoría de inventario (solo si no tiene productos asociados)"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar categorías")
     
     # Verificar que existe
@@ -1335,21 +1335,12 @@ async def actualizar_producto(
     if not existente:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    if role == "usuario":
-        # El rol 'usuario' sólo puede modificar existencias mínima y máxima.
-        campos_permitidos = {"existencia_minima", "existencia_maxima"}
-        update_data = {
-            k: v for k, v in producto.model_dump().items()
-            if v is not None and k in campos_permitidos
-        }
-        if not update_data:
-            raise HTTPException(status_code=400, detail="Sin campos válidos para actualizar")
-    else:
-        # Verificar permisos para editar precio (solo superadmin)
-        if producto.precio_venta is not None and role != "superadmin":
-            raise HTTPException(status_code=403, detail="Solo SuperAdmin puede editar precios de venta")
-        # Preparar actualización (solo campos no nulos)
-        update_data = {k: v for k, v in producto.model_dump().items() if v is not None}
+    # Preparar actualización (solo campos no nulos)
+    update_data = {k: v for k, v in producto.model_dump().items() if v is not None}
+    # El precio de venta solo lo modifica el superadmin; para el resto se conserva
+    # el actual (no es error enviarlo, simplemente se ignora).
+    if role != "superadmin":
+        update_data.pop("precio_venta", None)
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
@@ -1372,7 +1363,7 @@ async def cambiar_estado_producto(
     """Activa o desactiva un producto"""
     db = get_db()
     
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Sin permisos")
     
     existente = await db.productos_inventario.find_one({"id": producto_id, "origen": "clinica"})
@@ -2183,7 +2174,7 @@ async def registrar_ajuste(
     db = get_db()
     
     # Permitir a admin y superadmin realizar ajustes
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Solo Administradores pueden realizar ajustes de inventario")
     
     if not ajuste.motivo or len(ajuste.motivo.strip()) < 5:
@@ -2293,7 +2284,7 @@ async def _detectar_discrepancias_lotes(db) -> list:
 @router.get("/reconciliar-lotes/preview")
 async def reconciliar_lotes_preview(current_user: dict = Depends(get_current_user_dependency())):
     """Lista los productos con descuadre entre existencia y suma de lotes (solo detecta)."""
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Solo Administradores pueden reconciliar lotes")
     db = get_db()
     discrepancias = await _detectar_discrepancias_lotes(db)
@@ -2304,7 +2295,7 @@ async def reconciliar_lotes_preview(current_user: dict = Depends(get_current_use
 async def reconciliar_lotes(current_user: dict = Depends(get_current_user_dependency())):
     """Corrige la existencia agregada para que coincida con la suma de lotes.
     Deja traza en el kardex. Solo Administradores."""
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Solo Administradores pueden reconciliar lotes")
     db = get_db()
     discrepancias = await _detectar_discrepancias_lotes(db)
@@ -2360,7 +2351,7 @@ class TrasladoRequest(BaseModel):
 async def crear_traslado(data: TrasladoRequest, current_user: dict = Depends(get_current_user_dependency())):
     """Mueve unidades de un producto de una bodega a otra. Registra en el kardex
     (transferencia_salida / transferencia_entrada). Solo Administradores."""
-    if current_user.get("role") not in ["superadmin", "admin"]:
+    if current_user.get("role") not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=403, detail="Solo Administradores pueden trasladar entre bodegas")
     db = get_db()
 

@@ -118,7 +118,7 @@ async def list_anesthesia_types(
 @router.post("/anesthesia/types")
 async def create_anesthesia_type(
     body: dict = Body(...),
-    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+    current_user: dict = Depends(require_role(["admin", "superadmin", "usuario"])),
 ):
     name = (body.get("name") or "").strip()
     if not name:
@@ -143,7 +143,7 @@ async def create_anesthesia_type(
 async def update_anesthesia_type(
     type_id: str,
     body: dict = Body(...),
-    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+    current_user: dict = Depends(require_role(["admin", "superadmin", "usuario"])),
 ):
     item = await db.anesthesia_types.find_one({"id": type_id}, {"_id": 0})
     if not item:
@@ -165,7 +165,7 @@ async def update_anesthesia_type(
 @router.delete("/anesthesia/types/{type_id}")
 async def deactivate_anesthesia_type(
     type_id: str,
-    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+    current_user: dict = Depends(require_role(["admin", "superadmin", "usuario"])),
 ):
     res = await db.anesthesia_types.update_one({"id": type_id}, {"$set": {"active": False, "updated_at": _now()}})
     if res.matched_count == 0:

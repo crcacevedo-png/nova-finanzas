@@ -28,6 +28,7 @@ const Productos = () => {
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   // El rol 'usuario' también puede definir existencias mínima/máxima.
   const puedeEditarExistencias = isAdminOrSuperAdmin || user?.role === 'usuario';
+  const puedeGestionarInventario = isAdminOrSuperAdmin || user?.role === 'usuario';
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [productos, setProductos] = useState([]);
@@ -735,8 +736,8 @@ const Productos = () => {
                                   <ArrowDownToLine className="w-4 h-4" />
                                 </Button>
                               )}
-                              {/* Botón de Ajuste de Inventario - Solo admin/superadmin */}
-                              {producto.controla_inventario && isAdminOrSuperAdmin && (
+                              {/* Botón de Ajuste de Inventario - admin/superadmin/usuario */}
+                              {producto.controla_inventario && puedeGestionarInventario && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -968,7 +969,12 @@ const Productos = () => {
                   value={formData.precio_venta}
                   onChange={(e) => setFormData({ ...formData, precio_venta: parseFloat(e.target.value) || 0 })}
                   data-testid="input-precio-venta"
+                  disabled={!isSuperAdmin}
+                  className={!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed' : ''}
                 />
+                {!isSuperAdmin && (
+                  <p className="text-xs text-gray-400">Solo el superadministrador puede cambiar el precio de venta.</p>
+                )}
               </div>
               
               {/* Indicador de Margen en Tiempo Real */}
