@@ -176,18 +176,20 @@ const Sociedades = () => {
 
   useEffect(() => {
     fetchSociedades();
-  }, [fetchSociedades]);
+    fetchConsumos();
+    fetchProductosSociedad();
+  }, [fetchSociedades, fetchConsumos, fetchProductosSociedad]);
+
+  // Reiniciar a la primera página cuando cambian los filtros
+  useEffect(() => {
+    setPage(1);
+  }, [fechaInicio, fechaFin, productoFilter, sociedadFilter]);
 
   useEffect(() => {
-    if (activeTab === 'consumos') {
-      fetchConsumos();
-      fetchProductosSociedad();
-    } else if (activeTab === 'productos') {
-      fetchProductosSociedad();
-    } else if (activeTab === 'resumen') {
+    if (activeTab === 'resumen') {
       fetchResumenMensual();
     }
-  }, [activeTab, fetchConsumos, fetchProductosSociedad, fetchResumenMensual]);
+  }, [activeTab, fetchResumenMensual]);
 
   // CRUD Sociedades
   const handleNewSociedad = () => {

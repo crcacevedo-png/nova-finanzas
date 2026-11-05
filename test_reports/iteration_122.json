@@ -1,0 +1,33 @@
+{
+  "summary": "Tested Sociedades Médicas (consumos from POS sales at sale price, resumen, Excel/PDF exports, admin access fix). Backend: 22/22 pytest passed (12 new + 10 regression CRUD). Used seeded TEST_ data: a sociedad, a product with controla_inventario=false, 2 completed sales and 1 anulada sale in Mar-2019. Results: anulada excluded, values match sale subtotals (Q1,450), filters by producto/sociedad/fecha work, resumen by month works, Excel headers and totals correct, PDF has both sections. Role access: a temporary admin user gets 200 on all endpoints and can open /sociedades from sidebar (Inventario > Sociedades) and by direct URL; usuario gets 403 on the API and is sent to /pacientes in the UI with no menu item; superadmin works. UI: Consumos tab columns Fecha/Producto/Sociedad/Cantidad/Monto, cards show 51 / Q18,810.00, the date and product filters update the table and cards, Excel/PDF downloads work, Resumen and Productos tabs render. One UX bug: on first load the cards are empty (see below).",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "/api/inventario/sociedades/resumen, /exportar/*", "issue": "Month boundaries are compared as UTC strings ('YYYY-MM-01T00:00:00'), but the clinic is in Guatemala (UTC-6). Sales made 18:00-23:59 local time on the last day of a month fall into the next month. The Consumos date filter has the same problem (fecha_fin + T23:59:59 UTC)."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Sociedades stat cards", "issue": "The default tab is 'sociedades', and resumenConsumos and productosSociedad only load when the Consumos or Productos tab is opened. So on first load 'Productos Asignados'=0, 'Total Consumos'=0 and 'Monto Vendido'=Q0.00 until the user clicks Consumos. Confirmed for both admin and superadmin. Fix: fetch consumos and productos on mount, independent of the active tab.", "selector": "p.text-xl.font-bold", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sociedades > Consumos", "issues": ["Fecha inicio/fin use the browser's native <input type=date> instead of the shadcn Calendar/Popover", "Changing a filter does not reset page to 1, so a narrower filter on page>1 shows an empty table", "Tabs, filters and cards lack data-testid (only export and CRUD buttons have them)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_sociedades_consumos_ventas.py", "/app/backend/tests/test_sociedades.py", "/app/test_reports/pytest/pytest_sociedades_consumos.xml"],
+  "action_items": [
+    "Load the consumos summary and productos list on mount, so the stat cards are not 0 on the default Sociedades tab",
+    "Optional: use Guatemala local time (UTC-6) for month and date-range boundaries in _recolectar_consumos_sociedad callers",
+    "Optional: reset page to 1 when filters change; add data-testids to tabs, filters and cards"
+  ],
+  "critical_code_review_comments": [
+    "Sociedades.js is about 1073 lines; split the tabs into components",
+    "_recolectar_consumos_sociedad loads up to 50k ventas and paginates in memory. Fine for now; consider an aggregation pipeline with $unwind/$match as volume grows",
+    "The Excel/PDF buttons ignore the Consumos tab's producto filter. They only respect sociedad and date range, which matches the spec but may surprise users",
+    "'Productos Asignados' counts all es_sociedad products, including those with no sociedad ('Sin asignar')"
+  ],
+  "updated_files": ["/app/backend/tests/test_sociedades_consumos_ventas.py"],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "90% (all flows work; card initial-load bug)"},
+  "seed_data_creation": "All temporary, created and deleted by id: a TEST_ sociedad, a product, 3 ventas (inserted by the test fixture), and temporary admin users TEST_adm_<tag> and test_adminui. Verified 0 leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "CRUD lives at /api/inventario/sociedades/catalogo. No admin password exists in creds; create a temporary admin via POST /api/users (usernames are lowercased). ventas.numero_venta has a unique index. Run: pytest tests/test_sociedades_consumos_ventas.py -p no:xdist"
+}

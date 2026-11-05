@@ -1040,3 +1040,17 @@ Verificado: curl (5 dashboards con datos reales, Excel 6KB/PDF válidos, list li
 - Backend (ventas.py): listar_ventas (GET /api/ventas) con check superadmin inline; filtros/opciones, dashboard/stats, monthly-chart, top-medicos/productos/categorias, reports/monthly y anular usan Depends(require_superadmin_dep()). getById se dejó SIN restringir (lo comparte el POS/PuntoVenta). ventas/hoy y resumen-dia intactos para el POS.
 - Frontend: App.js ruta /ventas-clinica con ProtectedRoute requiredRole="superadmin"; Layout.js el ítem de menú "Ventas" ahora solo si isSuperAdmin.
 - Verificado: curl superadmin=200 en todos; usuario=403 en los endpoints del módulo pero 200 en ventas/hoy y resumen-dia (POS no afectado). UI: usuario no ve el menú y /ventas-clinica redirige a /pacientes.
+
+## Sociedades Médicas — consumos por venta + informes + acceso admin (2026-11) — COMPLETADA y verificada
+Problema: el módulo mostraba 0 consumos (leía de movimientos_inventario, que no existe para productos sin inventario ∞ y usaba el costo), y al administrador el botón "Sociedades" lo mandaba a Pacientes (ruta con requiredPermission="manage_users").
+
+### Backend (/app/backend/routes/inventario.py)
+- Nuevo helper _recolectar_consumos_sociedad(db, sociedad_id, producto_id, fecha_gte/lt/lte): arma los consumos desde la colección `ventas` (origen=clinica, estado != anulada, items.producto_id en productos es_sociedad). Cada línea de venta = 1 consumo, valuado al PRECIO DE VENTA (item.subtotal). Incluye histórico y productos sin control de existencia.
+- Reescritos: GET /sociedades/consumos (paginación en memoria; resumen total_cantidad/total_costo=monto), /sociedades/resumen (+param sociedad_id), /sociedades/exportar/excel y /pdf (+param sociedad_id, columnas con montos de venta y columna Sociedad). ConsumoSociedadItem ganó sociedad_nombre; costo_unitario/costo_total ahora llevan precio/monto de venta.
+- Ventas anuladas excluidas.
+
+### Frontend
+- Sociedades.js: pestaña Consumos con columnas Fecha/Producto/Sociedad/Cantidad/Monto; tarjeta "Costo Total"→"Monto Vendido" y "Monto Vendido del Mes" en Resumen; consumos+productos se cargan al montar (tarjetas ya no quedan en 0); page se reinicia a 1 al cambiar filtros.
+- App.js: ruta /sociedades con ProtectedRoute requiredRole={['admin','superadmin']} (antes manage_users) → admin ya entra, no lo manda a Pacientes.
+
+Verificado: testing agent iteration_122 backend 22/22 (12 nuevos + 10 regresión CRUD), admin 200 y abre el módulo, usuario 403 + redirige a /pacientes; UI tarjetas Total Consumos 51 / Monto Vendido Q18,810.00, filtros y Excel/PDF OK. Pendiente opcional (no bloqueante): límites de mes/fechas en hora local GT (hoy en UTC, pequeño sesgo); date-picker shadcn y data-testids en tabs/filtros. Fase 2/3 (ranking por sociedad, comparación de meses, envío por correo) quedan pendientes.
