@@ -79,6 +79,9 @@ const VentasClinica = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [medicoFilter, setMedicoFilter] = useState('all');
+  const [vendedorFilter, setVendedorFilter] = useState('all');
+  const [filterOptions, setFilterOptions] = useState({ medicos: [], vendedores: [] });
 
   // Dashboard
   const [dashboardStats, setDashboardStats] = useState({
@@ -120,6 +123,8 @@ const VentasClinica = () => {
       if (searchTerm) params.search = searchTerm;
       if (dateFrom) params.fecha_desde = dateFrom;
       if (dateTo) params.fecha_hasta = dateTo;
+      if (medicoFilter !== 'all') params.medico_id = medicoFilter;
+      if (vendedorFilter !== 'all') params.vendedor_id = vendedorFilter;
       params.limit = 200;
       const response = await ventasApi.getAll(params);
       setSales(response.data.data || []);
@@ -129,7 +134,7 @@ const VentasClinica = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchTerm, dateFrom, dateTo]);
+  }, [statusFilter, searchTerm, dateFrom, dateTo, medicoFilter, vendedorFilter]);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -161,6 +166,12 @@ const VentasClinica = () => {
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+
+  useEffect(() => {
+    ventasApi.getFilterOptions()
+      .then((r) => setFilterOptions(r.data || { medicos: [], vendedores: [] }))
+      .catch(() => {});
+  }, []);
 
   const refreshAll = () => { fetchSales(); fetchDashboard(); };
 
@@ -443,7 +454,7 @@ const VentasClinica = () => {
         {/* Filters */}
         <Card className="card-teal">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 sm:items-end">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <Input
@@ -455,13 +466,35 @@ const VentasClinica = () => {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px] input-teal" data-testid="ventas-estado-filter">
+                <SelectTrigger className="w-[160px] input-teal" data-testid="ventas-estado-filter">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="completada">Completadas</SelectItem>
                   <SelectItem value="anulada">Anuladas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={medicoFilter} onValueChange={setMedicoFilter}>
+                <SelectTrigger className="w-[180px] input-teal" data-testid="ventas-medico-filter">
+                  <SelectValue placeholder="Médico" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los médicos</SelectItem>
+                  {filterOptions.medicos.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={vendedorFilter} onValueChange={setVendedorFilter}>
+                <SelectTrigger className="w-[180px] input-teal" data-testid="ventas-vendedor-filter">
+                  <SelectValue placeholder="Vendedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los vendedores</SelectItem>
+                  {filterOptions.vendedores.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>{v.nombre}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <div className="flex items-center gap-2">
@@ -473,8 +506,8 @@ const VentasClinica = () => {
                   <Label className="text-xs text-gray-500">Hasta</Label>
                   <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="input-teal" data-testid="ventas-date-to" />
                 </div>
-                {(dateFrom || dateTo) && (
-                  <Button variant="ghost" size="sm" className="self-end h-9" onClick={() => { setDateFrom(''); setDateTo(''); }} data-testid="ventas-date-clear">
+                {(dateFrom || dateTo || medicoFilter !== 'all' || vendedorFilter !== 'all' || statusFilter !== 'all' || searchInput) && (
+                  <Button variant="ghost" size="sm" className="self-end h-9" onClick={() => { setDateFrom(''); setDateTo(''); setMedicoFilter('all'); setVendedorFilter('all'); setStatusFilter('all'); setSearchInput(''); }} data-testid="ventas-filtros-clear" title="Limpiar filtros">
                     <X className="w-4 h-4" />
                   </Button>
                 )}

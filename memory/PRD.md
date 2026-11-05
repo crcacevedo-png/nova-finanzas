@@ -1030,3 +1030,8 @@ Solicitud: "el mismo modulo de ventas que creaste para optica, crealo para la cl
 - Layout.js: ítem de menú Finanzas > "Ventas" (nav-ventas-clinica, icono TrendingUp, hasPermission('manage_sales')); añadido a arrays de resaltado.
 
 Verificado: curl (5 dashboards con datos reales, Excel 6KB/PDF válidos, list limit=200=200, getById incluye fel, search con '(' =200, rango fechas=200); testing agent iteration_121 (backend 19/20, frontend 90% — todos los flujos pedidos OK). Issues del reporte corregidos: search 500 (HIGH), FEL en anuladas (MEDIUM), fechas GT, docstring/guard anular, feedback de error. NO cambiado a propósito: el rol 'optica' puede abrir /ventas-clinica por URL (consistente con que óptica ya usa POS/CxC de clínica; el menú lo oculta).
+
+### Ventas de Clínica — filtros por Médico y Vendedor (2026-11) — COMPLETADA y verificada
+- Backend: GET /api/ventas/filtros/opciones devuelve {medicos, vendedores} distintos presentes en ventas de clínica; listar_ventas acepta medico_id y vendedor_id.
+- Frontend (VentasClinica.js): dos Selects (ventas-medico-filter, ventas-vendedor-filter) + botón limpiar (ventas-filtros-clear) que reinicia todos los filtros; api.js ventasApi.getFilterOptions; fila de filtros con flex-wrap/items-end.
+- Verificado: curl (opciones=1 médico/2 vendedores; medico_id→4, vendedor_id→44) y UI (filtrar por Dr. Carlos Méndez → "Lista de Ventas (4)").

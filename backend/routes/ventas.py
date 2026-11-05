@@ -807,6 +807,8 @@ async def listar_ventas(
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
     paciente_id: Optional[str] = None,
+    medico_id: Optional[str] = None,
+    vendedor_id: Optional[str] = None,
     estado: Optional[str] = None,
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
@@ -830,6 +832,10 @@ async def listar_ventas(
         filtro["fecha"] = rango
     if paciente_id:
         filtro["paciente_id"] = paciente_id
+    if medico_id:
+        filtro["medico_id"] = medico_id
+    if vendedor_id:
+        filtro["vendedor_id"] = vendedor_id
     if estado:
         filtro["estado"] = estado
     if search:
@@ -1090,6 +1096,31 @@ def _rango_mes_utc(year: int, month: int):
     ini = dia_gt_a_rango_utc(f"{year}-{month:02d}-01")[0]
     fin = dia_gt_a_rango_utc(f"{year}-{month:02d}-{last_day:02d}")[1]
     return ini, fin
+
+
+@router.get("/filtros/opciones")
+async def ventas_filtros_opciones(
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Médicos y vendedores presentes en las ventas de clínica, para los filtros."""
+    db = get_db()
+    ventas = await db.ventas.find(
+        {"origen": "clinica"},
+        {"_id": 0, "medico_id": 1, "medico_nombre": 1, "vendedor_id": 1, "vendedor_nombre": 1}
+    ).to_list(10000)
+    medicos = {}
+    vendedores = {}
+    for v in ventas:
+        mid = v.get("medico_id")
+        if mid and mid not in medicos:
+            medicos[mid] = v.get("medico_nombre") or "Médico"
+        vid = v.get("vendedor_id")
+        if vid and vid not in vendedores:
+            vendedores[vid] = v.get("vendedor_nombre") or "Vendedor"
+    return {
+        "medicos": sorted([{"id": k, "nombre": n} for k, n in medicos.items()], key=lambda x: x["nombre"]),
+        "vendedores": sorted([{"id": k, "nombre": n} for k, n in vendedores.items()], key=lambda x: x["nombre"]),
+    }
 
 
 @router.get("/dashboard/stats")

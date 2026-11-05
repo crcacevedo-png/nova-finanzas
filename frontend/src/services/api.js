@@ -758,6 +758,7 @@ export const ventasApi = {
 
   // Dashboard / análisis de ventas de clínica
   getDashboardStats: () => axios.get(`${API_URL}/ventas/dashboard/stats`),
+  getFilterOptions: () => axios.get(`${API_URL}/ventas/filtros/opciones`),
   getMonthlyChart: () => axios.get(`${API_URL}/ventas/dashboard/monthly-chart`),
   getTopMedicos: (limit = 5) => axios.get(`${API_URL}/ventas/dashboard/top-medicos?limit=${limit}`),
   getTopProductos: (limit = 5) => axios.get(`${API_URL}/ventas/dashboard/top-productos?limit=${limit}`),
