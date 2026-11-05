@@ -521,7 +521,7 @@ function AppRoutes() {
       <Route 
         path="/sociedades" 
         element={
-          <ProtectedRoute requiredPermission="manage_users">
+          <ProtectedRoute requiredRole={["admin", "superadmin"]}>
             <Sociedades />
           </ProtectedRoute>
         } 

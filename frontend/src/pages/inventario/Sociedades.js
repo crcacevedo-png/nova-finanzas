@@ -473,7 +473,7 @@ const Sociedades = () => {
                   <DollarSign className="w-5 h-5 text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Costo Total</p>
+                  <p className="text-sm text-gray-500">Monto Vendido</p>
                   <p className="text-xl font-bold">{formatCurrency(resumenConsumos.total_costo || 0)}</p>
                 </div>
               </div>
@@ -665,12 +665,9 @@ const Sociedades = () => {
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bodega</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sociedad</th>
                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Unit.</th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Total</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
+                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -685,23 +682,17 @@ const Sociedades = () => {
                                   <p className="text-xs text-gray-500">{consumo.producto_codigo}</p>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-sm">{consumo.bodega_nombre}</td>
                               <td className="px-4 py-3">
-                                <Badge variant="outline" className="text-xs">
-                                  {tipoLabels[consumo.tipo] || consumo.tipo}
+                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                                  <Building2 className="w-3 h-3 mr-1" />
+                                  {consumo.sociedad_nombre || 'Sin asignar'}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-sm text-right font-medium text-red-600">
-                                -{consumo.cantidad}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-right">
-                                {formatCurrency(consumo.costo_unitario)}
-                              </td>
                               <td className="px-4 py-3 text-sm text-right font-medium">
-                                {formatCurrency(consumo.costo_total)}
+                                {consumo.cantidad}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-500 max-w-[200px] truncate">
-                                {consumo.motivo || '-'}
+                              <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
+                                {formatCurrency(consumo.costo_total)}
                               </td>
                             </tr>
                           ))}
@@ -871,7 +862,7 @@ const Sociedades = () => {
                   <Card className="bg-gradient-to-br from-amber-50 to-white">
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <p className="text-sm text-gray-500">Costo Total del Mes</p>
+                        <p className="text-sm text-gray-500">Monto Vendido del Mes</p>
                         <p className="text-3xl font-bold text-amber-700">{formatCurrency(resumenMensual.total_costo)}</p>
                         <p className="text-sm text-gray-400 mt-1">en productos sociedad</p>
                       </div>
@@ -891,7 +882,7 @@ const Sociedades = () => {
                             <tr>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
                               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Costo Total</th>
+                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto Vendido</th>
                               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% del Total</th>
                             </tr>
                           </thead>
