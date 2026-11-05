@@ -50,6 +50,7 @@ import ReporteRentabilidad from './pages/inventario/ReporteRentabilidad';
 import Sociedades from './pages/inventario/Sociedades';
 // Punto de Venta (POS)
 import PuntoVenta from './pages/PuntoVenta';
+import VentasClinica from './pages/VentasClinica';
 import AnalisisProduccion from './pages/AnalisisProduccion';
 import './App.css';
 
@@ -440,6 +441,16 @@ function AppRoutes() {
             <PuntoVenta />
           </ProtectedRoute>
         } 
+      />
+
+      {/* ==================== VENTAS DE CLÍNICA (revisión y análisis) ==================== */}
+      <Route
+        path="/ventas-clinica"
+        element={
+          <ProtectedRoute requiredPermission="manage_sales">
+            <VentasClinica />
+          </ProtectedRoute>
+        }
       />
 
       {/* ==================== MÓDULO DE INVENTARIO ==================== */}

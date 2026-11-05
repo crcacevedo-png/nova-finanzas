@@ -69,7 +69,7 @@ const Layout = ({ children }) => {
   const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/configuracion'));
   const [opticaOpen, setOpticaOpen] = useState(location.pathname.startsWith('/optica'));
   const [finanzasOpen, setFinanzasOpen] = useState(
-    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p))
+    ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/configuracion/gastos-fijos', '/punto-venta', '/ventas-clinica', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p))
   );
   const [inventarioOpen, setInventarioOpen] = useState(location.pathname.startsWith('/inventario'));
   const [igssOpen, setIgssOpen] = useState(location.pathname.startsWith('/igss'));
@@ -144,6 +144,7 @@ const Layout = ({ children }) => {
   const finanzasItems = [];
   if (user?.role !== 'optica') {
     if (isMenuEnabled('finanzas_pos')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
+    if (hasPermission('manage_sales')) finanzasItems.push({ path: '/ventas-clinica', icon: TrendingUp, label: 'Ventas', testId: 'nav-ventas-clinica' });
     if (isMenuEnabled('finanzas_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
     if (isMenuEnabled('finanzas_cxc')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
     if (isMenuEnabled('finanzas_gastos')) finanzasItems.push({ path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' });
@@ -371,12 +372,12 @@ const Layout = ({ children }) => {
               <button
                 onClick={() => setFinanzasOpen(!finanzasOpen)}
                 className={`sidebar-item flex items-center justify-between w-full mx-2 ${
-                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
+                  ['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/ventas-clinica', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p)) ? 'active' : ''
                 }`}
                 data-testid="nav-finanzas"
               >
                 <div className="flex items-center gap-3">
-                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
+                  <Wallet className={`w-5 h-5 icon ${['/gastos', '/historial-pagos', '/autorizaciones-pendientes', '/caja', '/punto-venta', '/ventas-clinica', '/cuentas-cobrar-finanzas', '/cierre-diario', '/analisis-produccion'].some(p => location.pathname.startsWith(p)) ? 'opacity-100' : 'opacity-60'}`} />
                   <span className="font-medium text-sm">Finanzas</span>
                 </div>
                 {finanzasOpen ? (

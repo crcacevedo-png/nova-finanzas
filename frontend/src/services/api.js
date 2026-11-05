@@ -755,6 +755,15 @@ export const ventasApi = {
   
   // Ticket para impresión
   getTicket: (id) => axios.get(`${API_URL}/ventas/${id}/ticket`),
+
+  // Dashboard / análisis de ventas de clínica
+  getDashboardStats: () => axios.get(`${API_URL}/ventas/dashboard/stats`),
+  getMonthlyChart: () => axios.get(`${API_URL}/ventas/dashboard/monthly-chart`),
+  getTopMedicos: (limit = 5) => axios.get(`${API_URL}/ventas/dashboard/top-medicos?limit=${limit}`),
+  getTopProductos: (limit = 5) => axios.get(`${API_URL}/ventas/dashboard/top-productos?limit=${limit}`),
+  getTopCategorias: (limit = 5) => axios.get(`${API_URL}/ventas/dashboard/top-categorias?limit=${limit}`),
+  getMonthlyReport: (year, month, format = 'excel') =>
+    axios.get(`${API_URL}/ventas/reports/monthly?year=${year}&month=${month}&format=${format}`, { responseType: 'blob' }),
 };
 
 // Instancia de axios configurada para usar en componentes

@@ -63,22 +63,22 @@ class VentaResponse(BaseModel):
     id: str
     numero_venta: str
     fecha: str
-    bodega_id: str
+    bodega_id: Optional[str] = None
     bodega_nombre: Optional[str] = None
     paciente_id: Optional[str] = None
     paciente_nombre: Optional[str] = None
     medico_id: Optional[str] = None
     medico_nombre: Optional[str] = None
-    items: List[dict]
-    cantidad_items: int
-    subtotal: float
-    descuento_total: float
+    items: List[dict] = []
+    cantidad_items: int = 0
+    subtotal: float = 0
+    descuento_total: float = 0
     descuento_porcentaje: float = 0
     descuento_monto: float = 0
     descuento_autoriza: Optional[str] = ""
-    iva: float
-    total: float
-    formas_pago: List[dict]
+    iva: float = 0
+    total: float = 0
+    formas_pago: List[dict] = []
     efectivo_recibido: float = 0
     cambio: float = 0
     estado: str = "completada"
@@ -86,14 +86,19 @@ class VentaResponse(BaseModel):
     movimiento_caja_id: Optional[str] = None
     cxc_id: Optional[str] = None
     observaciones: Optional[str] = None
-    vendedor_id: str
+    vendedor_id: Optional[str] = None
     vendedor_nombre: Optional[str] = None
     origen: str = "clinica"
-    created_at: str
+    created_at: Optional[str] = None
     # FEL
     datos_fel: Optional[dict] = None
     fel_uuid: Optional[str] = None
     fel_numero: Optional[str] = None
+    fel: Optional[dict] = None
+    # Anulación
+    motivo_anulacion: Optional[str] = None
+    anulada_por_nombre: Optional[str] = None
+    fecha_anulacion: Optional[str] = None
 
 class VentaListResponse(BaseModel):
     """Lista de ventas"""
@@ -1070,6 +1075,298 @@ async def analisis_produccion(
     }
 
 
+# ==================== DASHBOARD DE VENTAS DE CLÍNICA ====================
+
+def _rango_mes_utc(year: int, month: int):
+    """Devuelve (inicio_utc, fin_utc) ISO para un mes en zona horaria de Guatemala."""
+    from calendar import monthrange
+    last_day = monthrange(year, month)[1]
+    ini = dia_gt_a_rango_utc(f"{year}-{month:02d}-01")[0]
+    fin = dia_gt_a_rango_utc(f"{year}-{month:02d}-{last_day:02d}")[1]
+    return ini, fin
+
+
+@router.get("/dashboard/stats")
+async def ventas_dashboard_stats(
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Estadísticas del mes actual para el módulo de Ventas de Clínica."""
+    db = get_db()
+    n = now_gt()
+    ini_mes, fin_mes = _rango_mes_utc(n.year, n.month)
+
+    ventas_mes = await db.ventas.find({
+        "origen": "clinica", "estado": "completada",
+        "fecha": {"$gte": ini_mes, "$lte": fin_mes}
+    }, {"_id": 0, "total": 1}).to_list(5000)
+    total_mes = round(sum(v.get("total", 0) or 0 for v in ventas_mes), 2)
+    ordenes_mes = len(ventas_mes)
+    ticket_promedio = round(total_mes / ordenes_mes, 2) if ordenes_mes else 0
+
+    anuladas_mes = await db.ventas.count_documents({
+        "origen": "clinica", "estado": "anulada",
+        "fecha": {"$gte": ini_mes, "$lte": fin_mes}
+    })
+
+    hoy = today_str_gt()
+    ini_hoy, fin_hoy = dia_gt_a_rango_utc(hoy)
+    ventas_hoy = await db.ventas.find({
+        "origen": "clinica", "estado": "completada",
+        "fecha": {"$gte": ini_hoy, "$lte": fin_hoy}
+    }, {"_id": 0, "total": 1}).to_list(2000)
+    total_hoy = round(sum(v.get("total", 0) or 0 for v in ventas_hoy), 2)
+
+    return {
+        "ventas_mes": total_mes,
+        "ordenes_mes": ordenes_mes,
+        "ticket_promedio": ticket_promedio,
+        "ventas_hoy": total_hoy,
+        "ordenes_hoy": len(ventas_hoy),
+        "anuladas_mes": anuladas_mes,
+    }
+
+
+@router.get("/dashboard/monthly-chart")
+async def ventas_monthly_chart(
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Ventas de clínica de los últimos 6 meses."""
+    db = get_db()
+    month_names = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    n = now_gt()
+    chart = []
+    year, month = n.year, n.month
+    meses = []
+    for _ in range(6):
+        meses.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    for (y, m) in reversed(meses):
+        ini, fin = _rango_mes_utc(y, m)
+        ventas = await db.ventas.find({
+            "origen": "clinica", "estado": "completada",
+            "fecha": {"$gte": ini, "$lte": fin}
+        }, {"_id": 0, "total": 1}).to_list(5000)
+        chart.append({
+            "mes": f"{month_names[m]} {y}",
+            "ventas": round(sum(v.get("total", 0) or 0 for v in ventas), 2),
+            "ordenes": len(ventas),
+        })
+    return chart
+
+
+async def _ventas_mes_items(db):
+    """Ventas completadas del mes actual (con items) para rankings."""
+    n = now_gt()
+    ini, fin = _rango_mes_utc(n.year, n.month)
+    return await db.ventas.find({
+        "origen": "clinica", "estado": "completada",
+        "fecha": {"$gte": ini, "$lte": fin}
+    }, {"_id": 0}).to_list(5000)
+
+
+@router.get("/dashboard/top-medicos")
+async def ventas_top_medicos(
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Top médicos que refieren ventas en el mes actual."""
+    db = get_db()
+    ventas = await _ventas_mes_items(db)
+    agg = {}
+    for v in ventas:
+        nombre = v.get("medico_nombre")
+        if not nombre:
+            continue
+        r = agg.setdefault(nombre, {"medico_nombre": nombre, "total_ventas": 0.0, "count": 0})
+        r["total_ventas"] += v.get("total", 0) or 0
+        r["count"] += 1
+    for r in agg.values():
+        r["total_ventas"] = round(r["total_ventas"], 2)
+    return sorted(agg.values(), key=lambda x: x["total_ventas"], reverse=True)[:limit]
+
+
+@router.get("/dashboard/top-productos")
+async def ventas_top_productos(
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Top productos más vendidos (por unidades) en el mes actual."""
+    db = get_db()
+    ventas = await _ventas_mes_items(db)
+    agg = {}
+    for v in ventas:
+        for item in v.get("items", []):
+            nombre = item.get("nombre", "Producto")
+            r = agg.setdefault(nombre, {"nombre": nombre, "cantidad": 0, "total_ventas": 0.0})
+            r["cantidad"] += item.get("cantidad", 0) or 0
+            r["total_ventas"] += item.get("subtotal", 0) or 0
+    for r in agg.values():
+        r["total_ventas"] = round(r["total_ventas"], 2)
+    return sorted(agg.values(), key=lambda x: x["cantidad"], reverse=True)[:limit]
+
+
+@router.get("/dashboard/top-categorias")
+async def ventas_top_categorias(
+    limit: int = 5,
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Top categorías de producto por ventas en el mes actual."""
+    db = get_db()
+    ventas = await _ventas_mes_items(db)
+    productos = {}
+    producto_ids = set()
+    for v in ventas:
+        for item in v.get("items", []):
+            pid = item.get("producto_id")
+            if pid:
+                producto_ids.add(pid)
+            p = productos.setdefault(pid, {"cantidad": 0, "monto": 0.0})
+            p["cantidad"] += item.get("cantidad", 0) or 0
+            p["monto"] += item.get("subtotal", 0) or 0
+    cat_de_producto = {}
+    if producto_ids:
+        async for pr in db.productos_inventario.find(
+            {"id": {"$in": list(producto_ids)}}, {"_id": 0, "id": 1, "categoria_id": 1}
+        ):
+            cat_de_producto[pr["id"]] = pr.get("categoria_id")
+    cat_ids = {c for c in cat_de_producto.values() if c}
+    nombre_categoria = {}
+    if cat_ids:
+        async for c in db.categorias_inventario.find(
+            {"id": {"$in": list(cat_ids)}}, {"_id": 0, "id": 1, "nombre": 1}
+        ):
+            nombre_categoria[c["id"]] = c.get("nombre")
+    agg = {}
+    for pid, p in productos.items():
+        cat_id = cat_de_producto.get(pid)
+        cat_nombre = nombre_categoria.get(cat_id, "Sin categoría") if cat_id else "Sin categoría"
+        r = agg.setdefault(cat_nombre, {"categoria": cat_nombre, "cantidad": 0, "total_ventas": 0.0})
+        r["cantidad"] += p["cantidad"]
+        r["total_ventas"] += p["monto"]
+    for r in agg.values():
+        r["total_ventas"] = round(r["total_ventas"], 2)
+    return sorted(agg.values(), key=lambda x: x["total_ventas"], reverse=True)[:limit]
+
+
+@router.get("/reports/monthly")
+async def ventas_reporte_mensual(
+    year: int,
+    month: int,
+    format: str = "excel",
+    current_user: dict = Depends(get_current_user_dependency())
+):
+    """Exporta el informe mensual de ventas de clínica en Excel o PDF."""
+    import io
+    from fastapi.responses import StreamingResponse
+    db = get_db()
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Mes inválido")
+    ini, fin = _rango_mes_utc(year, month)
+    ventas = await db.ventas.find({
+        "origen": "clinica",
+        "fecha": {"$gte": ini, "$lte": fin}
+    }, {"_id": 0}).sort("fecha", 1).to_list(10000)
+
+    month_names = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    titulo = f"Ventas de Clínica - {month_names[month]} {year}"
+
+    def _fecha_corta(iso):
+        try:
+            dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(GUATEMALA_TZ)
+            return dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            return iso or ""
+
+    completadas = [v for v in ventas if v.get("estado") == "completada"]
+    total_vendido = round(sum(v.get("total", 0) or 0 for v in completadas), 2)
+    filas = []
+    for v in ventas:
+        filas.append([
+            v.get("numero_venta", ""),
+            _fecha_corta(v.get("fecha", "")),
+            v.get("paciente_nombre") or "Consumidor Final",
+            v.get("medico_nombre") or "-",
+            v.get("vendedor_nombre") or "-",
+            round(v.get("total", 0) or 0, 2),
+            "Anulada" if v.get("estado") == "anulada" else "Completada",
+        ])
+
+    headers = ["Orden", "Fecha", "Cliente", "Médico", "Vendedor", "Total (Q)", "Estado"]
+    fname_base = f"ventas_clinica_{year}_{month:02d}"
+
+    if format == "excel":
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Ventas"
+        ws.merge_cells("A1:G1")
+        ws["A1"] = titulo
+        ws["A1"].font = Font(size=14, bold=True)
+        ws["A1"].alignment = Alignment(horizontal="center")
+        ws.append([])
+        ws.append(headers)
+        header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+        for col in range(1, len(headers) + 1):
+            c = ws.cell(row=3, column=col)
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = header_fill
+        for fila in filas:
+            ws.append(fila)
+        ws.append([])
+        ws.append(["", "", "", "", "TOTAL VENDIDO", total_vendido, ""])
+        ws.cell(row=ws.max_row, column=5).font = Font(bold=True)
+        ws.cell(row=ws.max_row, column=6).font = Font(bold=True)
+        widths = [18, 18, 30, 24, 22, 14, 14]
+        for i, w in enumerate(widths, start=1):
+            ws.column_dimensions[chr(64 + i)].width = w
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={fname_base}.xlsx"}
+        )
+
+    elif format == "pdf":
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=landscape(letter), topMargin=1*cm, bottomMargin=1*cm)
+        styles = getSampleStyleSheet()
+        elems = [Paragraph(titulo, styles["Title"]), Spacer(1, 8)]
+        data = [headers] + [[str(c) for c in fila] for fila in filas]
+        data.append(["", "", "", "", "TOTAL", f"{total_vendido:,.2f}", ""])
+        t = Table(data, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F6E56")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
+            ("ALIGN", (5, 1), (5, -1), "RIGHT"),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F1F5F9")]),
+        ]))
+        elems.append(t)
+        doc.build(elems)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={fname_base}.pdf"}
+        )
+
+    raise HTTPException(status_code=400, detail="Formato inválido (excel|pdf)")
+
+
 @router.get("/{venta_id}", response_model=VentaResponse)
 async def obtener_venta(
     venta_id: str,
@@ -1096,8 +1393,8 @@ async def anular_venta(
     """
     db = get_db()
     
-    if current_user.get("role") != "superadmin":
-        raise HTTPException(status_code=403, detail="Solo SuperAdmin puede anular ventas")
+    if current_user.get("role") not in ("superadmin", "admin"):
+        raise HTTPException(status_code=403, detail="Solo administradores pueden anular ventas")
     
     venta = await db.ventas.find_one({"id": venta_id, "origen": "clinica"})
     if not venta:
