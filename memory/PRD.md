@@ -1059,3 +1059,23 @@ Verificado: testing agent iteration_122 backend 22/22 (12 nuevos + 10 regresión
 - inventario.py: _recolectar_consumos_sociedad agrega medico_nombre; ConsumoSociedadItem gana paciente_nombre y medico_nombre; endpoint consumos los expone. Excel (cols Fecha/Código/Producto/Sociedad/Paciente/Médico/Cantidad/Monto Unit./Monto Total) y PDF (detalle con Paciente/Médico) actualizados.
 - Sociedades.js: tabla Consumos ahora Fecha/Producto/Sociedad/Paciente/Médico/Cantidad/Monto.
 - Verificado: curl (paciente/medico presentes), Excel/PDF 200, y UI muestra Paciente+Médico.
+
+## Flujo IGSS: ingreso del paciente alimenta Producción (SPS + descripción NOG) (2026-11) — Fase 1 COMPLETADA y verificada
+Causa: _build_produccion_rows/_resolver_orden solo completaban No. SPS/procedimiento desde la orden cuando la evaluación NO traía NOG; si la evaluación traía NOG pero no SPS, salía "—" y Procedimiento quedaba en blanco.
+
+### Cambios (backend /app/backend/routes/igss_nogs.py)
+- _resolver_orden: ahora, cuando la evaluación trae NOG, busca la ORDEN del paciente con el mismo NOG (prefiere la que tenga No. SPS) y completa No. SPS, código y procedimiento faltantes. Si la evaluación no trae NOG, usa la primera orden.
+- _build_produccion_rows: nog_map incluye nombre_servicio; Procedimiento = proc (eval/orden) o, si está vacío, el nombre del servicio del NOG del catálogo de la unidad. Fila agrupada por unidad+NOG, fecha = fecha de la evaluación/consulta.
+
+### Ya existente (no requirió cambios, confirmado)
+- Una línea y un descuento por autorización (NOG+No. SPS): _reconciliar_nog_paciente / _crear_acreditacion dedup por (nog_id, paciente_id, no_sps).
+- Descuento independiente del rol (se dispara en create/edit paciente, gated solo por create_patients/edit_patients).
+- Múltiples órdenes por paciente: formulario Pacientes.js (igss_ordenes, add/remove, NOG/SPS/código/procedimiento) sin candado de rol.
+- Recálculo/reproceso: POST /api/igss-units/nogs/recalcular-por-evaluaciones (permiso manage_igss_units).
+
+### Verificación (escenario real controlado, luego limpiado)
+- Evaluación con igss_nog=12345678, igss_no_sps='' y orden con no_sps='SPS-TEST-777' → fila de Producción: unidad "Zona 11", NOG 12345678, No. SPS 'SPS-TEST-777', Procedimiento 'Cirugia de catarata', fecha = fecha eval.
+- Reconciliación del paciente de prueba creó 1 acreditación (SPS-TEST-777) y NOG acreditados 1→2. Datos de prueba eliminados, contador restaurado a 1.
+- Página /igss/unidades pestaña Producción carga sin errores.
+
+Fase 2 (pendiente): validaciones al ingresar (aviso SPS faltante / NOG sin cupo) e indicador de datos incompletos por fila. Fase 3: reportes comparativos por unidad/período y envío programado.

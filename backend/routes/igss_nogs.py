@@ -1161,19 +1161,30 @@ def _eval_recencia(ev):
 
 
 def _resolver_orden(ev, pac):
-    """Resuelve (numero NOG, No. SPS, código, procedimiento) de una evaluación,
-    con respaldo en la primera orden IGSS del paciente."""
+    """Resuelve (numero NOG, No. SPS, código, procedimiento) de una evaluación.
+    Completa los datos faltantes con la ORDEN del paciente cuyo NOG coincide
+    (autorización). Si la evaluación no trae NOG, usa la primera orden IGSS."""
     numero = (ev.get("igss_nog") or "").strip()
-    no_sps = ev.get("igss_no_sps") or ""
+    no_sps = (ev.get("igss_no_sps") or "").strip()
     codigo = ev.get("igss_codigo") or ""
     proc = ev.get("igss_procedimiento") or ""
-    if not numero:
-        ords = (pac or {}).get("igss_ordenes") or []
-        if ords:
-            numero = (ords[0].get("nog") or "").strip()
-            no_sps = no_sps or ords[0].get("no_sps", "")
-            codigo = codigo or ords[0].get("codigo", "")
-            proc = proc or ords[0].get("procedimiento", "")
+    ords = (pac or {}).get("igss_ordenes") or []
+    orden = None
+    if numero:
+        # Orden del paciente con el mismo NOG; se prefiere la que tenga No. SPS
+        matches = [o for o in ords if str(o.get("nog", "") or "").strip() == numero]
+        if matches:
+            orden = next((o for o in matches if str(o.get("no_sps", "") or "").strip()), matches[0])
+    elif ords:
+        orden = ords[0]
+        numero = (orden.get("nog") or "").strip()
+    if orden:
+        if not no_sps:
+            no_sps = str(orden.get("no_sps", "") or "").strip()
+        if not codigo:
+            codigo = orden.get("codigo", "") or ""
+        if not proc:
+            proc = orden.get("procedimiento", "") or ""
     return numero, no_sps, codigo, proc
 
 
@@ -1243,7 +1254,7 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
     unit_ids = list({p.get("igss_unit_id") for p in pac_list if p.get("igss_unit_id")})
     unit_list = await db.igss_units.find({"id": {"$in": unit_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)
     unit_map = {u["id"]: u for u in unit_list}
-    nog_list = await db.igss_nogs.find({"unidad_id": {"$in": unit_ids}}, {"_id": 0, "unidad_id": 1, "numero": 1, "precio": 1}).to_list(None)
+    nog_list = await db.igss_nogs.find({"unidad_id": {"$in": unit_ids}}, {"_id": 0, "unidad_id": 1, "numero": 1, "precio": 1, "nombre_servicio": 1}).to_list(None)
     nog_map = {(n["unidad_id"], n["numero"]): n for n in nog_list}
     # 1) Candidatos: resolver orden, excluir no-IGSS y ocultar borradores vacíos
     candidatos = []
@@ -1262,7 +1273,11 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
         if not _eval_tiene_medico(ev) and not tiene_contenido:
             continue
         unit = unit_map.get(uid)
-        precio = float((nog_map.get((uid, numero)) or {}).get("precio") or 0)
+        nogdoc = nog_map.get((uid, numero)) or {}
+        precio = float(nogdoc.get("precio") or 0)
+        # Procedimiento = descripción del servicio; si la evaluación/orden no lo trae,
+        # se usa el nombre del servicio del NOG del catálogo de la unidad.
+        proc = proc or nogdoc.get("nombre_servicio") or ""
         candidatos.append({
             "ev": ev, "pac": pac, "uid": uid, "unit": unit,
             "numero": numero, "no_sps": no_sps, "codigo": codigo, "proc": proc,

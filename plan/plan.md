@@ -1,56 +1,55 @@
-# Sociedades Médicas: consumos por venta, informes mensuales y acceso de administrador
+# Flujo IGSS: que el ingreso del paciente alimente producción (SPS, descripción del servicio, NOG por unidad)
 
-El módulo de Sociedades Médicas debe reflejar los productos de sociedad que se venden en el Punto de Venta, permitir descargar ese detalle en Excel/PDF por mes, y abrir correctamente para el administrador.
-Hoy el módulo muestra cero consumos aunque haya ventas, y al administrador el botón "Sociedades" lo lleva a Pacientes.
+Corregir el módulo de Producción IGSS para que cada paciente IGSS atendido aparezca correctamente, con su No. SPS y la descripción del servicio, agrupado por unidad, y para que cada autorización descuente su cupo de NOG sin importar qué usuario autorizado ingresó los datos.
 
 ## Para quién es
-- Administrador y superadministrador de la clínica, que dan seguimiento a lo que cada sociedad (p. ej. NIDEK, FAROS) genera por los productos de alquiler/uso que tiene asignados.
+- Personal que ingresa pacientes IGSS y da seguimiento a la producción: roles **usuario**, **usuario IGSS**, **óptica** y **administrador IGSS** (más superadministrador). Todos los roles permitidos deben poder completar el mismo flujo de un paciente IGSS.
 
-## Funcionalidades principales y experiencia
-1. **Conteo de consumos a partir de las ventas.**
-   - Cada vez que se vende en el Punto de Venta de clínica un producto asignado a una sociedad, esa venta cuenta como un consumo de la sociedad.
-   - El monto registrado por cada consumo es el **precio de venta** cobrado en esa venta (no el costo).
-   - Funciona también para productos de alquiler/servicio que no manejan existencia (los que aparecen con "∞"), que es justamente lo que hoy no se contabiliza.
-   - El conteo considera las ventas ya existentes en el sistema, no solo las futuras: al corregirlo, el histórico de ventas de productos de sociedad aparece de inmediato.
-   - Las ventas anuladas no cuentan.
-2. **Tarjetas y pestañas actualizadas.**
-   - Las tarjetas "Total Consumos" (unidades) y "Costo Total" (ahora monto vendido) reflejan las ventas de productos de sociedad del período.
-   - La pestaña "Consumos" lista cada venta: fecha, producto, sociedad, cantidad y monto.
-   - La pestaña "Resumen" muestra el consolidado por producto del mes elegido.
-   - Los filtros por sociedad, por producto y por rango de fechas siguen funcionando sobre esta nueva información.
-3. **Exportación de informes mensuales (Excel y PDF).**
-   - Los botones "Excel" y "PDF" descargan el informe del mes y año seleccionados con el mismo detalle de consumos por venta.
-   - Respetan el filtro de sociedad activo y, si se usa, el rango de fechas.
-4. **Corrección del acceso del administrador.**
-   - El botón "Sociedades" abre el módulo para el administrador (hoy lo redirige a Pacientes por una regla de acceso que no coincide con lo que muestra el menú).
-   - El acceso queda disponible para administrador y superadministrador, igual que el menú ya lo ofrece.
+## Qué está fallando hoy (causa)
+- El listado de Producción se arma a partir de las **evaluaciones** y, para el No. SPS y el procedimiento, solo mira la evaluación o, como respaldo, la **primera** orden del paciente. Por eso:
+  - Cuando la evaluación trae NOG pero no trae No. SPS, el No. SPS sale vacío (“—”) aunque sí se haya capturado al ingresar al paciente.
+  - La columna **Procedimiento** queda vacía porque no se está tomando la descripción del servicio del NOG.
+  - Algunos pacientes IGSS atendidos **no aparecen** en producción por reglas de filtrado (p. ej. evaluaciones sin médico/sin datos quedan ocultas, o autorizaciones absorbidas por registros antiguos sin SPS).
+
+## Qué cambia (Fase 1 – lo que se construye ahora)
+1. **No. SPS siempre correcto por autorización.**
+   - En producción, el No. SPS de cada línea se toma de la autorización del paciente (la orden IGSS cuyo NOG coincide con el de la atención). Si la evaluación no trae SPS, se completa con el de esa orden. Deja de salir “—” cuando el dato sí fue capturado.
+2. **Procedimiento = descripción del NOG.**
+   - La columna Procedimiento muestra la **descripción/nombre del servicio del NOG** correspondiente (del catálogo de la unidad). Ya no queda en blanco.
+3. **Una línea y un descuento por autorización (NOG + No. SPS).**
+   - Cada autorización distinta del paciente genera **una** línea en producción y descuenta **una** unidad de su NOG. Un paciente con dos autorizaciones aparece dos veces y descuenta dos unidades. Las consultas de seguimiento de la misma autorización se consolidan en esa misma línea (no duplican descuento).
+4. **Todos los pacientes atendidos aparecen, agrupados por unidad.**
+   - Se corrigen las reglas que hoy dejan fuera a pacientes IGSS válidos, de modo que cada autorización atendida en el período se muestre una vez, bajo la **unidad** y el **NOG** que le corresponde al paciente.
+   - La **fecha** que se muestra y con la que se filtra cada servicio sigue siendo la **fecha de la evaluación/consulta**.
+5. **NOG asignado desde el ingreso del paciente (varias órdenes por paciente).**
+   - Se **mantiene tal cual** la capacidad actual de agregar **más de una orden/autorización** a un mismo paciente; no se elimina ni se limita.
+   - El formulario de ingreso del paciente permite agregar/asignar el NOG (y su No. SPS) de cada orden. Cada orden del paciente se refleja en producción dentro de la unidad del paciente, como su propia línea.
+6. **El descuento funciona para todos los roles permitidos.**
+   - Al ingresar o editar un paciente IGSS, el descuento del NOG por autorización se aplica igual, sin importar si lo hizo usuario, usuario IGSS, óptica o administrador IGSS.
+7. **Corrección de lo ya ingresado (reproceso).**
+   - Un recálculo deja al día los pacientes ya ingresados: ajusta los descuentos de NOG por autorización y hace que aparezcan correctamente en producción con su SPS y descripción.
 
 ## Flujo de uso
-1. El administrador entra a Inventario → Sociedades y el módulo abre correctamente.
-2. Ve en las tarjetas el total de unidades y el monto vendido de productos de sociedad del período.
-3. En "Consumos" revisa cada venta registrada; puede filtrar por sociedad, producto y fechas.
-4. En "Resumen" elige mes y año para ver el consolidado por producto.
-5. Con los botones "Excel"/"PDF" descarga el informe del mes seleccionado.
+1. Cualquier usuario permitido ingresa un paciente IGSS con todos sus datos: unidad, NOG, No. SPS y la autorización correspondiente.
+2. Al guardar, el sistema descuenta una unidad del NOG por cada autorización (NOG + No. SPS) del paciente.
+3. Cuando el paciente es atendido (evaluación), su servicio aparece en el listado de Producción, agrupado por unidad y NOG, con No. SPS visible, la descripción del servicio del NOG y la fecha de la consulta.
+4. El administrador IGSS marca impreso/enviado/facturado/pagado y ajusta costo igual que hoy, y exporta el reporte por unidad.
 
 ## Sensación de UI/UX
-- Se mantiene la apariencia actual del módulo (encabezado morado, tarjetas, pestañas Sociedades/Consumos/Productos/Resumen).
-- No se agregan pantallas nuevas; cambia el origen de los datos para que incluya las ventas, y se corrige el acceso.
+- Se mantiene la pantalla actual de Producción (agrupada por unidad y por NOG, con las columnas Paciente, Exp., No. SPS, Procedimiento, Médico, Fecha, Costo y los estados). Solo cambia que No. SPS y Procedimiento ahora se llenan correctamente y aparecen todos los pacientes que corresponden.
+- El formulario de ingreso del paciente conserva su aspecto; se asegura que el campo de NOG/autorización esté disponible para todos los roles permitidos.
 
 ## Fases de implementación
-- **Fase 1 (MVP, se construye ahora):**
-  - Contabilizar como consumo de sociedad cada venta del Punto de Venta de clínica de un producto asignado a una sociedad, valuada al precio de venta (incluye histórico y productos sin existencia).
-  - Actualizar tarjetas, pestañas "Consumos" y "Resumen" y los filtros para reflejar esa información.
-  - Hacer que la exportación Excel/PDF mensual use ese mismo detalle.
-  - Corregir el acceso al módulo para el administrador.
-- **Fase 2 (posterior):**
-  - Desglose y totales por sociedad (ranking de sociedades por monto, no solo por producto) y comparación entre meses.
-- **Fase 3 (posterior):**
-  - Programación de envío automático del informe mensual por correo a cada sociedad o al administrador.
+- **Fase 1 (MVP, se construye ahora):** correcciones de los puntos 1–7: No. SPS por autorización, Procedimiento con la descripción del NOG, una línea/descuento por autorización, visibilidad completa de pacientes agrupados por unidad, NOG desde el ingreso reflejado en producción, descuento para todos los roles permitidos y recálculo de lo ya ingresado.
+- **Fase 2 (posterior):** validaciones al ingresar (avisar si una autorización no tiene No. SPS o si el NOG ya no tiene cupo), y un indicador de datos incompletos por fila en producción.
+- **Fase 3 (posterior):** reportes comparativos por unidad y período, y envío/descarga programada del reporte de producción.
 
 ## Supuestos
-- Solo cuentan las ventas del Punto de Venta de clínica; no se incluyen ventas de óptica ni salidas/ajustes/bajas manuales de inventario.
-- El monto de cada consumo es el precio de venta cobrado en esa línea de venta; "Costo Total" pasa a representar el monto vendido.
-- Las ventas anuladas se excluyen del conteo.
-- Un producto se considera "de sociedad" cuando está marcado como tal y tiene una sociedad asignada (como hoy en la pestaña Productos).
-- El acceso al módulo queda para administrador y superadministrador; no se amplía a otros roles.
-- Se mantienen las pestañas, filtros y diseño actuales; no se crean pantallas nuevas.
+- Cada paciente IGSS que deba aparecer en producción tiene su atención registrada como evaluación/consulta (la fecha de producción es la de esa consulta, según lo indicado).
+- La “autorización” es el par **NOG + No. SPS**; dos órdenes del mismo NOG con distinto No. SPS cuentan y descuentan por separado; varias consultas con el mismo No. SPS se consolidan en una sola línea y un solo descuento.
+- Se conserva la funcionalidad actual de **múltiples órdenes por paciente**: cada orden es una autorización independiente que genera su propia línea en producción y su propio descuento de NOG.
+- La descripción que se muestra en Procedimiento es el nombre del servicio definido en el NOG del catálogo de la unidad.
+- Un servicio sin NOG no descuenta cupo; se asigna el NOG en el ingreso del paciente y a partir de ahí se refleja en la unidad correspondiente.
+- No se cambian los permisos: el acceso al listado de Producción y sus acciones sigue siendo de administrador IGSS y superadministrador; el ingreso de pacientes IGSS lo pueden hacer los roles ya permitidos (usuario, usuario IGSS, óptica, administrador IGSS).
+- Se mantiene el diseño, las columnas y la exportación actuales; no se crean pantallas nuevas.
+- La verificación de la causa de “pacientes que no aparecen” se confirmará durante la construcción reproduciendo el caso con datos reales antes de dar por cerrado el arreglo.
