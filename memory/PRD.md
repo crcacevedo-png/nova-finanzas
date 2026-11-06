@@ -1079,3 +1079,11 @@ Causa: _build_produccion_rows/_resolver_orden solo completaban No. SPS/procedimi
 - Página /igss/unidades pestaña Producción carga sin errores.
 
 Fase 2 (pendiente): validaciones al ingresar (aviso SPS faltante / NOG sin cupo) e indicador de datos incompletos por fila. Fase 3: reportes comparativos por unidad/período y envío programado.
+
+## FEL Digifact — RESUELTO (2026-11): NUC certifica correctamente en TEST
+Causa raíz del error [3064] "Root element is missing" en PrepareEmisorForTOSIGN: NO era aprovisionamiento de Digifact (el archivo de ejemplo que Digifact envió certificó con NUESTRAS credenciales/token → emisor sí habilitado). El problema estaba en cómo construíamos el NUC:
+1. **Seller.TaxID debía ir SIN ceros a la izquierda** (90042247), no el padding de 12 dígitos (000090042247). El XSD de SAT (tipoNITDelEFACE) rechaza el NIT con padding. (El TAXID del query param y el login SÍ usan los 12 dígitos; solo el Seller.TaxID del cuerpo va sin padding.)
+2. **AdditionalDocumentInfo (ADENDA) debía ser bien formada**: con AditionalData.Data -> INFORMACION_ADICIONAL (OBSERVACIONES) y AditionalInfo VALIDAR_REFERENCIA_INTERNA=NO_VALIDAR. La ADENDA mínima [{Code,Type}] hacía que el transform generara un XML de emisor vacío → el error 3064.
+Diagnóstico por morphing: el archivo correcto de Digifact certificó con nuestro token (code 1); al reemplazar solo la ADENDA por la nuestra, fallaba en PrepareEmisorForTOSIGN; al corregir ADENDA aparecía [3010] NITEmisor inválido (padding); corrigiendo ambos → code 1.
+Archivos: /app/backend/routes/fel.py _build_nuc (Seller.TaxID = taxid_12.lstrip('0'); AdditionalDocumentInfo bien formado).
+Verificado contra https://testnucgt.digifact.com/api v2/transform/nuc_json: FACT CF 1 ítem (Q168) → code 1 AUTH; FACT 2 ítems + NIT receptor → code 1 AUTH. Las pruebas se hicieron llamando al API directo (no por /certificar), no se persistió nada en BD. FEL sigue con enabled según config (el admin lo activa en Configuración FEL).

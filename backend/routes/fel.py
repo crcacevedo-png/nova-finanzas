@@ -248,7 +248,7 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
                 "Currency": "GTQ",
             },
             "Seller": {
-                "TaxID": taxid_12,
+                "TaxID": taxid_12.lstrip("0") or taxid_12,
                 "TaxIDAdditionalInfo": [{"Name": "AfiliacionIVA", "Data": None, "Value": cfg.get("afiliacion_iva", "GEN")}],
                 "Name": cfg.get("emisor_nombre", ""),
                 "AdditionlInfo": [
@@ -274,7 +274,18 @@ def _build_nuc(cfg: dict, taxid_12: str, norm: dict, receptor: dict) -> dict:
                 "GrandTotal": {"InvoiceTotal": suma_total},
             },
             "AdditionalDocumentInfo": {
-                "AdditionalInfo": [{"Code": str(uuid.uuid4()), "Type": "ADENDA"}]
+                "AdditionalInfo": [{
+                    "Code": str(uuid.uuid4()).upper(),
+                    "Type": "ADENDA",
+                    "AditionalData": {"Data": [
+                        {"Name": "INFORMACION_ADICIONAL", "Info": [
+                            {"Name": "OBSERVACIONES", "Data": None, "Value": "-"},
+                        ]},
+                    ]},
+                    "AditionalInfo": [
+                        {"Name": "VALIDAR_REFERENCIA_INTERNA", "Data": None, "Value": "NO_VALIDAR"},
+                    ],
+                }]
             },
     }
     return nuc
