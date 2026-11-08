@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import axios from 'axios';
 import { toast, Toaster } from 'sonner';
 import { formatCurrency } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,7 +16,7 @@ import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileT
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const TiposTab = () => {
+const TiposTab = ({ canManage }) => {
   const [tipos, setTipos] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -54,12 +55,14 @@ const TiposTab = () => {
     <div data-testid="anesthesia-types-tab">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">Honorario fijo por tipo (igual para todos los anestesiólogos)</p>
-        <Button onClick={openNew} className="bg-indigo-600 hover:bg-indigo-700 text-white" data-testid="anesthesia-type-add"><Plus className="w-4 h-4 mr-2" />Agregar tipo</Button>
+        {canManage && (
+          <Button onClick={openNew} className="bg-indigo-600 hover:bg-indigo-700 text-white" data-testid="anesthesia-type-add"><Plus className="w-4 h-4 mr-2" />Agregar tipo</Button>
+        )}
       </div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs text-gray-500">
-            <tr><th className="px-4 py-3">Tipo de anestesia</th><th className="px-4 py-3 text-right">Honorario</th><th className="px-4 py-3 text-center">Estado</th><th className="px-4 py-3 text-right">Acciones</th></tr>
+            <tr><th className="px-4 py-3">Tipo de anestesia</th><th className="px-4 py-3 text-right">Honorario</th><th className="px-4 py-3 text-center">Estado</th>{canManage && <th className="px-4 py-3 text-right">Acciones</th>}</tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {tipos.map((t) => (
@@ -67,10 +70,12 @@ const TiposTab = () => {
                 <td className="px-4 py-3 font-medium text-gray-900">{t.name}</td>
                 <td className="px-4 py-3 text-right font-semibold">{formatCurrency(t.value)}</td>
                 <td className="px-4 py-3 text-center"><Badge className={t.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}>{t.active ? 'Activo' : 'Inactivo'}</Badge></td>
-                <td className="px-4 py-3 text-right space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(t)} data-testid={`anesthesia-type-edit-${t.id}`}><Pencil className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => toggleActive(t)}><Power className="w-4 h-4" /></Button>
-                </td>
+                {canManage && (
+                  <td className="px-4 py-3 text-right space-x-1">
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(t)} data-testid={`anesthesia-type-edit-${t.id}`}><Pencil className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => toggleActive(t)}><Power className="w-4 h-4" /></Button>
+                  </td>
+                )}
               </tr>
             ))}
             {tipos.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">Sin tipos. Agrega el primero (ej. Tópica, General).</td></tr>}
@@ -200,19 +205,23 @@ const CierreTab = () => {
 };
 
 export default function ProcedimientosAnestesia() {
+  const { user } = useAuth();
+  const canSeeCierre = ['admin', 'superadmin'].includes(user?.role);
+  const canManageTipos = ['admin', 'superadmin', 'usuario'].includes(user?.role);
+
   return (
     <Layout>
       <Toaster position="top-right" richColors />
       <div className="p-4 sm:p-6 max-w-5xl mx-auto" data-testid="anestesia-page">
         <h1 className="text-2xl font-bold text-gray-900 mb-1 flex items-center gap-2"><Syringe className="w-6 h-6 text-indigo-600" />Procedimientos de Anestesia</h1>
         <p className="text-sm text-gray-500 mb-6">Tipos de anestesia con honorario y cierre mensual de pago por anestesiólogo.</p>
-        <Tabs defaultValue="cierre">
+        <Tabs defaultValue={canSeeCierre ? 'cierre' : 'tipos'}>
           <TabsList>
-            <TabsTrigger value="cierre" data-testid="tab-cierre">Cierre mensual</TabsTrigger>
+            {canSeeCierre && <TabsTrigger value="cierre" data-testid="tab-cierre">Cierre mensual</TabsTrigger>}
             <TabsTrigger value="tipos" data-testid="tab-tipos">Tipos de anestesia</TabsTrigger>
           </TabsList>
-          <TabsContent value="cierre" className="mt-4"><CierreTab /></TabsContent>
-          <TabsContent value="tipos" className="mt-4"><TiposTab /></TabsContent>
+          {canSeeCierre && <TabsContent value="cierre" className="mt-4"><CierreTab /></TabsContent>}
+          <TabsContent value="tipos" className="mt-4"><TiposTab canManage={canManageTipos} /></TabsContent>
         </Tabs>
       </div>
     </Layout>
