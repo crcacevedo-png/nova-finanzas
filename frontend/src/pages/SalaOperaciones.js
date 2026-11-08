@@ -177,6 +177,7 @@ const SalaOperaciones = () => {
     surgeon: '',
     assistant_surgeon: '',
     eye: '',
+    lio: '',
     anesthesia_type: '',
     anesthesiologist: '',
     institution: '',
@@ -217,6 +218,16 @@ const SalaOperaciones = () => {
       fetchSurgeries();
       setSelectedSurgery((prev) => (prev && prev.id === surgeryId ? { ...prev, supplies_status: estado } : prev));
     } catch (e) { toast.error('No se pudo actualizar el estado'); }
+  };
+
+  const togglePreopStatus = async (surgery) => {
+    const nuevoEstado = surgery.preop_status === 'completo' ? 'incompleto' : 'completo';
+    try {
+      await axios.patch(`${API_URL}/surgeries/${surgery.id}/preop-status`, { estado: nuevoEstado });
+      setSurgeries((prev) => prev.map((s) => (s.id === surgery.id ? { ...s, preop_status: nuevoEstado } : s)));
+      setSelectedSurgery((prev) => (prev && prev.id === surgery.id ? { ...prev, preop_status: nuevoEstado } : prev));
+      toast.success(`Pre-Ops marcado como ${nuevoEstado === 'completo' ? 'Completos' : 'Incompletos'}`);
+    } catch (e) { toast.error('No se pudo actualizar el estado de Pre-Ops'); }
   };
 
   const [cancelForm, setCancelForm] = useState({ reason: '', reschedule_date: '' });
@@ -378,6 +389,7 @@ const SalaOperaciones = () => {
       procedure: '',
       surgeon: '',
       eye: '',
+      lio: '',
       anesthesia_type: '',
       anesthesiologist: '',
       institution: '',
@@ -401,6 +413,7 @@ const SalaOperaciones = () => {
       surgeon: surgery.surgeon,
       assistant_surgeon: surgery.assistant_surgeon || '',
       eye: surgery.eye,
+      lio: surgery.lio || '',
       anesthesia_type: surgery.anesthesia_type,
       anesthesiologist: surgery.anesthesiologist,
       institution: surgery.institution,
@@ -770,9 +783,11 @@ const SalaOperaciones = () => {
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Hora</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Paciente</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Procedimiento</TableHead>
+                      <TableHead className="text-xs uppercase text-slate-500 font-semibold">LIO</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Cirujano</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Ojo</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Anestesia</TableHead>
+                      <TableHead className="text-xs uppercase text-slate-500 font-semibold">Pre-Ops</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Institución</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Costo Proc.</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Acciones</TableHead>
@@ -803,9 +818,26 @@ const SalaOperaciones = () => {
                           <TableCell className="text-sm">{surgery.time}</TableCell>
                           <TableCell className="font-medium">{surgery.patient_name}</TableCell>
                           <TableCell className="text-sm">{surgery.procedure}</TableCell>
+                          <TableCell className="text-sm" data-testid={`surgery-lio-${surgery.id}`}>{surgery.lio || '—'}</TableCell>
                           <TableCell className="text-sm">{surgery.surgeon}</TableCell>
                           <TableCell>{getEyeBadge(surgery.eye)}</TableCell>
                           <TableCell className="text-sm">{getAnesthesiaLabel(surgery.anesthesia_type)}</TableCell>
+                          <TableCell>
+                            <button
+                              type="button"
+                              onClick={() => togglePreopStatus(surgery)}
+                              disabled={surgery.status === 'cancelado'}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                surgery.preop_status === 'completo'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                              }`}
+                              title="Clic para alternar el estado de Pre-Ops"
+                              data-testid={`preop-toggle-${surgery.id}`}
+                            >
+                              {surgery.preop_status === 'completo' ? 'Completos' : 'Incompletos'}
+                            </button>
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 flex-wrap">
                               <span className="text-sm">{surgery.institution}</span>
@@ -1156,6 +1188,15 @@ const SalaOperaciones = () => {
                       ))}
                     </div>
                   </div>
+                  <div>
+                    <Label>LIO</Label>
+                    <Input
+                      value={formData.lio}
+                      onChange={(e) => setFormData({ ...formData, lio: e.target.value })}
+                      placeholder="Modelo / potencia del lente intraocular"
+                      data-testid="surgery-lio-input"
+                    />
+                  </div>
                 </div>
               </div>
               
@@ -1376,6 +1417,9 @@ const SalaOperaciones = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div><span className="text-xs uppercase text-slate-400">Paciente</span><p className="font-medium">{selectedSurgery.patient_name}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Procedimiento</span><p className="font-medium">{selectedSurgery.procedure}</p></div>
+                    {selectedSurgery.lio && (
+                      <div><span className="text-xs uppercase text-slate-400">LIO</span><p className="font-medium">{selectedSurgery.lio}</p></div>
+                    )}
                     <div><span className="text-xs uppercase text-slate-400">Cirujano</span><p className="font-medium">{selectedSurgery.surgeon}</p></div>
                     {selectedSurgery.assistant_surgeon && (
                       <div><span className="text-xs uppercase text-slate-400">Ayudante</span><p className="font-medium">{selectedSurgery.assistant_surgeon}</p></div>
@@ -1383,6 +1427,24 @@ const SalaOperaciones = () => {
                     <div><span className="text-xs uppercase text-slate-400">Ojo</span><p>{getEyeBadge(selectedSurgery.eye)}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Tipo anestesia</span><p className="font-medium">{getAnesthesiaLabel(selectedSurgery.anesthesia_type)}</p></div>
                     <div><span className="text-xs uppercase text-slate-400">Anestesiólogo</span><p className="font-medium">{selectedSurgery.anesthesiologist}</p></div>
+                    <div>
+                      <span className="text-xs uppercase text-slate-400">Pre-Ops</span>
+                      <p>
+                        <button
+                          type="button"
+                          onClick={() => togglePreopStatus(selectedSurgery)}
+                          disabled={selectedSurgery.status === 'cancelado'}
+                          className={`mt-0.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            selectedSurgery.preop_status === 'completo'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                          }`}
+                          data-testid={`preop-toggle-detail-${selectedSurgery.id}`}
+                        >
+                          {selectedSurgery.preop_status === 'completo' ? 'Completos' : 'Incompletos'}
+                        </button>
+                      </p>
+                    </div>
                     <div><span className="text-xs uppercase text-slate-400">Institución</span><p className="font-medium">{selectedSurgery.institution}</p></div>
                     {selectedSurgery.institution === 'Seguro Privado' && selectedSurgery.insurance_name && (
                       <div><span className="text-xs uppercase text-slate-400">Seguro</span><p className="font-medium">{selectedSurgery.insurance_name}</p></div>

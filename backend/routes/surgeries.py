@@ -59,12 +59,14 @@ class SurgeryBase(BaseModel):
     surgeon: str
     assistant_surgeon: Optional[str] = None
     eye: str  # OD, OI, AO
+    lio: Optional[str] = ""
     anesthesia_type: str  # topica, local, local_asistida, general
     anesthesiologist: str
     institution: str  # Novavision, Alquiler, Seguro Privado, IGSS
     igss_data: Optional[IGSSData] = None
     insurance_name: Optional[str] = ""
     observations: Optional[str] = ""
+    preop_status: Optional[str] = "incompleto"  # completo, incompleto
 
 class SurgeryCreate(SurgeryBase):
     pass
@@ -77,6 +79,7 @@ class SurgeryUpdate(BaseModel):
     surgeon: Optional[str] = None
     assistant_surgeon: Optional[str] = None
     eye: Optional[str] = None
+    lio: Optional[str] = None
     anesthesia_type: Optional[str] = None
     anesthesiologist: Optional[str] = None
     institution: Optional[str] = None
@@ -86,6 +89,7 @@ class SurgeryUpdate(BaseModel):
     status: Optional[str] = None  # activo, cancelado
     cancellation_reason: Optional[str] = None
     rescheduled_to: Optional[str] = None
+    preop_status: Optional[str] = None  # completo, incompleto
 
 class SurgeryResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -98,6 +102,7 @@ class SurgeryResponse(BaseModel):
     surgeon: str
     assistant_surgeon: Optional[str] = None
     eye: str
+    lio: Optional[str] = ""
     anesthesia_type: str
     anesthesiologist: str
     institution: str
@@ -107,6 +112,7 @@ class SurgeryResponse(BaseModel):
     equipment: List[EquipmentItem] = []
     supplies: List[SupplyItem] = []
     supplies_status: Optional[str] = None
+    preop_status: Optional[str] = "incompleto"  # completo, incompleto
     status: str = "activo"
     cancellation_reason: Optional[str] = None
     rescheduled_to: Optional[str] = None
@@ -328,6 +334,27 @@ async def set_supplies_status(
     await db.surgeries.update_one(
         {"id": surgery_id},
         {"$set": {"supplies_status": estado, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**enriched)
+
+
+@router.patch("/{surgery_id}/preop-status")
+async def set_preop_status(
+    surgery_id: str,
+    estado: str = Body(..., embed=True),
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
+):
+    """Alterna el estado de Pre-Ops (Completos/Incompletos) de una cirugía."""
+    if estado not in ("completo", "incompleto"):
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not surgery:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    await db.surgeries.update_one(
+        {"id": surgery_id},
+        {"$set": {"preop_status": estado, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     enriched = await enrich_surgery(updated)
@@ -627,7 +654,7 @@ async def export_surgeries(
             )
             
             # Headers
-            headers = ["Fecha", "Hora", "Paciente", "Procedimiento", "Cirujano", "Ojo", "Anestesia", "Institución", "Costo Proc.", "Insumos", "Total", "Equipo", "Observaciones"]
+            headers = ["Fecha", "Hora", "Paciente", "Procedimiento", "LIO", "Cirujano", "Ojo", "Anestesia", "Institución", "Costo Proc.", "Insumos", "Total", "Equipo", "Observaciones"]
             for col, header in enumerate(headers, 1):
                 cell = ws.cell(row=1, column=col, value=header)
                 cell.fill = header_fill
@@ -649,30 +676,31 @@ async def export_surgeries(
                 ws.cell(row=row, column=2, value=s["time"]).border = thin_border
                 ws.cell(row=row, column=3, value=s["patient_name"]).border = thin_border
                 ws.cell(row=row, column=4, value=s["procedure"]).border = thin_border
-                ws.cell(row=row, column=5, value=s["surgeon"]).border = thin_border
-                ws.cell(row=row, column=6, value=s["eye"]).border = thin_border
-                ws.cell(row=row, column=7, value=anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", ""))).border = thin_border
-                ws.cell(row=row, column=8, value=format_institution(s)).border = thin_border
+                ws.cell(row=row, column=5, value=s.get("lio", "")).border = thin_border
+                ws.cell(row=row, column=6, value=s["surgeon"]).border = thin_border
+                ws.cell(row=row, column=7, value=s["eye"]).border = thin_border
+                ws.cell(row=row, column=8, value=anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", ""))).border = thin_border
+                ws.cell(row=row, column=9, value=format_institution(s)).border = thin_border
                 
                 proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
-                cell_proc = ws.cell(row=row, column=9, value=proc_cost)
+                cell_proc = ws.cell(row=row, column=10, value=proc_cost)
                 cell_proc.border = thin_border
                 cell_proc.number_format = currency_format
                 
                 supplies_total = get_supplies_total(s.get("supplies", []))
-                cell_supplies = ws.cell(row=row, column=10, value=supplies_total)
+                cell_supplies = ws.cell(row=row, column=11, value=supplies_total)
                 cell_supplies.border = thin_border
                 cell_supplies.number_format = currency_format
                 
                 total = get_total_general(s)
-                cell_total = ws.cell(row=row, column=11, value=total)
+                cell_total = ws.cell(row=row, column=12, value=total)
                 cell_total.border = thin_border
                 cell_total.number_format = currency_format
                 cell_total.font = Font(bold=True)
                 
                 equipment_list = ", ".join([eq["name"] for eq in s.get("equipment", [])])
-                ws.cell(row=row, column=12, value=equipment_list).border = thin_border
-                ws.cell(row=row, column=13, value=s.get("observations", "")).border = thin_border
+                ws.cell(row=row, column=13, value=equipment_list).border = thin_border
+                ws.cell(row=row, column=14, value=s.get("observations", "")).border = thin_border
             
             # Ajustar anchos
             ws.column_dimensions['A'].width = 12
@@ -680,32 +708,33 @@ async def export_surgeries(
             ws.column_dimensions['C'].width = 28
             ws.column_dimensions['D'].width = 25
             ws.column_dimensions['E'].width = 20
-            ws.column_dimensions['F'].width = 6
-            ws.column_dimensions['G'].width = 12
-            ws.column_dimensions['H'].width = 15
-            ws.column_dimensions['I'].width = 12
+            ws.column_dimensions['F'].width = 20
+            ws.column_dimensions['G'].width = 6
+            ws.column_dimensions['H'].width = 12
+            ws.column_dimensions['I'].width = 15
             ws.column_dimensions['J'].width = 12
             ws.column_dimensions['K'].width = 12
-            ws.column_dimensions['L'].width = 35
-            ws.column_dimensions['M'].width = 30
+            ws.column_dimensions['L'].width = 12
+            ws.column_dimensions['M'].width = 35
+            ws.column_dimensions['N'].width = 30
             
             # Fila de totales
             total_row = len(surgeries) + 2
-            ws.cell(row=total_row, column=8, value="TOTALES:").font = Font(bold=True)
+            ws.cell(row=total_row, column=9, value="TOTALES:").font = Font(bold=True)
             
             total_proc = sum(s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0 for s in surgeries)
             total_supplies = sum(get_supplies_total(s.get("supplies", [])) for s in surgeries)
             total_general = sum(get_total_general(s) for s in surgeries)
             
-            cell_total_proc = ws.cell(row=total_row, column=9, value=total_proc)
+            cell_total_proc = ws.cell(row=total_row, column=10, value=total_proc)
             cell_total_proc.number_format = currency_format
             cell_total_proc.font = Font(bold=True)
             
-            cell_total_supplies = ws.cell(row=total_row, column=10, value=total_supplies)
+            cell_total_supplies = ws.cell(row=total_row, column=11, value=total_supplies)
             cell_total_supplies.number_format = currency_format
             cell_total_supplies.font = Font(bold=True)
             
-            cell_total_all = ws.cell(row=total_row, column=11, value=total_general)
+            cell_total_all = ws.cell(row=total_row, column=12, value=total_general)
             cell_total_all.number_format = currency_format
             cell_total_all.font = Font(bold=True, color="0d9488")
             
@@ -789,18 +818,20 @@ async def export_surgeries(
                 "retrobulbar": "Retrob.", "peribulbar": "Perib.", "sedacion": "Sedación"
             }
             
-            table_data = [["Fecha", "Hora", "Paciente", "Procedimiento", "Cirujano", "Ojo", "Anest.", "Institución", "Costo Proc.", "Insumos", "Total"]]
+            table_data = [["Fecha", "Hora", "Paciente", "Procedimiento", "LIO", "Cirujano", "Ojo", "Anest.", "Institución", "Costo Proc.", "Insumos", "Total"]]
             
             for s in surgeries:
                 proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
                 supplies_total = get_supplies_total(s.get("supplies", []))
                 total = get_total_general(s)
+                lio = s.get("lio", "") or ""
                 
                 table_data.append([
                     s["date"],
                     s["time"],
                     s["patient_name"][:25] + "..." if len(s["patient_name"]) > 25 else s["patient_name"],
-                    s["procedure"][:20] + "..." if len(s["procedure"]) > 20 else s["procedure"],
+                    s["procedure"][:18] + "..." if len(s["procedure"]) > 18 else s["procedure"],
+                    lio[:16] + "..." if len(lio) > 16 else lio,
                     s["surgeon"][:18] + "..." if len(s["surgeon"]) > 18 else s["surgeon"],
                     s["eye"],
                     anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", "")[:6]),
@@ -810,7 +841,7 @@ async def export_surgeries(
                     f'Q {total:,.2f}'
                 ])
             
-            col_widths = [0.7*inch, 0.5*inch, 1.1*inch, 1.1*inch, 1.1*inch, 0.4*inch, 0.55*inch, 1.3*inch, 0.75*inch, 0.75*inch, 0.75*inch]
+            col_widths = [0.7*inch, 0.5*inch, 1.1*inch, 0.9*inch, 0.9*inch, 1.0*inch, 0.4*inch, 0.55*inch, 1.3*inch, 0.75*inch, 0.75*inch, 0.75*inch]
             table = Table(table_data, colWidths=col_widths)
             
             table.setStyle(TableStyle([
@@ -823,8 +854,8 @@ async def export_surgeries(
                 ('TOPPADDING', (0, 0), (-1, 0), 6),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 7),
-                ('ALIGN', (5, 1), (5, -1), 'CENTER'),
-                ('ALIGN', (8, 1), (10, -1), 'RIGHT'),
+                ('ALIGN', (6, 1), (6, -1), 'CENTER'),
+                ('ALIGN', (9, 1), (11, -1), 'RIGHT'),
                 ('TOPPADDING', (0, 1), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdfa')]),
