@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend tests of 4 Agenda/Evaluación fixes: all 4 PASS. FIX1: in the medications print preview, the Observaciones typed in receta-medicamentos-observaciones appear after the 'Observaciones:' label (window.print was stubbed and called once). FIX2: 'Deshacer llegada' (deshacer-llegada-cita-<id>) shows for Presente in the Calendar card and for En consulta in the Tablero card. Clicking it showed a toast and reverted the cita: Confirmada->Presente->Confirmada and Agendada->Presente->En consulta->Agendada. The API confirmed hora_llegada=null. FIX3: with Dra. Ana García hidden (medicosOcultos), her cita was hidden in Calendario but appeared in Tablero 'Citas del día' and in 'Pacientes Presentes' (its own doctor group). FIX4: 'Ver paciente' navigated in the same tab to /pacientes?id=<id>; page count stayed 1 and the patient detail opened.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/tests/setup_agenda_fixes.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Agenda.js Tablero 'Pacientes Presentes': presentes.por_medico has a duplicated .sort(...) line (harmless, remove it). It also sorts the state array in place; use [...arr].sort.",
+    "Tablero 'Citas del día' still uses the 'citas' state from fetchCitas, which applies the Calendar's medicoFiltro/estadoFiltro dropdowns. If a user picks a specific doctor in the Calendar filter, the Tablero shows only that doctor. medicosOcultos is no longer applied. Decide whether the Tablero should ignore medicoFiltro too.",
+    "handleVerEvaluacion still uses window.open(..., '_blank') with query param 'paciente=' (other routes use 'paciente_id='). Possible inconsistency.",
+    "Agenda.js (~3000 lines) and EvaluacionOftalmologica.js (~3850 lines) far exceed the 700-line guideline."
+  ],
+  "updated_files": ["/app/tests/setup_agenda_fixes.py"],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% (4/4 fixes)"},
+  "seed_data_creation": "Created 2 TEST_ citas on 2026-11-07 (Dr. Roberto Sánchez, Dra. Ana García) via the API and temporarily hid Ana García in superadmin's medicos preferences. Both were deleted by id and preferences restored to {orden:[],ocultos:[]}. No patient records were modified. The evaluation observations were typed but never saved.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Guatemala date is used by the Agenda (system UTC Nov 8 00:xx = GT Nov 7, Saturday; Dr. Carlos Méndez doesn't work Saturdays, so creating his cita returns 409). 'Marcar llegada' via the UI on demo patients opens the 'Completar expediente' dialog because the patient record is incomplete. To avoid editing patients, use PATCH /api/agenda/citas/{id}/estado {estado:'Presente'}. Helper: python /app/tests/setup_agenda_fixes.py setup|hide|get|cleanup."
+}

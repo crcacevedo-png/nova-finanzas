@@ -2143,8 +2143,7 @@ const Agenda = () => {
                   {presentes.por_medico.length === 0 ? (
                     <p className="text-center text-gray-500 py-8">No hay pacientes presentes</p>
                   ) : (
-                    presentes.por_medico
-                      .sort((a, b) => ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id))
+                    [...presentes.por_medico]
                       .sort((a, b) => ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id))
                       .map(grupo => (
                       <div key={grupo.medico_id} className="mb-4">

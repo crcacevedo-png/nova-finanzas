@@ -1087,3 +1087,10 @@ Causa raíz del error [3064] "Root element is missing" en PrepareEmisorForTOSIGN
 Diagnóstico por morphing: el archivo correcto de Digifact certificó con nuestro token (code 1); al reemplazar solo la ADENDA por la nuestra, fallaba en PrepareEmisorForTOSIGN; al corregir ADENDA aparecía [3010] NITEmisor inválido (padding); corrigiendo ambos → code 1.
 Archivos: /app/backend/routes/fel.py _build_nuc (Seller.TaxID = taxid_12.lstrip('0'); AdditionalDocumentInfo bien formado).
 Verificado contra https://testnucgt.digifact.com/api v2/transform/nuc_json: FACT CF 1 ítem (Q168) → code 1 AUTH; FACT 2 ítems + NIT receptor → code 1 AUTH. Las pruebas se hicieron llamando al API directo (no por /certificar), no se persistió nada en BD. FEL sigue con enabled según config (el admin lo activa en Configuración FEL).
+
+## Correcciones de producción Agenda + Evaluación (2026-11) — COMPLETADAS y verificadas (testing agent 4/4)
+1. Receta de Medicamentos: la impresión mostraba 'indicaciones_generales' (campo inexistente); ahora muestra 'Observaciones' (recetas.medicamentos.observaciones). EvaluacionOftalmologica.js ~3685.
+2. Agenda: nuevo 'Deshacer llegada' en el menú de la cita cuando está Presente/En consulta (CitaCard onCancelarLlegada → PATCH /agenda/citas/{id}/revertir-llegada, que ya existía). Agenda.js CitaCard + 3 instancias.
+3. Tablero del Día: se quitó el filtro !medicosOcultos de 'Citas del día' y 'Pacientes Presentes' para que compilen TODAS las agendas, aunque haya médicos ocultos en el Calendario. (Nota: 'Citas del día' usa el estado `citas` que respeta el medicoFiltro/estadoFiltro explícito del Calendario; por defecto 'todos'.)
+4. 'Ver paciente' ahora navega en la MISMA pestaña (navigate a /pacientes?id=) en vez de window.open _blank. Agenda.js handleVerPaciente.
+Verificado por testing agent iteration_123 (frontend 4/4 PASS). Pendiente menor no bloqueante: handleVerEvaluacion sigue abriendo nueva pestaña con param 'paciente=' (no estaba en alcance).
