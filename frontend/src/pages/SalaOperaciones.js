@@ -8,7 +8,7 @@ const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const EMPTY_IGSS = { unit: '', unit_id: '', nog_id: '', nog_number: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' };
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
-  Eye, Pencil, Trash2, X, Calendar, Clock, User, Building2,
+  Eye, Trash2, X, Calendar, Clock, User, Building2,
   Stethoscope, Activity, Package, FileText
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -382,6 +382,21 @@ const SalaOperaciones = () => {
     setFilterMonth('');
     setDateFrom('');
     setDateTo('');
+    setPage(1);
+  };
+
+  const todayStr = getGuatemalaDate();
+  const isToday = dateFrom === todayStr && dateTo === todayStr && !filterMonth;
+
+  const toggleHoy = () => {
+    if (isToday) {
+      setDateFrom('');
+      setDateTo('');
+    } else {
+      setFilterMonth('');
+      setDateFrom(todayStr);
+      setDateTo(todayStr);
+    }
     setPage(1);
   };
 
@@ -791,6 +806,15 @@ const SalaOperaciones = () => {
                 placeholder="Hasta"
               />
               
+              <Button
+                variant={isToday ? 'default' : 'outline'}
+                onClick={toggleHoy}
+                className={isToday ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'text-slate-600'}
+                data-testid="filter-today-btn"
+              >
+                Hoy
+              </Button>
+              
               <Button variant="ghost" onClick={clearFilters} className="text-slate-500">
                 Limpiar filtros
               </Button>
@@ -833,7 +857,6 @@ const SalaOperaciones = () => {
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Anestesia</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Pre-Ops</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Institución</TableHead>
-                      <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Costo Proc.</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -899,9 +922,6 @@ const SalaOperaciones = () => {
                               })()}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-sm">
-                            {surgery.igss_data?.procedure_cost ? formatCurrency(surgery.igss_data.procedure_cost) : '—'}
-                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
@@ -910,20 +930,10 @@ const SalaOperaciones = () => {
                                 onClick={() => { setSelectedSurgery(surgery); setDetailDialogOpen(true); }}
                                 className="h-8 w-8 p-0"
                                 title="Ver detalle"
+                                data-testid={`view-surgery-${surgery.id}`}
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              {canEdit && surgery.status !== 'cancelado' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openEditDialog(surgery)}
-                                  className="h-8 w-8 p-0"
-                                  title="Editar"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              )}
                               {isSuperAdmin && surgery.status !== 'cancelado' && (
                                 <>
                                   <Button
@@ -953,7 +963,7 @@ const SalaOperaciones = () => {
                         {/* Expanded Row */}
                         {expandedRows[surgery.id] && (
                           <TableRow>
-                            <TableCell colSpan={13} className="bg-slate-50 p-0">
+                            <TableCell colSpan={12} className="bg-slate-50 p-0">
                               <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Equipment Column */}
                                 <div>
