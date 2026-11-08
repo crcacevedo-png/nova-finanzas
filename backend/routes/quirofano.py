@@ -345,22 +345,39 @@ async def delete_anesthesia_record(
 async def _build_closure(month: str) -> dict:
     """Agrega los registros de anestesia del mes agrupados por anestesiólogo."""
     records = await db.anesthesia_records.find({"month": month}, {"_id": 0}).to_list(5000)
+    surgery_ids = [r["surgery_id"] for r in records if r.get("surgery_id")]
+    surgeries_map = {}
+    if surgery_ids:
+        surgeries = await db.surgeries.find(
+            {"id": {"$in": surgery_ids}}, {"_id": 0, "id": 1, "procedure": 1, "surgeon": 1}
+        ).to_list(len(surgery_ids))
+        surgeries_map = {s["id"]: s for s in surgeries}
     por_anest = {}
     for r in records:
         key = r.get("anesthesiologist") or ""
         if key.strip().upper() in ("", "N/A", "NA", "—"):
             continue
-        grp = por_anest.setdefault(key, {"anesthesiologist": key, "count": 0, "total": 0.0, "tipos": {}})
+        grp = por_anest.setdefault(key, {"anesthesiologist": key, "count": 0, "total": 0.0, "tipos": {}, "detalle": []})
         grp["count"] += 1
         grp["total"] += (r.get("value") or 0)
         tname = r.get("anesthesia_type_name") or "Sin tipo"
         t = grp["tipos"].setdefault(tname, {"tipo": tname, "count": 0, "value": r.get("value") or 0, "subtotal": 0.0})
         t["count"] += 1
         t["subtotal"] += (r.get("value") or 0)
+        surg = surgeries_map.get(r.get("surgery_id")) or {}
+        grp["detalle"].append({
+            "date": r.get("date") or "",
+            "patient_name": r.get("patient_name") or "",
+            "procedure": surg.get("procedure") or "",
+            "surgeon": surg.get("surgeon") or "",
+            "tipo": tname,
+            "value": round(r.get("value") or 0, 2),
+        })
     resultado = []
     for grp in por_anest.values():
         grp["total"] = round(grp["total"], 2)
         grp["tipos"] = sorted(grp["tipos"].values(), key=lambda x: x["tipo"])
+        grp["detalle"].sort(key=lambda x: (x["date"], x["patient_name"]))
         resultado.append(grp)
     resultado.sort(key=lambda x: x["total"], reverse=True)
     closure = await db.anesthesia_closures.find_one({"month": month}, {"_id": 0})
@@ -411,7 +428,7 @@ async def export_monthly_closure(
         ws["A2"] = f"Mes: {month}   |   Estado: {estado}   |   Total a pagar: Q {data['total_general']:,.2f}   |   Procedimientos: {data['num_registros']}"
         ws["A3"] = ""
 
-        headers = ["Anestesiólogo", "Tipo de anestesia", "Cantidad", "Honorario unit.", "Subtotal"]
+        headers = ["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico responsable", "Tipo de anestesia", "Honorario"]
         row = 4
         for c, h in enumerate(headers, start=1):
             cell = ws.cell(row=row, column=c, value=h)
@@ -423,26 +440,28 @@ async def export_monthly_closure(
 
         for g in grupos:
             first = True
-            for t in g["tipos"]:
+            for d in g["detalle"]:
                 ws.cell(row=row, column=1, value=g["anesthesiologist"] if first else "").border = border
-                ws.cell(row=row, column=2, value=t["tipo"]).border = border
-                ws.cell(row=row, column=3, value=t["count"]).border = border
-                ws.cell(row=row, column=4, value=round(t["value"], 2)).border = border
-                ws.cell(row=row, column=5, value=round(t["subtotal"], 2)).border = border
+                ws.cell(row=row, column=2, value=d["date"]).border = border
+                ws.cell(row=row, column=3, value=d["patient_name"]).border = border
+                ws.cell(row=row, column=4, value=d["procedure"]).border = border
+                ws.cell(row=row, column=5, value=d["surgeon"]).border = border
+                ws.cell(row=row, column=6, value=d["tipo"]).border = border
+                ws.cell(row=row, column=7, value=round(d["value"], 2)).border = border
                 first = False
                 row += 1
             # Subtotal por anestesiólogo
-            lbl = ws.cell(row=row, column=2, value=f"Total {g['anesthesiologist']} ({g['count']} proc.)")
+            lbl = ws.cell(row=row, column=4, value=f"Total {g['anesthesiologist']} ({g['count']} proc.)")
             lbl.font = bold
-            tot = ws.cell(row=row, column=5, value=round(g["total"], 2))
+            tot = ws.cell(row=row, column=7, value=round(g["total"], 2))
             tot.font = bold
             row += 1
 
         row += 1
-        ws.cell(row=row, column=2, value="TOTAL GENERAL").font = Font(bold=True, size=12)
-        ws.cell(row=row, column=5, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
+        ws.cell(row=row, column=4, value="TOTAL GENERAL").font = Font(bold=True, size=12)
+        ws.cell(row=row, column=7, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
 
-        widths = [28, 24, 12, 16, 14]
+        widths = [20, 12, 26, 26, 22, 20, 14]
         for i, w in enumerate(widths, start=1):
             ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
@@ -476,36 +495,36 @@ async def export_monthly_closure(
         Paragraph(f"Mes: {month} &nbsp;|&nbsp; Estado: {estado} &nbsp;|&nbsp; Total a pagar: Q {data['total_general']:,.2f} &nbsp;|&nbsp; Procedimientos: {data['num_registros']}", sub_style),
     ]
 
-    table_data = [["Anestesiólogo", "Tipo de anestesia", "Cant.", "Honorario", "Subtotal"]]
+    table_data = [["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico resp.", "Tipo", "Honorario"]]
     style_cmds = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
-        ('ALIGN', (0, 0), (1, 0), 'LEFT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+        ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (-2, 0), 'LEFT'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#4F46E5')),
     ]
     r = 1
     for g in grupos:
         first = True
-        for t in g["tipos"]:
+        for d in g["detalle"]:
             table_data.append([
                 g["anesthesiologist"] if first else "",
-                t["tipo"], str(t["count"]),
-                f"Q {t['value']:,.2f}", f"Q {t['subtotal']:,.2f}",
+                d["date"], d["patient_name"], d["procedure"], d["surgeon"], d["tipo"],
+                f"Q {d['value']:,.2f}",
             ])
             first = False
             r += 1
-        table_data.append(["", f"Total {g['anesthesiologist']} ({g['count']} proc.)", "", "", f"Q {g['total']:,.2f}"])
+        table_data.append(["", "", "", "", "", f"Total {g['anesthesiologist']} ({g['count']} proc.)", f"Q {g['total']:,.2f}"])
         style_cmds.append(('FONTNAME', (0, r), (-1, r), 'Helvetica-Bold'))
         style_cmds.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#EEF2FF')))
         r += 1
 
-    table = Table(table_data, colWidths=[1.9 * inch, 2.2 * inch, 0.7 * inch, 1.1 * inch, 1.1 * inch])
+    table = Table(table_data, colWidths=[1.1 * inch, 0.65 * inch, 1.3 * inch, 1.3 * inch, 1.1 * inch, 0.85 * inch, 0.8 * inch])
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))

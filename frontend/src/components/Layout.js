@@ -554,7 +554,7 @@ const Layout = ({ children }) => {
       <ChangePasswordDialog open={changePwdOpen} onOpenChange={setChangePwdOpen} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
+      <div className="flex-1 flex flex-col min-h-screen lg:ml-0 min-w-0">
         {/* Header - Mobile only */}
         <header className="lg:hidden h-16 bg-white border-b flex items-center px-4" style={{ borderColor: 'var(--border-card)' }}>
           <button 
@@ -575,7 +575,7 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6 lg:p-8 overflow-auto">
+        <main className="flex-1 p-6 lg:p-8 overflow-auto min-w-0">
           {children}
         </main>
       </div>

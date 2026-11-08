@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import axios from 'axios';
 import { toast, Toaster } from 'sonner';
-import { formatCurrency } from '../services/api';
+import { formatCurrency, formatDate } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
@@ -156,7 +156,7 @@ const CierreTab = ({ canClose }) => {
           <Label className="text-sm">Mes:</Label>
           <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-56 min-w-[14rem]" data-testid="anesthesia-closure-month" />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button variant="outline" size="sm" onClick={() => exportar('xlsx')} disabled={exporting || !data?.num_registros} data-testid="anesthesia-export-xlsx">
             <FileSpreadsheet className="w-4 h-4 mr-2 text-emerald-600" />Excel
           </Button>
@@ -180,18 +180,31 @@ const CierreTab = ({ canClose }) => {
       </div>
       <div className="space-y-3">
         {(data?.por_anestesiologo || []).map((g, i) => (
-          <div key={i} className="bg-white rounded-xl border border-gray-200 p-4" data-testid={`anesthesia-anest-${i}`}>
-            <div className="flex items-center justify-between mb-2">
+          <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto" data-testid={`anesthesia-anest-${i}`}>
+            <div className="flex items-center justify-between mb-2 min-w-[640px]">
               <span className="font-bold text-gray-900">{g.anesthesiologist}</span>
               <span className="font-bold text-emerald-700">{formatCurrency(g.total)} <span className="text-xs font-normal text-gray-400">({g.count} proc.)</span></span>
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="text-xs text-gray-400 border-b border-gray-100">
+                  <th className="py-1.5 text-left font-medium">Fecha</th>
+                  <th className="py-1.5 text-left font-medium">Paciente</th>
+                  <th className="py-1.5 text-left font-medium">Procedimiento</th>
+                  <th className="py-1.5 text-left font-medium">Médico responsable</th>
+                  <th className="py-1.5 text-left font-medium">Tipo de anestesia</th>
+                  <th className="py-1.5 text-right font-medium">Honorario</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-gray-50">
-                {g.tipos.map((t, j) => (
-                  <tr key={j}>
-                    <td className="py-1.5 text-gray-600">{t.tipo}</td>
-                    <td className="py-1.5 text-center text-gray-500">{t.count} × {formatCurrency(t.value)}</td>
-                    <td className="py-1.5 text-right font-medium">{formatCurrency(t.subtotal)}</td>
+                {g.detalle.map((d, j) => (
+                  <tr key={j} data-testid={`anesthesia-detail-row-${i}-${j}`}>
+                    <td className="py-1.5 text-gray-500 whitespace-nowrap">{formatDate(d.date)}</td>
+                    <td className="py-1.5 text-gray-900 font-medium">{d.patient_name || '—'}</td>
+                    <td className="py-1.5 text-gray-600">{d.procedure || '—'}</td>
+                    <td className="py-1.5 text-gray-600">{d.surgeon || '—'}</td>
+                    <td className="py-1.5 text-gray-500">{d.tipo}</td>
+                    <td className="py-1.5 text-right font-medium">{formatCurrency(d.value)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -215,7 +228,7 @@ export default function ProcedimientosAnestesia() {
   return (
     <Layout>
       <Toaster position="top-right" richColors />
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto" data-testid="anestesia-page">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto" data-testid="anestesia-page">
         <h1 className="text-2xl font-bold text-gray-900 mb-1 flex items-center gap-2"><Syringe className="w-6 h-6 text-indigo-600" />Procedimientos de Anestesia</h1>
         <p className="text-sm text-gray-500 mb-6">Tipos de anestesia con honorario y cierre mensual de pago por anestesiólogo.</p>
         <Tabs defaultValue={canSeeCierre ? 'cierre' : 'tipos'}>
