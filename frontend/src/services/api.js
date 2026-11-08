@@ -147,6 +147,7 @@ export const surgeryApi = {
     if (filters.eye) params.append('eye', filters.eye);
     return axios.get(`${API_URL}/reports/surgeries?${params.toString()}`, { responseType: 'blob' });
   },
+  downloadTemplate: () => axios.get(`${API_URL}/surgeries/template`, { responseType: 'blob' }),
 };
 
 // Suppliers API

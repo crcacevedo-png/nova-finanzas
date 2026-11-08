@@ -218,6 +218,118 @@ async def get_surgery_options(current_user: dict = Depends(get_current_user)):
     }
 
 
+@router.get("/template")
+async def download_surgery_template(
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
+):
+    """Descarga la plantilla Excel para el ingreso de cirugías históricas/programadas por lote
+    (carga manual en el sistema; aún no incluye importación automática)."""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Cirugías"
+
+    header_fill = PatternFill("solid", fgColor="0d9488")
+    white_bold = Font(bold=True, color="FFFFFF")
+    thin = Side(style="thin", color="E2E8F0")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    sample_fill = PatternFill("solid", fgColor="F0FDFA")
+
+    headers = [
+        "Fecha (AAAA-MM-DD)", "Hora (HH:MM)", "Paciente", "Procedimiento", "LIO",
+        "Cirujano", "Ayudante", "Ojo (OD/OS/AO)", "Tipo Anestesia", "Anestesiólogo",
+        "Institución", "Nombre Seguro (solo Seguro Privado)",
+        "Unidad IGSS (solo IGSS)", "No. SPS (solo IGSS)", "No. Afiliación (solo IGSS)",
+        "Código (solo IGSS)", "Costo Procedimiento (solo IGSS)",
+        "Pre-Ops (Completo/Incompleto)", "Observaciones",
+    ]
+    for c, h in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.fill = header_fill
+        cell.font = white_bold
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = border
+    ws.row_dimensions[1].height = 34
+
+    ejemplos = [
+        ["2026-10-05", "08:30", "Juan Pérez López", "Facoemulsificación + LIO", "AcrySof IQ +21.0D",
+         "Dr. Roberto Méndez", "", "OD", "local_asistida", "Dra. Ana Gómez",
+         "Novavision", "", "", "", "", "", "", "Completo", "Ejemplo — borrar esta fila"],
+        ["2026-10-06", "10:00", "María García", "Trabeculectomía", "",
+         "Dra. Patricia Solares", "", "OS", "general", "Dr. Luis Ramírez",
+         "IGSS", "", "Hospital General", "SPS-1234", "123456", "A01", "2500",
+         "Incompleto", "Ejemplo — borrar esta fila"],
+    ]
+    for r, fila in enumerate(ejemplos, start=2):
+        for c, val in enumerate(fila, start=1):
+            cell = ws.cell(row=r, column=c, value=val)
+            cell.border = border
+            cell.fill = sample_fill
+
+    widths = [16, 10, 24, 24, 20, 20, 18, 12, 16, 18, 14, 22, 20, 14, 18, 12, 18, 18, 30]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    # Validación de datos (listas desplegables) para evitar valores inválidos
+    max_row = 500
+    dv_ojo = DataValidation(type="list", formula1='"OD,OS,AO"', allow_blank=True)
+    dv_anestesia = DataValidation(
+        type="list",
+        formula1='"topica,local,local_asistida,general,retrobulbar,peribulbar,sedacion"',
+        allow_blank=True,
+    )
+    dv_institucion = DataValidation(
+        type="list", formula1='"Novavision,Alquiler,Seguro Privado,IGSS"', allow_blank=True
+    )
+    dv_preop = DataValidation(type="list", formula1='"Completo,Incompleto"', allow_blank=True)
+    for dv in (dv_ojo, dv_anestesia, dv_institucion, dv_preop):
+        ws.add_data_validation(dv)
+    dv_ojo.add(f"H2:H{max_row}")
+    dv_anestesia.add(f"I2:I{max_row}")
+    dv_institucion.add(f"K2:K{max_row}")
+    dv_preop.add(f"R2:R{max_row}")
+
+    ws.freeze_panes = "A2"
+
+    # Hoja de instrucciones
+    ins = wb.create_sheet("Instrucciones")
+    ins.column_dimensions['A'].width = 95
+    instrucciones = [
+        "PLANTILLA DE CIRUGÍAS — Novavisión",
+        "",
+        "1. Use la hoja 'Cirugías'. Borre las 2 filas de ejemplo antes de llenar sus datos reales.",
+        "2. No cambie ni borre los encabezados de la fila 1.",
+        "3. Fecha en formato AAAA-MM-DD (ej. 2026-10-15). Hora en formato HH:MM de 24h (ej. 14:30).",
+        "4. Ojo: OD, OS o AO. Tipo Anestesia: topica, local, local_asistida, general, retrobulbar, peribulbar o sedacion.",
+        "5. Institución: Novavision, Alquiler, Seguro Privado o IGSS.",
+        "   - Si Institución = 'Seguro Privado', llene 'Nombre Seguro'.",
+        "   - Si Institución = 'IGSS', llene Unidad IGSS, No. SPS, No. Afiliación, Código y Costo Procedimiento.",
+        "6. LIO: modelo/potencia del lente intraocular (texto libre, opcional).",
+        "7. Pre-Ops: Completo o Incompleto (si lo deja vacío, el sistema lo marca como Incompleto).",
+        "8. Esta plantilla es para el ingreso MANUAL de cirugías históricas/programadas (octubre en adelante).",
+        "   Por ahora NO existe una carga automática del archivo; cada fila debe registrarse en",
+        "   Sala de Operaciones > Registrar cirugía usando estos mismos datos como referencia.",
+    ]
+    for i, texto in enumerate(instrucciones, start=1):
+        c = ins.cell(row=i, column=1, value=texto)
+        if i == 1:
+            c.font = Font(bold=True, size=13, color="0d9488")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+
+    import io
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_cirugias_novavision.xlsx"},
+    )
+
+
 @router.get("/{surgery_id}", response_model=SurgeryResponse)
 async def get_surgery(surgery_id: str, current_user: dict = Depends(get_current_user)):
     """Obtener detalle de una cirugía"""

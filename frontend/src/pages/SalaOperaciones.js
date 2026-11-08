@@ -638,6 +638,28 @@ const SalaOperaciones = () => {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      toast.info('Generando plantilla...');
+      const response = await surgeryApi.downloadTemplate();
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'plantilla_cirugias_novavision.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Plantilla descargada');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Error al descargar la plantilla');
+    }
+  };
+
   return (
     <Layout>
       <Toaster position="top-right" richColors />
@@ -649,6 +671,15 @@ const SalaOperaciones = () => {
             <p className="text-slate-500 text-sm">Registro de cirugías oftalmológicas</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDownloadTemplate}
+              data-testid="download-template-btn"
+              title="Descargar plantilla Excel para ingreso de cirugías históricas/programadas"
+            >
+              <FileText className="w-4 h-4 mr-2 text-teal-600" />
+              Plantilla Excel
+            </Button>
             {/* Export Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
