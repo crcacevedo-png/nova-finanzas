@@ -76,7 +76,7 @@ const ProtectedRoute = ({ children, requiredPermission, requiredRole, requiredMe
   }
 
   // Determinar página de redirección basada en rol
-  const defaultPage = user?.role === 'superadmin' ? '/dashboard' : '/pacientes';
+  const defaultPage = user?.role === 'superadmin' ? '/dashboard' : user?.role === 'anestesia' ? '/sala-operaciones' : '/pacientes';
 
   // Verificar rol requerido (acepta string o lista de roles)
   if (requiredRole) {
@@ -552,8 +552,8 @@ const DefaultRedirect = () => {
     return <Navigate to="/login" replace />;
   }
   
-  // Superadmin va al dashboard, otros usuarios van a pacientes
-  const redirectTo = user?.role === 'superadmin' ? '/dashboard' : '/pacientes';
+  // Superadmin va al dashboard, anestesia a Sala de Operaciones, otros a pacientes
+  const redirectTo = user?.role === 'superadmin' ? '/dashboard' : user?.role === 'anestesia' ? '/sala-operaciones' : '/pacientes';
   return <Navigate to={redirectTo} replace />;
 };
 

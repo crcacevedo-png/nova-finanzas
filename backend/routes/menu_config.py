@@ -391,6 +391,9 @@ DEFAULT_MENU_CONFIG = {
     ],
     "medico": [
         "pacientes", "agenda", "evaluacion_oftalmologica"
+    ],
+    "anestesia": [
+        "sala_operaciones", "quirofano_insumos", "quirofano_anestesia"
     ]
 }
 

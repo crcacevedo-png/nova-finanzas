@@ -1094,3 +1094,10 @@ Verificado contra https://testnucgt.digifact.com/api v2/transform/nuc_json: FACT
 3. Tablero del Día: se quitó el filtro !medicosOcultos de 'Citas del día' y 'Pacientes Presentes' para que compilen TODAS las agendas, aunque haya médicos ocultos en el Calendario. (Nota: 'Citas del día' usa el estado `citas` que respeta el medicoFiltro/estadoFiltro explícito del Calendario; por defecto 'todos'.)
 4. 'Ver paciente' ahora navega en la MISMA pestaña (navigate a /pacientes?id=) en vez de window.open _blank. Agenda.js handleVerPaciente.
 Verificado por testing agent iteration_123 (frontend 4/4 PASS). Pendiente menor no bloqueante: handleVerEvaluacion sigue abriendo nueva pestaña con param 'paciente=' (no estaba en alcance).
+
+## Rol anestesia: acceso a Sala de Operaciones (2026-11) — CORREGIDO y verificado
+Causa: el rol anestesia tenía el permiso view_sala_operaciones pero NO tenía documento en menu_configurations (enabled_menus vacío). Las rutas /sala-operaciones y /quirofano/* usan requiredMenu (revisa enabled_menus), por eso la página salía en blanco y redirigía a /pacientes, y el menú no aparecía.
+Fix:
+- backend/routes/menu_config.py: DEFAULT_MENU_CONFIG["anestesia"] = ["sala_operaciones","quirofano_insumos","quirofano_anestesia"] (submenú completo). Se resuelve por defecto sin necesidad de doc en BD; funciona en preview y producción.
+- frontend/src/App.js: DefaultRedirect y ProtectedRoute.defaultPage → el rol anestesia aterriza en /sala-operaciones (no /pacientes).
+Verificado: login como anestesia aterriza en /sala-operaciones con la lista de cirugías; sidebar muestra Sala de Operaciones con Cirugías + Insumos y Equipos Qx + Proced. de Anestesia; rutas /quirofano/anestesia y /quirofano/insumos-equipos cargan sin redirigir. Las páginas no tienen candado de rol (SalaOperaciones usa hasPermission('view_sala_operaciones') que anestesia ya tiene). Nota: crear/editar registros de procedimientos de anestesia requiere permiso edit_expenses (anestesia hoy solo ve/lee salvo cirugías); si se requiere que registre procedimientos, ampliar esos endpoints.
