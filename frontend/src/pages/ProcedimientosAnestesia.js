@@ -99,7 +99,7 @@ const TiposTab = ({ canManage }) => {
   );
 };
 
-const CierreTab = () => {
+const CierreTab = ({ canClose }) => {
   const now = new Date();
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [data, setData] = useState(null);
@@ -165,10 +165,12 @@ const CierreTab = () => {
           </Button>
           {data?.closed ? (
             <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700 py-1.5 px-3" data-testid="anesthesia-month-closed"><Lock className="w-3.5 h-3.5 mr-1" />Mes cerrado (pagado)</Badge>
-          ) : (
+          ) : canClose ? (
             <Button onClick={cerrarMes} disabled={loading || !data?.num_registros} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="anesthesia-close-month-btn">
               <CheckCircle className="w-4 h-4 mr-2" />Cerrar mes y marcar pagado
             </Button>
+          ) : (
+            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700 py-1.5 px-3">Mes abierto (pendiente de pago)</Badge>
           )}
         </div>
       </div>
@@ -206,7 +208,8 @@ const CierreTab = () => {
 
 export default function ProcedimientosAnestesia() {
   const { user } = useAuth();
-  const canSeeCierre = ['admin', 'superadmin'].includes(user?.role);
+  const canSeeCierre = ['admin', 'superadmin', 'anestesia'].includes(user?.role);
+  const canCloseMonth = ['admin', 'superadmin'].includes(user?.role);
   const canManageTipos = ['admin', 'superadmin', 'usuario'].includes(user?.role);
 
   return (
@@ -220,7 +223,7 @@ export default function ProcedimientosAnestesia() {
             {canSeeCierre && <TabsTrigger value="cierre" data-testid="tab-cierre">Cierre mensual</TabsTrigger>}
             <TabsTrigger value="tipos" data-testid="tab-tipos">Tipos de anestesia</TabsTrigger>
           </TabsList>
-          {canSeeCierre && <TabsContent value="cierre" className="mt-4"><CierreTab /></TabsContent>}
+          {canSeeCierre && <TabsContent value="cierre" className="mt-4"><CierreTab canClose={canCloseMonth} /></TabsContent>}
           <TabsContent value="tipos" className="mt-4"><TiposTab canManage={canManageTipos} /></TabsContent>
         </Tabs>
       </div>

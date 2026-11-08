@@ -377,7 +377,7 @@ async def _build_closure(month: str) -> dict:
 @router.get("/anesthesia/closure")
 async def get_monthly_closure(
     month: str = Query(..., description="YYYY-MM"),
-    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+    current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"])),
 ):
     return await _build_closure(month)
 
@@ -386,7 +386,7 @@ async def get_monthly_closure(
 async def export_monthly_closure(
     month: str = Query(..., description="YYYY-MM"),
     format: str = Query("xlsx", description="xlsx | pdf"),
-    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+    current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"])),
 ):
     import io
     data = await _build_closure(month)
