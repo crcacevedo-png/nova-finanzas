@@ -112,6 +112,7 @@ const formatDateDisplay = (dateStr) => {
 };
 
 const getEyeBadge = (eye) => {
+  if (!eye) return <span className="text-slate-400">—</span>;
   // Normalizar OI legacy a OS
   const normalizedEye = eye === 'OI' ? 'OS' : eye;
   const styles = {

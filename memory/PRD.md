@@ -1108,3 +1108,18 @@ Verificado: login como anestesia aterriza en /sala-operaciones con la lista de c
 2. Columna "LIO" en el listado de cirugías, después de "Procedimiento". También agregada a los exports Excel y PDF (reports/surgeries) después de la columna Procedimiento, con ajuste de anchos/índices de columnas.
 3. Columna "Pre-Ops" en el listado, después de "Anestesia": botón-badge que alterna Completos (verde)/Incompletos (ámbar) con un clic, sin abrir el formulario de edición. Backend: campo `preop_status` (default "incompleto") + endpoint `PATCH /api/surgeries/{id}/preop-status` body `{estado: "completo"|"incompleto"}`, protegido con permiso `view_sala_operaciones` (no `edit_expenses`) para que el rol anestesia —que solo tiene ese permiso— pueda usarlo. También visible/editable en el modal de detalle de la cirugía.
 Verificado: curl end-to-end (login anestesia + superadmin, toggle completo/incompleto, rechazo de valor inválido 400) y click real en UI (toast, color del badge, revertido) en preview. Sin regresión de overflow horizontal (la tabla ya usaba scroll horizontal por tener muchas columnas).
+
+## Plantilla Excel de cirugías + descarga desde la app (2026-11) — COMPLETADO
+- Endpoint `GET /api/surgeries/template` (permiso `view_sala_operaciones`) genera un .xlsx con hoja "Cirugías" (encabezados + 2 filas de ejemplo + listas desplegables para Ojo/Tipo Anestesia/Institución/Pre-Ops) y hoja "Instrucciones". Botón "Plantilla Excel" en la toolbar de Cirugías (routes/surgeries.py, services/api.js `downloadTemplate`, SalaOperaciones.js `handleDownloadTemplate`).
+- Sigue siendo solo para ingreso MANUAL (sin importación automática todavía).
+
+## Carga masiva real de cirugías oct/2026–ene/2027 (2026-11) — COMPLETADO (reemplaza datos de ejemplo en preview)
+- El usuario llenó la plantilla con datos reales (192 filas, `cirugias_novavision_oct2026_ene2027.xlsx`) y pidió borrar las 10 cirugías de ejemplo y cargar las reales en su lugar.
+- Script de una sola ejecución `backend/scripts/import_surgeries_from_excel.py`: 1) borra `db.surgeries` + `anesthesia_records`/`notas_cirugia` asociados a esos ids, 2) parsea el Excel y valida/normaliza, 3) inserta 192 cirugías + genera sus registros de anestesia vía `upsert_anesthesia_from_surgery` (igual que haría la API).
+- Normalizaciones aplicadas durante la carga: Institución vacía con "Institución: X" en Observaciones → `institution="Seguro Privado"`, `insurance_name=X` (5 filas, todas "Intevisa"); anestesiólogo vacío → `"N/A"` (101 filas); ojo no reconocido/vacío se deja vacío (17 filas) — el frontend ahora muestra "—" en vez de un badge vacío (`getEyeBadge` en SalaOperaciones.js).
+- **Pendiente de completar por el usuario (no bloqueante, datos reales incompletos en el Excel original):**
+  - 69 cirugías IGSS sin No. SPS/Afiliación/Código/Costo (se guardaron con `igss_data: null`; al editarlas desde la UI con institución IGSS habrá que llenar esos campos porque el formulario los exige).
+  - 109 cirugías "Seguro Privado" sin nombre de aseguradora (`insurance_name` vacío; el formulario de edición lo exige si se vuelve a guardar).
+  - 17 cirugías sin ojo especificado.
+  - Fila 2 del Excel (paciente "Exceresis de Pterigion", 2026-10-01 08:30): el nombre del paciente parece ser en realidad el procedimiento (posible error de captura); se importó tal cual, revisar manualmente.
+- Verificado: total 192 vía API, muestra IGSS/Seguro Privado/fechas correctas, búsqueda y badges en UI con datos reales.
