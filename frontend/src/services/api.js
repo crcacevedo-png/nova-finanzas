@@ -150,6 +150,13 @@ export const surgeryApi = {
     return axios.get(`${API_URL}/reports/surgeries?${params.toString()}`, { responseType: 'blob' });
   },
   downloadTemplate: () => axios.get(`${API_URL}/surgeries/template`, { responseType: 'blob' }),
+  importExcel: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API_URL}/surgeries/import`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 // Suppliers API

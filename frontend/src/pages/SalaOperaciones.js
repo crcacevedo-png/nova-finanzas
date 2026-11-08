@@ -9,7 +9,7 @@ const EMPTY_IGSS = { unit: '', unit_id: '', nog_id: '', nog_number: '', sps: '',
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Trash2, X, Calendar, Clock, User, Building2,
-  Stethoscope, Activity, Package, FileText, UserPlus
+  Stethoscope, Activity, Package, FileText, UserPlus, Upload
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -704,9 +704,39 @@ const SalaOperaciones = () => {
     }
   };
 
+  const importFileInputRef = React.useRef(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
+  const handleImportFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    try {
+      const response = await surgeryApi.importExcel(file);
+      setImportResult(response.data);
+      toast.success(response.data.message || 'Importación completada');
+      fetchSurgeries();
+      fetchOptions();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'No se pudo importar el archivo');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <Layout>
       <Toaster position="top-right" richColors />
+      <input
+        type="file"
+        ref={importFileInputRef}
+        onChange={handleImportFileSelected}
+        accept=".xlsx,.xls"
+        className="hidden"
+        data-testid="import-surgeries-file-input"
+      />
       <div className="space-y-6 animate-fade-in" data-testid="sala-operaciones-page">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -724,6 +754,18 @@ const SalaOperaciones = () => {
               <FileText className="w-4 h-4 mr-2 text-teal-600" />
               Plantilla Excel
             </Button>
+            {isSuperAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => importFileInputRef.current?.click()}
+                disabled={importing}
+                data-testid="import-surgeries-btn"
+                title="Subir el Excel de la Plantilla para crear cirugías en bloque (no borra las existentes)"
+              >
+                <Upload className="w-4 h-4 mr-2 text-teal-600" />
+                {importing ? 'Importando...' : 'Importar Excel'}
+              </Button>
+            )}
             {/* Export Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1850,6 +1892,37 @@ const SalaOperaciones = () => {
               <Button onClick={handleCancelSurgery} disabled={submitting} className="bg-amber-600 hover:bg-amber-700 text-white">
                 {submitting ? 'Cancelando...' : 'Cancelar cirugía'}
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Import Result Dialog */}
+        <Dialog open={!!importResult} onOpenChange={(open) => !open && setImportResult(null)}>
+          <DialogContent className="max-w-lg" data-testid="import-result-dialog">
+            <DialogHeader>
+              <DialogTitle>Resultado de la importación</DialogTitle>
+            </DialogHeader>
+            {importResult && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-emerald-700">
+                  {importResult.created} cirugías creadas correctamente.
+                </p>
+                {importResult.warnings?.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-amber-700 mb-1">
+                      {importResult.warnings.length} advertencias (revisa esos datos más tarde):
+                    </p>
+                    <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-md p-2 bg-slate-50">
+                      {importResult.warnings.map((w, idx) => (
+                        <p key={idx} className="text-xs text-slate-600 py-0.5">{w}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              <Button onClick={() => setImportResult(null)} data-testid="close-import-result-btn">Cerrar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,7 +1,7 @@
 # /app/backend/routes/surgeries.py
 # Rutas del módulo Sala de Operaciones (Cirugías)
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
@@ -336,6 +336,143 @@ async def download_surgery_template(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=plantilla_cirugias_novavision.xlsx"},
     )
+
+
+@router.post("/import")
+async def import_surgeries_excel(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_role("superadmin"))
+):
+    """Importar cirugías en bloque desde un Excel llenado con la Plantilla (ver /surgeries/template).
+    Crea cirugías NUEVAS (no borra ni reemplaza las existentes); es tolerante con datos
+    administrativos incompletos (IGSS, aseguradora, ojo) típicos de cargas históricas: los deja
+    vacíos/anotados en vez de rechazar la fila, a diferencia del formulario normal de registro."""
+    if not file.filename.lower().endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="El archivo debe ser .xlsx (usa la Plantilla Excel)")
+
+    content = await file.read()
+    import openpyxl as _openpyxl
+    try:
+        wb = _openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="No se pudo leer el archivo Excel")
+
+    if "Cirugías" not in wb.sheetnames:
+        raise HTTPException(status_code=400, detail="El archivo no tiene la hoja 'Cirugías' de la Plantilla")
+    ws = wb["Cirugías"]
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+
+    VALID_EYE = {"OD", "OS", "AO"}
+    VALID_ANESTHESIA = {"topica", "local", "local_asistida", "general", "retrobulbar", "peribulbar", "sedacion"}
+    VALID_INSTITUTION = {"Novavision", "Alquiler", "Seguro Privado", "IGSS"}
+    inst_in_obs_re = re.compile(r"Instituci[oó]n:\s*([^|]+)", re.IGNORECASE)
+
+    now = datetime.now(timezone.utc).isoformat()
+    created_ids = []
+    warnings = []
+
+    for i, r in enumerate(rows, start=2):
+        valores = (list(r) + [None] * 19)[:19]
+        (fecha, hora, paciente, procedimiento, lio, cirujano, ayudante, ojo,
+         tipo_anestesia, anestesiologo, institucion, nombre_seguro,
+         unidad_igss, sps, afiliacion, codigo, costo, preop, observaciones) = valores
+
+        if not (fecha and hora and paciente and procedimiento and cirujano and tipo_anestesia):
+            warnings.append(f"Fila {i}: faltan campos obligatorios (fecha/hora/paciente/procedimiento/cirujano/anestesia), se omite")
+            continue
+
+        observaciones = (observaciones or "").strip()
+        institucion = (institucion or "").strip()
+        insurance_name = (nombre_seguro or "").strip()
+
+        if not institucion:
+            m = inst_in_obs_re.search(observaciones)
+            if m:
+                insurance_name = m.group(1).strip()
+                institucion = "Seguro Privado"
+                observaciones = inst_in_obs_re.sub("", observaciones).strip(" |")
+            else:
+                warnings.append(f"Fila {i} ({paciente}): sin institución, se asigna 'Seguro Privado' por defecto")
+                institucion = "Seguro Privado"
+        if institucion not in VALID_INSTITUTION:
+            warnings.append(f"Fila {i} ({paciente}): institución '{institucion}' no reconocida, se asigna 'Seguro Privado'")
+            institucion = "Seguro Privado"
+
+        ojo = (ojo or "").strip().upper()
+        if ojo and ojo not in VALID_EYE:
+            warnings.append(f"Fila {i} ({paciente}): ojo '{ojo}' no válido, se deja vacío")
+            ojo = ""
+        if not ojo:
+            warnings.append(f"Fila {i} ({paciente}): sin ojo especificado")
+
+        tipo_anestesia = (tipo_anestesia or "").strip()
+        if tipo_anestesia not in VALID_ANESTHESIA:
+            warnings.append(f"Fila {i} ({paciente}): tipo de anestesia '{tipo_anestesia}' no válido, se omite")
+            continue
+
+        anestesiologo = (anestesiologo or "").strip() or "N/A"
+
+        igss_data = None
+        if institucion == "IGSS":
+            if unidad_igss or sps or afiliacion or codigo or costo:
+                igss_data = {
+                    "unit": (unidad_igss or "").strip() or None,
+                    "unit_id": None,
+                    "nog_id": None,
+                    "nog_number": None,
+                    "sps": (str(sps).strip() if sps else None),
+                    "affiliation_number": (str(afiliacion).strip() if afiliacion else None),
+                    "code": (str(codigo).strip() if codigo else None),
+                    "procedure_cost": float(costo) if costo else None,
+                }
+            else:
+                warnings.append(f"Fila {i} ({paciente}): IGSS sin SPS/afiliación/código/costo, pendiente de completar")
+
+        preop_status = "incompleto"
+        if preop and str(preop).strip().lower() == "completo":
+            preop_status = "completo"
+
+        doc = {
+            "id": str(uuid.uuid4()),
+            "date": str(fecha).strip(),
+            "time": str(hora).strip(),
+            "patient_name": str(paciente).strip(),
+            "patient_id": None,
+            "procedure": str(procedimiento).strip(),
+            "surgeon": str(cirujano).strip(),
+            "assistant_surgeon": (str(ayudante).strip() if ayudante else None),
+            "eye": ojo,
+            "lio": (str(lio).strip() if lio else ""),
+            "anesthesia_type": tipo_anestesia,
+            "anesthesiologist": anestesiologo,
+            "institution": institucion,
+            "igss_data": igss_data,
+            "insurance_name": insurance_name,
+            "observations": observaciones,
+            "equipment": [],
+            "supplies": [],
+            "supplies_status": "pendiente" if institucion == "Alquiler" else None,
+            "preop_status": preop_status,
+            "status": "activo",
+            "cancellation_reason": None,
+            "rescheduled_to": None,
+            "created_by": current_user["id"],
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.surgeries.insert_one(doc)
+        created_ids.append(doc["id"])
+        try:
+            from routes.quirofano import upsert_anesthesia_from_surgery
+            await upsert_anesthesia_from_surgery(doc)
+        except Exception:
+            pass
+
+    return {
+        "message": f"Se importaron {len(created_ids)} cirugías",
+        "created": len(created_ids),
+        "warnings": warnings,
+    }
 
 
 @router.get("/{surgery_id}", response_model=SurgeryResponse)

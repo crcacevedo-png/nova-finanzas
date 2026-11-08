@@ -2,12 +2,10 @@
 # Módulo de Administración - Integridad de datos y vinculación de cirugías
 # Solo SuperAdmin
 
-from fastapi import APIRouter, HTTPException, Depends, Body, Header
+from fastapi import APIRouter, HTTPException, Depends, Body
 from typing import Optional
 from datetime import datetime, timezone
 import unicodedata
-import os
-import json
 
 from config.database import db
 from routes.auth import require_role
@@ -312,45 +310,3 @@ async def vincular_cirugia_manual(
     }
 
 
-@router.post("/migrate-seed-data")
-async def migrate_seed_data(x_migration_key: str = Header(None)):
-    """
-    Endpoint operativo de una sola vez: carga a la base de datos donde esté corriendo
-    (producción al llamarse contra admin.novavision.me) la semilla de 192 cirugías reales
-    (oct/2026-ene/2027) + sus registros de anestesia + el rol/usuario 'anestesia', ya
-    cargados previamente en preview. Protegido por MIGRATION_SECRET_KEY (no requiere
-    sesión de usuario) porque es una operación de infraestructura, no de negocio.
-    Idempotente: usa upsert por id/name/username, se puede reintentar sin duplicar.
-    """
-    expected_key = os.environ.get("MIGRATION_SECRET_KEY")
-    if not expected_key or x_migration_key != expected_key:
-        raise HTTPException(status_code=403, detail="Clave de migración inválida")
-
-    seed_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "prod_migration_seed.json")
-    if not os.path.exists(seed_path):
-        raise HTTPException(status_code=404, detail="Archivo de semilla no encontrado en el despliegue")
-
-    with open(seed_path, "r", encoding="utf-8") as f:
-        seed = json.load(f)
-
-    result = {"surgeries": 0, "anesthesia_records": 0, "role_anestesia": False, "user_anestesia": False}
-
-    for s in seed.get("surgeries", []):
-        await db.surgeries.update_one({"id": s["id"]}, {"$set": s}, upsert=True)
-        result["surgeries"] += 1
-
-    for a in seed.get("anesthesia_records", []):
-        await db.anesthesia_records.update_one({"id": a["id"]}, {"$set": a}, upsert=True)
-        result["anesthesia_records"] += 1
-
-    role = seed.get("role_anestesia")
-    if role:
-        await db.roles.update_one({"name": role["name"]}, {"$set": role}, upsert=True)
-        result["role_anestesia"] = True
-
-    user = seed.get("user_anestesia")
-    if user:
-        await db.users.update_one({"username": user["username"]}, {"$set": user}, upsert=True)
-        result["user_anestesia"] = True
-
-    return {"message": "Migración completada", **result}
