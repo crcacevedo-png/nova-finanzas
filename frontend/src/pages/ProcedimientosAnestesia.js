@@ -181,17 +181,18 @@ const CierreTab = ({ canClose }) => {
       <div className="space-y-3">
         {(data?.por_anestesiologo || []).map((g, i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto" data-testid={`anesthesia-anest-${i}`}>
-            <div className="flex items-center justify-between mb-2 min-w-[640px]">
+            <div className="flex items-center justify-between mb-2 min-w-[760px]">
               <span className="font-bold text-gray-900">{g.anesthesiologist}</span>
               <span className="font-bold text-emerald-700">{formatCurrency(g.total)} <span className="text-xs font-normal text-gray-400">({g.count} proc.)</span></span>
             </div>
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-xs text-gray-400 border-b border-gray-100">
                   <th className="py-1.5 text-left font-medium">Fecha</th>
                   <th className="py-1.5 text-left font-medium">Paciente</th>
                   <th className="py-1.5 text-left font-medium">Procedimiento</th>
                   <th className="py-1.5 text-left font-medium">Médico responsable</th>
+                  <th className="py-1.5 text-left font-medium">Institución</th>
                   <th className="py-1.5 text-left font-medium">Tipo de anestesia</th>
                   <th className="py-1.5 text-right font-medium">Honorario</th>
                 </tr>
@@ -203,6 +204,7 @@ const CierreTab = ({ canClose }) => {
                     <td className="py-1.5 text-gray-900 font-medium">{d.patient_name || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.procedure || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.surgeon || '—'}</td>
+                    <td className="py-1.5 text-gray-600">{d.institution || '—'}</td>
                     <td className="py-1.5 text-gray-500">{d.tipo}</td>
                     <td className="py-1.5 text-right font-medium">{formatCurrency(d.value)}</td>
                   </tr>

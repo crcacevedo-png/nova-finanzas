@@ -349,7 +349,7 @@ async def _build_closure(month: str) -> dict:
     surgeries_map = {}
     if surgery_ids:
         surgeries = await db.surgeries.find(
-            {"id": {"$in": surgery_ids}}, {"_id": 0, "id": 1, "procedure": 1, "surgeon": 1}
+            {"id": {"$in": surgery_ids}}, {"_id": 0, "id": 1, "procedure": 1, "surgeon": 1, "institution": 1}
         ).to_list(len(surgery_ids))
         surgeries_map = {s["id"]: s for s in surgeries}
     por_anest = {}
@@ -370,6 +370,7 @@ async def _build_closure(month: str) -> dict:
             "patient_name": r.get("patient_name") or "",
             "procedure": surg.get("procedure") or "",
             "surgeon": surg.get("surgeon") or "",
+            "institution": surg.get("institution") or "",
             "tipo": tname,
             "value": round(r.get("value") or 0, 2),
         })
@@ -428,7 +429,7 @@ async def export_monthly_closure(
         ws["A2"] = f"Mes: {month}   |   Estado: {estado}   |   Total a pagar: Q {data['total_general']:,.2f}   |   Procedimientos: {data['num_registros']}"
         ws["A3"] = ""
 
-        headers = ["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico responsable", "Tipo de anestesia", "Honorario"]
+        headers = ["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico responsable", "Institución", "Tipo de anestesia", "Honorario"]
         row = 4
         for c, h in enumerate(headers, start=1):
             cell = ws.cell(row=row, column=c, value=h)
@@ -446,22 +447,23 @@ async def export_monthly_closure(
                 ws.cell(row=row, column=3, value=d["patient_name"]).border = border
                 ws.cell(row=row, column=4, value=d["procedure"]).border = border
                 ws.cell(row=row, column=5, value=d["surgeon"]).border = border
-                ws.cell(row=row, column=6, value=d["tipo"]).border = border
-                ws.cell(row=row, column=7, value=round(d["value"], 2)).border = border
+                ws.cell(row=row, column=6, value=d["institution"]).border = border
+                ws.cell(row=row, column=7, value=d["tipo"]).border = border
+                ws.cell(row=row, column=8, value=round(d["value"], 2)).border = border
                 first = False
                 row += 1
             # Subtotal por anestesiólogo
-            lbl = ws.cell(row=row, column=4, value=f"Total {g['anesthesiologist']} ({g['count']} proc.)")
+            lbl = ws.cell(row=row, column=5, value=f"Total {g['anesthesiologist']} ({g['count']} proc.)")
             lbl.font = bold
-            tot = ws.cell(row=row, column=7, value=round(g["total"], 2))
+            tot = ws.cell(row=row, column=8, value=round(g["total"], 2))
             tot.font = bold
             row += 1
 
         row += 1
-        ws.cell(row=row, column=4, value="TOTAL GENERAL").font = Font(bold=True, size=12)
-        ws.cell(row=row, column=7, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
+        ws.cell(row=row, column=5, value="TOTAL GENERAL").font = Font(bold=True, size=12)
+        ws.cell(row=row, column=8, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
 
-        widths = [20, 12, 26, 26, 22, 20, 14]
+        widths = [20, 12, 26, 26, 22, 16, 18, 14]
         for i, w in enumerate(widths, start=1):
             ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
@@ -495,12 +497,12 @@ async def export_monthly_closure(
         Paragraph(f"Mes: {month} &nbsp;|&nbsp; Estado: {estado} &nbsp;|&nbsp; Total a pagar: Q {data['total_general']:,.2f} &nbsp;|&nbsp; Procedimientos: {data['num_registros']}", sub_style),
     ]
 
-    table_data = [["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico resp.", "Tipo", "Honorario"]]
+    table_data = [["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico resp.", "Institución", "Tipo", "Honorario"]]
     style_cmds = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+        ('FONTSIZE', (0, 0), (-1, -1), 7),
         ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
         ('ALIGN', (0, 0), (-2, 0), 'LEFT'),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
@@ -514,17 +516,17 @@ async def export_monthly_closure(
         for d in g["detalle"]:
             table_data.append([
                 g["anesthesiologist"] if first else "",
-                d["date"], d["patient_name"], d["procedure"], d["surgeon"], d["tipo"],
+                d["date"], d["patient_name"], d["procedure"], d["surgeon"], d["institution"], d["tipo"],
                 f"Q {d['value']:,.2f}",
             ])
             first = False
             r += 1
-        table_data.append(["", "", "", "", "", f"Total {g['anesthesiologist']} ({g['count']} proc.)", f"Q {g['total']:,.2f}"])
+        table_data.append(["", "", "", "", "", "", f"Total {g['anesthesiologist']} ({g['count']} proc.)", f"Q {g['total']:,.2f}"])
         style_cmds.append(('FONTNAME', (0, r), (-1, r), 'Helvetica-Bold'))
         style_cmds.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#EEF2FF')))
         r += 1
 
-    table = Table(table_data, colWidths=[1.1 * inch, 0.65 * inch, 1.3 * inch, 1.3 * inch, 1.1 * inch, 0.85 * inch, 0.8 * inch])
+    table = Table(table_data, colWidths=[1.0 * inch, 0.55 * inch, 1.15 * inch, 1.05 * inch, 0.95 * inch, 0.95 * inch, 0.75 * inch, 0.7 * inch])
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))

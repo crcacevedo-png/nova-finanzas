@@ -1185,3 +1185,10 @@ Verificado: curl end-to-end (login anestesia + superadmin, toggle completo/incom
 - Fix de regresión de layout aprovechado en el mismo cambio: `Layout.js` tenía un bug de flexbox (`min-width: auto` por defecto en flex items) que causaba overflow horizontal de toda la página en cualquier vista con una tabla ancha; se agregó `min-w-0` a los contenedores flex principales (`<div className="flex-1 flex flex-col...">` y `<main className="flex-1 p-6 lg:p-8 overflow-auto">`). Verificado sin regresión en Sala de Operaciones y en esta misma página (scrollWidth === clientWidth en viewport móvil 390px).
 - Verificado con curl (GET closure trae `detalle` con paciente/fecha/procedimiento/médico correctos; export xlsx y pdf devuelven 200 y archivos válidos) y con screenshots desktop (1920x800) y móvil (390x844) como `superadmin`.
 - Deploy a producción disparado tras este fix.
+
+## Cierre mensual de Anestesia: columna Institución (2026-11) — COMPLETADO
+- El usuario pidió agregar también el tipo de institución (Novavision, Alquiler, Seguro Privado, IGSS) al mismo desglose (pantalla, Excel, PDF).
+- Backend: `_build_closure` ahora también trae `institution` de la cirugía vinculada y la agrega a cada item de `detalle`.
+- Frontend: nueva columna "Institución" entre "Médico responsable" y "Tipo de anestesia" en la tabla de cada anestesiólogo (ancho mínimo de la tabla ajustado a 760px para el scroll horizontal en móvil).
+- Excel y PDF: nueva columna "Institución" agregada en la misma posición; anchos de columna reajustados para que el PDF siga cabiendo en una página carta.
+- Verificado con curl (campo `institution` presente en `detalle`, ej. "Seguro Privado", "Novavision") y con screenshots desktop/móvil; sin overflow horizontal de página (scrollWidth === clientWidth en 390px).
