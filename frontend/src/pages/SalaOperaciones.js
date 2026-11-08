@@ -9,7 +9,7 @@ const EMPTY_IGSS = { unit: '', unit_id: '', nog_id: '', nog_number: '', sps: '',
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Trash2, X, Calendar, Clock, User, Building2,
-  Stethoscope, Activity, Package, FileText
+  Stethoscope, Activity, Package, FileText, UserPlus
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -155,6 +155,7 @@ const SalaOperaciones = () => {
   const [nogLibre, setNogLibre] = useState(false);
   const [patientResults, setPatientResults] = useState([]);
   const [showPatientResults, setShowPatientResults] = useState(false);
+  const [creatingPatient, setCreatingPatient] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});
   
   // Filters
@@ -368,6 +369,21 @@ const SalaOperaciones = () => {
     setFormData(prev => ({ ...prev, patient_name: nombre, patient_id: p.id }));
     setShowPatientResults(false);
     setPatientResults([]);
+  };
+
+  const handleQuickCreatePatient = async (rawName) => {
+    const nombre = (rawName || '').trim();
+    if (!nombre || creatingPatient) return;
+    setCreatingPatient(true);
+    try {
+      const res = await patientApi.createQuick(nombre);
+      selectPatient(res.data);
+      toast.success(`Paciente "${res.data.full_name}" creado — expediente ${res.data.record_number}. Completa sus datos en Pacientes cuando llegue.`);
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'No se pudo crear el paciente');
+    } finally {
+      setCreatingPatient(false);
+    }
   };
 
   const handleSearch = () => {
@@ -1143,7 +1159,7 @@ const SalaOperaciones = () => {
                     <Input
                       value={formData.patient_name}
                       onChange={(e) => handlePatientInput(e.target.value)}
-                      onFocus={() => formData.patient_name.length >= 2 && patientResults.length > 0 && setShowPatientResults(true)}
+                      onFocus={() => formData.patient_name.length >= 2 && setShowPatientResults(true)}
                       placeholder="Buscar por nombre, DPI o expediente..."
                       autoComplete="off"
                       data-testid="surgery-patient-search"
@@ -1153,7 +1169,7 @@ const SalaOperaciones = () => {
                     ) : formData.patient_name ? (
                       <p className="text-xs text-amber-600 mt-1">Paciente no registrado seleccionado — no se creará nota clínica</p>
                     ) : null}
-                    {showPatientResults && patientResults.length > 0 && (
+                    {showPatientResults && (patientResults.length > 0 || formData.patient_name.trim().length >= 2) && (
                       <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto" data-testid="surgery-patient-results">
                         {patientResults.map((p) => (
                           <button
@@ -1167,6 +1183,22 @@ const SalaOperaciones = () => {
                             <span className="text-xs text-slate-500 ml-2">Exp. {p.record_number || 's/exp'}{p.dpi ? ` · DPI ${p.dpi}` : ''}</span>
                           </button>
                         ))}
+                        {patientResults.length === 0 && (
+                          hasPermission('create_patients') ? (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickCreatePatient(formData.patient_name)}
+                              disabled={creatingPatient}
+                              className="w-full text-left px-3 py-2 hover:bg-teal-50 text-sm text-teal-700 font-medium flex items-center gap-2 disabled:opacity-60"
+                              data-testid="surgery-create-patient-btn"
+                            >
+                              <UserPlus className="w-4 h-4 shrink-0" />
+                              {creatingPatient ? 'Creando paciente...' : `Crear paciente nuevo: "${formData.patient_name.trim()}"`}
+                            </button>
+                          ) : (
+                            <p className="px-3 py-2 text-sm text-slate-400">Sin coincidencias</p>
+                          )
+                        )}
                       </div>
                     )}
                   </div>

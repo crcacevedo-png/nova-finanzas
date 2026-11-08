@@ -263,10 +263,12 @@ export const patientApi = {
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
     if (filters.is_active !== undefined) params.append('is_active', filters.is_active.toString());
+    if (filters.incomplete) params.append('incomplete', 'true');
     return axios.get(`${API_URL}/patients?${params.toString()}`);
   },
   getById: (id) => axios.get(`${API_URL}/patients/${id}`),
   create: (data) => axios.post(`${API_URL}/patients`, data),
+  createQuick: (name) => axios.post(`${API_URL}/patients/quick`, { name }),
   update: (id, data) => axios.put(`${API_URL}/patients/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/patients/${id}`),
   reactivate: (id) => axios.post(`${API_URL}/patients/${id}/reactivate`),

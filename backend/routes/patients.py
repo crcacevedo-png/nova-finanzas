@@ -122,6 +122,7 @@ class PatientResponse(BaseModel):
     updated_by: Optional[str] = ""
     updated_by_name: Optional[str] = ""
     updated_at: Optional[str] = None
+    datos_incompletos: bool = False
 
 
 class PatientListResponse(BaseModel):
@@ -147,6 +148,11 @@ class PatientDuplicateCheck(BaseModel):
     patient_id: Optional[str] = None
     patient_name: Optional[str] = None
     patient_record_number: Optional[str] = None
+
+
+class PatientQuickCreate(BaseModel):
+    """Alta rápida desde Registrar Cirugía: solo el nombre completo."""
+    name: str = Field(..., min_length=1, max_length=150)
 
 
 # ==================== HELPERS ====================
@@ -266,6 +272,9 @@ async def enrich_patient(patient: dict) -> dict:
     patient["full_name"] = f"{patient.get('first_name', '')} {patient.get('last_name', '')}".strip()
     patient["age"] = calcular_edad(patient.get("birth_date", ""))
     patient["referral_institution_label"] = INSTITUTION_LABELS.get(patient.get("referral_institution", ""), "")
+    patient["datos_incompletos"] = not bool(
+        patient.get("gender") and patient.get("birth_date") and patient.get("phone") and patient.get("referral_institution")
+    )
 
     # Migración lazy: si es IGSS y no tiene órdenes pero sí NOG/SPS/código legacy,
     # exponer una primera orden derivada de esos campos (solo para la respuesta).
@@ -397,15 +406,28 @@ async def get_patients(
     date_from: Optional[str] = Query(None, alias="dateFrom"),
     date_to: Optional[str] = Query(None, alias="dateTo"),
     is_active: bool = True,
+    incomplete: Optional[bool] = None,
     current_user: dict = Depends(require_permission("view_patients"))
 ):
     """Listar pacientes con filtros y paginación"""
     query = {"is_active": is_active}
     
+    and_clauses = []
     if search:
         conditions = build_patient_search_conditions(search)
         if conditions:
-            query["$or"] = conditions
+            and_clauses.append({"$or": conditions})
+    if incomplete:
+        and_clauses.append({"$or": [
+            {"gender": {"$in": [None, ""]}},
+            {"birth_date": {"$in": [None, ""]}},
+            {"phone": {"$in": [None, ""]}},
+            {"referral_institution": {"$in": [None, ""]}},
+        ]})
+    if len(and_clauses) == 1:
+        query.update(and_clauses[0])
+    elif len(and_clauses) > 1:
+        query["$and"] = and_clauses
     
     if referral_institution:
         query["referral_institution"] = referral_institution
@@ -663,6 +685,73 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
     from routes.igss_nogs import _reconciliar_nog_paciente
     await _reconciliar_nog_paciente(patient_doc, current_user, origen="asignacion")
     
+    enriched = await enrich_patient(patient_doc)
+    return PatientResponse(**enriched)
+
+
+@router.post("/quick", response_model=PatientResponse)
+async def create_patient_quick(
+    data: PatientQuickCreate,
+    current_user: dict = Depends(require_permission("create_patients"))
+):
+    """Alta rápida de paciente solo con el nombre (desde Registrar Cirugía).
+    El resto de los datos (género, fecha de nacimiento, teléfono, institución
+    referente) se completan después desde la edición normal de Pacientes; mientras
+    tanto el paciente aparece marcado como 'Datos incompletos' (ver enrich_patient)."""
+    nombre_completo = data.name.strip()
+    if not nombre_completo:
+        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+    partes = nombre_completo.split(" ", 1)
+    first_name = partes[0].strip()
+    last_name = partes[1].strip() if len(partes) > 1 else ""
+
+    now = datetime.now(timezone.utc).isoformat()
+    record_number = await get_next_record_number()
+
+    patient_doc = {
+        "id": str(uuid.uuid4()),
+        "record_number": record_number,
+        "first_name": first_name,
+        "last_name": last_name,
+        "gender": "",
+        "birth_date": "",
+        "profession": "",
+        "phone": "",
+        "email": "",
+        "dpi": "",
+        "emergency_phone": "",
+        "emergency_contact_name": "",
+        "emergency_contact_relationship": "",
+        "referral_institution": "",
+        "insurance_name": "",
+        "other_institution_name": "",
+        "igss_unit_id": "",
+        "igss_afiliacion": "",
+        "igss_no_sps": "",
+        "igss_codigo": "",
+        "igss_tipo_compra": "",
+        "igss_nog": "",
+        "igss_tipo_paciente": "",
+        "address": "",
+        "comments": "",
+        "igss_ordenes": [],
+        "is_active": True,
+        "created_by": current_user["id"],
+        "created_at": now,
+        "updated_by": "",
+        "updated_at": now,
+    }
+    await db.patients.insert_one(patient_doc)
+    if "_id" in patient_doc:
+        del patient_doc["_id"]
+
+    await audit.log(
+        action="PATIENT_QUICK_CREATED",
+        user_id=current_user["id"],
+        user_name=current_user.get("username", "unknown"),
+        details={"patient_id": patient_doc["id"], "patient_name": nombre_completo, "origen": "registrar_cirugia"}
+    )
+
     enriched = await enrich_patient(patient_doc)
     return PatientResponse(**enriched)
 

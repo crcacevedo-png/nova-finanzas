@@ -113,7 +113,8 @@ const Pacientes = () => {
     gender: '',
     dateFrom: '',
     dateTo: '',
-    is_active: true
+    is_active: true,
+    incomplete: false
   });
   
   const [formData, setFormData] = useState({
@@ -501,7 +502,8 @@ const Pacientes = () => {
       gender: '',
       dateFrom: '',
       dateTo: '',
-      is_active: true
+      is_active: true,
+      incomplete: false
     });
     setSearchTerm('');
     setPage(1);
@@ -634,6 +636,18 @@ const Pacientes = () => {
               >
                 <Filter className="w-4 h-4 mr-2" />
                 Filtros
+              </Button>
+              <Button
+                type="button"
+                variant={filters.incomplete ? 'default' : 'outline'}
+                onClick={() => {
+                  setFilters(prev => ({ ...prev, incomplete: !prev.incomplete }));
+                  setPage(1);
+                }}
+                className={filters.incomplete ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'btn-outline text-amber-700'}
+                data-testid="filter-incomplete-btn"
+              >
+                Datos incompletos
               </Button>
             </form>
 
@@ -819,6 +833,11 @@ const Pacientes = () => {
                             <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                               {patient.full_name}
                             </span>
+                            {patient.datos_incompletos && (
+                              <Badge className="ml-2 bg-amber-100 text-amber-700 border border-amber-300 align-middle" data-testid={`incomplete-badge-${patient.id}`}>
+                                Datos incompletos
+                              </Badge>
+                            )}
                             {patient.dpi && (
                               <p className="text-xs" style={{ color: 'var(--text-hint)' }}>
                                 DPI: {patient.dpi}
@@ -827,25 +846,33 @@ const Pacientes = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getGenderBadgeClass(patient.gender)}>
-                            {genderLabels[patient.gender] || patient.gender}
-                          </Badge>
+                          {patient.gender ? (
+                            <Badge className={getGenderBadgeClass(patient.gender)}>
+                              {genderLabels[patient.gender] || patient.gender}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-hint)' }}>—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                            {patient.age}
+                            {patient.age || '—'}
                           </span>
-                          <span className="text-xs ml-1" style={{ color: 'var(--text-hint)' }}>años</span>
+                          {patient.age ? <span className="text-xs ml-1" style={{ color: 'var(--text-hint)' }}>años</span> : null}
                         </TableCell>
                         <TableCell>
                           <span style={{ color: 'var(--text-secondary)' }}>
-                            {patient.phone}
+                            {patient.phone || '—'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getInstitutionBadgeClass(patient.referral_institution)}>
-                            {patient.referral_institution_label || referralInstitutionLabels[patient.referral_institution]}
-                          </Badge>
+                          {patient.referral_institution ? (
+                            <Badge className={getInstitutionBadgeClass(patient.referral_institution)}>
+                              {patient.referral_institution_label || referralInstitutionLabels[patient.referral_institution]}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-hint)' }}>—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
