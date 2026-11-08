@@ -102,7 +102,7 @@ const formatTime = (time) => {
 };
 
 // Componente de tarjeta de cita compacta
-const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, onMarcarLlegada, compact = false, sobrecupo = false }) => {
+const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPaciente, onNuevaEvaluacion, onMarcarLlegada, onCancelarLlegada, compact = false, sobrecupo = false }) => {
   const estadoConfig = ESTADOS_CITA[cita.estado] || ESTADOS_CITA['Agendada'];
   const IconoEstado = estadoConfig.icon;
   
@@ -163,6 +163,11 @@ const CitaCard = ({ cita, onEstadoChange, onEliminar, onAsignar, onEdit, onVerPa
             {cita.estado === 'Presente' && (
               <DropdownMenuItem onClick={() => onEstadoChange(cita.id, 'En consulta')}>
                 <Play className="w-4 h-4 mr-2" /> Iniciar consulta
+              </DropdownMenuItem>
+            )}
+            {['Presente', 'En consulta'].includes(cita.estado) && onCancelarLlegada && (
+              <DropdownMenuItem onClick={() => onCancelarLlegada(cita.id)} data-testid={`deshacer-llegada-cita-${cita.id}`}>
+                <RotateCcw className="w-4 h-4 mr-2" /> Deshacer llegada
               </DropdownMenuItem>
             )}
             {cita.estado === 'En consulta' && (
@@ -1354,7 +1359,7 @@ const Agenda = () => {
   };
   
   const handleVerPaciente = (pacienteId) => {
-    window.open(`/pacientes?id=${pacienteId}`, '_blank');
+    navigate(`/pacientes?id=${pacienteId}`);
   };
   
   const handleVerEvaluacion = (pacienteId) => {
@@ -1825,6 +1830,8 @@ const Agenda = () => {
                                     onVerPaciente={handleVerPaciente}
                                     onNuevaEvaluacion={handleNuevaEvaluacion}
                                     onMarcarLlegada={handleMarcarLlegada}
+
+                                    onCancelarLlegada={handleCancelarLlegada}
                                   />
                                 </div>
                               ))}
@@ -2098,11 +2105,11 @@ const Agenda = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="max-h-[500px] overflow-y-auto">
-                  {citas.filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado) && !medicosOcultos.includes(c.medico_id)).length === 0 ? (
+                  {citas.filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado)).length === 0 ? (
                     <p className="text-center text-gray-500 py-8">No hay citas pendientes</p>
                   ) : (
                     citas
-                      .filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado) && !medicosOcultos.includes(c.medico_id))
+                      .filter(c => !['Atendida', 'No asistió', 'Cancelada'].includes(c.estado))
                       .sort((a, b) => (ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id)) || (a.hora_inicio || '').localeCompare(b.hora_inicio || ''))
                       .map(cita => (
                         <CitaCard
@@ -2115,6 +2122,8 @@ const Agenda = () => {
                           onVerPaciente={handleVerPaciente}
                           onNuevaEvaluacion={handleNuevaEvaluacion}
                           onMarcarLlegada={handleMarcarLlegada}
+
+                          onCancelarLlegada={handleCancelarLlegada}
                         />
                       ))
                   )}
@@ -2131,11 +2140,11 @@ const Agenda = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 max-h-[500px] overflow-y-auto">
-                  {presentes.por_medico.filter(g => !medicosOcultos.includes(g.medico_id)).length === 0 ? (
+                  {presentes.por_medico.length === 0 ? (
                     <p className="text-center text-gray-500 py-8">No hay pacientes presentes</p>
                   ) : (
                     presentes.por_medico
-                      .filter(g => !medicosOcultos.includes(g.medico_id))
+                      .sort((a, b) => ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id))
                       .sort((a, b) => ordenMedicoIdx(a.medico_id) - ordenMedicoIdx(b.medico_id))
                       .map(grupo => (
                       <div key={grupo.medico_id} className="mb-4">
@@ -2341,6 +2350,8 @@ const Agenda = () => {
                             onVerPaciente={handleVerPaciente}
                             onNuevaEvaluacion={handleNuevaEvaluacion}
                             onMarcarLlegada={handleMarcarLlegada}
+
+                            onCancelarLlegada={handleCancelarLlegada}
                           />
                         ))
                       )}

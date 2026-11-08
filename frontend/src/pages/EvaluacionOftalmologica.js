@@ -3682,10 +3682,10 @@ const EvaluacionOftalmologica = () => {
                   ))}
                 </div>
                 
-                {/* Indicaciones generales */}
-                {formData.recetas.medicamentos.indicaciones_generales && (
+                {/* Observaciones de la receta */}
+                {formData.recetas.medicamentos.observaciones && (
                   <div className="mt-2 p-2 border rounded bg-yellow-50 text-xs">
-                    <span className="font-semibold">Indicaciones:</span> {formData.recetas.medicamentos.indicaciones_generales}
+                    <span className="font-semibold">Observaciones:</span> {formData.recetas.medicamentos.observaciones}
                   </div>
                 )}
               </div>
