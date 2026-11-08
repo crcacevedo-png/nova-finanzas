@@ -505,28 +505,43 @@ async def export_monthly_closure(
         ('FONTSIZE', (0, 0), (-1, -1), 7),
         ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
         ('ALIGN', (0, 0), (-2, 0), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#4F46E5')),
     ]
+    cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7, leading=9)
+    cell_bold_style = ParagraphStyle('CellB', parent=cell_style, fontName='Helvetica-Bold')
+
+    def _cell(text, bold=False):
+        return Paragraph(str(text or ''), cell_bold_style if bold else cell_style)
+
+    def _fecha(iso_date):
+        try:
+            y, m, d = iso_date.split('-')
+            return f"{d}/{m}/{y[2:]}"
+        except (AttributeError, ValueError):
+            return iso_date or ''
+
     r = 1
     for g in grupos:
         first = True
         for d in g["detalle"]:
             table_data.append([
-                g["anesthesiologist"] if first else "",
-                d["date"], d["patient_name"], d["procedure"], d["surgeon"], d["institution"], d["tipo"],
+                _cell(g["anesthesiologist"]) if first else "",
+                _fecha(d["date"]), _cell(d["patient_name"]), _cell(d["procedure"]),
+                _cell(d["surgeon"]), _cell(d["institution"]), _cell(d["tipo"]),
                 f"Q {d['value']:,.2f}",
             ])
             first = False
             r += 1
-        table_data.append(["", "", "", "", "", "", f"Total {g['anesthesiologist']} ({g['count']} proc.)", f"Q {g['total']:,.2f}"])
-        style_cmds.append(('FONTNAME', (0, r), (-1, r), 'Helvetica-Bold'))
+        table_data.append(["", "", "", "", "", "", _cell(f"Total {g['anesthesiologist']} ({g['count']} proc.)", bold=True), f"Q {g['total']:,.2f}"])
+        style_cmds.append(('FONTNAME', (-1, r), (-1, r), 'Helvetica-Bold'))
         style_cmds.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#EEF2FF')))
         r += 1
 
-    table = Table(table_data, colWidths=[1.0 * inch, 0.55 * inch, 1.15 * inch, 1.05 * inch, 0.95 * inch, 0.95 * inch, 0.75 * inch, 0.7 * inch])
+    table = Table(table_data, colWidths=[0.85 * inch, 0.5 * inch, 1.0 * inch, 0.95 * inch, 0.8 * inch, 0.8 * inch, 0.95 * inch, 0.65 * inch], repeatRows=1)
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))
