@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 from utils.timezone import now_gt
 import uuid
 import io
+import re
 
 # Importar dependencias compartidas
 from routes.auth import get_current_user, require_permission, require_role
@@ -149,6 +150,7 @@ async def get_surgeries(
     surgeon: Optional[str] = None,
     institution: Optional[str] = None,
     eye: Optional[str] = None,
+    month: Optional[str] = Query(None, description="YYYY-MM"),
     date_from: Optional[str] = Query(None, alias="dateFrom"),
     date_to: Optional[str] = Query(None, alias="dateTo"),
     sort_by: str = Query("date", alias="sortBy"),
@@ -174,13 +176,16 @@ async def get_surgeries(
     if eye:
         query["eye"] = eye
     
-    if date_from:
-        query["date"] = query.get("date", {})
-        query["date"]["$gte"] = date_from
-    
-    if date_to:
-        query["date"] = query.get("date", {})
-        query["date"]["$lte"] = date_to
+    if month:
+        query["date"] = {"$regex": f"^{re.escape(month)}"}
+    else:
+        if date_from:
+            query["date"] = query.get("date", {})
+            query["date"]["$gte"] = date_from
+        
+        if date_to:
+            query["date"] = query.get("date", {})
+            query["date"]["$lte"] = date_to
     
     # Ordenamiento
     sort_direction = -1 if sort_order == "desc" else 1
@@ -206,15 +211,18 @@ async def get_surgeries(
 
 @router.get("/options")
 async def get_surgery_options(current_user: dict = Depends(get_current_user)):
-    """Obtener opciones únicas para filtros (cirujanos, instituciones, anestesiólogos)"""
+    """Obtener opciones únicas para filtros (cirujanos, instituciones, anestesiólogos, meses)"""
     surgeons = await db.surgeries.distinct("surgeon")
     institutions = await db.surgeries.distinct("institution")
     anesthesiologists = await db.surgeries.distinct("anesthesiologist")
+    dates = await db.surgeries.distinct("date")
+    months = sorted({d[:7] for d in dates if d and len(d) >= 7}, reverse=True)
     
     return {
         "surgeons": sorted([s for s in surgeons if s]),
         "institutions": sorted([i for i in institutions if i]),
-        "anesthesiologists": sorted([a for a in anesthesiologists if a])
+        "anesthesiologists": sorted([a for a in anesthesiologists if a]),
+        "months": months
     }
 
 
@@ -703,6 +711,7 @@ async def delete_supply(
 @reports_router.get("/surgeries")
 async def export_surgeries(
     format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
+    month: Optional[str] = Query(None, description="YYYY-MM"),
     date_from: Optional[str] = Query(None, alias="dateFrom"),
     date_to: Optional[str] = Query(None, alias="dateTo"),
     surgeon: Optional[str] = None,
@@ -719,7 +728,9 @@ async def export_surgeries(
         query["institution"] = institution
     if eye:
         query["eye"] = eye
-    if date_from or date_to:
+    if month:
+        query["date"] = {"$regex": f"^{re.escape(month)}"}
+    elif date_from or date_to:
         date_query = {}
         if date_from:
             date_query["$gte"] = date_from
@@ -750,106 +761,114 @@ async def export_surgeries(
         try:
             import openpyxl
             from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-            
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Cirugías"
-            
-            # Estilos
-            header_fill = PatternFill(start_color="0d9488", end_color="0d9488", fill_type="solid")
-            header_font = Font(color="FFFFFF", bold=True, size=10)
-            thin_border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
-            
-            # Headers
-            headers = ["Fecha", "Hora", "Paciente", "Procedimiento", "LIO", "Cirujano", "Ojo", "Anestesia", "Institución", "Costo Proc.", "Insumos", "Total", "Equipo", "Observaciones"]
-            for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=1, column=col, value=header)
-                cell.fill = header_fill
-                cell.font = header_font
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-                cell.border = thin_border
-            
-            # Formato moneda
-            currency_format = 'Q #,##0.00'
-            
+
             # Etiquetas de anestesia
             anesthesia_labels = {
                 "topica": "Tópica", "local": "Local", "local_asistida": "Local Asistida", "general": "General",
                 "retrobulbar": "Retrobulbar", "peribulbar": "Peribulbar", "sedacion": "Sedación"
             }
-            
-            for row, s in enumerate(surgeries, 2):
-                ws.cell(row=row, column=1, value=s["date"]).border = thin_border
-                ws.cell(row=row, column=2, value=s["time"]).border = thin_border
-                ws.cell(row=row, column=3, value=s["patient_name"]).border = thin_border
-                ws.cell(row=row, column=4, value=s["procedure"]).border = thin_border
-                ws.cell(row=row, column=5, value=s.get("lio", "")).border = thin_border
-                ws.cell(row=row, column=6, value=s["surgeon"]).border = thin_border
-                ws.cell(row=row, column=7, value=s["eye"]).border = thin_border
-                ws.cell(row=row, column=8, value=anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", ""))).border = thin_border
-                ws.cell(row=row, column=9, value=format_institution(s)).border = thin_border
-                
-                proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
-                cell_proc = ws.cell(row=row, column=10, value=proc_cost)
-                cell_proc.border = thin_border
-                cell_proc.number_format = currency_format
-                
-                supplies_total = get_supplies_total(s.get("supplies", []))
-                cell_supplies = ws.cell(row=row, column=11, value=supplies_total)
-                cell_supplies.border = thin_border
-                cell_supplies.number_format = currency_format
-                
-                total = get_total_general(s)
-                cell_total = ws.cell(row=row, column=12, value=total)
-                cell_total.border = thin_border
-                cell_total.number_format = currency_format
-                cell_total.font = Font(bold=True)
-                
-                equipment_list = ", ".join([eq["name"] for eq in s.get("equipment", [])])
-                ws.cell(row=row, column=13, value=equipment_list).border = thin_border
-                ws.cell(row=row, column=14, value=s.get("observations", "")).border = thin_border
-            
-            # Ajustar anchos
-            ws.column_dimensions['A'].width = 12
-            ws.column_dimensions['B'].width = 8
-            ws.column_dimensions['C'].width = 28
-            ws.column_dimensions['D'].width = 25
-            ws.column_dimensions['E'].width = 20
-            ws.column_dimensions['F'].width = 20
-            ws.column_dimensions['G'].width = 6
-            ws.column_dimensions['H'].width = 12
-            ws.column_dimensions['I'].width = 15
-            ws.column_dimensions['J'].width = 12
-            ws.column_dimensions['K'].width = 12
-            ws.column_dimensions['L'].width = 12
-            ws.column_dimensions['M'].width = 35
-            ws.column_dimensions['N'].width = 30
-            
-            # Fila de totales
-            total_row = len(surgeries) + 2
-            ws.cell(row=total_row, column=9, value="TOTALES:").font = Font(bold=True)
-            
-            total_proc = sum(s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0 for s in surgeries)
-            total_supplies = sum(get_supplies_total(s.get("supplies", [])) for s in surgeries)
-            total_general = sum(get_total_general(s) for s in surgeries)
-            
-            cell_total_proc = ws.cell(row=total_row, column=10, value=total_proc)
-            cell_total_proc.number_format = currency_format
-            cell_total_proc.font = Font(bold=True)
-            
-            cell_total_supplies = ws.cell(row=total_row, column=11, value=total_supplies)
-            cell_total_supplies.number_format = currency_format
-            cell_total_supplies.font = Font(bold=True)
-            
-            cell_total_all = ws.cell(row=total_row, column=12, value=total_general)
-            cell_total_all.number_format = currency_format
-            cell_total_all.font = Font(bold=True, color="0d9488")
-            
+            currency_format = 'Q #,##0.00'
+            MESES_ES = {
+                1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
+                7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre",
+            }
+
+            def month_label(key):
+                if key == "sin-fecha":
+                    return "Sin fecha"
+                anio, mes = key.split("-")
+                return f"{MESES_ES.get(int(mes), mes)} {anio}"
+
+            def write_sheet(ws, mes_surgeries):
+                header_fill = PatternFill(start_color="0d9488", end_color="0d9488", fill_type="solid")
+                header_font = Font(color="FFFFFF", bold=True, size=10)
+                thin_border = Border(
+                    left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin')
+                )
+                headers = ["Fecha", "Hora", "Paciente", "Procedimiento", "LIO", "Cirujano", "Ojo", "Anestesia", "Institución", "Costo Proc.", "Insumos", "Total", "Equipo", "Observaciones"]
+                for col, header in enumerate(headers, 1):
+                    cell = ws.cell(row=1, column=col, value=header)
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                    cell.border = thin_border
+
+                for row, s in enumerate(mes_surgeries, 2):
+                    ws.cell(row=row, column=1, value=s["date"]).border = thin_border
+                    ws.cell(row=row, column=2, value=s["time"]).border = thin_border
+                    ws.cell(row=row, column=3, value=s["patient_name"]).border = thin_border
+                    ws.cell(row=row, column=4, value=s["procedure"]).border = thin_border
+                    ws.cell(row=row, column=5, value=s.get("lio", "")).border = thin_border
+                    ws.cell(row=row, column=6, value=s["surgeon"]).border = thin_border
+                    ws.cell(row=row, column=7, value=s["eye"]).border = thin_border
+                    ws.cell(row=row, column=8, value=anesthesia_labels.get(s.get("anesthesia_type", ""), s.get("anesthesia_type", ""))).border = thin_border
+                    ws.cell(row=row, column=9, value=format_institution(s)).border = thin_border
+
+                    proc_cost = s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0
+                    cell_proc = ws.cell(row=row, column=10, value=proc_cost)
+                    cell_proc.border = thin_border
+                    cell_proc.number_format = currency_format
+
+                    supplies_total = get_supplies_total(s.get("supplies", []))
+                    cell_supplies = ws.cell(row=row, column=11, value=supplies_total)
+                    cell_supplies.border = thin_border
+                    cell_supplies.number_format = currency_format
+
+                    total = get_total_general(s)
+                    cell_total = ws.cell(row=row, column=12, value=total)
+                    cell_total.border = thin_border
+                    cell_total.number_format = currency_format
+                    cell_total.font = Font(bold=True)
+
+                    equipment_list = ", ".join([eq["name"] for eq in s.get("equipment", [])])
+                    ws.cell(row=row, column=13, value=equipment_list).border = thin_border
+                    ws.cell(row=row, column=14, value=s.get("observations", "")).border = thin_border
+
+                widths = [12, 8, 28, 25, 20, 20, 6, 12, 15, 12, 12, 12, 35, 30]
+                for i, w in enumerate(widths, start=1):
+                    ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+                total_row = len(mes_surgeries) + 2
+                ws.cell(row=total_row, column=9, value="TOTALES:").font = Font(bold=True)
+
+                total_proc = sum(s.get("igss_data", {}).get("procedure_cost", 0) if s.get("igss_data") else 0 for s in mes_surgeries)
+                total_supplies = sum(get_supplies_total(s.get("supplies", [])) for s in mes_surgeries)
+                total_general = sum(get_total_general(s) for s in mes_surgeries)
+
+                cell_total_proc = ws.cell(row=total_row, column=10, value=total_proc)
+                cell_total_proc.number_format = currency_format
+                cell_total_proc.font = Font(bold=True)
+
+                cell_total_supplies = ws.cell(row=total_row, column=11, value=total_supplies)
+                cell_total_supplies.number_format = currency_format
+                cell_total_supplies.font = Font(bold=True)
+
+                cell_total_all = ws.cell(row=total_row, column=12, value=total_general)
+                cell_total_all.number_format = currency_format
+                cell_total_all.font = Font(bold=True, color="0d9488")
+
+            # Agrupar por mes (una hoja por mes, sin mezclar meses en la misma hoja).
+            # El orden de los grupos respeta el orden ya recibido (fecha desc).
+            grupos = {}
+            for s in surgeries:
+                key = (s.get("date") or "")[:7] or "sin-fecha"
+                grupos.setdefault(key, []).append(s)
+
+            wb = openpyxl.Workbook()
+            wb.remove(wb.active)
+            nombres_usados = set()
+            for key, mes_surgeries in (grupos.items() if grupos else {"sin-fecha": []}.items()):
+                nombre = month_label(key)[:31]
+                sufijo = 2
+                nombre_final = nombre
+                while nombre_final in nombres_usados:
+                    nombre_final = f"{nombre[:28]} ({sufijo})"
+                    sufijo += 1
+                nombres_usados.add(nombre_final)
+                ws = wb.create_sheet(title=nombre_final)
+                write_sheet(ws, mes_surgeries)
+
             output = io.BytesIO()
             wb.save(output)
             output.seek(0)

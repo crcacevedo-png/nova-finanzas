@@ -102,6 +102,18 @@ const SUPPLY_CATEGORIES = [
 ];
 
 // Helpers
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+const formatMonthLabel = (monthKey) => {
+  // monthKey: "YYYY-MM" -> "Mes/Año"
+  const [anio, mes] = monthKey.split('-');
+  const nombre = MESES_ES[parseInt(mes, 10) - 1] || mes;
+  return `${nombre}/${anio}`;
+};
+
 const formatDateDisplay = (dateStr) => {
   if (!dateStr) return '-';
   const date = new Date(dateStr + 'T00:00:00');
@@ -136,7 +148,7 @@ const SalaOperaciones = () => {
   // State
   const [surgeries, setSurgeries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [options, setOptions] = useState({ surgeons: [], institutions: [], anesthesiologists: [] });
+  const [options, setOptions] = useState({ surgeons: [], institutions: [], anesthesiologists: [], months: [] });
   const [doctorsList, setDoctorsList] = useState([]);
   const [igssUnits, setIgssUnits] = useState([]);
   const [nogsList, setNogsList] = useState([]);
@@ -149,7 +161,7 @@ const SalaOperaciones = () => {
   const [search, setSearch] = useState('');
   const [filterSurgeon, setFilterSurgeon] = useState('');
   const [filterInstitution, setFilterInstitution] = useState('');
-  const [filterEye, setFilterEye] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
@@ -237,7 +249,7 @@ const SalaOperaciones = () => {
   useEffect(() => {
     fetchSurgeries();
     fetchOptions();
-  }, [page, filterSurgeon, filterInstitution, filterEye, dateFrom, dateTo]);
+  }, [page, filterSurgeon, filterInstitution, filterMonth, dateFrom, dateTo]);
 
   const fetchSurgeries = async () => {
     try {
@@ -248,9 +260,9 @@ const SalaOperaciones = () => {
         search: search || undefined,
         surgeon: filterSurgeon || undefined,
         institution: filterInstitution || undefined,
-        eye: filterEye || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        month: filterMonth || undefined,
+        dateFrom: filterMonth ? undefined : (dateFrom || undefined),
+        dateTo: filterMonth ? undefined : (dateTo || undefined),
       });
       setSurgeries(response.data.data || []);
       setTotalPages(response.data.total_pages || 1);
@@ -367,7 +379,7 @@ const SalaOperaciones = () => {
     setSearch('');
     setFilterSurgeon('');
     setFilterInstitution('');
-    setFilterEye('');
+    setFilterMonth('');
     setDateFrom('');
     setDateTo('');
     setPage(1);
@@ -610,11 +622,11 @@ const SalaOperaciones = () => {
       toast.info(`Generando reporte ${format.toUpperCase()}...`);
       const response = await surgeryApi.exportReport({
         format,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        month: filterMonth || undefined,
+        dateFrom: filterMonth ? undefined : (dateFrom || undefined),
+        dateTo: filterMonth ? undefined : (dateTo || undefined),
         surgeon: filterSurgeon || undefined,
         institution: filterInstitution || undefined,
-        eye: filterEye || undefined,
       });
       
       // Crear blob y descargar
@@ -752,15 +764,15 @@ const SalaOperaciones = () => {
                 </SelectContent>
               </Select>
               
-              <Select value={filterEye || "all"} onValueChange={(v) => setFilterEye(v === "all" ? "" : v)}>
-                <SelectTrigger className="w-[120px]" data-testid="filter-eye">
-                  <SelectValue placeholder="Ojo" />
+              <Select value={filterMonth || "all"} onValueChange={(v) => setFilterMonth(v === "all" ? "" : v)}>
+                <SelectTrigger className="w-[160px]" data-testid="filter-month">
+                  <SelectValue placeholder="Mes" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="OD">OD</SelectItem>
-                  <SelectItem value="OS">OS</SelectItem>
-                  <SelectItem value="AO">AO</SelectItem>
+                  <SelectItem value="all">Todos los meses</SelectItem>
+                  {options.months.map(m => (
+                    <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               

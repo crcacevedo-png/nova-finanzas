@@ -1123,3 +1123,9 @@ Verificado: curl end-to-end (login anestesia + superadmin, toggle completo/incom
   - 17 cirugías sin ojo especificado.
   - Fila 2 del Excel (paciente "Exceresis de Pterigion", 2026-10-01 08:30): el nombre del paciente parece ser en realidad el procedimiento (posible error de captura); se importó tal cual, revisar manualmente.
 - Verificado: total 192 vía API, muestra IGSS/Seguro Privado/fechas correctas, búsqueda y badges en UI con datos reales.
+
+## Filtro de Mes (reemplaza filtro de Ojo) + Excel con una hoja por mes (2026-11) — COMPLETADO
+- Listado de Cirugías: el filtro "Ojo" (Todos/OD/OS/AO) fue reemplazado por un filtro "Mes" con formato `Mes/Año` (ej. "Noviembre/2026"), poblado dinámicamente con los meses que realmente tienen cirugías (`GET /surgeries/options` ahora devuelve `months`, orden descendente). Al elegir un mes se ignoran los inputs de fecha Desde/Hasta (quedan disponibles para rangos manuales cuando no hay mes seleccionado). Nuevo query param `month=YYYY-MM` en `GET /surgeries` y en `GET /reports/surgeries` (filtra con regex de prefijo sobre `date`).
+- Exportar a Excel (`GET /reports/surgeries?format=xlsx`): antes generaba una sola hoja "Cirugías" mezclando todos los meses; ahora agrupa por mes y crea **una hoja por mes** (ej. "Octubre 2026", "Noviembre 2026", "Enero 2027"), cada una con sus propios encabezados/formato/fila de totales, sin mezclar meses. Si se exporta con el filtro de mes activo, el archivo trae solo esa hoja. El export a PDF no se modificó (sigue siendo una tabla única).
+- `filterEye`/columna "Ojo" en la UI del listado se mantienen igual (badge "—" cuando no hay dato); solo se quitó el dropdown de filtro por ojo.
+- Verificado con curl (options.months, filtrado por mes, conteo por hoja del xlsx = 192 en total repartidos en 3 hojas) y click real en el dropdown en preview, sin overflow horizontal.

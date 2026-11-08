@@ -116,6 +116,7 @@ export const surgeryApi = {
     if (filters.surgeon) params.append('surgeon', filters.surgeon);
     if (filters.institution) params.append('institution', filters.institution);
     if (filters.eye) params.append('eye', filters.eye);
+    if (filters.month) params.append('month', filters.month);
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
@@ -140,6 +141,7 @@ export const surgeryApi = {
   exportReport: (filters = {}) => {
     const params = new URLSearchParams();
     params.append('format', filters.format || 'xlsx');
+    if (filters.month) params.append('month', filters.month);
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
     if (filters.surgeon) params.append('surgeon', filters.surgeon);
