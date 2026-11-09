@@ -1,54 +1,35 @@
-# Expediente Clínico Confiable: Autoguardado de Exámenes y Diagnósticos Persistentes
+# Permisos de "usuario" en Sala de Operaciones: Cancelar, Reprogramar y Eliminar
 
-Corrige el autoguardado de "Lectura de Exámenes" en Evaluación Oftalmológica para que nunca se pierda lo escrito, y convierte los diagnósticos en una lista de problemas activos del paciente que se repite en cada consulta hasta que el médico la marque como resuelta.
+El rol "usuario" podrá cancelar, reprogramar y eliminar cirugías en Sala de Operaciones, acciones que hoy son exclusivas de SuperAdmin. Los demás roles (Admin, Médico, Anestesia) no cambian.
 
-## A quién afecta
-
-Médicos y personal clínico que usan el módulo de Evaluación Oftalmológica para registrar exámenes y diagnósticos de cada paciente, en cualquier tipo de consulta (consulta general, control, etc.).
+## Quién lo usa
+Personal con rol "usuario" que gestiona el día a día de Sala de Operaciones. Ya puede crear/editar cirugías y gestionar equipo e insumos; hoy le falta poder cancelar, reprogramar o eliminar un registro sin depender de un SuperAdmin.
 
 ## Funcionalidad principal y experiencia
-
-**1. Autoguardado de Lectura de Exámenes**
-- Se revisa por qué el campo "Lectura de Exámenes" (interpretación de estudios auxiliares, laboratorios, imágenes) no queda guardado en el expediente al autoguardarse, y se corrige para que se comporte igual que el resto de campos de la evaluación: se guarda solo y también al presionar "Guardar".
-- Se confirma con una prueba real: escribir en el campo, esperar el autoguardado (sin tocar "Guardar"), recargar el expediente y verificar que el texto sigue ahí.
-
-**2. Diagnósticos persistentes entre consultas**
-- Cada diagnóstico queda activo para el paciente hasta que alguien lo marque como resuelto — sin importar cuántas consultas pasen o de qué tipo sean (consulta, control, etc.).
-- Al abrir una nueva evaluación para un paciente, los diagnósticos activos de su última consulta aparecen ya cargados en "Diagnósticos", con su mismo texto y ojo (OD/OI/OU), editables igual que uno nuevo. No se distinguen visualmente de los diagnósticos que el médico agregue en esa misma consulta.
-- Cada diagnóstico (nuevo o traído de antes) tiene un botón para marcarlo como "Resuelto". Al marcarlo:
-  - Deja de copiarse a las próximas consultas de ese paciente.
-  - Permanece visible en el historial de la consulta donde se registró (no se borra el registro histórico, solo deja de arrastrarse hacia adelante).
-- Si el médico borra un diagnóstico traído de antes (en vez de marcarlo resuelto), también deja de aparecer en consultas futuras — se trata igual que si nunca se hubiera copiado.
+- Botón de cancelar (ícono X) visible para "usuario" tanto en el listado como en el detalle de cada cirugía activa.
+- Al cancelar, puede indicar un motivo y, opcionalmente, una fecha y hora de reprogramación. Si se indica, se crea automáticamente la nueva cirugía activa en esa fecha/hora, igual que ya ocurre hoy cuando lo hace SuperAdmin.
+- Botón de eliminar (ícono de basurero) visible para "usuario", con la misma confirmación que ve hoy SuperAdmin. Es una acción permanente, no hay papelera de reciclaje.
+- Sin cambios para Admin, Médico o Anestesia: Admin sigue sin poder cancelar, reprogramar ni eliminar (igual que hoy, confirmado); Médico sigue como hasta ahora; Anestesia sigue en solo lectura.
 
 ## Flujo de uso
-
-1. El médico abre una evaluación nueva para un paciente que ya tiene diagnósticos activos de antes.
-2. La sección "Diagnósticos" aparece con esos diagnósticos ya precargados.
-3. El médico agrega nuevos diagnósticos si corresponde, y escribe en "Lectura de Exámenes" — ambos se autoguardan.
-4. Si alguno de los diagnósticos activos ya se resolvió, el médico presiona el botón "Resuelto" en esa fila.
-5. Al terminar y guardar, la próxima consulta de ese paciente (de cualquier tipo) arrancará con los diagnósticos que sigan activos, sin el que se marcó resuelto.
+1. "usuario" abre Sala de Operaciones → Cirugías.
+2. En una fila, o dentro del detalle de una cirugía, ahora ve los íconos de ver, cancelar y eliminar (antes solo tenía "ver" para esas dos acciones).
+3. Cancelar: abre el mismo diálogo que usa hoy SuperAdmin (motivo + fecha/hora opcional de reprogramación). Al confirmar, la cirugía queda marcada como cancelada y, si se indicó reprogramación, aparece la nueva cirugía en la fecha elegida.
+4. Eliminar: abre el mismo diálogo de confirmación que usa hoy SuperAdmin. Al confirmar, el registro desaparece del listado de forma permanente.
 
 ## Estilo visual
-
-Sin cambios de estilo: se usan los mismos componentes, tipografía y colores ya existentes en la sección "Diagnóstico y Plan". El único elemento nuevo es un botón pequeño de "Resuelto" junto a cada diagnóstico, con el mismo lenguaje visual que los demás botones de acción de esa sección (como el de eliminar).
+Sin cambios de estilo ni de componentes: se reutilizan exactamente los mismos botones, íconos y diálogos que SuperAdmin ya usa hoy para estas dos acciones; solo se habilitan también para el rol "usuario".
 
 ## Fases
+**Fase 1 (ahora — MVP):** Habilitar para "usuario" las acciones de cancelar/reprogramar y eliminar cirugías, reutilizando los flujos y diálogos ya existentes. Ningún otro rol cambia.
 
-**Fase 1 (ahora):**
-- Corrección del autoguardado de "Lectura de Exámenes", confirmada con una prueba real.
-- Diagnósticos activos se copian automáticamente a la siguiente evaluación del paciente, sin distinción visual de cuáles son nuevos.
-- Botón "Resuelto" por diagnóstico que lo saca de futuras consultas conservando el historial.
+**Fase 2 (futuro):** Evaluar si Admin también debería tener acceso a cancelar/reprogramar cirugías (hoy tampoco lo tiene, a diferencia de lo que se creía). Queda pendiente de una solicitud explícita, no se construye ahora.
 
-**Fase 2 (futuro):**
-- Indicador de cuánto tiempo lleva activo un diagnóstico sin resolver (ej. "activo desde hace 3 consultas").
-- Filtro en el historial del paciente para ver solo diagnósticos resueltos vs. activos.
-
-**Fase 3 (futuro):**
-- Alertas o resumen para el médico al abrir el expediente si hay diagnósticos activos de larga data sin resolver.
+**Fase 3 (futuro):** Vista de auditoría para revisar quién canceló, reprogramó o eliminó cada cirugía y cuándo (hoy esa información se guarda internamente pero no hay una pantalla dedicada para consultarla).
 
 ## Supuestos
-
-- Cualquier usuario con permiso para editar la evaluación oftalmológica (médico, admin, optica, etc., según los permisos ya existentes del módulo) puede marcar un diagnóstico como resuelto; no se crea un permiso nuevo solo para esta acción.
-- "Última consulta" para efectos de copiar diagnósticos es la evaluación más reciente de ese paciente por fecha, sin importar el tipo.
-- Marcar un diagnóstico como resuelto es una acción reversible solo editándolo manualmente de nuevo en una consulta futura (no se construye un botón de "deshacer resuelto").
-- La corrección del autoguardado se limita al campo "Lectura de Exámenes"; si al revisarlo aparecen otros campos con el mismo problema, se corrigen como parte del mismo fix.
+- Las capacidades que "usuario" ya tenía (ver, crear, editar cirugías, agregar/editar/eliminar equipo e insumos) no cambian con este plan.
+- Admin no gana ninguna capacidad nueva en este plan; se confirmó que debe quedar como está hoy.
+- La lógica de reprogramación no cambia: sigue clonando la cirugía original a la nueva fecha/hora exactamente igual que cuando lo hace SuperAdmin hoy.
+- Eliminar sigue siendo una acción permanente e irreversible, igual que hoy para SuperAdmin; no se agrega confirmación adicional ni papelera de reciclaje.
+- No se crean roles nuevos ni se tocan los menús o accesos ya configurados para otros roles.

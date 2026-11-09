@@ -146,6 +146,8 @@ const SalaOperaciones = () => {
   const isSuperAdmin = user?.role === 'superadmin';
   const canEdit = hasPermission('manage_sala_operaciones');
   const canEditPatient = hasPermission('edit_patients') || hasPermission('edit_patients_in_surgery');
+  // Cancelar/reprogramar y eliminar cirugías: SuperAdmin y "usuario" (Admin/Médico/Anestesia no cambian)
+  const canCancelOrDelete = isSuperAdmin || user?.role === 'usuario';
 
   // State
   const [surgeries, setSurgeries] = useState([]);
@@ -996,7 +998,7 @@ const SalaOperaciones = () => {
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              {isSuperAdmin && surgery.status !== 'cancelado' && (
+                              {canCancelOrDelete && surgery.status !== 'cancelado' && (
                                 <>
                                   <Button
                                     variant="ghost"
@@ -1014,6 +1016,7 @@ const SalaOperaciones = () => {
                                     onClick={() => { setSelectedSurgery(surgery); setDeleteDialogOpen(true); }}
                                     className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                                     title="Eliminar"
+                                    data-testid={`delete-surgery-${surgery.id}`}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
@@ -1766,6 +1769,26 @@ const SalaOperaciones = () => {
                 
                 <DialogFooter>
                   <Button variant="ghost" onClick={() => setDetailDialogOpen(false)}>Cerrar</Button>
+                  {canCancelOrDelete && selectedSurgery.status !== 'cancelado' && (
+                    <Button
+                      variant="outline"
+                      className="text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                      onClick={() => { setDetailDialogOpen(false); setCancelDialogOpen(true); }}
+                      data-testid="detail-cancel-surgery-btn"
+                    >
+                      <X className="w-4 h-4 mr-1" /> Cancelar
+                    </Button>
+                  )}
+                  {canCancelOrDelete && selectedSurgery.status !== 'cancelado' && (
+                    <Button
+                      variant="outline"
+                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => { setDetailDialogOpen(false); setDeleteDialogOpen(true); }}
+                      data-testid="detail-delete-surgery-btn"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+                    </Button>
+                  )}
                   {canEdit && selectedSurgery.status !== 'cancelado' && (
                     <Button variant="outline" onClick={() => { setDetailDialogOpen(false); openEditDialog(selectedSurgery); }}>
                       Editar

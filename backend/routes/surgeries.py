@@ -627,9 +627,9 @@ async def set_preop_status(
 @router.delete("/{surgery_id}")
 async def delete_surgery(
     surgery_id: str,
-    current_user: dict = Depends(require_role("superadmin"))
+    current_user: dict = Depends(require_role(["superadmin", "usuario"]))
 ):
-    """Eliminar cirugía (solo superadmin)"""
+    """Eliminar cirugía (superadmin y usuario)"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     if not surgery:
         raise HTTPException(status_code=404, detail="Cirugía no encontrada")
@@ -649,9 +649,9 @@ async def cancel_surgery(
     reason: str = Body(..., embed=True),
     reschedule_date: Optional[str] = Body(None, embed=True),
     reschedule_time: Optional[str] = Body(None, embed=True),
-    current_user: dict = Depends(require_role("superadmin"))
+    current_user: dict = Depends(require_role(["superadmin", "usuario"]))
 ):
-    """Cancelar cirugía con motivo (solo superadmin). Si se indica fecha (y hora)
+    """Cancelar cirugía con motivo (superadmin y usuario). Si se indica fecha (y hora)
     de reagendamiento, crea una nueva cirugía activa en esa fecha/hora con los
     mismos datos clínicos, para que aparezca en el listado del nuevo día."""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
