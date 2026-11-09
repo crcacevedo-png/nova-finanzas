@@ -1363,6 +1363,9 @@ const EvaluacionOftalmologica = () => {
       
       if (response.data) {
         const historial = response.data;
+        // Evitar que esta precarga (antecedentes/medicamentos/diagnósticos arrastrados)
+        // dispare por sí sola la creación automática de una evaluación de hoy.
+        skipAutoguardadoRef.current = true;
         setFormData(prev => ({
           ...prev,
           antecedentes: historial.antecedentes || prev.antecedentes,
@@ -2548,6 +2551,7 @@ const EvaluacionOftalmologica = () => {
                     <Label className="text-xs font-semibold">Diagnósticos</Label>
                     {!isReadOnly && (
                       <Button
+                        data-testid="diagnostico-agregar-btn"
                         variant="ghost"
                         size="sm"
                         onClick={() => addArrayItem('diagnosticos', { descripcion: '', codigo_cie10: '', ojo: 'OU', resuelto: false })}
@@ -2568,6 +2572,7 @@ const EvaluacionOftalmologica = () => {
                             fetchUrl="/catalogos/diagnosticos"
                             disabled={isReadOnly || diag.resuelto}
                             className={`input-teal text-xs h-8 ${diag.resuelto ? 'line-through text-gray-400' : ''}`}
+                            testId={`diagnostico-descripcion-input-${idx}`}
                           />
                         </div>
                         <Select
@@ -2585,38 +2590,42 @@ const EvaluacionOftalmologica = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      {diag.resuelto ? (
-                        <div
-                          data-testid={`diagnostico-resuelto-badge-${idx}`}
-                          className="h-8 flex items-center px-1.5 text-[10px] font-medium text-green-600 gap-1 shrink-0"
-                        >
-                          <CheckCircle className="w-3.5 h-3.5" /> Resuelto
-                        </div>
-                      ) : (
-                        !isReadOnly && (
-                          <Button
-                            data-testid={`diagnostico-resuelto-btn-${idx}`}
-                            variant="ghost"
-                            size="sm"
-                            title="Marcar como resuelto"
-                            onClick={() => updateArrayItem('diagnosticos', idx, 'resuelto', true)}
-                            className="h-8 w-8 p-0 text-gray-400 hover:text-green-600"
+                      <div className="flex items-center gap-1 shrink-0 w-[68px] justify-end">
+                        {diag.resuelto ? (
+                          <div
+                            data-testid={`diagnostico-resuelto-badge-${idx}`}
+                            className="h-8 flex items-center px-1.5 text-[10px] font-medium text-green-600 gap-1 whitespace-nowrap"
                           >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                          </Button>
-                        )
-                      )}
-                      {!isReadOnly && (
-                        <Button
-                          data-testid={`diagnostico-eliminar-btn-${idx}`}
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeArrayItem('diagnosticos', idx)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      )}
+                            <CheckCircle className="w-3.5 h-3.5" /> Resuelto
+                          </div>
+                        ) : (
+                          <>
+                            {!isReadOnly && (
+                              <Button
+                                data-testid={`diagnostico-resuelto-btn-${idx}`}
+                                variant="ghost"
+                                size="sm"
+                                title="Marcar como resuelto"
+                                onClick={() => updateArrayItem('diagnosticos', idx, 'resuelto', true)}
+                                className="h-8 w-8 p-0 text-gray-400 hover:text-green-600"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            {!isReadOnly && (
+                              <Button
+                                data-testid={`diagnostico-eliminar-btn-${idx}`}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeArrayItem('diagnosticos', idx)}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -1,0 +1,42 @@
+{
+  "summary": "Frontend E2E (Playwright, superadmin) of 'Lectura de Exámenes' autosave + persistent active diagnoses. Test data: TEST_DxPersist Paciente plus a past evaluation (3 days ago, 2 dx) created via API. To simulate 'another day', the fecha of today's eval was moved back via PATCH autoguardar. All 8 requested flows PASS. Found 1 significant side-effect bug: just selecting a patient who has active diagnoses auto-CREATES a new evaluation for today, with only the carried-over dx and no user edits.",
+  "verified_passing": [
+    "Lectura de Exámenes autosave: typed text, waited ~6s (PATCH /autoguardar fired, status 'Guardado a las ...'), reloaded and reopened the patient, and the text persisted",
+    "No regression: motivo_consulta, padecimiento_actual, examen.segmento_anterior, plan, antecedentes.personales_patologicos all persisted via autosave after reload",
+    "New eval preloads active dx with the same descripcion and ojo (Glaucoma OD, Catarata OS), editable, and toast 'Se cargaron los diagnósticos activos...' shows",
+    "Resuelto btn -> badge diagnostico-resuelto-badge-1 (static DIV, text 'Resuelto'). Input disabled with line-through. Clicking the badge does nothing and there is no reactivate button. resuelto=true persisted after reload",
+    "Next new eval (another day) preloads only the non-resolved dx. The previous eval opened from Historial still shows the Resuelto dx with its badge",
+    "Deleting a carried dx (diagnostico-eliminar-btn-0) means the next new eval no longer preloads it",
+    "Agregar creates an empty row with ojo OU and its own diagnostico-resuelto-btn",
+    "Read-only (sealed eval): no Agregar/Resuelto/Eliminar buttons, inputs disabled, badge still shown. Role 'anestesia' is redirected to /sala-operaciones and cannot open the page at all"
+  ],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "seleccionarPaciente -> prefill diagnosticos_activos -> autosave useEffect", "issue": "HIGH: Selecting a patient with no eval today but with active dx triggers the autosave effect. The formData change from the prefill is not skipped, and tieneDatosClinicos() returns true because diagnosticos.length>0. After 2s it POSTs /evaluaciones and creates today's evaluation with only the copied dx (no motivo, no médico) even though the user never typed anything. Reproduced twice: evals 487e4533 and 6064f8a6 were auto-created right after clicking the patient option. Impact: just opening a chronic patient's record to look at it creates a 'visit' for today. This defeats the 'no crear evaluaciones vacías' protection, pollutes the clinical history and reports, and if that day has no real visit the copied dx stay in an orphan record.", "affected_selectors": ["eval-paciente-option-{id}", "autoguardado-status"]}
+    ],
+    "design_issues": [
+      {"screen": "Diagnóstico y Plan (read-only/sealed)", "issues": ["A non-resolved row's inputs are wider than a resolved row's, because the badge takes space and there is no action column. The rows are slightly misaligned."]},
+      {"screen": "Diagnóstico y Plan", "issues": ["Resolved dx still shows the Trash2 delete button. Deleting it in the consult where it was resolved erases the historical 'resuelto' record. Consider hiding delete for resolved items, or confirm it is intended.", "The 'Agregar' button for diagnósticos has no data-testid (diagnostico-agregar-btn recommended). The Autocomplete for each dx gets no testId either (the component supports a testId prop)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/dx_setup_helper.py"],
+  "action_items": [
+    "HIGH: Stop the dx prefill from triggering autosave creation of a new evaluation. Option A: set skipAutoguardadoRef.current = true before setFormData in seleccionarPaciente's historial block. Option B: in tieneDatosClinicos, don't count diagnoses that only came from the prefill (e.g. track carried dx and require at least one user edit).",
+    "Add data-testid to the Diagnósticos 'Agregar' button and pass testId to the dx Autocomplete",
+    "Decide whether resolved diagnoses should still be deletable (Trash2 visible)"
+  ],
+  "critical_code_review_comments": [
+    "EvaluacionOftalmologica.js is 3874 lines and should be split, e.g. extract DiagnosticosSection.",
+    "The dx rows use key={idx}. Removing a row shifts indices. It worked in tests because Autocomplete is controlled, but a stable id is safer.",
+    "get_historial_medico_paciente sorts by fecha and includes imported/IGSS evals. Confirm that imported legacy records should be able to become the dx source."
+  ],
+  "updated_files": ["/app/backend/tests/dx_setup_helper.py (new helper, no app code modified)"],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested flows pass; 1 HIGH side-effect bug found"},
+  "seed_data_creation": "Created TEST_DxPersist Paciente (id 9da61a47-a1e9-49db-8925-30b1020f83f0) and 4 evaluations. The evals were hard-deleted and the patient was deleted (soft, is_active=False). To verify read-only mode, sellado on my own TEST eval was temporarily set via mongo and then unset before deleting.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use dx_setup_helper.py (setup/list/shift <eval_id> <days_ago>/cleanup) to create a TEST patient with a past eval and to move today's eval to a past date to simulate another day. Selectors: search-paciente, eval-paciente-option-{id}, historial-toggle-btn, historial-item-{id}, autoguardado-status. Lectura textarea: textarea[placeholder^='Interpretación de estudios']. Dx inputs: input[placeholder='Diagnóstico']. After the fix, retest that selecting a patient with active dx does NOT fire POST /evaluaciones until the user edits something.",
+  "rca of the issue": "seleccionarPaciente calls setFormData with diagnosticos_activos without setting skipAutoguardadoRef. The autosave useEffect on formData runs, and tieneDatosClinicos(formData) is true because diagnosticos.length > 0, so axios.post('/evaluaciones') runs after the 2s debounce. Repro: create a patient with a past eval that has dx, open /evaluacion-oftalmologica, select the patient, wait 3s, and observe POST /evaluaciones and a new eval with today's date."
+}
