@@ -138,6 +138,7 @@ class Diagnostico(BaseModel):
     descripcion: str = ""
     codigo_cie10: str = ""
     ojo: str = "OU"  # OD, OS, OU
+    resuelto: bool = False  # Deja de copiarse a futuras consultas cuando es True
 
 
 class EstudioARealizar(BaseModel):

@@ -1,54 +1,54 @@
-# Paciente rápido desde Registrar Cirugía
+# Expediente Clínico Confiable: Autoguardado de Exámenes y Diagnósticos Persistentes
 
-Al registrar una cirugía, si el paciente aún no está en el sistema, se podrá crear al instante escribiendo solo su nombre, sin llenar el resto del formulario. Cuando el paciente se presenta a la cirugía, admisión lo encuentra en Pacientes y completa el resto de su expediente.
+Corrige el autoguardado de "Lectura de Exámenes" en Evaluación Oftalmológica para que nunca se pierda lo escrito, y convierte los diagnósticos en una lista de problemas activos del paciente que se repite en cada consulta hasta que el médico la marque como resuelta.
 
-## Para quién es
+## A quién afecta
 
-- Personal que agenda/registra cirugías antes de que el paciente pase por admisión (coordinación, médicos, anestesia, y cualquier otro rol con permiso para crear pacientes).
-- Admisión/recepción, que completa el expediente cuando el paciente llega físicamente a la cirugía.
+Médicos y personal clínico que usan el módulo de Evaluación Oftalmológica para registrar exámenes y diagnósticos de cada paciente, en cualquier tipo de consulta (consulta general, control, etc.).
 
 ## Funcionalidad principal y experiencia
 
-- En "Registrar cirugía", el buscador de paciente sigue funcionando igual: si el nombre coincide con alguien ya registrado, se elige de la lista como hoy.
-- Si no hay coincidencia, aparece una opción para crear un paciente nuevo con ese nombre tal cual se escribió, sin pedir ningún otro dato.
-- Ese paciente queda creado de verdad en el sistema (no es un texto suelto): aparece en Pacientes y se puede volver a buscar y usar en cualquier otra cirugía o pantalla, igual que cualquier otro paciente.
-- En el listado de Pacientes, ese registro muestra una etiqueta "Datos incompletos" hasta que se le complete género, fecha de nacimiento, teléfono e institución referente.
-- Se agrega un filtro en Pacientes para ver únicamente los pacientes con "Datos incompletos", para que admisión los ubique rápido.
-- Completar esos datos se hace con la pantalla de edición de pacientes de siempre; al guardar con esos campos llenos, la etiqueta desaparece sola.
-- Esta forma de crear pacientes solo con el nombre está disponible únicamente desde "Registrar cirugía", y solo para quienes ya tienen permiso de crear pacientes. En el resto del sistema (Pacientes, Agenda, etc.) seguirá pidiéndose el formulario completo como hasta ahora.
+**1. Autoguardado de Lectura de Exámenes**
+- Se revisa por qué el campo "Lectura de Exámenes" (interpretación de estudios auxiliares, laboratorios, imágenes) no queda guardado en el expediente al autoguardarse, y se corrige para que se comporte igual que el resto de campos de la evaluación: se guarda solo y también al presionar "Guardar".
+- Se confirma con una prueba real: escribir en el campo, esperar el autoguardado (sin tocar "Guardar"), recargar el expediente y verificar que el texto sigue ahí.
+
+**2. Diagnósticos persistentes entre consultas**
+- Cada diagnóstico queda activo para el paciente hasta que alguien lo marque como resuelto — sin importar cuántas consultas pasen o de qué tipo sean (consulta, control, etc.).
+- Al abrir una nueva evaluación para un paciente, los diagnósticos activos de su última consulta aparecen ya cargados en "Diagnósticos", con su mismo texto y ojo (OD/OI/OU), editables igual que uno nuevo. No se distinguen visualmente de los diagnósticos que el médico agregue en esa misma consulta.
+- Cada diagnóstico (nuevo o traído de antes) tiene un botón para marcarlo como "Resuelto". Al marcarlo:
+  - Deja de copiarse a las próximas consultas de ese paciente.
+  - Permanece visible en el historial de la consulta donde se registró (no se borra el registro histórico, solo deja de arrastrarse hacia adelante).
+- Si el médico borra un diagnóstico traído de antes (en vez de marcarlo resuelto), también deja de aparecer en consultas futuras — se trata igual que si nunca se hubiera copiado.
 
 ## Flujo de uso
 
-1. El usuario abre "Registrar cirugía" y escribe el nombre del paciente.
-2. Si el paciente ya existe, lo selecciona de la lista como hoy.
-3. Si no existe, ve la opción de crear un paciente nuevo con ese nombre y la selecciona.
-4. La cirugía queda registrada y vinculada a ese paciente recién creado.
-5. Cuando el paciente llega a la cirugía, admisión entra a Pacientes, filtra por "Datos incompletos", busca al paciente por nombre y completa género, fecha de nacimiento, teléfono, institución referente, etc. con la pantalla de edición normal.
-6. Al guardar, la etiqueta "Datos incompletos" desaparece.
+1. El médico abre una evaluación nueva para un paciente que ya tiene diagnósticos activos de antes.
+2. La sección "Diagnósticos" aparece con esos diagnósticos ya precargados.
+3. El médico agrega nuevos diagnósticos si corresponde, y escribe en "Lectura de Exámenes" — ambos se autoguardan.
+4. Si alguno de los diagnósticos activos ya se resolvió, el médico presiona el botón "Resuelto" en esa fila.
+5. Al terminar y guardar, la próxima consulta de ese paciente (de cualquier tipo) arrancará con los diagnósticos que sigan activos, sin el que se marcó resuelto.
 
-## Aspecto e interacción
+## Estilo visual
 
-No se introduce ninguna pantalla ni estilo nuevo: es una opción adicional dentro del mismo buscador de paciente de "Registrar cirugía", y una etiqueta más un filtro dentro de la tabla de Pacientes que ya existen. Todo respeta el aspecto actual de esas dos pantallas.
+Sin cambios de estilo: se usan los mismos componentes, tipografía y colores ya existentes en la sección "Diagnóstico y Plan". El único elemento nuevo es un botón pequeño de "Resuelto" junto a cada diagnóstico, con el mismo lenguaje visual que los demás botones de acción de esa sección (como el de eliminar).
 
-## Fases de implementación
+## Fases
 
-**Fase 1 (MVP — se construye ahora)**
-- Opción de crear paciente solo con el nombre dentro del buscador de "Registrar cirugía".
-- El paciente queda creado de verdad, vinculado a la cirugía y disponible de inmediato en el resto del sistema.
-- Etiqueta "Datos incompletos" visible en Pacientes para esos registros, más un filtro para listarlos.
-- La etiqueta desaparece sola al completar género, fecha de nacimiento, teléfono e institución referente desde la edición normal de pacientes.
+**Fase 1 (ahora):**
+- Corrección del autoguardado de "Lectura de Exámenes", confirmada con una prueba real.
+- Diagnósticos activos se copian automáticamente a la siguiente evaluación del paciente, sin distinción visual de cuáles son nuevos.
+- Botón "Resuelto" por diagnóstico que lo saca de futuras consultas conservando el historial.
 
-**Fase 2 (futuro)**
-- Aviso para coordinación listando pacientes con cirugía próxima cuyo expediente sigue incompleto, para que no se pase ninguno antes de la fecha.
-- Sugerencia de fusión con un paciente parecido ya existente al momento de crear, para evitar duplicados por error de tipeo.
+**Fase 2 (futuro):**
+- Indicador de cuánto tiempo lleva activo un diagnóstico sin resolver (ej. "activo desde hace 3 consultas").
+- Filtro en el historial del paciente para ver solo diagnósticos resueltos vs. activos.
 
-**Fase 3 (futuro)**
-- Llevar esta misma excepción de "crear solo con el nombre" a otros puntos de alta rápida del sistema (por ejemplo, Agenda), una vez validado el uso diario de la Fase 1.
+**Fase 3 (futuro):**
+- Alertas o resumen para el médico al abrir el expediente si hay diagnósticos activos de larga data sin resolver.
 
 ## Supuestos
 
-- El nombre escrito se separa en nombre/apellido por el primer espacio (la primera palabra como nombre, el resto como apellido); si se escribe una sola palabra, el apellido queda vacío hasta completarse.
-- El paciente creado así recibe un número de expediente normal, asignado automáticamente igual que cualquier paciente nuevo.
-- "Datos incompletos" significa que falta género, fecha de nacimiento, teléfono o institución referente. DPI, dirección, email, profesión y contacto de emergencia siguen siendo opcionales como ya lo son hoy.
-- La detección de posibles duplicados (mismo nombre/DPI/fecha de nacimiento) no bloquea esta creación rápida, ya que la fecha de nacimiento aún no se conoce en ese momento; se aplicará normalmente la primera vez que alguien complete el expediente.
-- No se exige ningún paso de aprobación adicional ni se fuerza una nota clínica al momento de la creación; las notas clínicas siguen funcionando igual que hoy para un paciente vinculado a una cirugía.
+- Cualquier usuario con permiso para editar la evaluación oftalmológica (médico, admin, optica, etc., según los permisos ya existentes del módulo) puede marcar un diagnóstico como resuelto; no se crea un permiso nuevo solo para esta acción.
+- "Última consulta" para efectos de copiar diagnósticos es la evaluación más reciente de ese paciente por fecha, sin importar el tipo.
+- Marcar un diagnóstico como resuelto es una acción reversible solo editándolo manualmente de nuevo en una consulta futura (no se construye un botón de "deshacer resuelto").
+- La corrección del autoguardado se limita al campo "Lectura de Exámenes"; si al revisarlo aparecen otros campos con el mismo problema, se corrigen como parte del mismo fix.

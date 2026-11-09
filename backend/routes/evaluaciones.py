@@ -1616,6 +1616,7 @@ async def autoguardar_evaluacion(
     allowed_fields = [
         "paciente_id", "paciente_nombre", "paciente_edad", "paciente_sexo", "paciente_expediente",
         "fecha", "medico_id", "medico_nombre", "motivo_consulta", "padecimiento_actual",
+        "lectura_examenes",
         "antecedentes", "medicamentos_actuales", "medicamentos_previos", "examen",
         "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas", "igss_med_proc",
         "proxima_cita",
@@ -1696,6 +1697,26 @@ async def get_historial_medico_paciente(
     Obtener antecedentes y medicamentos actuales del paciente.
     Estos datos persisten entre evaluaciones.
     """
+    # Diagnósticos activos (no resueltos) de la evaluación más reciente del paciente
+    # (sin importar el tipo de consulta). Se copian a la nueva evaluación hasta que
+    # se marquen como resueltos o se eliminen de la consulta donde se arrastran.
+    diagnosticos_activos = []
+    ultima_eval_dx = await db.evaluaciones_oftalmologicas.find(
+        {"paciente_id": paciente_id},
+        {"_id": 0, "diagnosticos": 1, "fecha": 1, "fecha_creacion": 1}
+    ).sort([("fecha", -1), ("fecha_creacion", -1)]).limit(1).to_list(1)
+    if ultima_eval_dx:
+        diagnosticos_activos = [
+            {
+                "descripcion": d.get("descripcion", ""),
+                "codigo_cie10": d.get("codigo_cie10", ""),
+                "ojo": d.get("ojo", "OU"),
+                "resuelto": False
+            }
+            for d in (ultima_eval_dx[0].get("diagnosticos") or [])
+            if not d.get("resuelto") and (d.get("descripcion") or "").strip()
+        ]
+    
     # Buscar en la colección de historial médico del paciente
     historial = await db.pacientes_historial_medico.find_one(
         {"paciente_id": paciente_id}, 
@@ -1715,6 +1736,7 @@ async def get_historial_medico_paciente(
                 "antecedentes": ultima_evaluacion.get("antecedentes", {}),
                 "medicamentos_actuales": ultima_evaluacion.get("medicamentos_actuales", []),
                 "medicamentos_previos": ultima_evaluacion.get("medicamentos_previos", []),
+                "diagnosticos_activos": diagnosticos_activos,
                 "fuente": "ultima_evaluacion"
             }
         
@@ -1731,11 +1753,13 @@ async def get_historial_medico_paciente(
             },
             "medicamentos_actuales": [],
             "medicamentos_previos": [],
+            "diagnosticos_activos": diagnosticos_activos,
             "fuente": "nuevo"
         }
     
     return {
         **historial,
+        "diagnosticos_activos": diagnosticos_activos,
         "fuente": "historial_guardado"
     }
 

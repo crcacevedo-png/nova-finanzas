@@ -1367,11 +1367,17 @@ const EvaluacionOftalmologica = () => {
           ...prev,
           antecedentes: historial.antecedentes || prev.antecedentes,
           medicamentos_actuales: historial.medicamentos_actuales || prev.medicamentos_actuales,
-          medicamentos_previos: historial.medicamentos_previos || prev.medicamentos_previos
+          medicamentos_previos: historial.medicamentos_previos || prev.medicamentos_previos,
+          diagnosticos: Array.isArray(historial.diagnosticos_activos) && historial.diagnosticos_activos.length > 0
+            ? historial.diagnosticos_activos
+            : prev.diagnosticos
         }));
         
         if (historial.fuente === 'historial_guardado' || historial.fuente === 'ultima_evaluacion') {
           toast.info('Se cargaron los antecedentes y medicamentos previos del paciente');
+        }
+        if (Array.isArray(historial.diagnosticos_activos) && historial.diagnosticos_activos.length > 0) {
+          toast.info('Se cargaron los diagnósticos activos de la última consulta');
         }
       }
     } catch (error) {
@@ -2544,7 +2550,7 @@ const EvaluacionOftalmologica = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => addArrayItem('diagnosticos', { descripcion: '', codigo_cie10: '', ojo: 'OU' })}
+                        onClick={() => addArrayItem('diagnosticos', { descripcion: '', codigo_cie10: '', ojo: 'OU', resuelto: false })}
                         className="h-6 text-xs text-blue-600 hover:text-blue-700"
                       >
                         <Plus className="w-3 h-3 mr-1" /> Agregar
@@ -2560,14 +2566,14 @@ const EvaluacionOftalmologica = () => {
                             onChange={(v) => updateArrayItem('diagnosticos', idx, 'descripcion', v)}
                             placeholder="Diagnóstico"
                             fetchUrl="/catalogos/diagnosticos"
-                            disabled={isReadOnly}
-                            className="input-teal text-xs h-8"
+                            disabled={isReadOnly || diag.resuelto}
+                            className={`input-teal text-xs h-8 ${diag.resuelto ? 'line-through text-gray-400' : ''}`}
                           />
                         </div>
                         <Select
                           value={diag.ojo}
                           onValueChange={(v) => updateArrayItem('diagnosticos', idx, 'ojo', v)}
-                          disabled={isReadOnly}
+                          disabled={isReadOnly || diag.resuelto}
                         >
                           <SelectTrigger className="input-teal h-8 text-xs">
                             <SelectValue />
@@ -2579,8 +2585,30 @@ const EvaluacionOftalmologica = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                      {diag.resuelto ? (
+                        <div
+                          data-testid={`diagnostico-resuelto-badge-${idx}`}
+                          className="h-8 flex items-center px-1.5 text-[10px] font-medium text-green-600 gap-1 shrink-0"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" /> Resuelto
+                        </div>
+                      ) : (
+                        !isReadOnly && (
+                          <Button
+                            data-testid={`diagnostico-resuelto-btn-${idx}`}
+                            variant="ghost"
+                            size="sm"
+                            title="Marcar como resuelto"
+                            onClick={() => updateArrayItem('diagnosticos', idx, 'resuelto', true)}
+                            className="h-8 w-8 p-0 text-gray-400 hover:text-green-600"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                          </Button>
+                        )
+                      )}
                       {!isReadOnly && (
                         <Button
+                          data-testid={`diagnostico-eliminar-btn-${idx}`}
                           variant="ghost"
                           size="sm"
                           onClick={() => removeArrayItem('diagnosticos', idx)}
