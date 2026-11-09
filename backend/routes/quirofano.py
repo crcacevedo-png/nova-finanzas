@@ -341,9 +341,31 @@ async def delete_anesthesia_record(
     return {"message": "Registro eliminado"}
 
 
+@router.post("/anesthesia/records/{record_id}/pagar")
+async def marcar_pago_individual(
+    record_id: str,
+    body: dict = Body(...),
+    current_user: dict = Depends(require_role(["admin", "superadmin"])),
+):
+    """Marca/desmarca un registro de anestesia individual como pagado."""
+    rec = await db.anesthesia_records.find_one({"id": record_id}, {"_id": 0})
+    if not rec:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    if await _month_closed(rec.get("month")):
+        raise HTTPException(status_code=400, detail="El mes ya está cerrado; todos los registros están pagados")
+    paid = bool(body.get("paid", True))
+    await db.anesthesia_records.update_one(
+        {"id": record_id},
+        {"$set": {"paid": paid, "paid_at": _now() if paid else None, "paid_by": current_user.get("id") if paid else None}},
+    )
+    return {"message": "Pago individual actualizado", "paid": paid}
+
+
 # ==================== CIERRE MENSUAL ====================
 async def _build_closure(month: str) -> dict:
-    """Agrega los registros de anestesia del mes agrupados por anestesiólogo."""
+    """Agrega los registros de anestesia del mes agrupados por anestesiólogo.
+    Los totales reflejan únicamente los registros PENDIENTES de pago; los ya
+    pagados individualmente se descuentan del total a pagar del mes."""
     records = await db.anesthesia_records.find({"month": month}, {"_id": 0}).to_list(5000)
     surgery_ids = [r["surgery_id"] for r in records if r.get("surgery_id")]
     surgeries_map = {}
@@ -357,26 +379,39 @@ async def _build_closure(month: str) -> dict:
         key = r.get("anesthesiologist") or ""
         if key.strip().upper() in ("", "N/A", "NA", "—"):
             continue
-        grp = por_anest.setdefault(key, {"anesthesiologist": key, "count": 0, "total": 0.0, "tipos": {}, "detalle": []})
+        grp = por_anest.setdefault(key, {
+            "anesthesiologist": key, "count": 0, "total": 0.0,
+            "count_pagado": 0, "total_pagado": 0.0, "tipos": {}, "detalle": [],
+        })
         grp["count"] += 1
-        grp["total"] += (r.get("value") or 0)
+        pagado = bool(r.get("paid"))
+        valor = r.get("value") or 0
+        if pagado:
+            grp["count_pagado"] += 1
+            grp["total_pagado"] += valor
+        else:
+            grp["total"] += valor
         tname = r.get("anesthesia_type_name") or "Sin tipo"
-        t = grp["tipos"].setdefault(tname, {"tipo": tname, "count": 0, "value": r.get("value") or 0, "subtotal": 0.0})
+        t = grp["tipos"].setdefault(tname, {"tipo": tname, "count": 0, "value": valor, "subtotal": 0.0})
         t["count"] += 1
-        t["subtotal"] += (r.get("value") or 0)
+        if not pagado:
+            t["subtotal"] += valor
         surg = surgeries_map.get(r.get("surgery_id")) or {}
         grp["detalle"].append({
+            "id": r.get("id"),
             "date": r.get("date") or "",
             "patient_name": r.get("patient_name") or "",
             "procedure": surg.get("procedure") or "",
             "surgeon": surg.get("surgeon") or "",
             "institution": surg.get("institution") or "",
             "tipo": tname,
-            "value": round(r.get("value") or 0, 2),
+            "value": round(valor, 2),
+            "paid": pagado,
         })
     resultado = []
     for grp in por_anest.values():
         grp["total"] = round(grp["total"], 2)
+        grp["total_pagado"] = round(grp["total_pagado"], 2)
         grp["tipos"] = sorted(grp["tipos"].values(), key=lambda x: x["tipo"])
         grp["detalle"].sort(key=lambda x: (x["date"], x["patient_name"]))
         resultado.append(grp)
@@ -388,7 +423,9 @@ async def _build_closure(month: str) -> dict:
         "closed_at": closure.get("closed_at") if closure else None,
         "por_anestesiologo": resultado,
         "total_general": round(sum(g["total"] for g in resultado), 2),
+        "total_pagado_general": round(sum(g["total_pagado"] for g in resultado), 2),
         "num_registros": sum(g["count"] for g in resultado),
+        "num_pendientes": sum(g["count"] - g["count_pagado"] for g in resultado),
     }
 
 
@@ -429,7 +466,7 @@ async def export_monthly_closure(
         ws["A2"] = f"Mes: {month}   |   Estado: {estado}   |   Total a pagar: Q {data['total_general']:,.2f}   |   Procedimientos: {data['num_registros']}"
         ws["A3"] = ""
 
-        headers = ["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico responsable", "Institución", "Tipo de anestesia", "Honorario"]
+        headers = ["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico responsable", "Institución", "Tipo de anestesia", "Estado", "Honorario"]
         row = 4
         for c, h in enumerate(headers, start=1):
             cell = ws.cell(row=row, column=c, value=h)
@@ -449,21 +486,22 @@ async def export_monthly_closure(
                 ws.cell(row=row, column=5, value=d["surgeon"]).border = border
                 ws.cell(row=row, column=6, value=d["institution"]).border = border
                 ws.cell(row=row, column=7, value=d["tipo"]).border = border
-                ws.cell(row=row, column=8, value=round(d["value"], 2)).border = border
+                ws.cell(row=row, column=8, value="Pagado" if d["paid"] else "Pendiente").border = border
+                ws.cell(row=row, column=9, value=round(d["value"], 2)).border = border
                 first = False
                 row += 1
-            # Subtotal por anestesiólogo
-            lbl = ws.cell(row=row, column=5, value=f"Total {g['anesthesiologist']} ({g['count']} proc.)")
+            # Subtotal por anestesiólogo (solo pendientes)
+            lbl = ws.cell(row=row, column=6, value=f"Total pendiente {g['anesthesiologist']} ({g['count'] - g['count_pagado']} proc.)")
             lbl.font = bold
-            tot = ws.cell(row=row, column=8, value=round(g["total"], 2))
+            tot = ws.cell(row=row, column=9, value=round(g["total"], 2))
             tot.font = bold
             row += 1
 
         row += 1
-        ws.cell(row=row, column=5, value="TOTAL GENERAL").font = Font(bold=True, size=12)
-        ws.cell(row=row, column=8, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
+        ws.cell(row=row, column=6, value="TOTAL A PAGAR (pendiente)").font = Font(bold=True, size=12)
+        ws.cell(row=row, column=9, value=round(data["total_general"], 2)).font = Font(bold=True, size=12)
 
-        widths = [20, 12, 26, 26, 22, 16, 18, 14]
+        widths = [20, 12, 26, 26, 22, 16, 18, 12, 14]
         for i, w in enumerate(widths, start=1):
             ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
@@ -497,7 +535,7 @@ async def export_monthly_closure(
         Paragraph(f"Mes: {month} &nbsp;|&nbsp; Estado: {estado} &nbsp;|&nbsp; Total a pagar: Q {data['total_general']:,.2f} &nbsp;|&nbsp; Procedimientos: {data['num_registros']}", sub_style),
     ]
 
-    table_data = [["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico resp.", "Institución", "Tipo", "Honorario"]]
+    table_data = [["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico resp.", "Institución", "Tipo", "Estado", "Honorario"]]
     style_cmds = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -532,16 +570,17 @@ async def export_monthly_closure(
                 _cell(g["anesthesiologist"]) if first else "",
                 _fecha(d["date"]), _cell(d["patient_name"]), _cell(d["procedure"]),
                 _cell(d["surgeon"]), _cell(d["institution"]), _cell(d["tipo"]),
+                _cell("Pagado" if d["paid"] else "Pendiente"),
                 f"Q {d['value']:,.2f}",
             ])
             first = False
             r += 1
-        table_data.append(["", "", "", "", "", "", _cell(f"Total {g['anesthesiologist']} ({g['count']} proc.)", bold=True), f"Q {g['total']:,.2f}"])
+        table_data.append(["", "", "", "", "", "", "", _cell(f"Total pendiente {g['anesthesiologist']} ({g['count'] - g['count_pagado']} proc.)", bold=True), f"Q {g['total']:,.2f}"])
         style_cmds.append(('FONTNAME', (-1, r), (-1, r), 'Helvetica-Bold'))
         style_cmds.append(('BACKGROUND', (0, r), (-1, r), colors.HexColor('#EEF2FF')))
         r += 1
 
-    table = Table(table_data, colWidths=[0.85 * inch, 0.5 * inch, 1.0 * inch, 0.95 * inch, 0.8 * inch, 0.8 * inch, 0.95 * inch, 0.65 * inch], repeatRows=1)
+    table = Table(table_data, colWidths=[0.9 * inch, 0.5 * inch, 1.05 * inch, 0.95 * inch, 0.85 * inch, 0.85 * inch, 1.0 * inch, 0.75 * inch, 0.65 * inch], repeatRows=1)
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))

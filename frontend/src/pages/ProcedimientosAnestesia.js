@@ -12,7 +12,7 @@ import { Badge } from '../components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '../components/ui/dialog';
-import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileText, Check, RotateCcw } from 'lucide-react';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -124,6 +124,18 @@ const CierreTab = ({ canClose }) => {
     } catch (e) { toast.error(e.response?.data?.detail || 'No se pudo cerrar el mes'); }
   };
 
+  const [payingId, setPayingId] = useState(null);
+  const marcarPago = async (recordId, paid) => {
+    setPayingId(recordId);
+    try {
+      await axios.post(`${API_URL}/quirofano/anesthesia/records/${recordId}/pagar`, { paid });
+      toast.success(paid ? 'Procedimiento marcado como pagado' : 'Pago revertido a pendiente');
+      fetchClosure();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'No se pudo actualizar el pago');
+    } finally { setPayingId(null); }
+  };
+
   const [exporting, setExporting] = useState(false);
   const exportar = async (format) => {
     setExporting(true);
@@ -174,18 +186,23 @@ const CierreTab = ({ canClose }) => {
           )}
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-center justify-between">
-        <span className="text-sm text-gray-500">Total a pagar del mes ({data?.num_registros || 0} procedimientos)</span>
-        <span className="text-2xl font-bold text-indigo-700" data-testid="anesthesia-total-general">{formatCurrency(data?.total_general || 0)}</span>
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm text-gray-500">Total a pagar del mes ({data?.num_pendientes ?? 0} de {data?.num_registros || 0} procedimientos pendientes)</span>
+        <div className="flex items-center gap-4">
+          {(data?.total_pagado_general || 0) > 0 && (
+            <span className="text-sm text-gray-400">Pagado: <span className="font-semibold text-emerald-600">{formatCurrency(data.total_pagado_general)}</span></span>
+          )}
+          <span className="text-2xl font-bold text-indigo-700" data-testid="anesthesia-total-general">{formatCurrency(data?.total_general || 0)}</span>
+        </div>
       </div>
       <div className="space-y-3">
         {(data?.por_anestesiologo || []).map((g, i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto" data-testid={`anesthesia-anest-${i}`}>
-            <div className="flex items-center justify-between mb-2 min-w-[760px]">
+            <div className="flex items-center justify-between mb-2 min-w-[840px]">
               <span className="font-bold text-gray-900">{g.anesthesiologist}</span>
-              <span className="font-bold text-emerald-700">{formatCurrency(g.total)} <span className="text-xs font-normal text-gray-400">({g.count} proc.)</span></span>
+              <span className="font-bold text-emerald-700">{formatCurrency(g.total)} <span className="text-xs font-normal text-gray-400">({g.count - g.count_pagado} de {g.count} pendientes)</span></span>
             </div>
-            <table className="w-full text-sm min-w-[760px]">
+            <table className="w-full text-sm min-w-[840px]">
               <thead>
                 <tr className="text-xs text-gray-400 border-b border-gray-100">
                   <th className="py-1.5 text-left font-medium">Fecha</th>
@@ -195,11 +212,12 @@ const CierreTab = ({ canClose }) => {
                   <th className="py-1.5 text-left font-medium">Institución</th>
                   <th className="py-1.5 text-left font-medium">Tipo de anestesia</th>
                   <th className="py-1.5 text-right font-medium">Honorario</th>
+                  <th className="py-1.5 text-center font-medium">Pago</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {g.detalle.map((d, j) => (
-                  <tr key={j} data-testid={`anesthesia-detail-row-${i}-${j}`}>
+                  <tr key={j} className={d.paid ? 'opacity-50' : ''} data-testid={`anesthesia-detail-row-${i}-${j}`}>
                     <td className="py-1.5 text-gray-500 whitespace-nowrap">{formatDate(d.date)}</td>
                     <td className="py-1.5 text-gray-900 font-medium">{d.patient_name || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.procedure || '—'}</td>
@@ -207,6 +225,23 @@ const CierreTab = ({ canClose }) => {
                     <td className="py-1.5 text-gray-600">{d.institution || '—'}</td>
                     <td className="py-1.5 text-gray-500">{d.tipo}</td>
                     <td className="py-1.5 text-right font-medium">{formatCurrency(d.value)}</td>
+                    <td className="py-1.5 text-center">
+                      {canClose && !data?.closed ? (
+                        d.paid ? (
+                          <Button variant="ghost" size="sm" disabled={payingId === d.id} onClick={() => marcarPago(d.id, false)} className="h-7 px-2 text-xs text-gray-500 hover:text-amber-600" data-testid={`unpay-record-${d.id}`}>
+                            <RotateCcw className="w-3.5 h-3.5 mr-1" />Pagado
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" disabled={payingId === d.id} onClick={() => marcarPago(d.id, true)} className="h-7 px-2 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50" data-testid={`pay-record-${d.id}`}>
+                            <Check className="w-3.5 h-3.5 mr-1" />Marcar pagado
+                          </Button>
+                        )
+                      ) : (
+                        <Badge variant="outline" className={d.paid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}>
+                          {d.paid ? 'Pagado' : 'Pendiente'}
+                        </Badge>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
