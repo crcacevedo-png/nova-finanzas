@@ -657,6 +657,8 @@ async def cancel_surgery(
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     if not surgery:
         raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    if surgery.get("status") == "cancelado":
+        raise HTTPException(status_code=400, detail="La cirugía ya está cancelada")
 
     now = datetime.now(timezone.utc).isoformat()
     new_surgery_id = None

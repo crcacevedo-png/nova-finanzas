@@ -1790,7 +1790,7 @@ const SalaOperaciones = () => {
                     </Button>
                   )}
                   {canEdit && selectedSurgery.status !== 'cancelado' && (
-                    <Button variant="outline" onClick={() => { setDetailDialogOpen(false); openEditDialog(selectedSurgery); }}>
+                    <Button variant="outline" onClick={() => { setDetailDialogOpen(false); openEditDialog(selectedSurgery); }} data-testid="detail-edit-surgery-btn">
                       Editar
                     </Button>
                   )}
@@ -1903,8 +1903,8 @@ const SalaOperaciones = () => {
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-              <Button variant="destructive" onClick={handleDeleteSurgery} disabled={submitting}>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} data-testid="delete-dialog-close-btn">Cancelar</Button>
+              <Button variant="destructive" onClick={handleDeleteSurgery} disabled={submitting} data-testid="confirm-delete-surgery-btn">
                 {submitting ? 'Eliminando...' : 'Eliminar'}
               </Button>
             </DialogFooter>
@@ -1912,7 +1912,7 @@ const SalaOperaciones = () => {
         </Dialog>
 
         {/* Cancel Dialog */}
-        <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <Dialog open={cancelDialogOpen} onOpenChange={(open) => { setCancelDialogOpen(open); if (!open) setCancelForm({ reason: '', reschedule_date: '', reschedule_time: '' }); }}>
           <DialogContent className="max-w-[450px]">
             <DialogHeader>
               <DialogTitle className="text-amber-600">Cancelar cirugía</DialogTitle>
@@ -1933,6 +1933,7 @@ const SalaOperaciones = () => {
                     onChange={(e) => setCancelForm({ ...cancelForm, reason: e.target.value })}
                     placeholder="Indique el motivo..."
                     rows={3}
+                    data-testid="cancel-reason-input"
                   />
                 </div>
                 <div>
@@ -1959,8 +1960,8 @@ const SalaOperaciones = () => {
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Volver</Button>
-              <Button onClick={handleCancelSurgery} disabled={submitting} className="bg-amber-600 hover:bg-amber-700 text-white">
+              <Button variant="outline" onClick={() => setCancelDialogOpen(false)} data-testid="cancel-dialog-close-btn">Volver</Button>
+              <Button onClick={handleCancelSurgery} disabled={submitting} className="bg-amber-600 hover:bg-amber-700 text-white" data-testid="confirm-cancel-surgery-btn">
                 {submitting ? 'Cancelando...' : 'Cancelar cirugía'}
               </Button>
             </DialogFooter>

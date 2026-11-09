@@ -114,7 +114,8 @@ def test_cancel_endpoint(sessions, created):
     sa = sessions["superadmin"]
     sid = sa.post(f"{BASE_URL}/api/surgeries", json=_payload("TEST_Iter127_cancel")).json()["id"]
     created.append(sid)
-    assert sessions["usuario"].post(f"{BASE_URL}/api/surgeries/{sid}/cancel", json={"reason": "x"}).status_code == 403
+    assert sessions["usuario"].post(f"{BASE_URL}/api/surgeries/{sid}/cancel", json={"reason": "x"}).status_code == 200  # iter128: usuario allowed
+    sa.put(f"{BASE_URL}/api/surgeries/{sid}", json={"observations": "noop"})
     r = sa.post(f"{BASE_URL}/api/surgeries/{sid}/cancel", json={"reason": "TEST motivo"})
     assert r.status_code == 200, r.text
     assert sa.get(f"{BASE_URL}/api/surgeries/{sid}").json()["status"] == "cancelado"

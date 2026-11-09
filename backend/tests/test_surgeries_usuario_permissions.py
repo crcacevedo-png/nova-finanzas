@@ -71,11 +71,11 @@ def test_usuario_crud_surgery(usuario, superadmin, created):
     assert r.status_code == 200, r.text
     r = usuario.patch(f"{BASE_URL}/api/surgeries/{sid}/preop-status", json={"estado": "completo"})
     assert r.status_code == 200, r.text
-    # restricted
+    # iter128: usuario now CAN cancel/delete (previously 403)
     r = usuario.post(f"{BASE_URL}/api/surgeries/{sid}/cancel", json={"reason": "TEST"})
-    assert r.status_code == 403
+    assert r.status_code == 200
     r = usuario.delete(f"{BASE_URL}/api/surgeries/{sid}")
-    assert r.status_code == 403
+    assert r.status_code == 200
 
 
 # cancel bypass via PUT status (should be blocked for non-superadmin)

@@ -1,0 +1,35 @@
+{
+  "summary": "Verified plan 'usuario puede Cancelar/Reprogramar/Eliminar cirugías'. Backend: new test file (8 tests) + updated 2 stale regression files (iter126/127 asserted usuario=403 on cancel/delete; now 200). 26/27 backend tests pass; only failure is a pre-existing edge case (re-cancel of an already-cancelled surgery is allowed and creates a second clone). Frontend (Playwright, desktop): usuario sees Ver/Cancelar/Eliminar in list; list-cancel with reschedule -> toast 'Cirugía cancelada y reagendada', original greyed (no action icons) and clone at 27/01 11:30 with same clinical data; detail footer shows Cerrar/Cancelar/Eliminar/Editar; detail-cancel without reschedule -> 'Cirugía cancelada', no new row; delete from detail and from list -> 'Cirugía eliminada', row gone (persisted after reload). Cancelled surgery detail hides Cancelar/Eliminar. Anestesia: 0 cancel/delete buttons in list and detail (only 'Cerrar'), API 403 on both. Superadmin: list buttons present, detail Cancelar/Eliminar present, detail-cancel with reschedule date only (time kept 09:00) works. All test data cleaned up.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/surgeries/{id}/cancel", "issue": "No status guard: cancelling an already-cancelled surgery returns 200, overwrites cancellation_reason/rescheduled_to and creates ANOTHER clone (duplicate rescheduled surgery). UI hides the button for cancelled rows so only reachable via API/double-submit, but now exposed to more users (usuario). Suggest returning 400 if status=='cancelado'."},
+      {"endpoint": "GET /api/surgeries/{id}", "issue": "rescheduled_from_surgery_id is stored on clones but not in SurgeryResponse, so UI cannot link clone back to original."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sala de Operaciones list", "issues": ["Cancelled rows only greyed out with eye icon shifted right (no 'Cancelada' badge) — status not explicit; consider a badge", "Cancel/Delete confirm dialogs: Textarea motivo, 'Cancelar cirugía' and 'Eliminar' confirm buttons, and detail 'Editar' button lack data-testid (tested via role/text)", "cancelForm not reset when user clicks 'Volver' — reopening cancel for another surgery keeps previous motivo/fecha"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_surgeries_cancel_delete_usuario.py", "/app/backend/tests/test_surgeries_usuario_permissions.py", "/app/backend/tests/test_surgeries_manage_permission.py", "/app/test_reports/pytest/pytest_iter128.xml"],
+  "action_items": [
+    "Add status guard in cancel_surgery (400 if already cancelado) to prevent duplicate clones",
+    "Add data-testid to cancel-reason textarea, confirm-cancel and confirm-delete buttons and detail Editar button",
+    "Reset cancelForm when cancel dialog closes",
+    "(Optional) show a 'Cancelada' badge on cancelled rows"
+  ],
+  "critical_code_review_comments": [
+    "Permission is role-name based (require_role ['superadmin','usuario']) while create/edit uses permission flag manage_sala_operaciones — inconsistent; custom roles cannot be granted cancel/delete without code change. Consider a 'cancel_delete_sala_operaciones' permission.",
+    "SalaOperaciones.js is very large (>1900 lines) — should be split (dialogs into components).",
+    "Login rate-limit (per-minute) caused many skips when running several test files back-to-back; rerun after ~60s passed."
+  ],
+  "updated_files": ["/app/backend/tests/test_surgeries_cancel_delete_usuario.py", "/app/backend/tests/seed_ui128.py", "/app/backend/tests/test_surgeries_usuario_permissions.py", "/app/backend/tests/test_surgeries_manage_permission.py"],
+  "success_rate": {"backend": "96% (26/27; failing test is pre-existing edge case)", "frontend": "100%"},
+  "seed_data_creation": "Created TEST_UI128_A..D and TEST_I128_* surgeries; all deleted by id (verified none remain).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "usuario/superadmin can cancel/delete; anestesia 403. test_surgeries_cancel_delete_usuario.py::test_recancel_already_cancelled intentionally fails until status guard added. Login endpoint is rate-limited per minute — wait 60s between big suites. seed_ui128.py helper: create/list/cleanup TEST_UI128 surgeries."
+}
