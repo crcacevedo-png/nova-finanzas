@@ -144,7 +144,7 @@ const getCategoryBadge = (category) => {
 const SalaOperaciones = () => {
   const { user, hasPermission } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
-  const canEdit = hasPermission('view_sala_operaciones');
+  const canEdit = hasPermission('manage_sala_operaciones');
   const canEditPatient = hasPermission('edit_patients') || hasPermission('edit_patients_in_surgery');
 
   // State

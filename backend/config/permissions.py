@@ -41,7 +41,8 @@ PERMISSIONS = {
         "view_agenda": True,
         "view_evaluacion": True,
         "manage_recetas": True,
-        "view_sala_operaciones": True
+        "view_sala_operaciones": True,
+        "manage_sala_operaciones": True
     },
     "admin": {
         "view_dashboard": True,
@@ -79,7 +80,8 @@ PERMISSIONS = {
         "view_agenda": True,
         "view_evaluacion": True,
         "manage_recetas": True,
-        "view_sala_operaciones": True
+        "view_sala_operaciones": True,
+        "manage_sala_operaciones": True
     },
     "usuario": {
         "view_dashboard": True,
@@ -120,7 +122,8 @@ PERMISSIONS = {
         "view_agenda": True,
         "view_evaluacion": True,
         "manage_recetas": False,
-        "view_sala_operaciones": True
+        "view_sala_operaciones": True,
+        "manage_sala_operaciones": True
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
@@ -196,7 +199,8 @@ PERMISSIONS = {
         "view_agenda": True,
         "view_evaluacion": True,
         "manage_recetas": True,
-        "view_sala_operaciones": True
+        "view_sala_operaciones": True,
+        "manage_sala_operaciones": True
     }
 }
 

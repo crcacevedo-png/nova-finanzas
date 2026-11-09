@@ -1,0 +1,37 @@
+{
+  "summary": "Verified fix: rol 'usuario' ahora gestiona cirugías en Sala de Operaciones (view_sala_operaciones). Backend pytest 4/5 pass; UI end-to-end as 'usuario' 100% pass: 'Registrar cirugía' visible, created full surgery (Novavision, patient linked, surgeon, OD, anestesia General, anestesiólogo, obs) -> toast 'Cirugía registrada', appears in list; detail -> + Agregar equipo (Facoemulsificador) 'Equipo agregado', + Agregar insumo (Viscoelástico x2) 'Insumo agregado', Editar observaciones 'Cirugía actualizada' persisted (verified in DB); zero 4xx API responses. Cancel (X) and delete buttons NOT shown to usuario; cancel endpoint 403; DELETE 403. 'Editar datos del paciente' (form) and 'Editar paciente' (detail) links visible and open Editar Paciente modal (not saved, to avoid altering real data). usuario /auth/me: view_sala_operaciones=True, create_expenses/edit_expenses=False; POST /api/expenses 403. Superadmin regression: register btn, cancel btn visible, edit saves OK. ONE SECURITY GAP found: cancel restriction can be bypassed via PUT /api/surgeries/{id} with {status:'cancelado'}.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PUT /api/surgeries/{id}", "issue": "SurgeryUpdate model accepts status/cancellation_reason/rescheduled_to and update_surgery $sets them blindly. Any user with view_sala_operaciones (now incl. 'usuario', medico, anestesia) can cancel a surgery by PUT {\"status\":\"cancelado\",\"cancellation_reason\":\"x\"} -> 200 and status persisted 'cancelado', bypassing the superadmin-only POST /cancel. Pre-existed for admin (had edit_expenses), but now widened to usuario. Reproduced by test_usuario_cannot_cancel_via_put.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "DELETE /api/surgeries/{id}", "issue": "Deletes anesthesia_records but leaves orphan db.notas_cirugia (clinical-history note auto-created when surgery is linked to a patient). Pre-existing; I manually removed the orphan note of my test surgery."},
+      {"endpoint": "permissions resolution (config/permissions.py resolve_permissions)", "issue": "db.roles overrides merge on top of defaults. Preview has no db.roles doc for 'usuario', but if PRODUCTION has a customized 'usuario' doc in db.roles with view_sala_operaciones:false (e.g. saved via Roles UI), the code fix will NOT take effect in prod. Verify prod db.roles {name:'usuario'}."},
+      {"endpoint": "scope side-effect", "issue": "Switching to view_sala_operaciones also grants create/edit surgeries to 'medico' (create_expenses was False -> previously 403 although UI showed buttons) and to 'anestesia' role (db.roles has view_sala_operaciones:true). Likely desired (aligns with UI), but confirm anestesia should be able to create/edit surgeries."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_surgeries_usuario_permissions.py", "/app/test_reports/pytest/pytest_surgery_perms.xml"],
+  "action_items": [
+    "HIGH: In update_surgery, strip/forbid status, cancellation_reason, rescheduled_to (and related cancel fields) for non-superadmin (or remove from SurgeryUpdate and use only POST /cancel). Also ensure frontend edit form does not send them.",
+    "Check PRODUCTION db.roles for a 'usuario' override with view_sala_operaciones=false; if present the fix won't apply in prod (update that doc or via Roles UI).",
+    "Optional: delete_surgery should also delete db.notas_cirugia with surgery_id.",
+    "Optional: confirm intended access for 'anestesia' and 'medico' roles now able to create/edit surgeries."
+  ],
+  "critical_code_review_comments": [
+    "Duplicate PERMISSIONS matrices in server.py and config/permissions.py already drift (view_audit_logs, admin manage_igss_units differ) — consolidate to a single source.",
+    "preop toggle button in detail dialog has no canEdit guard (harmless now since backend checks same permission).",
+    "SalaOperaciones.js ~1990 lines — should be split."
+  ],
+  "updated_files": ["/app/backend/tests/test_surgeries_usuario_permissions.py"],
+  "success_rate": {"backend": "80% (4/5; failing test = cancel bypass via PUT)", "frontend": "100%"},
+  "seed_data_creation": "None persisted. Test surgeries (TEST_Perm*, TEST_UI) deleted via superadmin; orphan notas_cirugia of UI surgery deleted by its surgery_id. Patient 'MARÍA TERESA MILIÁN ARGUETA' was linked but NOT modified.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Rerun /app/backend/tests/test_surgeries_usuario_permissions.py (run with -p no:xdist -o addopts=''). After fix of PUT cancel bypass, test_usuario_cannot_cancel_via_put should pass. UI flow as usuario verified fully in iteration_126.",
+  "rca of the issue": "Original bug: surgery write endpoints used require_permission('create_expenses'/'edit_expenses'); usuario/medico had those False -> 403 while frontend (canEdit=view_sala_operaciones) showed controls. Fix verified. New finding: PUT accepts status field enabling cancellation bypass."
+}
