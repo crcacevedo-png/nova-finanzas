@@ -12,7 +12,7 @@ import uuid
 import io
 
 from config.database import db
-from routes.auth import get_current_user, require_role, require_permission
+from routes.auth import get_current_user, require_role, require_permission, require_any_permission
 from pymongo import ReturnDocument
 
 router = APIRouter(prefix="/patients", tags=["Pacientes"])
@@ -757,7 +757,7 @@ async def create_patient_quick(
 
 
 @router.put("/{patient_id}", response_model=PatientResponse)
-async def update_patient(patient_id: str, patient_data: PatientUpdate, current_user: dict = Depends(require_permission("edit_patients"))):
+async def update_patient(patient_id: str, patient_data: PatientUpdate, current_user: dict = Depends(require_any_permission(["edit_patients", "edit_patients_in_surgery"]))):
     """Actualizar paciente"""
     patient = await db.patients.find_one({"id": patient_id})
     if not patient:

@@ -419,6 +419,9 @@ PERMISSIONS = {
         "manage_igss_units": False,
         "import_patients": False,
         "export_patients": False,
+        # Puede editar los datos del paciente SOLO desde Sala de Operaciones /
+        # Editar cirugía (no desbloquea el botón de editar en el módulo general de Pacientes)
+        "edit_patients_in_surgery": True,
         # Sin acceso a Óptica
         "view_optica": False,
         "manage_optica_inventory": False,

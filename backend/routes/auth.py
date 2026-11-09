@@ -114,6 +114,15 @@ def require_permission(permission: str):
         return current_user
     return permission_checker
 
+def require_any_permission(permissions: list):
+    """Permite el acceso si el usuario tiene AL MENOS UNO de los permisos indicados."""
+    async def permission_checker(current_user: dict = Depends(get_current_user)):
+        user_permissions = current_user.get("permissions") or get_permissions(current_user["role"])
+        if not any(user_permissions.get(p, False) for p in permissions):
+            raise HTTPException(status_code=403, detail="No tienes permiso para realizar esta acción")
+        return current_user
+    return permission_checker
+
 def require_role(roles):
     """Requiere que el usuario tenga uno de los roles especificados"""
     if isinstance(roles, str):

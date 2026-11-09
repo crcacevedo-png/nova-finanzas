@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { surgeryApi, formatCurrency, doctorApi, patientApi, getGuatemalaDate, getGuatemalaTimeHM } from '../services/api';
+import { PatientEditDialog } from '../components/PatientEditDialog';
 import axios from 'axios';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -144,6 +145,7 @@ const SalaOperaciones = () => {
   const { user, hasPermission } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
   const canEdit = hasPermission('view_sala_operaciones');
+  const canEditPatient = hasPermission('edit_patients') || hasPermission('edit_patients_in_surgery');
 
   // State
   const [surgeries, setSurgeries] = useState([]);
@@ -157,6 +159,8 @@ const SalaOperaciones = () => {
   const [showPatientResults, setShowPatientResults] = useState(false);
   const [creatingPatient, setCreatingPatient] = useState(false);
   const [expandedRows, setExpandedRows] = useState({});
+  const [patientEditOpen, setPatientEditOpen] = useState(false);
+  const [patientEditId, setPatientEditId] = useState(null);
   
   // Filters
   const [search, setSearch] = useState('');
@@ -1207,7 +1211,19 @@ const SalaOperaciones = () => {
                       data-testid="surgery-patient-search"
                     />
                     {formData.patient_id ? (
-                      <p className="text-xs text-emerald-600 mt-1" data-testid="surgery-patient-linked">✓ Vinculado al expediente — se creará la nota en su historial clínico</p>
+                      <div className="flex items-center justify-between mt-1 gap-2">
+                        <p className="text-xs text-emerald-600" data-testid="surgery-patient-linked">✓ Vinculado al expediente — se creará la nota en su historial clínico</p>
+                        {canEditPatient && (
+                          <button
+                            type="button"
+                            onClick={() => { setPatientEditId(formData.patient_id); setPatientEditOpen(true); }}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 underline whitespace-nowrap"
+                            data-testid="surgery-edit-patient-link"
+                          >
+                            Editar datos del paciente
+                          </button>
+                        )}
+                      </div>
                     ) : formData.patient_name ? (
                       <p className="text-xs text-amber-600 mt-1">Paciente no registrado seleccionado — no se creará nota clínica</p>
                     ) : null}
@@ -1543,7 +1559,22 @@ const SalaOperaciones = () => {
                 <div className="space-y-6">
                   {/* Datos del procedimiento */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div><span className="text-xs uppercase text-slate-400">Paciente</span><p className="font-medium">{selectedSurgery.patient_name}</p></div>
+                    <div>
+                      <span className="text-xs uppercase text-slate-400">Paciente</span>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{selectedSurgery.patient_name}</p>
+                        {canEditPatient && selectedSurgery.patient_id && (
+                          <button
+                            type="button"
+                            onClick={() => { setPatientEditId(selectedSurgery.patient_id); setPatientEditOpen(true); }}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                            data-testid="surgery-detail-edit-patient-link"
+                          >
+                            Editar paciente
+                          </button>
+                        )}
+                      </div>
+                    </div>
                     <div><span className="text-xs uppercase text-slate-400">Procedimiento</span><p className="font-medium">{selectedSurgery.procedure}</p></div>
                     {selectedSurgery.lio && (
                       <div><span className="text-xs uppercase text-slate-400">LIO</span><p className="font-medium">{selectedSurgery.lio}</p></div>
@@ -1926,6 +1957,13 @@ const SalaOperaciones = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <PatientEditDialog
+          open={patientEditOpen}
+          onOpenChange={setPatientEditOpen}
+          patientId={patientEditId}
+          onSaved={() => fetchSurgeries()}
+        />
       </div>
     </Layout>
   );

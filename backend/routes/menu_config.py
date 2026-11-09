@@ -380,6 +380,7 @@ DEFAULT_MENU_CONFIG = {
     ],
     "usuario": [
         "pacientes", "evaluacion_oftalmologica", "crm_cirugias", "agenda",
+        "sala_operaciones",
         "inventario_panel", "inventario_productos", "inventario_lotes"
     ],
     "optica": [
