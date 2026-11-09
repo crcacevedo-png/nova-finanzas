@@ -129,7 +129,7 @@ export const surgeryApi = {
   create: (data) => axios.post(`${API_URL}/surgeries`, data),
   update: (id, data) => axios.put(`${API_URL}/surgeries/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/surgeries/${id}`),
-  cancel: (id, reason, rescheduleDate) => axios.post(`${API_URL}/surgeries/${id}/cancel`, { reason, reschedule_date: rescheduleDate }),
+  cancel: (id, reason, rescheduleDate, rescheduleTime) => axios.post(`${API_URL}/surgeries/${id}/cancel`, { reason, reschedule_date: rescheduleDate, reschedule_time: rescheduleTime }),
   // Equipment
   addEquipment: (surgeryId, data) => axios.post(`${API_URL}/surgeries/${surgeryId}/equipment`, data),
   deleteEquipment: (surgeryId, equipmentId) => axios.delete(`${API_URL}/surgeries/${surgeryId}/equipment/${equipmentId}`),

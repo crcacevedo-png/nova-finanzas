@@ -117,6 +117,8 @@ class SurgeryResponse(BaseModel):
     status: str = "activo"
     cancellation_reason: Optional[str] = None
     rescheduled_to: Optional[str] = None
+    rescheduled_to_time: Optional[str] = None
+    new_surgery_id: Optional[str] = None
     created_by: str
     created_by_name: Optional[str] = None
     created_at: str
@@ -642,20 +644,68 @@ async def cancel_surgery(
     surgery_id: str,
     reason: str = Body(..., embed=True),
     reschedule_date: Optional[str] = Body(None, embed=True),
+    reschedule_time: Optional[str] = Body(None, embed=True),
     current_user: dict = Depends(require_role("superadmin"))
 ):
-    """Cancelar cirugía con motivo (solo superadmin)"""
+    """Cancelar cirugía con motivo (solo superadmin). Si se indica fecha (y hora)
+    de reagendamiento, crea una nueva cirugía activa en esa fecha/hora con los
+    mismos datos clínicos, para que aparezca en el listado del nuevo día."""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     if not surgery:
         raise HTTPException(status_code=404, detail="Cirugía no encontrada")
-    
+
+    now = datetime.now(timezone.utc).isoformat()
+    new_surgery_id = None
+
+    if reschedule_date:
+        new_surgery_id = str(uuid.uuid4())
+        new_doc = {
+            "id": new_surgery_id,
+            "date": reschedule_date,
+            "time": reschedule_time or surgery.get("time", ""),
+            "patient_name": surgery.get("patient_name"),
+            "patient_id": surgery.get("patient_id"),
+            "procedure": surgery.get("procedure"),
+            "surgeon": surgery.get("surgeon"),
+            "assistant_surgeon": surgery.get("assistant_surgeon"),
+            "eye": surgery.get("eye"),
+            "lio": surgery.get("lio", ""),
+            "anesthesia_type": surgery.get("anesthesia_type"),
+            "anesthesiologist": surgery.get("anesthesiologist"),
+            "institution": surgery.get("institution"),
+            "igss_data": surgery.get("igss_data"),
+            "insurance_name": surgery.get("insurance_name", ""),
+            "observations": surgery.get("observations", ""),
+            "equipment": [],
+            "supplies": [],
+            "supplies_status": "pendiente" if surgery.get("institution") == "Alquiler" else None,
+            "preop_status": "incompleto",
+            "status": "activo",
+            "cancellation_reason": None,
+            "rescheduled_to": None,
+            "rescheduled_to_time": None,
+            "new_surgery_id": None,
+            "rescheduled_from_surgery_id": surgery_id,
+            "created_by": current_user["id"],
+            "created_at": now,
+            "updated_at": now,
+        }
+        await db.surgeries.insert_one(new_doc)
+        try:
+            from routes.quirofano import upsert_anesthesia_from_surgery
+            await upsert_anesthesia_from_surgery(new_doc)
+        except Exception:
+            pass
+
     update_data = {
         "status": "cancelado",
         "cancellation_reason": reason,
         "rescheduled_to": reschedule_date,
-        "updated_at": datetime.now(timezone.utc).isoformat()
+        "rescheduled_to_time": reschedule_time,
+        "new_surgery_id": new_surgery_id,
+        "updated_at": now
     }
-    
+
     await db.surgeries.update_one({"id": surgery_id}, {"$set": update_data})
     try:
         from routes.quirofano import delete_anesthesia_for_surgery

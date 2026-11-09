@@ -248,7 +248,7 @@ const SalaOperaciones = () => {
     } catch (e) { toast.error('No se pudo actualizar el estado de Pre-Ops'); }
   };
 
-  const [cancelForm, setCancelForm] = useState({ reason: '', reschedule_date: '' });
+  const [cancelForm, setCancelForm] = useState({ reason: '', reschedule_date: '', reschedule_time: '' });
 
   // Fetch data
   useEffect(() => {
@@ -553,11 +553,11 @@ const SalaOperaciones = () => {
     }
     setSubmitting(true);
     try {
-      await surgeryApi.cancel(selectedSurgery.id, cancelForm.reason, cancelForm.reschedule_date || null);
-      toast.success('Cirugía cancelada');
+      await surgeryApi.cancel(selectedSurgery.id, cancelForm.reason, cancelForm.reschedule_date || null, cancelForm.reschedule_time || null);
+      toast.success(cancelForm.reschedule_date ? 'Cirugía cancelada y reagendada' : 'Cirugía cancelada');
       setCancelDialogOpen(false);
       setSelectedSurgery(null);
-      setCancelForm({ reason: '', reschedule_date: '' });
+      setCancelForm({ reason: '', reschedule_date: '', reschedule_time: '' });
       fetchSurgeries();
     } catch (error) {
       console.error('Error canceling surgery:', error);
@@ -1004,6 +1004,7 @@ const SalaOperaciones = () => {
                                     onClick={() => { setSelectedSurgery(surgery); setCancelDialogOpen(true); }}
                                     className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700"
                                     title="Cancelar"
+                                    data-testid={`cancel-surgery-${surgery.id}`}
                                   >
                                     <X className="w-4 h-4" />
                                   </Button>
@@ -1754,7 +1755,10 @@ const SalaOperaciones = () => {
                       <span className="text-xs uppercase text-red-500">Motivo de cancelación</span>
                       <p className="text-sm mt-1 text-red-700">{selectedSurgery.cancellation_reason}</p>
                       {selectedSurgery.rescheduled_to && (
-                        <p className="text-sm mt-2 text-red-600">Reagendado para: {formatDateDisplay(selectedSurgery.rescheduled_to)}</p>
+                        <p className="text-sm mt-2 text-red-600" data-testid="surgery-rescheduled-to">
+                          Reagendado para: {formatDateDisplay(selectedSurgery.rescheduled_to)}{selectedSurgery.rescheduled_to_time ? ` ${selectedSurgery.rescheduled_to_time}` : ''}
+                          {selectedSurgery.new_surgery_id && <span className="text-emerald-600"> — nueva cirugía creada ✓</span>}
+                        </p>
                       )}
                     </div>
                   )}
@@ -1910,11 +1914,24 @@ const SalaOperaciones = () => {
                 </div>
                 <div>
                   <Label>Reagendar para (opcional)</Label>
-                  <Input
-                    type="date"
-                    value={cancelForm.reschedule_date}
-                    onChange={(e) => setCancelForm({ ...cancelForm, reschedule_date: e.target.value })}
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="date"
+                      value={cancelForm.reschedule_date}
+                      onChange={(e) => setCancelForm({ ...cancelForm, reschedule_date: e.target.value })}
+                      data-testid="reschedule-date-input"
+                    />
+                    <Input
+                      type="time"
+                      value={cancelForm.reschedule_time}
+                      onChange={(e) => setCancelForm({ ...cancelForm, reschedule_time: e.target.value })}
+                      disabled={!cancelForm.reschedule_date}
+                      data-testid="reschedule-time-input"
+                    />
+                  </div>
+                  {cancelForm.reschedule_date && (
+                    <p className="text-xs text-indigo-600 mt-1">Se creará una nueva cirugía activa en esa fecha y hora con los mismos datos.</p>
+                  )}
                 </div>
               </div>
             )}
