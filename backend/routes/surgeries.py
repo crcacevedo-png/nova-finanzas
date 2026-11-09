@@ -491,7 +491,7 @@ async def get_surgery(surgery_id: str, current_user: dict = Depends(get_current_
 @router.post("", response_model=SurgeryResponse)
 async def create_surgery(
     surgery: SurgeryCreate,
-    current_user: dict = Depends(require_permission("create_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Registrar nueva cirugía"""
     # Validar campos IGSS si la institución es IGSS
@@ -544,7 +544,7 @@ async def create_surgery(
 async def update_surgery(
     surgery_id: str,
     surgery: SurgeryUpdate,
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Editar cirugía"""
     existing = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -582,7 +582,7 @@ async def update_surgery(
 async def set_supplies_status(
     surgery_id: str,
     estado: str = Body(..., embed=True),
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Estado de insumos para caja (solo aplica a cirugías de Alquiler)."""
     if estado not in ("pendiente", "registrados", "sin_adicionales"):
@@ -728,7 +728,7 @@ async def add_equipment(
     quantity: int = Body(1),
     notes: str = Body(""),
     catalog_id: str = Body(None),
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Agregar equipo a una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -762,7 +762,7 @@ async def add_equipment(
 async def delete_equipment(
     surgery_id: str,
     equipment_id: str,
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Eliminar equipo de una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -793,7 +793,7 @@ async def add_supply(
     unit_cost: float = Body(0),
     notes: str = Body(""),
     catalog_id: str = Body(None),
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Agregar insumo a una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -833,7 +833,7 @@ async def update_supply(
     quantity: Optional[int] = Body(None),
     unit_cost: Optional[float] = Body(None),
     notes: Optional[str] = Body(None),
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Editar insumo de una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
@@ -873,7 +873,7 @@ async def update_supply(
 async def delete_supply(
     surgery_id: str,
     supply_id: str,
-    current_user: dict = Depends(require_permission("edit_expenses"))
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Eliminar insumo de una cirugía"""
     surgery = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})

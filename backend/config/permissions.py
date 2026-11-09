@@ -120,7 +120,7 @@ PERMISSIONS = {
         "view_agenda": True,
         "view_evaluacion": True,
         "manage_recetas": False,
-        "view_sala_operaciones": False
+        "view_sala_operaciones": True
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
