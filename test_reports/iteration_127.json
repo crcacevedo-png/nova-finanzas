@@ -1,0 +1,34 @@
+{
+  "summary": "RETEST of iteration_126 fixes. Backend: 17/17 pytest pass (new tests/test_surgeries_manage_permission.py 12 + existing test_surgeries_usuario_permissions.py 5). FIX 1 confirmed: PUT /api/surgeries/{id} with {status:'cancelado', cancellation_reason, rescheduled_to} returns 200 but status stays 'activo' and fields remain empty, for usuario, medico AND superadmin. Real cancel via POST /cancel works for superadmin only (usuario 403). FIX 2 confirmed: /auth/me manage_sala_operaciones=True for superadmin/usuario/medico, False for anestesia; view_sala_operaciones=True for all four. anestesia: GET list/detail 200; all 9 write endpoints (POST create, PUT edit, PATCH supplies-status, POST/DELETE equipment, POST/PUT/DELETE supplies, POST cancel, DELETE surgery) return 403 and data unchanged. usuario/medico/superadmin create+edit via API OK. UI: anestesia on /sala-operaciones sees list and detail but NO 'Registrar cirugía', no cancel/delete row buttons, no '+ Agregar equipo/insumo', no 'Editar' -> read-only OK. usuario UI: register button visible and dialog opens, detail -> Editar -> 'Guardar registro' toast 'Cirugía actualizada', '+ Agregar equipo' toast 'Equipo agregado', no cancel/delete buttons, zero 4xx. superadmin UI: same plus cancel/delete visible, all OK. medico_test UI could NOT be tested: in preview the 'medico' role has no 'sala_operaciones' menu (DEFAULT_MENU_CONFIG medico = pacientes, agenda, evaluacion_oftalmologica; no db.menu_configurations doc for medico) so /sala-operaciones redirects to Pacientes. Not a regression of this change; medico write capability verified via API only.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/surgeries/{id}", "issue": "status/cancellation_reason/rescheduled_to are silently dropped (200 returned). Secure, but a 400/ignored-field note could be clearer. Acceptable."},
+      {"endpoint": "permissions (administrador_igss role)", "issue": "administrador_igss has 'sala_operaciones' menu but no manage_sala_operaciones -> read-only in Sala de Operaciones. Previously it also lacked view_sala_operaciones in db.roles so no behavior change; confirm intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "medico -> /sala-operaciones", "issue": "Preview medico role has no sala_operaciones menu (routes/menu_config.py DEFAULT_MENU_CONFIG['medico']); page redirects to /pacientes. /app/memory/test_credentials.md claims medico has sala_operaciones menu. Medico UI create/edit therefore unverifiable in preview (API works). In production it depends on menu_configurations for medico.", "affected_selectors": ["[data-testid='sala-operaciones-page']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_surgeries_manage_permission.py", "/app/backend/tests/test_surgeries_usuario_permissions.py", "/app/test_reports/pytest/pytest_iter127.xml"],
+  "action_items": [
+    "Decide whether 'medico' should get 'sala_operaciones' in DEFAULT_MENU_CONFIG (or via Menu config UI); otherwise update test_credentials.md which says medico has it.",
+    "Optional: confirm administrador_igss should remain read-only in Sala de Operaciones."
+  ],
+  "critical_code_review_comments": [
+    "Duplicate PERMISSIONS matrices in server.py and config/permissions.py (new key had to be added twice) — consolidate.",
+    "preop-status PATCH still gated by view_sala_operaciones, so anestesia (read-only) can toggle Pre-Ops via API; UI toggle button in list (line ~964) is likely not canEdit-guarded either. Confirm this is intended.",
+    "SalaOperaciones.js ~1990 lines — should be split."
+  ],
+  "updated_files": ["/app/backend/tests/test_surgeries_manage_permission.py"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% of testable flows (anestesia, usuario, superadmin); medico UI not testable (no menu)"},
+  "seed_data_creation": "None persisted. All TEST_Iter127_* and TEST_UI127 surgeries deleted via superadmin; verified 0 TEST_ surgeries and 0 orphan notas_cirugia.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... python3 -m pytest tests/test_surgeries_manage_permission.py tests/test_surgeries_usuario_permissions.py -p no:xdist -o addopts=''. Medico has no sala_operaciones menu in preview.",
+  "rca of the issue": "Cancel bypass closed by popping status/cancellation_reason/rescheduled_to in update_surgery. anestesia regression avoided by new manage_sala_operaciones permission absent from anestesia db.roles doc (require_permission defaults False)."
+}

@@ -6,6 +6,7 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Confirmar que el deploy del fix "texto superpuesto en PDF de Cierre + columna Institución" (Sesión, 2026-11) quedó activo en producción.
 - Confirmar que el deploy de "pago individual por procedimiento en Cierre mensual de Anestesia" (2026-11) quedó activo y validado por el usuario en producción.
 - Confirmar deploy y validación en producción del fix de Sesión 53 (2026-02): autoguardado de "Lectura de Exámenes" + diagnósticos persistentes.
+- Confirmar deploy y validación en producción del fix de Sesión 54 (2026-02): rol "usuario" puede crear/editar cirugías + cierre de bypass de cancelación. Verificar si existe un doc personalizado de "usuario" en `db.roles` de producción que necesite actualizarse manualmente (vía Gestión de Roles) para incluir `manage_sala_operaciones`.
 - Investigación sin causa raíz confirmada: "Tipo de Compra" IGSS desactualizado en un PDF de producción — pendiente de que el usuario indique el PDF/reporte exacto para reproducir.
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
 
@@ -17,6 +18,8 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Sala de Operaciones: alertas/filtro opcional de Pre-Ops incompletos.
 - NOG: exportación de la lista + alertas automáticas al 90%/100% de cupo; control de vigencia/vencimiento.
 - Completar valores faltantes en registros IGSS/seguro importados desde la hoja de cálculo original.
+- Confirmar si el rol "medico" debería tener el menú "sala_operaciones" por defecto (en preview no lo tiene, pero test_credentials.md documenta que sí debería verlo; no bloquea el backend, que ya funciona vía API para medico).
+- Confirmar si "administrador_igss" debe seguir siendo de solo lectura en Sala de Operaciones (hoy no tiene `manage_sala_operaciones`).
 
 ## P2 — Pausado / depende de terceros
 - FEL/Digifact: activación de producción pendiente de certificado SAT/Digifact, aprovisionamiento y credenciales seguras del usuario.
