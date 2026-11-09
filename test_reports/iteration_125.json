@@ -1,0 +1,35 @@
+{
+  "summary": "RETEST of 'Diagnósticos persistentes' after the HIGH fix from iteration_124 (frontend only, Playwright, superadmin, network requests captured). REGRESSION FIXED: selecting a patient who has active diagnoses and no eval today fires NO POST/PATCH /evaluaciones, even after waiting 9s. The DB was checked through the API: no new eval. The dx still prefill correctly (TEST_Glaucoma primario OD, TEST_Catarata senil OS). Real autosave still works: typing in motivo_consulta, and separately editing a dx description, each triggered POST /evaluaciones and then PATCH /autoguardar, with status 'Guardado a las ...'. All earlier flows still pass, and all new checks pass.",
+  "verified_passing": [
+    "No spurious auto-create on patient select. Tested twice: on the first visit, and on a simulated next day with 1 carried dx",
+    "A real edit (motivo, or the dx description) triggers autosave creation, and the data persists after reload",
+    "Resuelto btn -> diagnostico-resuelto-badge-1. diagnostico-resuelto-btn-1 and diagnostico-eliminar-btn-1 are both gone (Trash hidden for resolved). Active row 0 still has both buttons. resuelto=true persists after reload",
+    "Alignment: description inputs of resolved, active, and newly added rows all have the same x=1377 and width=277px, in both editable and sealed modes",
+    "diagnostico-agregar-btn exists. diagnostico-descripcion-input-{idx} is applied to the inputs. Agregar creates an OU row with its own Resuelto btn",
+    "Next day carries forward only non-resolved dx. Empty dx rows are filtered from diagnosticos_activos. Deleting a carried dx leaves diagnosticos_activos empty",
+    "Sealed eval: no Agregar, Resuelto, or Eliminar buttons. Inputs are disabled and the badge still shows",
+    "Role anestesia is redirected to /sala-operaciones",
+    "Lectura de Exámenes autosave persists after reload"
+  ],
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "autoguardado-status after patient select", "issue": "LOW: Right after selecting a patient with no eval today, the badge shows 'Cambios sin guardar' even though the user changed nothing, and it never clears. Cause: the form-reset setFormData runs the effect, which sets 'Cambios sin guardar' and starts a timer. The historial prefill render then runs the effect cleanup, which clears that timer, and the skip branch returns without resetting the status. Suggested fix: in the skip branch, call setAutoguardadoStatus('') when !evaluacionActual?.id.", "selector": "[data-testid='autoguardado-status']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/dx_setup_helper.py"],
+  "action_items": ["(Optional, LOW) Clear the misleading 'Cambios sin guardar' status in the autosave skip branch for new, unsaved evaluations"],
+  "critical_code_review_comments": [
+    "EvaluacionOftalmologica.js is still well over 3800 lines. Extract DiagnosticosSection.",
+    "The dx rows still use key={idx}. A stable id is safer.",
+    "The skipAutoguardadoRef single-shot flag relies on the very next effect run being the one caused by the prefill. It works now, but it is fragile if other effect deps change in a separate render in between."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% (all requested flows pass; 1 LOW cosmetic status issue)"},
+  "seed_data_creation": "Created TEST_DxPersist Paciente (df74601e-9799-402a-b4e1-989a44f0a22b) and 3 evals. Temporarily set sellado on my own TEST eval via mongo, then unset it. All 3 evals were hard-deleted and the patient was deleted via the cleanup helper.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use dx_setup_helper.py setup/list/shift/cleanup. To detect spurious autosave, capture POST/PATCH requests to /api/evaluaciones with page.on('request'). Selectors: search-paciente, eval-paciente-option-{id}, autoguardado-status, diagnostico-descripcion-input-{i}, diagnostico-resuelto-btn-{i}, diagnostico-resuelto-badge-{i}, diagnostico-eliminar-btn-{i}, diagnostico-agregar-btn."
+}

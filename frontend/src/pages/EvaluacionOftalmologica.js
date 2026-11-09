@@ -925,6 +925,7 @@ const EvaluacionOftalmologica = () => {
     // No autoguardar si este cambio de formData proviene de CARGAR una evaluación (no es edición del usuario)
     if (skipAutoguardadoRef.current) {
       skipAutoguardadoRef.current = false;
+      if (!evaluacionActual?.id) setAutoguardadoStatus('');
       return;
     }
     
