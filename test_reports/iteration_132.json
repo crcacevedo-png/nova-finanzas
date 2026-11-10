@@ -1,0 +1,23 @@
+{
+  "summary": "Verified date-only fix in Procedimientos de Anestesia > Cierre mensual (Nov 2026, 37 records). With browser TZ emulated as America/Guatemala (CDP) AND in UTC, all 37 rows show the same date as backend 'date' (YYYY-MM-DD). Cross-checked 9 patients (11 rows) against /sala-operaciones (Rudel Mauricio Álvarez 09/11/26, Rudel Mauricio Alvarez 10/11/26, Adolfo Rosales 09/11/26, Berta Maria Merlo Rivas 02/11/26, Sofia Simpson Carcamo 17/11/26, Hilda Evelia Barrera 10/11 & 16/11, Marta Alicia Marroquin 04/11 & 23/11, Carlos Eduardo Diaz-nuila 05/11) - all identical. Excel and PDF exports (API + UI download buttons) contain correct dates. Regression: patient, procedure, surgeon, institution, anesthesia type, honorario, Marcar pagado -> Pagado (opacity, pending counter 37->36) -> revert to pendiente (37) all work. Bug FIXED.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional/latent (same root cause, not in scope): services/api.js formatDate() is used on date-only 'YYYY-MM-DD' fields elsewhere and will show the previous day: Gastos.js (expense.due_date L758/L1150, payment.date L1166), Dashboard.js L125 (alert.due_date, DB e.g. '2026-04-02'), Pacientes.js L1483 (birth_date, DB e.g. '1985-06-15'), plus possibly HistorialPagos payment.date, CuentasCobrarOptica/CXC fecha_emision/fecha_vencimiento/pago.fecha, Caja cierre.fecha/abono.fecha, Agenda miAgenda.fecha, VentasClinica sale.fecha (verify which are date-only vs datetime). Best fix: make formatDate detect /^\\d{4}-\\d{2}-\\d{2}$/ and format without timezone conversion."
+  ],
+  "critical_code_review_comments": [
+    "formatDateOnly in ProcedimientosAnestesia.js duplicates formatDateDisplay in SalaOperaciones.js - move to services/api.js as shared helper (or make formatDate date-only aware) to fix the same bug app-wide.",
+    "formatDateOnly would render 'NaN/NaN/aN' if d.date ever arrived as full ISO datetime; fine today since backend always sends YYYY-MM-DD."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (export endpoints 200, verified)", "frontend": "100%"},
+  "seed_data_creation": "None. Toggled pay on Adolfo Rosales anesthesia record and reverted it to pendiente (original state restored).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Route is /quirofano/anestesia (not /procedimientos-anestesia). Env clock is Nov 2026; month 2026-11 has 37 records. Use CDP Emulation.setTimezoneOverride America/Guatemala to reproduce TZ bugs. Login testids: login-username-input/login-password-input/login-submit-button."
+}

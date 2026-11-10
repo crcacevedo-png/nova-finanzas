@@ -449,6 +449,13 @@ const GUATEMALA_TIMEZONE = 'America/Guatemala';
 // Format date helper - Formato dd/mm/yy (estándar Guatemala) con zona horaria correcta
 export const formatDate = (dateString) => {
   if (!dateString) return '-';
+  // Fechas "solo fecha" (YYYY-MM-DD, sin hora) se parsean como medianoche UTC; convertirlas
+  // a la zona horaria de Guatemala (UTC-6) las corre al día anterior. Para ese caso se formatea
+  // directamente desde los componentes del string, sin pasar por conversión de zona horaria.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [y, m, d] = dateString.split('-');
+    return `${d}/${m}/${y.slice(-2)}`;
+  }
   const date = new Date(dateString);
   // Usar Intl.DateTimeFormat con zona horaria de Guatemala
   return date.toLocaleDateString('es-GT', {
