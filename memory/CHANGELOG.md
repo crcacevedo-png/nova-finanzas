@@ -3,6 +3,13 @@
 Historial cronológico de sesiones de desarrollo (más reciente primero dentro de cada bloque agregado). Para el problema original y alcance del producto ver PRD.md. Para pendientes/backlog ver ROADMAP.md.
 
 ## Estado Actual del Proyecto
+### Sesión 57 — Fix: Punto de Venta de Óptica no permitía confirmar la venta (2026-02) — RESUELTO y verificado
+- 🐛 **Reporte del usuario (con captura de pantalla)**: al escribir el monto en el diálogo de pago del Punto de Venta de Óptica, "Pagado" seguía en Q0.00 y "Confirmar Venta" quedaba deshabilitado.
+- 🔍 **Causa raíz**: el monto escrito en el campo "Monto" es solo un valor en espera hasta que se presiona el botón "+" para agregarlo a la lista de formas de pago; "Pagado"/"Pendiente" y el habilitado de "Confirmar Venta" solo se calculan sobre esa lista, no sobre el texto escrito. El usuario escribió el monto pero no presionó "+", por lo que el sistema seguía viendo la venta como no pagada (comportamiento técnicamente esperado por el código, pero confuso/bloqueante en la práctica — mismo patrón ya existente también en el Punto de Venta de la Clínica, no es exclusivo de Óptica, pero solo se corrigió en Óptica ya que es el flujo reportado).
+- ✅ **Fix**: (1) "Confirmar Venta" ahora también resta el monto escrito aún no agregado al calcular si debe habilitarse; (2) al procesar la venta, si queda un monto válido sin agregar explícitamente con "+", se agrega automáticamente antes de validar y enviar — el usuario ya no necesita presionar "+" si va a pagar todo con una sola forma de pago.
+- ✅ **Verificado**: testing E2E 100% (6/6 escenarios + regresión FEL/impresión): pagar sin presionar "+", pago dividido (parte con "+", resto sin "+"), monto insuficiente sigue bloqueado correctamente, Cuenta por Cobrar sin/con paciente se comporta igual que antes. Flujo original (con "+") sigue funcionando sin cambios. Punto de Venta de la Clínica no fue tocado.
+- ⚠️ Requiere redespliegue para producción.
+
 ### Sesión 56 — Facturación Electrónica (FEL) en el Punto de Venta de Óptica (2026-02) — COMPLETADO y verificado
 - 🎯 Plan aprobado: el Punto de Venta de Óptica (`OpticaPOS.js`, ruta `/optica/punto-venta`) ahora puede emitir, consultar e imprimir la factura electrónica (FEL) de cada venta, igual que ya funcionaba en el Punto de Venta de la Clínica. Reutiliza la misma configuración/credenciales de prueba de Digifact ya usada para la Clínica (sin configuración separada para Óptica).
 - ✅ **Backend** (`routes/optica.py`): nuevo endpoint `GET /optica/sales/{sale_id}/ticket` (mismo formato que el ya existente de la Clínica, adaptado a `items_v2`/pagos de Óptica, con fallback para ventas legacy sin `items_v2`).

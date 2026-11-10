@@ -9,6 +9,7 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Confirmar deploy y validación en producción del fix de Sesión 54 (2026-02): rol "usuario" puede crear/editar cirugías + cierre de bypass de cancelación. Verificar si existe un doc personalizado de "usuario" en `db.roles` de producción que necesite actualizarse manualmente (vía Gestión de Roles) para incluir `manage_sala_operaciones`.
 - Confirmar deploy y validación en producción del fix de Sesión 55 (2026-02): rol "usuario" puede cancelar/reprogramar/eliminar cirugías.
 - Confirmar deploy y validación en producción de la Sesión 56 (2026-02): FEL en el Punto de Venta de Óptica.
+- Confirmar deploy y validación en producción de la Sesión 57 (2026-02): fix de "Confirmar Venta" deshabilitado en el POS de Óptica.
 - Investigación sin causa raíz confirmada: "Tipo de Compra" IGSS desactualizado en un PDF de producción — pendiente de que el usuario indique el PDF/reporte exacto para reproducir.
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
 
@@ -28,6 +29,9 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Óptica POS FEL — Fase 2: indicador de estado de factura (facturada/pendiente) directamente en cada fila de "Ver Ventas del Día" sin abrir el detalle.
 - Óptica POS FEL: bloquear en el backend la certificación de una venta ya cancelada (hoy no lo impide; aplica igual para Clínica, no introducido por esta sesión).
 - "Ver Ventas del Día" (Óptica y posible paridad en Clínica): el conteo del encabezado excluye ventas canceladas aunque sí aparecen en la lista con su insignia; evaluar si se debe aclarar o filtrar.
+- Punto de Venta de Óptica: mostrar en el diálogo de pago cuánto se "agregará" del monto escrito aún no confirmado con "+" (ej. "Se agregará Q45.00 (Efectivo) al confirmar"), para que el usuario entienda el nuevo comportamiento sin ambigüedad.
+- Al cancelar una venta de Óptica con Cuenta por Cobrar asociada, la cuenta por cobrar queda abierta (no se cancela junto con la venta) — pre-existente, no introducido por el fix reciente.
+- Evaluar si el mismo problema de "Confirmar Venta deshabilitado al escribir el monto sin presionar +" también debería corregirse en el Punto de Venta de la Clínica (no se tocó, usa código separado).
 
 ## P2 — Pausado / depende de terceros
 - FEL/Digifact: activación de producción pendiente de certificado SAT/Digifact, aprovisionamiento y credenciales seguras del usuario.

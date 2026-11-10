@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend-only check of the Óptica POS fix for 'Confirmar Venta' (it was disabled when the amount was typed but '+' was not pressed). Logged in as optica at /optica/punto-venta, tested with 'NovaVision Estuche rígido' (Q45), and captured the POST /api/optica/sales/v2 payloads. All 6 scenarios PASS. (1) Typing 45.00 in Efectivo without '+' enables Confirmar, and the sale completes (Venta Exitosa ORD-0015, payments=[Efectivo 45]). (2) Tarjeta without '+' with reference TEST_REF123 sends payments=[Tarjeta 45, reference TEST_REF123], so the method and reference are kept. (3) Original flow, 'Monto exacto' then '+', still works: the list shows 'Efectivo: Q45', Pagado Q45, Pendiente Q0, and the sale completes. (4) Split: after Efectivo 20 is added, Confirmar stays disabled. Typing Tarjeta 25 without '+' enables it, and the payload is [Efectivo 20, Tarjeta 25]. (5) Not enough paid: Confirmar stays disabled with 10 or 44.98 typed. (6) CxC with patient María García López and médico Dr. Carlos Méndez: a full Q45 CxC typed without '+' gives tiene_cxc=true, monto_cxc=45, and POST /cuentas-cobrar/optica returns 200. Efectivo 25 added plus CxC 20 typed gives payments=[Efectivo 25], monto_cxc=20, and the CxC is created. CxC without a patient: Confirmar is enabled, but clicking it shows the toast 'Debe seleccionar un paciente...', no sale is created, and the typed amount moves into the payment list (no duplicate). FEL regression: a sale made with the fixed flow (Tarjeta without '+', ORD-0022) was certified via Digifact (badge 'FEL BB2E4E19-1567378432' with Ver). Imprimir opens the ticket with the right order, client, item and 'Tarjeta: Q45.00'. Clínica PuntoVenta.js was not touched (not retested). Cleanup: all 8 test sales (ORD-202611-0015 to 0022) were cancelled with superadmin, and the 2 FEL certifications were annulled first.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/optica/sales/{id}/cancel", "issue": "Cancelling a sale that has a CxC does not cancel or close the linked cuenta por cobrar. CXC-OPT-202611-0006 (Q45) and CXC-OPT-202611-0007 (Q20), created by test sales ORD-0019/0020, are still open after the sales were cancelled (saldo_pendiente 45/20, venta_id null). This existed before this fix. They are test data for María García López and need manual cleanup."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "POS Óptica - Procesar Pago dialog", "issues": [
+        "A typed amount that has not been added with '+' does not show anywhere in the summary (Pagado stays Q0.00, Pendiente stays Q45.00) even though Confirmar is now enabled. A hint like 'Se agregará Q45.00 (Efectivo) al confirmar' would help the user understand what will be charged.",
+        "The yellow 'Agregar saldo pendiente a Cuenta por Cobrar' button still shows while a typed amount already covers the total."
+      ]}
+    ]
+  },
+  "test_report_links": ["/app/tests/helper_pos_fel_retest.py"],
+  "action_items": [
+    "Optional UX: show the typed amount in the summary (for example 'Por agregar: Q45.00 (Efectivo)') so Pagado and Pendiente match the enabled Confirmar button.",
+    "Add data-testid to POSPaymentDialog elements: Monto input, the '+' button, 'Monto exacto', the Pagado and Pendiente values, 'Confirmar Venta', and the payment list rows. Tests currently rely on role and xpath selectors. The testing agent could not add them because /app is read-only for it.",
+    "Consider cancelling the linked CxC when an Óptica sale with CxC is cancelled (this existed before the fix).",
+    "Manually clean up the test CxC accounts CXC-OPT-202611-0006 and CXC-OPT-202611-0007 (patient María García López)."
+  ],
+  "critical_code_review_comments": [
+    "The fix is correct: procesarVenta builds formasPagoFinal from the typed amount, and it uses formasPagoFinal (not the stale formasPago state) for validation, the CxC split and the payload. The disabled check in POSPaymentDialog subtracts the typed amount.",
+    "procesarVenta calls setFormasPago(formasPagoFinal) and clears Monto before validating. If validation then fails (CxC without a patient, missing médico, discount without an authorizer), the typed amount has already been moved into the list. Nothing is duplicated, but it is a hidden side effect. Acceptable.",
+    "The disabled check only looks at formasPago.some(es_cxc), not at a typed CxC amount. So a partial CxC typed alone (for example 20 of 45) stays disabled. This is the same behaviour as before the fix.",
+    "Overpayment is allowed (typing 100 Efectivo for Q45 enables Confirmar, and the payment amount is sent as 100), the same as the original '+' flow. Check that the backend and the ticket handle change (vuelto) correctly if this matters."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% (6/6 scenarios plus FEL/print regression)"},
+  "seed_data_creation": "Created test sales ORD-202611-0015 to 0022; all were cancelled with superadmin, and the 2 FEL certifications were annulled. 2 CxC accounts (CXC-OPT-202611-0006/0007) are still open because cancelling a sale does not cancel them.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Óptica POS payment dialog: the Monto input is dialog input[type=number]. The '+' button is the last button in the input's ancestor div.flex.gap-2. Method buttons have data-testid pos-metodo-{Efectivo|Tarjeta|Transferencia|Cheque|Cuenta por Cobrar}. The patient search needs at least 2 characters ('ma' finds María García López, and the médico is suggested or found with 'Ca'). FEL certification can take more than 12s, so wait up to 110s for fel-badge-certificado. Use /app/tests/helper_pos_fel_retest.py cancel <ids> for cleanup."
+}
