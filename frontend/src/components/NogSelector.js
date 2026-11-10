@@ -65,17 +65,25 @@ export const NogSelector = ({ unitId, value, onChange, idSuffix = '' }) => {
   // Sin catálogo: solo texto libre (comportamiento anterior)
   if (nogs.length === 0) {
     return (
-      <Input
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        className="input-teal"
-        placeholder="No. Orden Gestión"
-        data-testid={`patient-igss-nog${idSuffix}`}
-      />
+      <div className="space-y-1">
+        <Input
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          className="input-teal"
+          placeholder="No. Orden Gestión"
+          data-testid={`patient-igss-nog${idSuffix}`}
+        />
+        {(value || '').trim() && (
+          <p className="text-xs text-amber-600" data-testid={`patient-nog-warning${idSuffix}`}>
+            Esta unidad no tiene NOG registrados en su catálogo: este NOG no descontará cupo ni aparecerá en Producción IGSS hasta que se registre en "Unidades IGSS".
+          </p>
+        )}
+      </div>
     );
   }
 
   const selectValue = libre ? LIBRE : (value || '');
+  const nogNoCatalogado = libre && (value || '').trim() && !nogs.some((n) => n.numero === value.trim());
 
   return (
     <div className="space-y-2">
@@ -105,13 +113,20 @@ export const NogSelector = ({ unitId, value, onChange, idSuffix = '' }) => {
         </SelectContent>
       </Select>
       {libre && (
-        <Input
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          className="input-teal"
-          placeholder="No. Orden Gestión (texto libre)"
-          data-testid={`patient-igss-nog${idSuffix}`}
-        />
+        <div className="space-y-1">
+          <Input
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="input-teal"
+            placeholder="No. Orden Gestión (texto libre)"
+            data-testid={`patient-igss-nog${idSuffix}`}
+          />
+          {nogNoCatalogado && (
+            <p className="text-xs text-amber-600" data-testid={`patient-nog-warning${idSuffix}`}>
+              Este NOG no está registrado en el catálogo de esta unidad: no descontará cupo ni aparecerá en Producción IGSS. Regístralo en "Unidades IGSS" o verifica que esté bien escrito.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

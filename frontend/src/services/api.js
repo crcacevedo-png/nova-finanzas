@@ -258,6 +258,8 @@ export const rolesApi = {
 
 // Patients API (Base de Datos de Pacientes)
 export const patientApi = {
+  previewOrdenesLegacy: () => axios.get(`${API_URL}/patients/mantenimiento/ordenes-legacy`),
+  migrarOrdenesLegacy: () => axios.post(`${API_URL}/patients/mantenimiento/migrar-ordenes-legacy`),
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
     if (filters.page) params.append('page', filters.page.toString());

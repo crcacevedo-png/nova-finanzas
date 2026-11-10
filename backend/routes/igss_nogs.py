@@ -1278,10 +1278,13 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
         # Procedimiento = descripción del servicio; si la evaluación/orden no lo trae,
         # se usa el nombre del servicio del NOG del catálogo de la unidad.
         proc = proc or nogdoc.get("nombre_servicio") or ""
+        # Si el NOG de la orden no está registrado en el catálogo de la unidad, la fila
+        # se muestra igual (no se oculta) pero marcada para que el usuario la catalogue.
+        nog_catalogado = bool(numero) and bool(nogdoc)
         candidatos.append({
             "ev": ev, "pac": pac, "uid": uid, "unit": unit,
             "numero": numero, "no_sps": no_sps, "codigo": codigo, "proc": proc,
-            "precio": precio, "tiene_contenido": tiene_contenido,
+            "precio": precio, "tiene_contenido": tiene_contenido, "nog_catalogado": nog_catalogado,
         })
 
     # 2) Agrupar por paciente + orden (No. SPS; respaldo NOG; respaldo paciente/día)
@@ -1337,6 +1340,7 @@ async def _build_produccion_rows(fecha, desde, hasta, unidad_id, nog):
             "unidad_id": rep["uid"] or "",
             "unidad_nombre": (unit or {}).get("name", ""),
             "nog": rep["numero"], "no_sps": rep["no_sps"], "codigo": rep["codigo"], "procedimiento": rep["proc"],
+            "nog_catalogado": rep["nog_catalogado"],
             "medico_nombre": ev.get("medico_nombre", ""),
             "fecha": fecha_primera,
             "precio_nog": precio,
@@ -1474,14 +1478,14 @@ async def exportar_produccion_excel(
     ws.title = "Produccion"
     hf = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
     bold = Font(color="FFFFFF", bold=True)
-    headers = ["Fecha", "Unidad", "NOG", "No. SPS", "Paciente", "Expediente", "Procedimiento", "Médico", "Costo (Q)", "Impreso", "Enviado", "Facturado", "Pagado"]
+    headers = ["Fecha", "Unidad", "NOG", "NOG Catalogado", "No. SPS", "Paciente", "Expediente", "Procedimiento", "Médico", "Costo (Q)", "Impreso", "Enviado", "Facturado", "Pagado"]
     ws.append(headers)
     for c in ws[1]:
         c.fill = hf
         c.font = bold
     si = lambda b: "Sí" if b else "No"
     for r in rows:
-        ws.append([r["fecha"], r["unidad_nombre"], r["nog"], r["no_sps"], r["paciente_nombre"], r["expediente"], r["procedimiento"], r["medico_nombre"], r["costo"], si(r["impreso"]), si(r["enviado"]), si(r["facturado"]), si(r["pagado"])])
+        ws.append([r["fecha"], r["unidad_nombre"], r["nog"], si(r.get("nog_catalogado", True)), r["no_sps"], r["paciente_nombre"], r["expediente"], r["procedimiento"], r["medico_nombre"], r["costo"], si(r["impreso"]), si(r["enviado"]), si(r["facturado"]), si(r["pagado"])])
     ws.append([])
     ws.append(["TOTALES", "", "", "", "", "", "", "", tot["total_costo"]])
     ws.append(["Servicios", tot["servicios"]])

@@ -910,6 +910,79 @@ async def reactivate_patient(patient_id: str, current_user: dict = Depends(requi
     return PatientResponse(**enriched)
 
 
+@router.get("/mantenimiento/ordenes-legacy")
+async def preview_ordenes_legacy(current_user: dict = Depends(require_role(["superadmin"]))):
+    """Vista previa de pacientes IGSS con NOG/SPS/código legacy pero sin ninguna
+    orden en `igss_ordenes` (candidatos a migrar)."""
+    candidatos = await db.patients.find({
+        "referral_institution": "igss",
+        "is_active": True,
+        "$or": [{"igss_ordenes": {"$exists": False}}, {"igss_ordenes": []}, {"igss_ordenes": None}],
+        "$and": [{"$or": [
+            {"igss_nog": {"$nin": [None, ""]}},
+            {"igss_no_sps": {"$nin": [None, ""]}},
+            {"igss_codigo": {"$nin": [None, ""]}},
+        ]}],
+    }, {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "igss_nog": 1, "igss_no_sps": 1, "igss_codigo": 1}).to_list(500)
+    return {
+        "total": len(candidatos),
+        "muestra": [
+            {
+                "id": p["id"],
+                "paciente_nombre": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                "nog": p.get("igss_nog", ""),
+                "no_sps": p.get("igss_no_sps", ""),
+                "codigo": p.get("igss_codigo", ""),
+            }
+            for p in candidatos[:20]
+        ],
+    }
+
+
+@router.post("/mantenimiento/migrar-ordenes-legacy")
+async def migrar_ordenes_legacy(current_user: dict = Depends(require_role(["superadmin"]))):
+    """Migración (idempotente): para cada paciente IGSS con NOG/SPS/código legacy
+    pero sin ninguna orden en `igss_ordenes`, crea esa orden a partir de los campos
+    legacy. No crea ni modifica acreditaciones (el cupo que ya estaba descontado
+    por la vía legacy se mantiene igual; solo se vuelve visible en la ficha)."""
+    from routes.igss_nogs import _reconciliar_nog_paciente
+    candidatos = await db.patients.find({
+        "referral_institution": "igss",
+        "is_active": True,
+        "$or": [{"igss_ordenes": {"$exists": False}}, {"igss_ordenes": []}, {"igss_ordenes": None}],
+        "$and": [{"$or": [
+            {"igss_nog": {"$nin": [None, ""]}},
+            {"igss_no_sps": {"$nin": [None, ""]}},
+            {"igss_codigo": {"$nin": [None, ""]}},
+        ]}],
+    }, {"_id": 0}).to_list(500)
+    migrados = []
+    for p in candidatos:
+        nueva_orden = _normalizar_ordenes_igss([{
+            "nog": p.get("igss_nog", ""),
+            "no_sps": p.get("igss_no_sps", ""),
+            "codigo": p.get("igss_codigo", ""),
+            "procedimiento": "",
+        }])
+        if not nueva_orden:
+            continue
+        await db.patients.update_one(
+            {"id": p["id"]},
+            {"$set": {
+                "igss_ordenes": nueva_orden,
+                "updated_by": current_user["id"],
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        actualizado = await db.patients.find_one({"id": p["id"]}, {"_id": 0})
+        await _reconciliar_nog_paciente(actualizado, current_user, origen="migracion_legacy")
+        migrados.append({
+            "id": p["id"],
+            "paciente_nombre": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+        })
+    return {"migrados": len(migrados), "pacientes": migrados}
+
+
 # ==================== EXPORT ENDPOINTS ====================
 
 @router.get("/export/template")

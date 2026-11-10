@@ -17,7 +17,8 @@ import {
   RotateCcw,
   Wrench,
   Trash,
-  Loader2
+  Loader2,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -44,7 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
-import { igssUnitApi, igssNogApi } from '../services/api';
+import { igssUnitApi, igssNogApi, patientApi } from '../services/api';
 import { ProduccionIGSS } from '../components/ProduccionIGSS';
 import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
 import { NogAlertasBanner } from '../components/NogAlertasBanner';
@@ -189,6 +190,8 @@ const UnidadesIGSS = () => {
   const [mantLoading, setMantLoading] = useState(false);
   const [limpiando, setLimpiando] = useState(false);
   const [recalcEval, setRecalcEval] = useState(false);
+  const [legacyPreview, setLegacyPreview] = useState(null);
+  const [migrandoLegacy, setMigrandoLegacy] = useState(false);
   const [confirmLimpiar, setConfirmLimpiar] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -248,6 +251,26 @@ const UnidadesIGSS = () => {
       toast.error(error.response?.data?.detail || 'Error al revisar borradores vacíos');
     } finally {
       setMantLoading(false);
+    }
+    try {
+      const res2 = await patientApi.previewOrdenesLegacy();
+      setLegacyPreview(res2.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al revisar órdenes legacy');
+    }
+  };
+
+  const handleMigrarOrdenesLegacy = async () => {
+    try {
+      setMigrandoLegacy(true);
+      const res = await patientApi.migrarOrdenesLegacy();
+      toast.success(`Se migraron ${res.data.migrados} paciente(s) con NOG legacy`);
+      setLegacyPreview({ total: 0, muestra: [] });
+      fetchUnits();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al migrar órdenes legacy');
+    } finally {
+      setMigrandoLegacy(false);
     }
   };
 
@@ -878,6 +901,30 @@ const UnidadesIGSS = () => {
                 >
                   {recalcEval ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-2" />}
                   {recalcEval ? 'Recalculando...' : 'Recalcular consumo'}
+                </Button>
+              </div>
+
+              {/* Sección 3: Migración de órdenes legacy */}
+              <div className="rounded-lg border p-4 space-y-3" data-testid="mant-legacy-section">
+                <div>
+                  <p className="font-semibold text-sm">Migrar pacientes con NOG legacy</p>
+                  <p className="text-xs text-gray-500">
+                    Pacientes IGSS con un NOG/SPS/código antiguo (de antes de "Órdenes IGSS") que no aparece
+                    como orden en su ficha. Crea la orden visible sin tocar el cupo ya descontado.
+                  </p>
+                </div>
+                <p className="text-sm" data-testid="mant-legacy-count">
+                  {legacyPreview === null ? 'Revisando...' : `${legacyPreview.total} paciente(s) encontrados`}
+                </p>
+                <Button
+                  size="sm"
+                  disabled={migrandoLegacy || !legacyPreview || legacyPreview.total === 0}
+                  onClick={handleMigrarOrdenesLegacy}
+                  className="btn-primary"
+                  data-testid="mant-migrar-legacy-button"
+                >
+                  {migrandoLegacy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRightLeft className="w-4 h-4 mr-2" />}
+                  {migrandoLegacy ? 'Migrando...' : `Migrar ${legacyPreview?.total ?? 0} paciente(s)`}
                 </Button>
               </div>
             </div>

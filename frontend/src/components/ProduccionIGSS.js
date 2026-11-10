@@ -11,8 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import { FileText, Printer, FolderOpen, Download } from 'lucide-react';
+import { FileText, Printer, FolderOpen, Download, AlertTriangle } from 'lucide-react';
 import { igssNogApi, igssUnitApi } from '../services/api';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -220,7 +221,14 @@ export const ProduccionIGSS = () => {
               {Object.entries(g.nogs).map(([nk, gn]) => (
                 <div key={nk}>
                   <div className="flex items-center justify-between text-xs font-semibold text-blue-700 bg-blue-50 rounded px-2 py-1 mb-1">
-                    <span>NOG {nk}</span>
+                    <span className="flex items-center gap-1.5">
+                      NOG {nk}
+                      {gn.rows.some((r) => r.nog_catalogado === false) && (
+                        <Badge className="bg-red-100 text-red-700 border border-red-300 text-[10px] font-semibold gap-1" data-testid={`nog-group-no-catalogado-${nk}`}>
+                          <AlertTriangle className="w-3 h-3" /> No catalogado
+                        </Badge>
+                      )}
+                    </span>
                     <span>{gn.rows.length} · {Q(gn.monto)}</span>
                   </div>
                   <div className="overflow-x-auto">
@@ -240,8 +248,21 @@ export const ProduccionIGSS = () => {
                       </TableHeader>
                       <TableBody>
                         {gn.rows.map((r) => (
-                          <TableRow key={r.evaluacion_id} data-testid={`prod-row-${r.evaluacion_id}`}>
-                            <TableCell className="font-medium">{r.paciente_nombre}</TableCell>
+                          <TableRow key={r.evaluacion_id} data-testid={`prod-row-${r.evaluacion_id}`} className={r.nog_catalogado === false ? 'bg-red-50' : ''}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-1.5">
+                                {r.paciente_nombre}
+                                {r.nog_catalogado === false && (
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 bg-red-100 border border-red-300 rounded px-1.5 py-0.5"
+                                    title="Este NOG no está registrado en el catálogo de la unidad: no tiene precio asignado ni descontó cupo."
+                                    data-testid={`prod-nog-no-catalogado-${r.evaluacion_id}`}
+                                  >
+                                    <AlertTriangle className="w-3 h-3" /> Pendiente de catalogar
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="font-mono text-xs">{r.expediente || '—'}</TableCell>
                             <TableCell className="text-xs">{r.no_sps || '—'}</TableCell>
                             <TableCell className="text-xs">{r.procedimiento || '—'}</TableCell>
