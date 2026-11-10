@@ -16,8 +16,8 @@ crons:
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     enabled: true
   - name: informe-anestesia-diario
-    description: "Envia por correo el informe diario de procedimientos de anestesia (17:00 Guatemala)"
-    cron: "0 17 * * *"
+    description: "Envia por correo el informe diario de procedimientos de anestesia (18:00 Guatemala)"
+    cron: "0 18 * * *"
     timezone: "America/Guatemala"
     endpoint: "{{BASE_URL}}/api/cron/informe-anestesia-diario"
     method: POST
