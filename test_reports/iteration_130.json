@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only retest of the 4 findings from iteration_129 (Óptica POS FEL), plus a quick regression. All 4 fixes verified in the UI as optica. (1) Stale row fixed: certified ORD-202611-0013 from the 'Ver Ventas del Día' detail (Consumidor Final), closed the detail with the list still open, and clicked the same row again. It showed 'FEL 270E3882-1613973419' with the 'Ver' button, and no 'Facturar FEL'. Also certified ORD-202611-0014 from 'Venta Exitosa', then opened it from Ver Ventas without reloading: it showed as certified. (2) Hover fixed: the row border changes from rgb(15,23,41) to rgb(20,184,166) (teal) on hover and goes back on mouse leave. (3) The FEL label on Venta Exitosa now sits above the control (flex-direction: column, label is 20px tall, so a single line, with the badge and 'Ver' below). It looks clean. (4) Cancelled rows show a red 'Cancelado' badge next to the order number. Paid rows show no badge (0 of 9 rows contained 'Pagado'). Regression: certification works, 'Ver' opens the PDF popup, and 'Imprimir' from both Venta Exitosa and the detail opens the Óptica ticket with the correct order, customer, items and Efectivo. /optica/ventas loads with no page errors and lists the new sales with their status badges.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/fel/certificar", "issue": "External Digifact sandbox latency: one certification took about 50s, and the UI showed 'Certificando...' throughout. The certification did complete. httpx timeouts are 40s and 60s (routes/fel.py lines 85 and 99), so a slower sandbox response could hit the timeout. This is an environment issue, not a bug in the fix. Optionally show a 'puede tardar hasta 1 minuto' hint."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Ver Ventas del Día header", "issues": ["The header count excludes cancelled sales (e.g. '2 ventas' while 9 rows are listed). Now that rows have a 'Cancelado' badge this is understandable. Optional: add '(N canceladas)' or a filter."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/helper_pos_fel_retest.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "refrescarVentaDetalle now syncs ventasHoy correctly. The Ver Ventas button also calls fetchVentasHoy() on open, so state certified from Venta Exitosa is always fresh.",
+    "Carried over from iteration_129: generarTicketHTMLOptica writes patient and item names into the HTML without escaping (minor HTML-injection risk). OpticaPOS.js is 1046 lines (>700), so consider extracting the ticket generator into a utility shared with PuntoVenta.js.",
+    "The backend still allows FEL certification of cancelled sales (from iteration_129, not addressed)."
+  ],
+  "updated_files": ["/app/tests/helper_pos_fel_retest.py"],
+  "success_rate": {"backend": "N/A (not retested)", "frontend": "100%"},
+  "seed_data_creation": "Created test sales ORD-202611-0011, 0012 and 0013 (API, patient TEST_RETEST_*) and 0014 (UI, Consumidor Final). 0011, 0013 and 0014 were certified. Cleanup done: FEL anulada for all three via /fel/anular (200), and all four sales cancelled via PUT /optica/sales/{id}/cancel as superadmin (200). No user or seed data was modified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The Óptica POS FEL fixes from iteration_129 are all verified. Use /app/tests/helper_pos_fel_retest.py (create N | cancel ids... | status ids...) to create and clean up test sales. Digifact sandbox certification can take 30-60s, so use a timeout of 110s or more when waiting for fel-badge-certificado. Stub window.print with add_init_script to inspect the ticket popup."
+}

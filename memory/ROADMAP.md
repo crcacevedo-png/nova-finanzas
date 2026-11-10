@@ -8,6 +8,7 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Confirmar deploy y validación en producción del fix de Sesión 53 (2026-02): autoguardado de "Lectura de Exámenes" + diagnósticos persistentes.
 - Confirmar deploy y validación en producción del fix de Sesión 54 (2026-02): rol "usuario" puede crear/editar cirugías + cierre de bypass de cancelación. Verificar si existe un doc personalizado de "usuario" en `db.roles` de producción que necesite actualizarse manualmente (vía Gestión de Roles) para incluir `manage_sala_operaciones`.
 - Confirmar deploy y validación en producción del fix de Sesión 55 (2026-02): rol "usuario" puede cancelar/reprogramar/eliminar cirugías.
+- Confirmar deploy y validación en producción de la Sesión 56 (2026-02): FEL en el Punto de Venta de Óptica.
 - Investigación sin causa raíz confirmada: "Tipo de Compra" IGSS desactualizado en un PDF de producción — pendiente de que el usuario indique el PDF/reporte exacto para reproducir.
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
 
@@ -24,6 +25,9 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Sala de Operaciones: agregar una insignia visual "Cancelada" en las filas canceladas del listado (hoy solo se ven atenuadas/grises).
 - Evaluar si Admin también debería poder cancelar/reprogramar/eliminar cirugías (Fase 2 del plan de Sesión 55, no solicitado aún).
 - Vista de auditoría de quién canceló/reprogramó/eliminó cada cirugía y cuándo (Fase 3 del plan de Sesión 55).
+- Óptica POS FEL — Fase 2: indicador de estado de factura (facturada/pendiente) directamente en cada fila de "Ver Ventas del Día" sin abrir el detalle.
+- Óptica POS FEL: bloquear en el backend la certificación de una venta ya cancelada (hoy no lo impide; aplica igual para Clínica, no introducido por esta sesión).
+- "Ver Ventas del Día" (Óptica y posible paridad en Clínica): el conteo del encabezado excluye ventas canceladas aunque sí aparecen en la lista con su insignia; evaluar si se debe aclarar o filtrar.
 
 ## P2 — Pausado / depende de terceros
 - FEL/Digifact: activación de producción pendiente de certificado SAT/Digifact, aprovisionamiento y credenciales seguras del usuario.
