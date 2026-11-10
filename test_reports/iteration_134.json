@@ -1,0 +1,30 @@
+{
+  "summary": "Backend-only test of the new daily anesthesia report: the manual send endpoint, the cron webhook, the signed public PDF link, the email HTML guardrails, and a regression check of Cierre del Día. 24 of 25 pytest cases passed. The one failure is minor: a forged token whose signature contains non-ASCII characters makes the PDF endpoint return 500 instead of 404. No data is exposed. Everything else works: real emails were accepted (202 from the Emergent email proxy), the zero-procedure day is still sent, auth is enforced, and the cron acks in 0.13s with today's Guatemala date and then sends in the background (backend log: 'Informe de anestesia 2026-11-09 enviado: 1 ok, 0 errores, 13 procedimientos').",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/quirofano/anesthesia/daily-report/pdf", "issue": "A token that decodes to 'date|exp|<non-ASCII sig>' (e.g. base64 of '2026-11-09|9999999999|é') returns 500. Cause: hmac.compare_digest raises TypeError on non-ASCII str inputs and _verify_report_token does not catch it. A non-integer expires_at only reaches int() after the HMAC check, so it is not reachable without the secret. Fix: compare bytes (sig.encode(), expected.encode()) or add TypeError to the except, plus wrap int(expires_at). No data is exposed."},
+      {"endpoint": "POST /api/quirofano/anesthesia/daily-report/enviar", "issue": "The 'fecha' query parameter is not checked against YYYY-MM-DD. Any string (e.g. 'abc') sends a real email showing 0 procedures and builds a token for that string. Suggest regex validation with a 400 response."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_informe_anestesia_diario.py", "/app/test_reports/pytest/informe_anestesia.xml"],
+  "action_items": [
+    "Make _verify_report_token robust: use hmac.compare_digest(sig.encode(), expected.encode()) or catch TypeError, and protect int(expires_at), so that bad tokens always return 404 and never 500.",
+    "Validate the fecha param (YYYY-MM-DD) on /quirofano/anesthesia/daily-report/enviar (and ideally /caja/cierre-diario/enviar too)."
+  ],
+  "critical_code_review_comments": [
+    "Design is correct: there are no email attachments, the PDF is delivered via an HMAC-signed link with a 21-day expiry, the link uses the absolute https APP_PUBLIC_URL, from_name is 'NovaVisión', and the HTML has no form/input and escapes all values (XSS-safe, checked in-process with _assert_safe_email).",
+    "_REPORT_TOKEN_SECRET = os.environ.get('WEBHOOK_CRON_SECRET', '') falls back to an empty string. If the env var is missing, tokens would be signed with an empty key and could be forged. Remove the default and fail fast (or refuse to issue/verify tokens when it is empty).",
+    "The PDF link token is valid for any caller for 21 days and contains patient names (PHI). This is acceptable as designed, but consider a shorter TTL.",
+    "Some rows on 2026-11-09 show Honorario Q 0.00, which matches the stored record values (not a report bug)."
+  ],
+  "updated_files": ["/app/backend/tests/test_informe_anestesia_diario.py"],
+  "success_rate": {"backend": "96% (24/25)", "frontend": "not tested (backend only)"},
+  "seed_data_creation": "None. Only read existing anesthesia_records and surgeries. Real emails were sent: about 4 to draherreranestesia@gmail.com (2026-11-09 twice, 2026-01-01 twice, plus 1 by the cron for today) and 1 Cierre del Día email (fecha 2026-01-01) to the CIERRE_DIARIO_EMAILS recipients.",
+  "test_credentials": "superadmin/nova2024 (POST /api/auth/login with username+password, returns access_token)",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The test file builds valid PDF tokens by repeating the HMAC from _make_report_token with WEBHOOK_CRON_SECRET from backend/.env, and uses pypdf to check the PDF text (procedure count, total, patient names) against GET /api/quirofano/anesthesia/records?month=2026-11 filtered by date. The 2026-11 month now has 64 records, not 37. 2026-11-09 has 13 records totalling Q800.00. 2026-01-01 has 0. The only failing case is the non-ASCII forged-token 500.",
+  "rca of the issue": "hmac.compare_digest(a, b) with str arguments raises TypeError if either contains non-ASCII characters. base64-decoding the attacker-controlled token yields arbitrary unicode in the sig field. _verify_report_token only catches ValueError/UnicodeDecodeError around decoding, not around compare_digest, so the error surfaces as an unhandled 500. Repro: GET /api/quirofano/anesthesia/daily-report/pdf?token=MjAyNi0xMS0wOXw5OTk5OTk5OTk5fMOp"
+}

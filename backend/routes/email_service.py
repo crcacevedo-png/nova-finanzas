@@ -47,6 +47,15 @@ def _destinatarios_anestesia():
     return [e.strip() for e in raw.split(",") if e.strip()]
 
 
+def _parse_fecha_param(fecha: Optional[str]) -> str:
+    """Valida que 'fecha' (si se provee) tenga formato YYYY-MM-DD; si no, usa hoy (Guatemala)."""
+    if not fecha:
+        return today_str_gt()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", fecha):
+        raise HTTPException(status_code=400, detail="El parámetro 'fecha' debe tener formato YYYY-MM-DD")
+    return fecha
+
+
 # ==================== GUARDRAIL GATE (copiar tal cual; llamar en cada envío) ====================
 _SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
 _CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
@@ -327,7 +336,7 @@ async def enviar_cierre_diario_manual(
     current_user: dict = Depends(require_role(["admin", "superadmin"]))
 ):
     """Envío manual del cierre diario por correo (Admin/SuperAdmin)."""
-    fecha_dia = fecha or today_str_gt()
+    fecha_dia = _parse_fecha_param(fecha)
     destinatarios = _destinatarios()
     if not destinatarios:
         raise HTTPException(status_code=400, detail="No hay destinatarios configurados")
@@ -458,7 +467,7 @@ async def enviar_informe_anestesia_manual(
     current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"]))
 ):
     """Envío manual del informe diario de anestesia por correo."""
-    fecha_dia = fecha or today_str_gt()
+    fecha_dia = _parse_fecha_param(fecha)
     destinatarios = _destinatarios_anestesia()
     if not destinatarios:
         raise HTTPException(status_code=400, detail="No hay destinatarios configurados")

@@ -11,6 +11,7 @@ import io
 import time
 import hmac
 import base64
+import binascii
 import hashlib
 from datetime import datetime, timezone
 from typing import Optional
@@ -757,6 +758,8 @@ def render_daily_report_pdf(date_str: str, data: dict) -> bytes:
 def _make_report_token(date_str: str, ttl_days: int = _REPORT_TOKEN_TTL_DAYS) -> str:
     """Token opaco, firmado y con expiración para el enlace público (sin login)
     de descarga del informe diario de anestesia de una fecha específica."""
+    if not _REPORT_TOKEN_SECRET:
+        raise HTTPException(status_code=503, detail="No se puede generar el enlace del informe (falta configuración)")
     expires_at = int(time.time()) + ttl_days * 86400
     payload = f"{date_str}|{expires_at}"
     sig = hmac.new(_REPORT_TOKEN_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
@@ -765,16 +768,19 @@ def _make_report_token(date_str: str, ttl_days: int = _REPORT_TOKEN_TTL_DAYS) ->
 
 
 def _verify_report_token(token: str) -> Optional[str]:
+    if not _REPORT_TOKEN_SECRET:
+        return None
     try:
         padded = token + "=" * (-len(token) % 4)
-        raw = base64.urlsafe_b64decode(padded.encode()).decode()
+        raw = base64.urlsafe_b64decode(padded.encode()).decode("ascii")
         date_str, expires_at, sig = raw.split("|")
-    except (ValueError, UnicodeDecodeError):
+        expires_at_int = int(expires_at)
+    except (ValueError, UnicodeDecodeError, binascii.Error):
         return None
     expected = hmac.new(_REPORT_TOKEN_SECRET.encode(), f"{date_str}|{expires_at}".encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(sig, expected):
+    if not hmac.compare_digest(sig.encode(), expected.encode()):
         return None
-    if int(expires_at) < int(time.time()):
+    if expires_at_int < int(time.time()):
         return None
     return date_str
 

@@ -3,6 +3,8 @@
 Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (sesión donde se originó).
 
 ## P0 — Bloqueadores / pendientes de confirmación en producción
+- Confirmar que el cron "informe-anestesia-diario" (17:00 Guatemala, envía a draherreranestesia@gmail.com) quedó activo en producción tras el próximo deploy, y validar que el correo real llega a esa bandeja (no se tiene acceso a esa cuenta para verificarlo desde aquí).
+- Confirmar que el deploy del fix de fechas de solo-día (`formatDate` + `Gastos.js getDaysUntilDue`) (2026-11) quedó activo en producción.
 - Confirmar que el deploy del fix "texto superpuesto en PDF de Cierre + columna Institución" (Sesión, 2026-11) quedó activo en producción.
 - Confirmar que el deploy de "pago individual por procedimiento en Cierre mensual de Anestesia" (2026-11) quedó activo y validado por el usuario en producción.
 - Confirmar deploy y validación en producción del fix de Sesión 53 (2026-02): autoguardado de "Lectura de Exámenes" + diagnósticos persistentes.
@@ -14,6 +16,7 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
 
 ## P1 — Próximos pasos conocidos (mencionados por el usuario o como continuación natural)
+- Revisión opcional de otros parseos de fecha-solo-día con el mismo patrón de riesgo (`new Date(str)` sin hora) señalados por el testing agent pero no confirmados como bug real: `EvaluacionOftalmologica.js` (cálculo de edad desde fecha de nacimiento), `HistorialPagos.js` (filtro de rango de fechas), `Sociedades.js` y `CRMCirugias.js` (si sus campos de fecha son `YYYY-MM-DD` plano).
 - Diagnósticos (Fase 2 del plan aprobado): indicador de cuánto tiempo lleva activo un diagnóstico sin resolver (ej. "activo desde hace 3 consultas"); filtro en historial del paciente para ver solo diagnósticos resueltos vs. activos.
 - Diagnósticos (Fase 3): alertas/resumen al abrir el expediente si hay diagnósticos activos de larga data sin resolver.
 - Paciente rápido desde Registrar Cirugía — Fase 2: alertas de ficha incompleta en próximas cirugías, sugerencia de fusión de pacientes duplicados/similares.
