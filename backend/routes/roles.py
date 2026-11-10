@@ -58,7 +58,9 @@ AVAILABLE_PERMISSIONS = {
             {"id": "view_agenda", "label": "Agenda", "description": "Ver y gestionar la agenda de citas"},
             {"id": "view_evaluacion", "label": "Evaluación Oftalmológica", "description": "Ver y editar la evaluación oftalmológica"},
             {"id": "manage_recetas", "label": "Recetas", "description": "Emitir recetas médicas y de lentes en la evaluación"},
-            {"id": "view_sala_operaciones", "label": "Sala de Operaciones", "description": "Ver y editar el registro de sala de operaciones"},
+            {"id": "view_sala_operaciones", "label": "Sala de Operaciones", "description": "Ver el listado y detalle de cirugías (visibilidad del menú)"},
+            {"id": "manage_sala_operaciones", "label": "Gestionar Sala de Operaciones", "description": "Crear, editar, cancelar/reprogramar y eliminar cirugías (incluye equipo e insumos)"},
+            {"id": "manage_sala_operaciones_insumos", "label": "Gestionar Equipo e Insumos", "description": "Solo agregar o quitar equipo e insumos en cirugías existentes, sin poder crear, editar ni eliminar cirugías"},
         ]
     },
     "administracion": {

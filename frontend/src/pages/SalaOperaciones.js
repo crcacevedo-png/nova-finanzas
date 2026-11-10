@@ -146,6 +146,9 @@ const SalaOperaciones = () => {
   const isSuperAdmin = user?.role === 'superadmin';
   const canEdit = hasPermission('manage_sala_operaciones');
   const canEditPatient = hasPermission('edit_patients') || hasPermission('edit_patients_in_surgery');
+  // Agregar/quitar equipo e insumos: manage_sala_operaciones (acceso completo) o
+  // manage_sala_operaciones_insumos (rol acotado solo a equipo/insumos, ej. "sop")
+  const canManageSupplies = canEdit || hasPermission('manage_sala_operaciones_insumos');
   // Cancelar/reprogramar y eliminar cirugías: SuperAdmin y "usuario" (Admin/Médico/Anestesia no cambian)
   const canCancelOrDelete = isSuperAdmin || user?.role === 'usuario';
 
@@ -1035,7 +1038,7 @@ const SalaOperaciones = () => {
                                 <div>
                                   <div className="flex items-center justify-between mb-3">
                                     <h4 className="font-semibold text-sm text-slate-700">Equipo utilizado</h4>
-                                    {canEdit && surgery.status !== 'cancelado' && (
+                                    {canManageSupplies && surgery.status !== 'cancelado' && (
                                       <Button
                                         variant="link"
                                         size="sm"
@@ -1055,7 +1058,7 @@ const SalaOperaciones = () => {
                                             {eq.name}
                                             <span className="text-slate-400">x{eq.quantity}</span>
                                           </span>
-                                          {canEdit && surgery.status !== 'cancelado' && (
+                                          {canManageSupplies && surgery.status !== 'cancelado' && (
                                             <button
                                               onClick={() => { setSelectedSurgery(surgery); handleDeleteEquipment(eq.id); }}
                                               className="text-slate-400 hover:text-red-500"
@@ -1075,7 +1078,7 @@ const SalaOperaciones = () => {
                                 <div>
                                   <div className="flex items-center justify-between mb-3">
                                     <h4 className="font-semibold text-sm text-slate-700">Insumos utilizados</h4>
-                                    {canEdit && surgery.status !== 'cancelado' && (
+                                    {canManageSupplies && surgery.status !== 'cancelado' && (
                                       <Button
                                         variant="link"
                                         size="sm"
@@ -1108,7 +1111,7 @@ const SalaOperaciones = () => {
                                               <td className="text-right">{formatCurrency(sup.unit_cost)}</td>
                                               <td className="text-right font-medium">{formatCurrency(sup.total_cost)}</td>
                                               <td className="text-right">
-                                                {canEdit && surgery.status !== 'cancelado' && (
+                                                {canManageSupplies && surgery.status !== 'cancelado' && (
                                                   <button
                                                     onClick={() => { setSelectedSurgery(surgery); handleDeleteSupply(sup.id); }}
                                                     className="text-slate-400 hover:text-red-500"
@@ -1659,7 +1662,7 @@ const SalaOperaciones = () => {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">Equipo utilizado</h4>
-                      {canEdit && selectedSurgery.status !== 'cancelado' && (
+                      {canManageSupplies && selectedSurgery.status !== 'cancelado' && (
                         <Button variant="link" size="sm" onClick={() => setEquipmentDialogOpen(true)} className="text-blue-600">
                           + Agregar equipo
                         </Button>
@@ -1670,7 +1673,7 @@ const SalaOperaciones = () => {
                         {selectedSurgery.equipment.map(eq => (
                           <li key={eq.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
                             <span>{eq.name} <span className="text-slate-400">x{eq.quantity}</span></span>
-                            {canEdit && selectedSurgery.status !== 'cancelado' && (
+                            {canManageSupplies && selectedSurgery.status !== 'cancelado' && (
                               <button onClick={() => handleDeleteEquipment(eq.id)} className="text-slate-400 hover:text-red-500">
                                 <X className="w-4 h-4" />
                               </button>
@@ -1687,7 +1690,7 @@ const SalaOperaciones = () => {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">Insumos utilizados</h4>
-                      {canEdit && selectedSurgery.status !== 'cancelado' && (
+                      {canManageSupplies && selectedSurgery.status !== 'cancelado' && (
                         <Button variant="link" size="sm" onClick={() => setSupplyDialogOpen(true)} className="text-blue-600">
                           + Agregar insumo
                         </Button>
@@ -1714,7 +1717,7 @@ const SalaOperaciones = () => {
                               <td className="text-right">{formatCurrency(sup.unit_cost)}</td>
                               <td className="text-right font-medium">{formatCurrency(sup.total_cost)}</td>
                               <td className="text-right">
-                                {canEdit && selectedSurgery.status !== 'cancelado' && (
+                                {canManageSupplies && selectedSurgery.status !== 'cancelado' && (
                                   <button onClick={() => handleDeleteSupply(sup.id)} className="text-slate-400 hover:text-red-500">
                                     <X className="w-4 h-4" />
                                   </button>

@@ -3,6 +3,7 @@
 Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (sesión donde se originó).
 
 ## P0 — Bloqueadores / pendientes de confirmación en producción
+- Desplegar a producción el nuevo permiso "Gestionar Equipo e Insumos" (`manage_sala_operaciones_insumos`) y, una vez desplegado, activarlo para el rol "sop" (creado en producción) desde "Gestión de Usuarios" → "Roles", más confirmar el menú "Sala de Operaciones" habilitado en "Menús por Rol" para ese rol.
 - Confirmar que el cron "informe-anestesia-diario" (17:00 Guatemala, envía a draherreranestesia@gmail.com) quedó activo en producción tras el próximo deploy, y validar que el correo real llega a esa bandeja (no se tiene acceso a esa cuenta para verificarlo desde aquí).
 - Confirmar que el deploy del fix de fechas de solo-día (`formatDate` + `Gastos.js getDaysUntilDue`) (2026-11) quedó activo en producción.
 - Confirmar que el deploy del fix "texto superpuesto en PDF de Cierre + columna Institución" (Sesión, 2026-11) quedó activo en producción.
