@@ -26,6 +26,8 @@ const Productos = () => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'superadmin';
   const isAdminOrSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+  // El precio de venta lo pueden editar superadmin y el rol "usuario"; admin/médico/óptica no.
+  const canEditPrecioVenta = isSuperAdmin || user?.role === 'usuario';
   // El rol 'usuario' también puede definir existencias mínima/máxima.
   const puedeEditarExistencias = isAdminOrSuperAdmin || user?.role === 'usuario';
   const puedeGestionarInventario = isAdminOrSuperAdmin || user?.role === 'usuario';
@@ -969,10 +971,10 @@ const Productos = () => {
                   value={formData.precio_venta}
                   onChange={(e) => setFormData({ ...formData, precio_venta: parseFloat(e.target.value) || 0 })}
                   data-testid="input-precio-venta"
-                  disabled={!isSuperAdmin}
-                  className={!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed' : ''}
+                  disabled={!canEditPrecioVenta}
+                  className={!canEditPrecioVenta ? 'bg-gray-100 cursor-not-allowed' : ''}
                 />
-                {!isSuperAdmin && (
+                {!canEditPrecioVenta && (
                   <p className="text-xs text-gray-400">Solo el superadministrador puede cambiar el precio de venta.</p>
                 )}
               </div>

@@ -1337,9 +1337,9 @@ async def actualizar_producto(
     
     # Preparar actualización (solo campos no nulos)
     update_data = {k: v for k, v in producto.model_dump().items() if v is not None}
-    # El precio de venta solo lo modifica el superadmin; para el resto se conserva
-    # el actual (no es error enviarlo, simplemente se ignora).
-    if role != "superadmin":
+    # El precio de venta lo puede modificar superadmin o el rol "usuario"; para el
+    # resto se conserva el actual (no es error enviarlo, simplemente se ignora).
+    if role not in ("superadmin", "usuario"):
         update_data.pop("precio_venta", None)
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
