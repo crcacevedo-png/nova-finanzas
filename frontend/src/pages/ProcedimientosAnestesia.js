@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import axios from 'axios';
 import { toast, Toaster } from 'sonner';
-import { formatCurrency, formatDate } from '../services/api';
+import { formatCurrency } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
@@ -15,6 +15,17 @@ import {
 import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileText, Check, RotateCcw } from 'lucide-react';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Formatea una fecha "YYYY-MM-DD" (sin componente de hora) sin aplicar conversión de
+// zona horaria, para evitar que se muestre el día anterior (mismo criterio que SalaOperaciones.js).
+const formatDateOnly = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr + 'T00:00:00');
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear().toString().slice(-2);
+  return `${day}/${month}/${year}`;
+};
 
 const TiposTab = ({ canManage }) => {
   const [tipos, setTipos] = useState([]);
@@ -218,7 +229,7 @@ const CierreTab = ({ canClose }) => {
               <tbody className="divide-y divide-gray-50">
                 {g.detalle.map((d, j) => (
                   <tr key={j} className={d.paid ? 'opacity-50' : ''} data-testid={`anesthesia-detail-row-${i}-${j}`}>
-                    <td className="py-1.5 text-gray-500 whitespace-nowrap">{formatDate(d.date)}</td>
+                    <td className="py-1.5 text-gray-500 whitespace-nowrap">{formatDateOnly(d.date)}</td>
                     <td className="py-1.5 text-gray-900 font-medium">{d.patient_name || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.procedure || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.surgeon || '—'}</td>
