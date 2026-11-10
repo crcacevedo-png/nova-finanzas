@@ -1,45 +1,63 @@
-# Facturación Electrónica (FEL) en el Punto de Venta de Óptica
+# Manual Operativo del Superadministrador — NovaVisión ERP
 
-El Punto de Venta de Óptica podrá emitir, consultar e imprimir la factura electrónica (FEL) de cada venta, igual que ya funciona hoy en el Punto de Venta de la Clínica. Se reutiliza la misma configuración y credenciales de prueba de Digifact ya usadas para la Clínica; no se crea una configuración separada para Óptica.
+Un manual en PDF, en español, que explica cómo operar correctamente todos los módulos de NovaVisión ERP desde la cuenta de superadmin. Se entrega como archivo descargable en este chat, listo para imprimir o compartir con quien asuma ese rol.
 
-## A quién afecta
+## Para quién es
 
-Personal de Óptica que cobra ventas en el Punto de Venta (armazones, lentes, accesorios) y necesita emitir o consultar la factura electrónica de esa venta sin salir del flujo de cobro.
+- El superadmin actual del sistema (uso diario y de referencia).
+- Cualquier persona que en el futuro reciba el rol de superadmin o admin y necesite ponerse al día sin depender de explicaciones verbales.
 
-## Funcionalidad principal y experiencia
+## Qué cubre el documento
 
-- **Pantalla de "Venta Exitosa"** (justo después de cobrar): aparece el mismo control de Facturación Electrónica que ya existe en el Punto de Venta de la Clínica — certificar la factura, ver su estado (pendiente, certificada, con error, anulada), descargar/ver el documento, y anular si corresponde.
-- **"Ver Ventas del Día"**: hoy esa lista solo muestra el resumen de cada venta sin poder abrir el detalle. Se agrega poder tocar una venta para ver su detalle (productos, totales, forma de pago) y desde ahí también facturar o consultar su FEL, igual que en la pantalla de venta exitosa.
-- **Impresión de ticket**: el botón "Imprimir" de la pantalla de "Venta Exitosa" (hoy no hace nada) queda conectado para imprimir el ticket de la venta, con el mismo formato y estilo de ticket térmico que ya usa el Punto de Venta de la Clínica, adaptado a los productos de Óptica (armazones, lentes, accesorios). También se podrá imprimir desde el nuevo detalle de "Ver Ventas del Día".
-- Sin cambios en el Punto de Venta de la Clínica ni en el módulo de "Ventas" de Óptica (el historial administrativo aparte), que ya tiene su propia facturación FEL funcionando.
+Manual operativo completo, organizado por módulo, cada uno con los pasos para usarlo correctamente y qué cuidar para que no se generen datos inconsistentes:
 
-## Flujo de uso
+- **Pacientes**: alta, edición, búsqueda, datos de institución/seguro/IGSS.
+- **Agenda**: programación de citas, sincronización con Google Calendar.
+- **Sala de Operaciones**: registrar/editar/cancelar/reprogramar cirugías, Pre-Ops, LIO, equipo e insumos.
+- **Procedimientos de Anestesia**: registros automáticos desde cirugía, cierre mensual, pago individual por procedimiento, exportación Excel/PDF.
+- **Evaluaciones Oftalmológicas**: autoguardado, diagnósticos persistentes, recetas.
+- **Óptica y Punto de Venta (POS)**: ventas, cobros, FEL (factura electrónica), ventas del día.
+- **Caja**: apertura/cierre de caja, conciliación, cuentas por cobrar.
+- **Facturación Electrónica (FEL)**: certificación, consulta, anulación.
+- **Roles y Permisos**: qué controla cada rol (admin, médico, usuario, anestesia, óptica, administrador_igss) y cómo ajustar permisos sin romper accesos.
+- **Respaldos**: respaldo semanal automático y cómo verificarlo.
+- **Correos automáticos**: cierre del día (18:00) e informe diario de anestesia (17:00) — qué contienen, a quién llegan y cómo cambiar destinatarios.
+- **Solución de problemas comunes**: ej. un correo automático no llegó, un usuario no ve un menú que debería, un enlace de pago no confirma, un mes de anestesia aparece cerrado y no se puede editar, etc. — causa probable y qué revisar primero.
 
-1. El personal de Óptica cobra una venta normalmente.
-2. En la pantalla de "Venta Exitosa", además del total y el botón "Imprimir" (ahora funcional), aparece el control de Facturación Electrónica para certificarla al momento.
-3. Si no se factura de inmediato, puede hacerlo después: abre "Ver Ventas del Día", toca la venta en la lista, y desde su detalle certifica, consulta o anula la factura igual que en el paso anterior.
-4. En cualquiera de las dos pantallas puede volver a imprimir el ticket cuando lo necesite.
+No incluye capturas de pantalla (solo texto e instrucciones paso a paso, con los nombres exactos de botones/menús entre comillas) ni valores reales de contraseñas o llaves — para esas se indica dónde se gestionan, nunca el valor.
 
-## UI/UX feel
+## Cómo se entrega y se usa
 
-Mismo lenguaje visual y componentes que el Punto de Venta de la Clínica usa hoy para esto (mismo control de Facturación Electrónica, mismos estados y colores). El nuevo detalle de "Ver Ventas del Día" sigue el estilo general ya establecido en el Punto de Venta de Óptica (fondo oscuro, acentos teal), sin introducir un estilo nuevo.
+1. Se genera el documento como PDF.
+2. Se comparte el archivo en este mismo chat para descarga directa.
+3. El superadmin lo abre, usa el índice para saltar a la sección que necesita, o lo lee completo una vez al recibirlo.
+4. Puede imprimirse o guardarse como referencia permanente.
 
-## Fases de implementación
+## Estilo del documento
 
-**Fase 1 (ahora — MVP):**
-- Control de Facturación Electrónica en la pantalla de "Venta Exitosa" del Punto de Venta de Óptica.
-- Detalle de venta (nuevo) dentro de "Ver Ventas del Día", con el mismo control de Facturación Electrónica.
-- Botón "Imprimir" funcional en ambas pantallas, con ticket adaptado a productos de Óptica.
+- Portada con el nombre del sistema y fecha de emisión.
+- Índice al inicio con los módulos como en la lista de arriba.
+- Cada sección numerada, con pasos en listas claras y los nombres de botones/menús citados tal como aparecen en el sistema (ej. "clic en 'Registrar cirugía'").
+- Recuadros destacados para advertencias importantes (ej. "no cerrar el mes de anestesia hasta confirmar todos los pagos").
+- Sección final de solución de problemas en formato pregunta → causa probable → qué hacer.
+- Tipografía y colores simples, pensados para lectura en pantalla o impresión en blanco y negro.
 
-**Fase 2 (futuro):**
-- Indicador visual de estado de factura (facturada / pendiente) directamente en cada fila de "Ver Ventas del Día", sin necesidad de abrir el detalle.
+## Fases
 
-**Fase 3 (futuro):**
-- Activación en producción ante SAT/Digifact (hoy pausada igual que para la Clínica, pendiente de certificación real); hasta entonces todo opera en modo de prueba con las mismas credenciales ya usadas.
+**Fase 1 — MVP (se construye ahora)**
+Manual completo en PDF con todos los módulos listados arriba y la sección de solución de problemas, entregado en este chat.
+
+**Fase 2 — futuro**
+Agregar capturas de pantalla reales a cada sección una vez que el usuario confirme que el diseño actual de cada módulo ya es estable y no cambiará pronto.
+
+**Fase 3 — futuro**
+Versiones cortas tipo "hoja de referencia rápida" derivadas del manual completo, una por rol (admin, médico, usuario, anestesia, óptica), con solo lo que cada rol necesita.
 
 ## Supuestos
 
-- Se usa la misma configuración global de FEL (NIT, establecimiento, credenciales de prueba de Digifact) ya configurada para la Clínica; no se crea una configuración ni credenciales separadas para Óptica.
-- El alcance de esta mejora es solo el Punto de Venta de Óptica; el módulo de "Ventas" de Óptica (gestión/historial administrativo) no cambia porque ya tiene su propia facturación FEL funcionando de forma independiente.
-- La lista de "Ver Ventas del Día" en sí (lo que se ve sin abrir el detalle) no muestra el estado de la factura; eso queda para la Fase 2.
-- El formato del ticket impreso en Óptica sigue el mismo estilo que el de la Clínica (encabezado de la empresa, productos, totales, forma de pago, mensaje de agradecimiento), ajustado a los productos propios de Óptica.
+- El documento se escribe en español, igual que el resto del sistema.
+- Se basa en las funcionalidades ya implementadas y documentadas a la fecha; no describe funciones pendientes del backlog.
+- Se entrega como un único archivo PDF enlazado en el chat, no por correo.
+- No se incluyen capturas de pantalla en esta fase (elegido por el usuario).
+- No se incluyen contraseñas, llaves ni datos sensibles reales — solo referencia a dónde se gestionan.
+- El documento es de uso interno del superadmin; no se publica dentro de la aplicación.

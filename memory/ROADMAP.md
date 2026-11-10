@@ -16,6 +16,8 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
 
 ## P1 — Próximos pasos conocidos (mencionados por el usuario o como continuación natural)
+- Manual del Superadministrador — Fase 2: agregar capturas de pantalla reales a cada sección una vez el usuario confirme que el diseño de cada módulo ya es estable y no cambiará pronto.
+- Manual del Superadministrador — Fase 3: hojas de referencia rápida por rol (admin, médico, usuario, anestesia, óptica) derivadas del manual completo.
 - Revisión opcional de otros parseos de fecha-solo-día con el mismo patrón de riesgo (`new Date(str)` sin hora) señalados por el testing agent pero no confirmados como bug real: `EvaluacionOftalmologica.js` (cálculo de edad desde fecha de nacimiento), `HistorialPagos.js` (filtro de rango de fechas), `Sociedades.js` y `CRMCirugias.js` (si sus campos de fecha son `YYYY-MM-DD` plano).
 - Diagnósticos (Fase 2 del plan aprobado): indicador de cuánto tiempo lleva activo un diagnóstico sin resolver (ej. "activo desde hace 3 consultas"); filtro en historial del paciente para ver solo diagnósticos resueltos vs. activos.
 - Diagnósticos (Fase 3): alertas/resumen al abrir el expediente si hay diagnósticos activos de larga data sin resolver.
