@@ -11,7 +11,14 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { FELButton } from '../FELButton';
-import { formatCurrency, formatDate } from '../../services/api';
+import { formatCurrency, formatDate, saleStatusLabels } from '../../services/api';
+import { Badge } from '../ui/badge';
+
+const estadoBadgeClass = {
+  pagado: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100',
+  pendiente: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
+  cancelado: 'bg-red-100 text-red-700 hover:bg-red-100',
+};
 
 // Diálogo de venta exitosa
 export const POSSuccessDialog = ({
@@ -39,8 +46,8 @@ export const POSSuccessDialog = ({
           </p>
 
           {ventaExitosa && (
-            <div className="flex items-center justify-center gap-2 mb-6" data-testid="pos-exitosa-fel-row">
-              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Factura electrónica (FEL):</span>
+            <div className="flex flex-col items-center justify-center gap-1.5 mb-6" data-testid="pos-exitosa-fel-row">
+              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Factura electrónica (FEL)</span>
               <FELButton
                 origen="optica"
                 sale={ventaExitosa}
@@ -110,15 +117,24 @@ export const POSSalesDialog = ({
                 role="button"
                 tabIndex={0}
                 onClick={() => onSelectVenta(venta)}
-                className="p-3 rounded-lg border cursor-pointer transition-colors hover:border-teal-500"
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#14b8a6'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+                className="p-3 rounded-lg border cursor-pointer transition-colors"
                 style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-color)' }}
                 data-testid={`pos-venta-row-${venta.id}`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {venta.order_number || venta.id}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {venta.order_number || venta.id}
+                      </p>
+                      {venta.status && venta.status !== 'pagado' && (
+                        <Badge className={`text-[10px] px-1.5 py-0 ${estadoBadgeClass[venta.status] || ''}`}>
+                          {saleStatusLabels[venta.status] || venta.status}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                       {venta.patient_name || 'Consumidor Final'}
                     </p>

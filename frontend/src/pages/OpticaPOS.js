@@ -273,6 +273,7 @@ const OpticaPOS = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setVentaDetalle(res.data);
+      setVentasHoy(prev => prev.map(v => (v.id === res.data.id ? res.data : v)));
     } catch (error) {
       console.error('Error refreshing venta detalle:', error);
     }
@@ -296,6 +297,10 @@ const OpticaPOS = () => {
       const ticketHTML = generarTicketHTMLOptica(ticket);
 
       const printWindow = window.open('', '_blank', 'width=350,height=600');
+      if (!printWindow) {
+        toast.error('El navegador bloqueó la ventana de impresión. Permite ventanas emergentes para este sitio.');
+        return;
+      }
       printWindow.document.write(ticketHTML);
       printWindow.document.close();
 

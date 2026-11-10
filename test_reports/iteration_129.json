@@ -1,0 +1,40 @@
+{
+  "summary": "FEL in the Óptica POS (Phase 1). Backend: 8 of 8 pytest passed. Covered: the sale detail now includes 'fel'; the new GET /optica/sales/{id}/ticket returns the right structure, 404 and 401; certifying with origen=optica saves the certification and it shows up in the detail and in resumen-dia; a second certification is rejected with 400. UI (optica user): 'Venta Exitosa' shows the FEL control. Certifying as Consumidor Final shows a success toast and switches to the 'FEL serie-numero' badge with a 'Ver' button without reloading, and 'Ver' opens the PDF. 'Imprimir' opens a new window with the Óptica ticket (NOVAVISIÓN/Óptica, order number, date, customer, items, totals, 'Efectivo'). 'Ver Ventas del Día' rows are clickable (cursor pointer). The detail dialog shows the order, customer, Pagado badge, items, totals, payments, the FEL control and Imprimir, and certifying from it updates without closing. OpticaVentas regression: certify, then close and reload the page, still shows certified. Clínica POS: code unchanged (git), page and Ventas del Día load; the full sale flow was not run because the cash register is closed. One functional bug found: data goes stale when a row is reopened (see below).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/fel/certificar", "issue": "Pre-existing: _get_sale does not check status, so a cancelled sale (status=cancelado) can still be certified. Should return 400 for cancelled sales."},
+      {"endpoint": "GET /api/optica/sales/{id}/ticket", "issue": "pago.formas[].metodo returns the raw stored value (e.g. 'Efectivo' from v2, but legacy sales store lowercase 'efectivo'/'mixto'), so labels can be inconsistent on legacy tickets. efectivo_recibido is always total_pagado and cambio is always 0."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpticaPOS > Ver Ventas del Día > POSSaleDetailDialog", "issue": "Stale FEL state: after certifying from the detail and closing it (the list stays open), clicking the same row again shows 'Facturar FEL' again. abrirDetalleVenta uses the cached ventasHoy row, and refrescarVentaDetalle only updates ventaDetalle, never ventasHoy. Reproduced in UI with ORD-202611-0008. If the user clicks Certificar again they get a 400 error toast. Fix: in refrescarVentaDetalle also update the matching entry in ventasHoy (or call fetchVentasHoy()), or GET /optica/sales/{id} inside abrirDetalleVenta.", "selector": "[data-testid^='pos-venta-row-'] -> [data-testid='fel-facturar-btn']", "priority": "MEDIUM"},
+      {"component": "POSSalesDialog rows", "issue": "The hover highlight does not work. The inline style borderColor: var(--border-color) overrides the Tailwind class hover:border-teal-500 (measured border on hover: rgb(15,23,41), unchanged). Move the border color to a class, or use onMouseEnter, so the hover shows.", "selector": "[data-testid^='pos-venta-row-']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "POS Venta Exitosa (certified)", "issues": ["Once certified, the label 'Factura electrónica (FEL):' wraps onto 2 lines and the badge and 'Ver' stack vertically (sm:max-w-md is too narrow). Consider putting the label above the control, or using flex-col."]},
+      {"screen": "Ver Ventas del Día", "issues": ["The list includes cancelled sales but rows show no status badge, while the header count excludes them (e.g. '1 ventas' with 3 rows). Add a status badge to each row, or filter out cancelled sales."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_optica_pos_fel.py", "/app/test_reports/pytest/optica_pos_fel.xml"],
+  "action_items": [
+    "Fix the stale ventasHoy row after certifying FEL from POSSaleDetailDialog (OpticaPOS.js refrescarVentaDetalle / abrirDetalleVenta)",
+    "Fix the row hover highlight in POSSalesDialog (inline borderColor overrides hover:border-teal-500)",
+    "Optional: block FEL certification of cancelled sales in the backend; show a status badge on Ventas del Día rows"
+  ],
+  "critical_code_review_comments": [
+    "imprimirTicket: window.open can return null if popups are blocked. printWindow.document then throws, and the user only sees the generic 'Error al generar ticket'. Show a 'permite ventanas emergentes' message instead.",
+    "generarTicketHTMLOptica writes patient_name, item names and notes into the HTML without escaping (minor XSS/HTML-injection risk in the print window). The same pattern exists in PuntoVenta.js.",
+    "printWindow.onload is assigned after document.write/close and may not fire reliably in some browsers. This was copied from PuntoVenta.js, so it is consistent with the Clínica.",
+    "OpticaPOS.js is 1040 lines (>700). Consider extracting the ticket HTML generator into a utility shared with PuntoVenta.js (DRY)."
+  ],
+  "updated_files": ["/app/backend/tests/test_optica_pos_fel.py"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "seed_data_creation": "Created test sales ORD-202611-0005 (pytest), 0006 and 0007 (UI), 0008 and 0009 (API, then certified in UI). Cleanup done for all of them: FEL anulada via /fel/anular, then sale cancelled via PUT /optica/sales/{id}/cancel as superadmin, inventory restored. No user or seed data was modified.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Óptica POS FEL flow works end to end. In headless Playwright, stub window.print through context.add_init_script, otherwise the ticket popup closes before it can be inspected. Accessory 'Estuche rígido' id 1cedd3ef-7840-4c2a-8b3a-b5ac49d2b293 (Q45) is a convenient test product. To pay: open the payment dialog, click 'Monto exacto', click the plus button (button:has(svg.lucide-plus)), then 'Confirmar Venta'. Retest the stale-row fix by certifying from the detail, closing it, and reopening the same row while the list is still open. Clínica POS sale flow not exercised (caja cerrada in preview).",
+  "rca of the issue": "Stale FEL in Ventas del Día: POSSalesDialog passes the cached row object from ventasHoy (fetched once when 'Ver Ventas' is opened) to abrirDetalleVenta. After certifying, refrescarVentaDetalle refetches only into ventaDetalle state, so ventasHoy still holds fel=null for that sale. Repro: open Ver Ventas, click an uncertified row, Facturar FEL, Certificar (badge shows), Cerrar the detail, click the same row again: 'Facturar FEL' shows again. Mitigation: after the refetch, setVentasHoy(prev => prev.map(v => v.id === res.data.id ? res.data : v))."
+}
