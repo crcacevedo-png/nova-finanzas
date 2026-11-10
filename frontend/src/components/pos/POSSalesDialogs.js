@@ -10,17 +10,20 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
+import { FELButton } from '../FELButton';
 import { formatCurrency, formatDate } from '../../services/api';
 
 // Diálogo de venta exitosa
 export const POSSuccessDialog = ({
   open,
   onOpenChange,
-  ventaExitosa
+  ventaExitosa,
+  onImprimir,
+  onFelUpdated
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" data-testid="pos-venta-exitosa-dialog">
         <div className="text-center py-6">
           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="h-8 w-8 text-white" />
@@ -34,12 +37,28 @@ export const POSSuccessDialog = ({
           <p className="text-3xl font-bold text-teal-500 mb-6">
             {formatCurrency(ventaExitosa?.total || 0)}
           </p>
-          
+
+          {ventaExitosa && (
+            <div className="flex items-center justify-center gap-2 mb-6" data-testid="pos-exitosa-fel-row">
+              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Factura electrónica (FEL):</span>
+              <FELButton
+                origen="optica"
+                sale={ventaExitosa}
+                defaultNombre={ventaExitosa.patient_name}
+                onUpdated={onFelUpdated}
+              />
+            </div>
+          )}
+
           <div className="flex gap-3 justify-center">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cerrar
             </Button>
-            <Button className="bg-teal-600 hover:bg-teal-700">
+            <Button
+              className="bg-teal-600 hover:bg-teal-700"
+              onClick={() => ventaExitosa && onImprimir(ventaExitosa.id)}
+              data-testid="pos-exitosa-imprimir-btn"
+            >
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
@@ -55,11 +74,12 @@ export const POSSalesDialog = ({
   open,
   onOpenChange,
   ventasHoy,
-  resumenDia
+  resumenDia,
+  onSelectVenta
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl" data-testid="pos-ventas-dialog">
         <DialogHeader>
           <DialogTitle>Mis Ventas del Día</DialogTitle>
           <DialogDescription>
@@ -87,8 +107,12 @@ export const POSSalesDialog = ({
             ventasHoy.map(venta => (
               <div 
                 key={venta.id}
-                className="p-3 rounded-lg border"
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectVenta(venta)}
+                className="p-3 rounded-lg border cursor-pointer transition-colors hover:border-teal-500"
                 style={{ background: 'var(--bg-hover)', borderColor: 'var(--border-color)' }}
+                data-testid={`pos-venta-row-${venta.id}`}
               >
                 <div className="flex items-center justify-between">
                   <div>

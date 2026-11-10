@@ -375,6 +375,7 @@ export const opticaSaleApi = {
     return axios.get(`${API_URL}/optica/sales?${params.toString()}`);
   },
   getById: (id) => axios.get(`${API_URL}/optica/sales/${id}`),
+  getTicket: (id) => axios.get(`${API_URL}/optica/sales/${id}/ticket`),
   create: (data) => axios.post(`${API_URL}/optica/sales`, data),
   getPending: () => axios.get(`${API_URL}/optica/sales/pending`),
   addPayment: (saleId, data) => axios.post(`${API_URL}/optica/sales/${saleId}/payments`, data),

@@ -4,7 +4,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
-from utils.timezone import now_gt, today_str_gt, dia_gt_a_rango_utc
+from utils.timezone import now_gt, today_str_gt, dia_gt_a_rango_utc, GUATEMALA_TZ
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 import uuid
@@ -353,6 +353,7 @@ class OpticaSaleResponse(BaseModel):
     cancelled_by: Optional[str] = ""
     cancelled_by_name: Optional[str] = ""
     cancelled_at: Optional[str] = None
+    fel: Optional[dict] = None
 
 class OpticaSaleListResponse(BaseModel):
     data: List[OpticaSaleResponse]
@@ -1157,6 +1158,81 @@ async def get_optica_sale(sale_id: str, current_user: dict = Depends(require_per
     
     enriched = await enrich_sale(sale)
     return OpticaSaleResponse(**enriched)
+
+
+@router.get("/sales/{sale_id}/ticket")
+async def obtener_ticket_optica_sale(sale_id: str, current_user: dict = Depends(require_permission("view_optica"))):
+    """Obtiene los datos formateados para impresión del ticket de una venta de Óptica.
+    Mismo formato que el ticket de la Clínica, adaptado a los productos de Óptica."""
+    sale = await db.optica_sales.find_one({"id": sale_id}, {"_id": 0})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    sale = await enrich_sale(sale)
+
+    fecha_dt = datetime.fromisoformat(sale["created_at"].replace("Z", "+00:00")).astimezone(GUATEMALA_TZ)
+    fecha_formateada = fecha_dt.strftime("%d/%m/%Y %H:%M")
+
+    config = await db.configuracion.find_one({"origen": "optica"})
+    empresa_config = config.get("empresa", {}) if config else {}
+
+    items = sale.get("items_v2") or []
+    if not items:
+        # Fallback para ventas legacy sin items_v2
+        if sale.get("frame_price", 0):
+            items.append({"name": sale.get("frame_info") or "Armazón", "quantity": 1, "unit_price": sale["frame_price"], "subtotal": sale["frame_price"]})
+        if sale.get("contact_lens_price", 0):
+            items.append({"name": sale.get("contact_lens_info") or "Lente de contacto", "quantity": 1, "unit_price": sale["contact_lens_price"], "subtotal": sale["contact_lens_price"]})
+        for li in sale.get("lens_items", []):
+            items.append({"name": li.get("lens_type_name", "Lente oftálmico"), "quantity": li.get("quantity", 1), "unit_price": li.get("unit_price", 0), "subtotal": li.get("subtotal", 0)})
+
+    total_pagado = sum(p.get("amount", 0) for p in sale.get("payments", []))
+
+    return {
+        "empresa": {
+            "nombre": empresa_config.get("nombre", "Novavisión - Óptica"),
+            "direccion": empresa_config.get("direccion", ""),
+            "nit": empresa_config.get("nit", ""),
+            "telefono": empresa_config.get("telefono", "")
+        },
+        "venta": {
+            "id": sale["id"],
+            "numero": sale["order_number"],
+            "fecha": fecha_formateada,
+            "vendedor": sale.get("created_by_name", "")
+        },
+        "cliente": {
+            "nombre": sale.get("patient_name") or "Consumidor Final",
+            "id": sale.get("patient_id")
+        },
+        "items": [
+            {
+                "cantidad": it.get("quantity", 1),
+                "nombre": it.get("name") or it.get("lens_type_name") or "Producto",
+                "precio_unitario": it.get("unit_price", 0),
+                "subtotal": it.get("subtotal", 0)
+            }
+            for it in items
+        ],
+        "totales": {
+            "subtotal": sale.get("subtotal", 0),
+            "descuento": sale.get("discount_amount", 0),
+            "total": sale.get("total", 0)
+        },
+        "pago": {
+            "formas": [
+                {
+                    "metodo": p.get("payment_method", "Efectivo"),
+                    "monto": p.get("amount", 0),
+                    "referencia": p.get("reference", "")
+                }
+                for p in sale.get("payments", [])
+            ],
+            "efectivo_recibido": total_pagado,
+            "cambio": 0
+        },
+        "observaciones": sale.get("notes"),
+        "estado": sale.get("status")
+    }
 
 
 @router.post("/sales", response_model=OpticaSaleResponse)

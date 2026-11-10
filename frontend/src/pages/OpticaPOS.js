@@ -38,7 +38,8 @@ import {
   POSPaymentDialog,
   POSRecetaDialog,
   POSSuccessDialog,
-  POSSalesDialog
+  POSSalesDialog,
+  POSSaleDetailDialog
 } from '../components/pos';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -121,6 +122,10 @@ const OpticaPOS = () => {
   // Confirmación de venta exitosa
   const [ventaExitosa, setVentaExitosa] = useState(null);
   const [ventaExitosaDialogOpen, setVentaExitosaDialogOpen] = useState(false);
+
+  // Detalle de venta (desde "Ver Ventas del Día")
+  const [ventaDetalle, setVentaDetalle] = useState(null);
+  const [ventaDetalleDialogOpen, setVentaDetalleDialogOpen] = useState(false);
   
   // UI state
   const [submitting, setSubmitting] = useState(false);
@@ -243,6 +248,231 @@ const OpticaPOS = () => {
     } catch (error) {
       console.error('Error fetching sales:', error);
     }
+  };
+
+  // Refresca el estado de FEL de la venta en el diálogo de "Venta Exitosa"
+  const refrescarVentaExitosa = async () => {
+    if (!ventaExitosa) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/optica/sales/${ventaExitosa.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setVentaExitosa(res.data);
+    } catch (error) {
+      console.error('Error refreshing venta exitosa:', error);
+    }
+  };
+
+  // Refresca el estado de FEL de la venta en el detalle de "Ver Ventas del Día"
+  const refrescarVentaDetalle = async () => {
+    if (!ventaDetalle) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/optica/sales/${ventaDetalle.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setVentaDetalle(res.data);
+    } catch (error) {
+      console.error('Error refreshing venta detalle:', error);
+    }
+  };
+
+  const abrirDetalleVenta = (venta) => {
+    setVentaDetalle(venta);
+    setVentaDetalleDialogOpen(true);
+  };
+
+  // ==================== IMPRESIÓN DE TICKETS TÉRMICOS ====================
+
+  const imprimirTicket = async (ventaId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/optica/sales/${ventaId}/ticket`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const ticket = response.data;
+
+      const ticketHTML = generarTicketHTMLOptica(ticket);
+
+      const printWindow = window.open('', '_blank', 'width=350,height=600');
+      printWindow.document.write(ticketHTML);
+      printWindow.document.close();
+
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    } catch (error) {
+      console.error('Error al generar ticket:', error);
+      toast.error('Error al generar ticket');
+    }
+  };
+
+  const generarTicketHTMLOptica = (ticket) => {
+    const formasPagoHTML = ticket.pago.formas.map(fp => `
+      <div class="pago-line">
+        <span>${fp.metodo}:</span>
+        <span>Q${fp.monto.toFixed(2)}</span>
+      </div>
+    `).join('');
+
+    const itemsHTML = ticket.items.map(item => {
+      const nombreCorto = item.nombre.length > 28 ? item.nombre.substring(0, 25) + '...' : item.nombre;
+      return `
+        <div class="item">
+          <div class="item-name">${nombreCorto}</div>
+          <div class="item-detail">
+            <span>${item.cantidad} x Q${item.precio_unitario.toFixed(2)}</span>
+            <span>Q${item.subtotal.toFixed(2)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Ticket ${ticket.venta.numero}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+
+            body {
+              font-family: 'Courier New', 'Lucida Console', Monaco, monospace;
+              font-size: 11px;
+              line-height: 1.3;
+              width: 280px;
+              padding: 8px;
+              background: #fff;
+              color: #000;
+            }
+
+            .ticket { width: 100%; }
+
+            .header {
+              text-align: center;
+              padding-bottom: 8px;
+              border-bottom: 1px dashed #000;
+              margin-bottom: 8px;
+            }
+
+            .logo-text { font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+            .empresa-info { font-size: 10px; margin-top: 4px; }
+            .divider { border-bottom: 1px dashed #000; margin: 6px 0; }
+            .info-section { margin-bottom: 8px; }
+            .info-line { display: flex; justify-content: space-between; margin: 2px 0; }
+
+            .ticket-numero {
+              text-align: center;
+              font-size: 14px;
+              font-weight: bold;
+              padding: 6px 0;
+              background: #f0f0f0;
+              margin: 6px 0;
+            }
+
+            .items { padding: 8px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; }
+            .item { margin-bottom: 6px; }
+            .item-name { font-weight: bold; font-size: 10px; }
+            .item-detail { display: flex; justify-content: space-between; font-size: 10px; padding-left: 8px; }
+
+            .totales { padding: 8px 0; }
+            .total-line { display: flex; justify-content: space-between; margin: 3px 0; }
+            .total-final { font-size: 14px; font-weight: bold; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
+
+            .pagos { padding: 6px 0; border-top: 1px dashed #000; }
+            .pagos-title { font-weight: bold; margin-bottom: 4px; }
+            .pago-line { display: flex; justify-content: space-between; font-size: 10px; }
+
+            .footer { text-align: center; padding-top: 10px; border-top: 1px dashed #000; margin-top: 8px; }
+            .footer-message { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+            .footer-legal { font-size: 9px; color: #666; }
+
+            @media print {
+              @page { size: 80mm auto; margin: 0; }
+              body { width: 72mm; padding: 2mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket">
+            <div class="header">
+              <div class="logo-text">NOVAVISIÓN</div>
+              <div class="empresa-info">Óptica</div>
+              ${ticket.empresa.direccion ? `<div class="empresa-info">${ticket.empresa.direccion}</div>` : ''}
+              ${ticket.empresa.nit ? `<div class="empresa-info">NIT: ${ticket.empresa.nit}</div>` : ''}
+              ${ticket.empresa.telefono ? `<div class="empresa-info">Tel: ${ticket.empresa.telefono}</div>` : ''}
+            </div>
+
+            <div class="ticket-numero">${ticket.venta.numero}</div>
+
+            <div class="info-section">
+              <div class="info-line">
+                <span>Fecha:</span>
+                <span>${ticket.venta.fecha}</span>
+              </div>
+              <div class="info-line">
+                <span>Cliente:</span>
+                <span>${ticket.cliente.nombre}</span>
+              </div>
+              ${ticket.venta.vendedor ? `
+                <div class="info-line">
+                  <span>Atendió:</span>
+                  <span>${ticket.venta.vendedor}</span>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="items">
+              ${itemsHTML}
+            </div>
+
+            <div class="totales">
+              <div class="total-line">
+                <span>Subtotal:</span>
+                <span>Q${ticket.totales.subtotal.toFixed(2)}</span>
+              </div>
+              ${ticket.totales.descuento > 0 ? `
+                <div class="total-line">
+                  <span>Descuento:</span>
+                  <span>-Q${ticket.totales.descuento.toFixed(2)}</span>
+                </div>
+              ` : ''}
+              <div class="total-line total-final">
+                <span>TOTAL:</span>
+                <span>Q${ticket.totales.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div class="pagos">
+              <div class="pagos-title">Forma de Pago:</div>
+              ${formasPagoHTML}
+            </div>
+
+            ${ticket.observaciones ? `
+              <div class="divider"></div>
+              <div style="font-size: 9px; padding: 4px 0;">
+                <strong>Obs:</strong> ${ticket.observaciones}
+              </div>
+            ` : ''}
+
+            <div class="footer">
+              <div class="footer-message">¡Gracias por su preferencia!</div>
+              <div class="footer-legal">Documento no fiscal</div>
+              <div class="footer-legal">Conserve este ticket para cualquier aclaración</div>
+            </div>
+          </div>
+
+          <script>
+            window.onafterprint = function() {
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
   };
 
   const buscarPacientes = async () => {
@@ -784,6 +1014,8 @@ const OpticaPOS = () => {
         open={ventaExitosaDialogOpen}
         onOpenChange={setVentaExitosaDialogOpen}
         ventaExitosa={ventaExitosa}
+        onImprimir={imprimirTicket}
+        onFelUpdated={refrescarVentaExitosa}
       />
       
       <POSSalesDialog
@@ -791,6 +1023,15 @@ const OpticaPOS = () => {
         onOpenChange={setVentasDialogOpen}
         ventasHoy={ventasHoy}
         resumenDia={resumenDia}
+        onSelectVenta={abrirDetalleVenta}
+      />
+
+      <POSSaleDetailDialog
+        open={ventaDetalleDialogOpen}
+        onOpenChange={setVentaDetalleDialogOpen}
+        venta={ventaDetalle}
+        onImprimir={imprimirTicket}
+        onFelUpdated={refrescarVentaDetalle}
       />
     </Layout>
   );
