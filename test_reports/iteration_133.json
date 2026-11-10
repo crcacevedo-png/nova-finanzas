@@ -1,0 +1,25 @@
+{
+  "summary": "Follow-up verification of centralized formatDate fix (services/api.js). Unit-checked formatDate in node: '1985-06-15'->15/06/85, '2026-01-01'->01/01/26, timestamps still converted to Guatemala TZ ('2026-08-12T00:05:00+00:00'->11/08/26, '...T05:59Z'->11/08, '...T06:00Z'->12/08), null/''->'-'. DB check: expenses.date/due_date, payments.date, patients.birth_date are all plain YYYY-MM-DD (or empty) - no datetime variants, so the regex path covers all of them. UI tested with browser in UTC AND with CDP timezone override America/Guatemala: Pacientes detail María García López birth 15/06/85 (DB 1985-06-15), Ana Rodríguez Castillo 08/11/90 (DB 1990-11-08) - correct. Timestamp regression: 'Registrado' 12/04/26 for created_at 2026-04-13T00:53Z (correct GT conversion, previous day), 'Última modificación' 09/11/26 for 2026-11-09T13:53Z - correct. Gastos: created TEST_FechaFix expense (due 2026-11-20) -> list column 20/11/26, detail 'Vencimiento' 20/11/26; Dashboard alert 'Vence: 20/11/26' in both TZs. Anestesia Cierre mensual: 37 rows, dates correct (02/11/26 Berta Maria Merlo Rivas matches iteration_132). Sala de Operaciones: dates correct (Marta Alicia Marroquín 23/11/26 etc). Fix CONFIRMED. One related off-by-one found: Gastos 'días' badge (getDaysUntilDue) shows 10 días with browser in America/Guatemala vs 11 días in UTC and backend days_remaining=11.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Gastos.js getDaysUntilDue (line ~437)", "issue": "Same root cause as the formatDate bug: `new Date(dueDate)` parses 'YYYY-MM-DD' as UTC midnight; in Guatemala (UTC-6) setHours(0) moves it to the previous local day, so the days-remaining badge is 1 day short (TEST expense due 20/11 showed '10 días' in GT browser vs '11 días' in UTC browser / backend days_remaining=11). Can also mislabel 'Hoy' vs overdue on the due date. Fix: build due as new Date(y, m-1, d) from the string components.", "selector": "[data-testid^='expense-row-'] days badge", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix Gastos.js getDaysUntilDue: parse dueDate 'YYYY-MM-DD' by components (new Date(y, m-1, d)) instead of new Date(dueDate) to avoid off-by-one days badge for Guatemala users.",
+    "Optional review of other date-only parsings with new Date(str): EvaluacionOftalmologica.js:1408 (age from birth_date, off on birthday eve), HistorialPagos.js:163/167 (date range filter compares UTC-midnight dates - mostly consistent since both sides parsed same way), Sociedades.js:681 and CRMCirugias.js:990 (toLocaleDateString with GT tz - off by one IF consumo.fecha / seg.fecha are stored as plain YYYY-MM-DD; verify data format)."
+  ],
+  "critical_code_review_comments": [
+    "formatDate fix is correct and minimal; timestamps path unchanged. Consider exporting a shared parseDateOnly helper and reusing it in Gastos/Evaluacion/Sociedades/CRM to eliminate this bug class."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100% of requested checks (1 related minor off-by-one found outside formatDate)"},
+  "seed_data_creation": "Created TEST_FechaFix expense (id 083eef60-344c-4cc4-933f-5023b79b2bb1) and deleted it afterwards (verified 404).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Env clock Nov 2026. Use CDP Emulation.setTimezoneOverride America/Guatemala to reproduce TZ bugs. Patients with known birth dates: 8c8723a3-... María García López 1985-06-15, 22a28d4d-... Ana Rodríguez Castillo 1990-11-08. Dashboard alerts 30/60 are empty unless a pending expense with due_date in range exists (create TEST_ expense via POST /api/expenses {name,type,amount,date,due_date}). Gastos list hides paid expenses like GST-0052 (payment history not viewed in UI; payments.date all plain YYYY-MM-DD so covered by formatDate fix)."
+}

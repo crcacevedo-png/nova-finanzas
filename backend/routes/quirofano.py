@@ -7,6 +7,11 @@
 - Cierre mensual por anestesiólogo con monto total a pagar y marcado de pago.
 """
 import uuid
+import io
+import time
+import hmac
+import base64
+import hashlib
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
@@ -22,6 +27,12 @@ _client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = _client[os.environ['DB_NAME']]
 
 router = APIRouter(prefix="/quirofano", tags=["Quirófano"])
+
+# Secreto para firmar los enlaces públicos y de un solo propósito del informe
+# diario de anestesia (se reutiliza el secreto de los cron webhooks; el HMAC
+# es unidireccional, por lo que firmar con él no expone el secreto original).
+_REPORT_TOKEN_SECRET = os.environ.get("WEBHOOK_CRON_SECRET", "")
+_REPORT_TOKEN_TTL_DAYS = 21
 
 ANESTHESIA_LABELS = {
     "topica": "Tópica", "local": "Local", "local_asistida": "Local asistida",
@@ -443,7 +454,6 @@ async def export_monthly_closure(
     format: str = Query("xlsx", description="xlsx | pdf"),
     current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"])),
 ):
-    import io
     data = await _build_closure(month)
     grupos = data["por_anestesiologo"]
     estado = "CERRADO (pagado)" if data["closed"] else "ABIERTO (pendiente)"
@@ -634,3 +644,152 @@ async def reopen_month(
     )
     await db.anesthesia_records.update_many({"month": month}, {"$set": {"paid": False}})
     return {"message": f"Mes {month} reabierto"}
+
+
+# ==================== INFORME DIARIO (envío automático por correo) ====================
+async def build_daily_report(date_str: str) -> dict:
+    """Arma el detalle de procedimientos de anestesia de un día específico
+    (YYYY-MM-DD), con los mismos datos ya disponibles en los registros de
+    anestesia: paciente, procedimiento, médico responsable, institución,
+    tipo de anestesia, anestesiólogo, honorario y estado de pago."""
+    records = await db.anesthesia_records.find({"date": date_str}, {"_id": 0}).to_list(500)
+    surgery_ids = [r["surgery_id"] for r in records if r.get("surgery_id")]
+    surgeries_map = {}
+    if surgery_ids:
+        surgeries = await db.surgeries.find(
+            {"id": {"$in": surgery_ids}}, {"_id": 0, "id": 1, "procedure": 1, "surgeon": 1, "institution": 1}
+        ).to_list(len(surgery_ids))
+        surgeries_map = {s["id"]: s for s in surgeries}
+    rows = []
+    for r in records:
+        surg = surgeries_map.get(r.get("surgery_id")) or {}
+        rows.append({
+            "patient_name": r.get("patient_name") or "",
+            "procedure": surg.get("procedure") or "",
+            "surgeon": surg.get("surgeon") or "",
+            "institution": surg.get("institution") or "",
+            "tipo": r.get("anesthesia_type_name") or "Sin tipo",
+            "anesthesiologist": r.get("anesthesiologist") or "",
+            "value": round(r.get("value") or 0, 2),
+            "paid": bool(r.get("paid")),
+        })
+    rows.sort(key=lambda x: x["patient_name"])
+    return {
+        "date": date_str,
+        "rows": rows,
+        "total_count": len(rows),
+        "total_value": round(sum(r["value"] for r in rows), 2),
+    }
+
+
+def render_daily_report_pdf(date_str: str, data: dict) -> bytes:
+    """Genera el PDF del informe diario de anestesia (mismo estilo visual que
+    el cierre mensual, pero listando los procedimientos del día)."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=0.5 * inch,
+                             leftMargin=0.5 * inch, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('T', parent=styles['Heading1'], fontSize=15, alignment=TA_CENTER,
+                                  textColor=colors.HexColor('#4F46E5'), spaceAfter=6)
+    sub_style = ParagraphStyle('S', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER,
+                                textColor=colors.grey, spaceAfter=14)
+    try:
+        y, m, d = date_str.split('-')
+        fecha_legible = f"{d}/{m}/{y}"
+    except (AttributeError, ValueError):
+        fecha_legible = date_str
+    elements = [
+        Paragraph("Novavisión — Informe Diario de Anestesia", title_style),
+        Paragraph(
+            f"Fecha: {fecha_legible} &nbsp;|&nbsp; Procedimientos: {data['total_count']} "
+            f"&nbsp;|&nbsp; Total honorarios: Q {data['total_value']:,.2f}",
+            sub_style,
+        ),
+    ]
+
+    cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=8, leading=10)
+
+    def _cell(text):
+        return Paragraph(str(text or ''), cell_style)
+
+    table_data = [["Paciente", "Procedimiento", "Médico resp.", "Institución", "Tipo anestesia", "Anestesiólogo", "Estado", "Honorario"]]
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4F46E5')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (-2, 0), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#4F46E5')),
+    ]
+    for r in data["rows"]:
+        table_data.append([
+            _cell(r["patient_name"]), _cell(r["procedure"]), _cell(r["surgeon"]), _cell(r["institution"]),
+            _cell(r["tipo"]), _cell(r["anesthesiologist"]), _cell("Pagado" if r["paid"] else "Pendiente"),
+            f"Q {r['value']:,.2f}",
+        ])
+
+    table = Table(table_data, colWidths=[1.1 * inch, 1.05 * inch, 0.95 * inch, 0.85 * inch, 0.95 * inch, 1.0 * inch, 0.7 * inch, 0.7 * inch], repeatRows=1)
+    table.setStyle(TableStyle(style_cmds))
+    elements.append(table)
+    elements.append(Spacer(1, 0.2 * inch))
+    total_style = ParagraphStyle('Tot', parent=styles['Normal'], fontSize=12, alignment=TA_RIGHT)
+    elements.append(Paragraph(f"<b>TOTAL DEL DÍA: Q {data['total_value']:,.2f}</b>", total_style))
+    if not data["rows"]:
+        elements.append(Paragraph("Sin procedimientos de anestesia registrados este día.", sub_style))
+
+    doc.build(elements)
+    output.seek(0)
+    return output.read()
+
+
+def _make_report_token(date_str: str, ttl_days: int = _REPORT_TOKEN_TTL_DAYS) -> str:
+    """Token opaco, firmado y con expiración para el enlace público (sin login)
+    de descarga del informe diario de anestesia de una fecha específica."""
+    expires_at = int(time.time()) + ttl_days * 86400
+    payload = f"{date_str}|{expires_at}"
+    sig = hmac.new(_REPORT_TOKEN_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    raw = f"{payload}|{sig}".encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _verify_report_token(token: str) -> Optional[str]:
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode()).decode()
+        date_str, expires_at, sig = raw.split("|")
+    except (ValueError, UnicodeDecodeError):
+        return None
+    expected = hmac.new(_REPORT_TOKEN_SECRET.encode(), f"{date_str}|{expires_at}".encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
+    if int(expires_at) < int(time.time()):
+        return None
+    return date_str
+
+
+@router.get("/anesthesia/daily-report/pdf")
+async def download_daily_report_pdf(token: str = Query(...)):
+    """Descarga pública (vía enlace firmado, sin login) del PDF del informe
+    diario de anestesia enviado por correo. El enlace expira automáticamente."""
+    date_str = _verify_report_token(token)
+    if not date_str:
+        raise HTTPException(status_code=404, detail="Enlace inválido o expirado")
+    data = await build_daily_report(date_str)
+    pdf_bytes = render_daily_report_pdf(date_str, data)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=anestesia_{date_str}.pdf"},
+    )

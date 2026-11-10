@@ -434,7 +434,8 @@ const Gastos = () => {
     const [ty, tm, td] = getGuatemalaDate().split('-').map(Number);
     const today = new Date(ty, tm - 1, td);
     today.setHours(0, 0, 0, 0);
-    const due = new Date(dueDate);
+    const [dy, dm, dd] = dueDate.split('-').map(Number);
+    const due = new Date(dy, dm - 1, dd);
     due.setHours(0, 0, 0, 0);
     const diffTime = due - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
