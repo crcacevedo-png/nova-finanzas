@@ -654,6 +654,13 @@ async def build_daily_report(date_str: str) -> dict:
     anestesia: paciente, procedimiento, médico responsable, institución,
     tipo de anestesia, anestesiólogo, honorario y estado de pago."""
     records = await db.anesthesia_records.find({"date": date_str}, {"_id": 0}).to_list(500)
+    # Mismo filtro que el cierre mensual (_build_closure): excluir registros sin
+    # anestesiólogo real asignado, para que el informe coincida exactamente con
+    # lo que se ve en el submenú de Procedimientos de Anestesia.
+    records = [
+        r for r in records
+        if (r.get("anesthesiologist") or "").strip().upper() not in ("", "N/A", "NA", "—")
+    ]
     surgery_ids = [r["surgery_id"] for r in records if r.get("surgery_id")]
     surgeries_map = {}
     if surgery_ids:
