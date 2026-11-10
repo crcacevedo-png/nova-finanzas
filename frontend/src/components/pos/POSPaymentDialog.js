@@ -208,7 +208,7 @@ const POSPaymentDialog = ({
           <Button 
             className="bg-teal-600 hover:bg-teal-700"
             onClick={onProcesarVenta}
-            disabled={submitting || (calcularPendiente() > 0.01 && !formasPago.some(fp => fp.es_cxc))}
+            disabled={submitting || (Math.max(0, calcularPendiente() - (parseFloat(montoPagoActual) || 0)) > 0.01 && !formasPago.some(fp => fp.es_cxc))}
           >
             {submitting ? (
               <>

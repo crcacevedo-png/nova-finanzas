@@ -659,14 +659,31 @@ const OpticaPOS = () => {
       toast.error('El carrito está vacío');
       return;
     }
+
+    // Si el usuario escribió un monto en el campo "Monto" pero no presionó el botón "+",
+    // se agrega automáticamente aquí para no bloquear la venta de forma poco intuitiva.
+    let formasPagoFinal = formasPago;
+    const montoStaged = parseFloat(montoPagoActual);
+    if (montoStaged > 0) {
+      formasPagoFinal = [...formasPago, {
+        metodo: metodoPagoActual,
+        monto: montoStaged,
+        referencia: referenciaPagoActual || null,
+        es_cxc: metodoPagoActual === 'Cuenta por Cobrar'
+      }];
+      setFormasPago(formasPagoFinal);
+      setMontoPagoActual('');
+      setReferenciaPagoActual('');
+    }
     
-    const tieneCxC = formasPago.some(fp => fp.es_cxc);
+    const tieneCxC = formasPagoFinal.some(fp => fp.es_cxc);
     if (tieneCxC && !paciente) {
       toast.error('Debe seleccionar un paciente para ventas con Cuenta por Cobrar');
       return;
     }
     
-    const pendiente = calcularPendiente();
+    const totalPagadoFinal = formasPagoFinal.reduce((sum, fp) => sum + fp.monto, 0);
+    const pendiente = calcularTotal() - totalPagadoFinal;
     if (pendiente > 0.01 && !tieneCxC) {
       toast.error('El monto pagado es insuficiente');
       return;
@@ -690,8 +707,8 @@ const OpticaPOS = () => {
       const token = localStorage.getItem('token');
       
       // Separar pagos CxC de pagos normales
-      const pagosCxC = formasPago.filter(fp => fp.es_cxc);
-      const pagosNormales = formasPago.filter(fp => !fp.es_cxc);
+      const pagosCxC = formasPagoFinal.filter(fp => fp.es_cxc);
+      const pagosNormales = formasPagoFinal.filter(fp => !fp.es_cxc);
       const montoCxC = pagosCxC.reduce((sum, fp) => sum + fp.monto, 0);
       
       // Preparar items para el nuevo formato V2
