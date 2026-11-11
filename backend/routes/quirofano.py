@@ -374,10 +374,12 @@ async def marcar_pago_individual(
 
 
 # ==================== CIERRE MENSUAL ====================
-async def _build_closure(month: str) -> dict:
+async def _build_closure(month: str, medico: Optional[str] = None, institucion: Optional[str] = None) -> dict:
     """Agrega los registros de anestesia del mes agrupados por anestesiólogo.
     Los totales reflejan únicamente los registros PENDIENTES de pago; los ya
-    pagados individualmente se descuentan del total a pagar del mes."""
+    pagados individualmente se descuentan del total a pagar del mes.
+    Si se indica `medico` y/o `institucion`, solo se incluyen los registros
+    cuya cirugía coincide con esos valores (médico responsable / institución)."""
     records = await db.anesthesia_records.find({"month": month}, {"_id": 0}).to_list(5000)
     surgery_ids = [r["surgery_id"] for r in records if r.get("surgery_id")]
     surgeries_map = {}
@@ -390,6 +392,11 @@ async def _build_closure(month: str) -> dict:
     for r in records:
         key = r.get("anesthesiologist") or ""
         if key.strip().upper() in ("", "N/A", "NA", "—"):
+            continue
+        surg = surgeries_map.get(r.get("surgery_id")) or {}
+        if medico and (surg.get("surgeon") or "") != medico:
+            continue
+        if institucion and (surg.get("institution") or "") != institucion:
             continue
         grp = por_anest.setdefault(key, {
             "anesthesiologist": key, "count": 0, "total": 0.0,
@@ -408,7 +415,6 @@ async def _build_closure(month: str) -> dict:
         t["count"] += 1
         if not pagado:
             t["subtotal"] += valor
-        surg = surgeries_map.get(r.get("surgery_id")) or {}
         grp["detalle"].append({
             "id": r.get("id"),
             "date": r.get("date") or "",
@@ -444,20 +450,53 @@ async def _build_closure(month: str) -> dict:
 @router.get("/anesthesia/closure")
 async def get_monthly_closure(
     month: str = Query(..., description="YYYY-MM"),
+    medico: Optional[str] = Query(None, description="Filtrar por médico responsable"),
+    institucion: Optional[str] = Query(None, description="Filtrar por institución"),
     current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"])),
 ):
-    return await _build_closure(month)
+    return await _build_closure(month, medico=medico, institucion=institucion)
+
+
+@router.get("/anesthesia/closure/filtros")
+async def get_closure_filtros(
+    month: str = Query(..., description="YYYY-MM"),
+    current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"])),
+):
+    """Devuelve los médicos e instituciones disponibles para filtrar el cierre del mes."""
+    records = await db.anesthesia_records.find(
+        {"month": month}, {"_id": 0, "surgery_id": 1, "anesthesiologist": 1}
+    ).to_list(5000)
+    records = [r for r in records if (r.get("anesthesiologist") or "").strip().upper() not in ("", "N/A", "NA", "—")]
+    surgery_ids = list({r["surgery_id"] for r in records if r.get("surgery_id")})
+    medicos, instituciones = set(), set()
+    if surgery_ids:
+        surgeries = await db.surgeries.find(
+            {"id": {"$in": surgery_ids}}, {"_id": 0, "surgeon": 1, "institution": 1}
+        ).to_list(len(surgery_ids))
+        for s in surgeries:
+            if s.get("surgeon"):
+                medicos.add(s["surgeon"])
+            if s.get("institution"):
+                instituciones.add(s["institution"])
+    return {"medicos": sorted(medicos), "instituciones": sorted(instituciones)}
 
 
 @router.get("/anesthesia/closure/export")
 async def export_monthly_closure(
     month: str = Query(..., description="YYYY-MM"),
     format: str = Query("xlsx", description="xlsx | pdf"),
+    medico: Optional[str] = Query(None, description="Filtrar por médico responsable"),
+    institucion: Optional[str] = Query(None, description="Filtrar por institución"),
     current_user: dict = Depends(require_role(["admin", "superadmin", "anestesia"])),
 ):
-    data = await _build_closure(month)
+    data = await _build_closure(month, medico=medico, institucion=institucion)
     grupos = data["por_anestesiologo"]
     estado = "CERRADO (pagado)" if data["closed"] else "ABIERTO (pendiente)"
+    filtro_txt = ""
+    if medico:
+        filtro_txt += f"   |   Médico: {medico}"
+    if institucion:
+        filtro_txt += f"   |   Institución: {institucion}"
 
     if format == "xlsx":
         import openpyxl
@@ -474,7 +513,7 @@ async def export_monthly_closure(
 
         ws["A1"] = "Novavisión — Cierre de Procedimientos de Anestesia"
         ws["A1"].font = Font(bold=True, size=14, color="4F46E5")
-        ws["A2"] = f"Mes: {month}   |   Estado: {estado}   |   Total a pagar: Q {data['total_general']:,.2f}   |   Procedimientos: {data['num_registros']}"
+        ws["A2"] = f"Mes: {month}   |   Estado: {estado}   |   Total a pagar: Q {data['total_general']:,.2f}   |   Procedimientos: {data['num_registros']}{filtro_txt}"
         ws["A3"] = ""
 
         headers = ["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico responsable", "Institución", "Tipo de anestesia", "Estado", "Honorario"]
@@ -543,7 +582,7 @@ async def export_monthly_closure(
                                textColor=colors.grey, spaceAfter=14)
     elements = [
         Paragraph("Novavisión — Cierre de Procedimientos de Anestesia", title_style),
-        Paragraph(f"Mes: {month} &nbsp;|&nbsp; Estado: {estado} &nbsp;|&nbsp; Total a pagar: Q {data['total_general']:,.2f} &nbsp;|&nbsp; Procedimientos: {data['num_registros']}", sub_style),
+        Paragraph(f"Mes: {month} &nbsp;|&nbsp; Estado: {estado} &nbsp;|&nbsp; Total a pagar: Q {data['total_general']:,.2f} &nbsp;|&nbsp; Procedimientos: {data['num_registros']}{filtro_txt.replace('   |   ', ' &nbsp;|&nbsp; ')}", sub_style),
     ]
 
     table_data = [["Anestesiólogo", "Fecha", "Paciente", "Procedimiento", "Médico resp.", "Institución", "Tipo", "Estado", "Honorario"]]

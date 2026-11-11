@@ -12,7 +12,10 @@ import { Badge } from '../components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from '../components/ui/dialog';
-import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileText, Check, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Power, Syringe, Lock, CheckCircle, FileSpreadsheet, FileText, Check, RotateCcw, Filter, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+
+const ALL_VALUE = '__all__';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -115,16 +118,37 @@ const CierreTab = ({ canClose }) => {
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [medico, setMedico] = useState(ALL_VALUE);
+  const [institucion, setInstitucion] = useState(ALL_VALUE);
+  const [filtros, setFiltros] = useState({ medicos: [], instituciones: [] });
+
+  const fetchFiltros = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/quirofano/anesthesia/closure/filtros?month=${month}`);
+      setFiltros(res.data || { medicos: [], instituciones: [] });
+    } catch (e) { /* silencioso: no bloquea la vista principal */ }
+  }, [month]);
+  useEffect(() => { fetchFiltros(); }, [fetchFiltros]);
 
   const fetchClosure = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/quirofano/anesthesia/closure?month=${month}`);
+      const params = new URLSearchParams({ month });
+      if (medico !== ALL_VALUE) params.set('medico', medico);
+      if (institucion !== ALL_VALUE) params.set('institucion', institucion);
+      const res = await axios.get(`${API_URL}/quirofano/anesthesia/closure?${params.toString()}`);
       setData(res.data);
     } catch (e) { toast.error(e.response?.data?.detail || 'Error al cargar el cierre'); }
     finally { setLoading(false); }
-  }, [month]);
+  }, [month, medico, institucion]);
   useEffect(() => { fetchClosure(); }, [fetchClosure]);
+
+  // Al cambiar de mes, los filtros de médico/institución de un mes anterior pueden ya
+  // no existir en el mes nuevo; se reinician para evitar un filtro "fantasma".
+  useEffect(() => { setMedico(ALL_VALUE); setInstitucion(ALL_VALUE); }, [month]);
+
+  const filtrosActivos = medico !== ALL_VALUE || institucion !== ALL_VALUE;
+  const limpiarFiltros = () => { setMedico(ALL_VALUE); setInstitucion(ALL_VALUE); };
 
   const cerrarMes = async () => {
     if (!window.confirm(`¿Cerrar el mes ${month} y marcar los honorarios como pagados? Esta acción deja el mes de solo lectura.`)) return;
@@ -152,7 +176,10 @@ const CierreTab = ({ canClose }) => {
     setExporting(true);
     try {
       toast.info(`Generando ${format.toUpperCase()}...`);
-      const res = await axios.get(`${API_URL}/quirofano/anesthesia/closure/export?month=${month}&format=${format}`, { responseType: 'blob' });
+      const params = new URLSearchParams({ month, format });
+      if (medico !== ALL_VALUE) params.set('medico', medico);
+      if (institucion !== ALL_VALUE) params.set('institucion', institucion);
+      const res = await axios.get(`${API_URL}/quirofano/anesthesia/closure/export?${params.toString()}`, { responseType: 'blob' });
       const blob = new Blob([res.data], {
         type: format === 'xlsx'
           ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -174,7 +201,7 @@ const CierreTab = ({ canClose }) => {
 
   return (
     <div data-testid="anesthesia-closure-tab">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <Label className="text-sm">Mes:</Label>
           <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-56 min-w-[14rem]" data-testid="anesthesia-closure-month" />
@@ -197,8 +224,35 @@ const CierreTab = ({ canClose }) => {
           )}
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-2 mb-4 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+        <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+        <Label className="text-sm text-gray-500 mr-1">Filtrar por:</Label>
+        <Select value={medico} onValueChange={setMedico}>
+          <SelectTrigger className="w-[220px] bg-white" data-testid="anesthesia-filter-medico">
+            <SelectValue placeholder="Médico responsable" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_VALUE}>Todos los médicos</SelectItem>
+            {filtros.medicos.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}
+          </SelectContent>
+        </Select>
+        <Select value={institucion} onValueChange={setInstitucion}>
+          <SelectTrigger className="w-[220px] bg-white" data-testid="anesthesia-filter-institucion">
+            <SelectValue placeholder="Institución" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_VALUE}>Todas las instituciones</SelectItem>
+            {filtros.instituciones.map((inst) => (<SelectItem key={inst} value={inst}>{inst}</SelectItem>))}
+          </SelectContent>
+        </Select>
+        {filtrosActivos && (
+          <Button variant="ghost" size="sm" onClick={limpiarFiltros} className="h-8 px-2 text-xs text-gray-500 hover:text-red-600" data-testid="anesthesia-filter-clear">
+            <X className="w-3.5 h-3.5 mr-1" />Limpiar filtros
+          </Button>
+        )}
+      </div>
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm text-gray-500">Total a pagar del mes ({data?.num_pendientes ?? 0} de {data?.num_registros || 0} procedimientos pendientes)</span>
+        <span className="text-sm text-gray-500">{filtrosActivos ? 'Total a pagar (filtrado)' : 'Total a pagar del mes'} ({data?.num_pendientes ?? 0} de {data?.num_registros || 0} procedimientos pendientes)</span>
         <div className="flex items-center gap-4">
           {(data?.total_pagado_general || 0) > 0 && (
             <span className="text-sm text-gray-400">Pagado: <span className="font-semibold text-emerald-600">{formatCurrency(data.total_pagado_general)}</span></span>
@@ -260,7 +314,9 @@ const CierreTab = ({ canClose }) => {
           </div>
         ))}
         {(data?.por_anestesiologo || []).length === 0 && !loading && (
-          <div className="text-center text-gray-400 py-10">Sin registros de anestesia este mes.</div>
+          <div className="text-center text-gray-400 py-10">
+            {filtrosActivos ? 'Sin registros de anestesia con los filtros seleccionados.' : 'Sin registros de anestesia este mes.'}
+          </div>
         )}
       </div>
     </div>
