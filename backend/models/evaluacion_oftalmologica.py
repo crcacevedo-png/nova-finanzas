@@ -307,11 +307,21 @@ LEGACY_LIST_ITEM_KEY_FIELD = {
 }
 
 
+def _limpiar_none(d: dict) -> dict:
+    """Quita las claves en None de un dict de primer nivel, para que apliquen los
+    valores por defecto del modelo (string vacío, etc.) en vez de fallar la validación."""
+    return {k: v for k, v in d.items() if v is not None} if isinstance(d, dict) else d
+
+
 def normalizar_items_evaluacion_legacy(data: dict) -> dict:
-    """Convierte items de texto suelto (legacy) de las listas clínicas en el objeto
-    mínimo válido, y descarta cualquier item que no sea ni dict ni texto. Evita que un
-    documento viejo con una lista parcialmente migrada rompa la validación (al guardar
-    o al leer) con un 422/500 que deja al usuario sin saber qué pasó con su guardado."""
+    """Normaliza datos heredados de evaluaciones legacy/importadas para que nunca
+    rompan la validación (al guardar o al leer), ni al guardarse exitosamente
+    devuelvan igual un error al frontend:
+    - items de listas clínicas que llegaron como texto suelto -> dict mínimo válido
+    - claves en None DENTRO de esos items (ej. {"descripcion": None}) -> se descartan
+    - recomendaciones.estudios_a_realizar y recetas.medicamentos.items: mismo criterio
+    - descarta cualquier item que no sea ni dict ni texto no vacío
+    """
     for campo, key_field in LEGACY_LIST_ITEM_KEY_FIELD.items():
         valor = data.get(campo)
         if not isinstance(valor, list):
@@ -319,10 +329,38 @@ def normalizar_items_evaluacion_legacy(data: dict) -> dict:
         normalizados = []
         for item in valor:
             if isinstance(item, dict):
-                normalizados.append(item)
+                normalizados.append(_limpiar_none(item))
             elif isinstance(item, str) and item.strip():
                 normalizados.append({key_field: item.strip()})
         data[campo] = normalizados
+
+    recomendaciones = data.get("recomendaciones")
+    if isinstance(recomendaciones, dict):
+        recomendaciones = _limpiar_none(recomendaciones)
+        estudios = recomendaciones.get("estudios_a_realizar")
+        if isinstance(estudios, list):
+            recomendaciones["estudios_a_realizar"] = [
+                _limpiar_none(e) if isinstance(e, dict) else {"estudio": e}
+                for e in estudios
+                if (isinstance(e, dict)) or (isinstance(e, str) and e.strip())
+            ]
+        elif "estudios_a_realizar" in recomendaciones and estudios is None:
+            recomendaciones["estudios_a_realizar"] = []
+        data["recomendaciones"] = recomendaciones
+
+    recetas = data.get("recetas")
+    if isinstance(recetas, dict):
+        medicamentos = recetas.get("medicamentos")
+        if isinstance(medicamentos, dict):
+            medicamentos = _limpiar_none(medicamentos)
+            items = medicamentos.get("items")
+            if isinstance(items, list):
+                medicamentos["items"] = [_limpiar_none(it) for it in items if isinstance(it, dict)]
+            elif "items" in medicamentos and items is None:
+                medicamentos["items"] = []
+            recetas["medicamentos"] = medicamentos
+        data["recetas"] = recetas
+
     return data
 
 

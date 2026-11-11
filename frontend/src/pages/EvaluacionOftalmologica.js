@@ -801,9 +801,19 @@ const EvaluacionOftalmologica = () => {
     }
   }, [getDraftKey]);
 
-  const clearDraftLocal = useCallback((evalId, pacienteId) => {
+  const clearDraftLocal = useCallback((evalId, pacienteId, soloSiNoEsPosteriorA = null) => {
     const key = getDraftKey(evalId, pacienteId);
-    if (key) localStorage.removeItem(key);
+    if (!key) return;
+    // Si se escribieron más cambios DESPUÉS de iniciar el guardado que acaba de confirmarse,
+    // ese borrador más nuevo todavía no está respaldado en el servidor: no se borra.
+    if (soloSiNoEsPosteriorA) {
+      try {
+        const raw = localStorage.getItem(key);
+        const draft = raw ? JSON.parse(raw) : null;
+        if (draft?.ts && new Date(draft.ts) > new Date(soloSiNoEsPosteriorA)) return;
+      } catch (e) { /* respaldo corrupto: se borra igual abajo */ }
+    }
+    localStorage.removeItem(key);
   }, [getDraftKey]);
 
   // Revisa si existe un borrador local más reciente que el último guardado confirmado
@@ -833,15 +843,51 @@ const EvaluacionOftalmologica = () => {
 
   const recuperarBorrador = () => {
     if (!draftRecovery) return;
-    skipAutoguardadoRef.current = true;
-    setFormData(draftRecovery.draft.data);
-    toast.success('Borrador recuperado. Revisa los datos antes de continuar.');
+    // Se combina con evaluacionVacia (como hace cargarEvaluacion) para que un borrador
+    // parcial o de una versión anterior del formulario no deje campos/objetos anidados
+    // undefined y rompa la página.
+    const datosRecuperados = {
+      ...evaluacionVacia,
+      ...draftRecovery.draft.data,
+      antecedentes: { ...evaluacionVacia.antecedentes, ...draftRecovery.draft.data?.antecedentes },
+      examen: { ...evaluacionVacia.examen, ...draftRecovery.draft.data?.examen },
+      recomendaciones: { ...evaluacionVacia.recomendaciones, ...draftRecovery.draft.data?.recomendaciones },
+      recetas: { ...evaluacionVacia.recetas, ...draftRecovery.draft.data?.recetas },
+      igss_med_proc: { ...evaluacionVacia.igss_med_proc, ...draftRecovery.draft.data?.igss_med_proc },
+    };
+    setFormData(datosRecuperados);
+    // A propósito NO se activa skipAutoguardadoRef: el borrador recuperado todavía no
+    // está confirmado en el servidor, así que debe autoguardarse como cualquier edición
+    // real (si no, el indicador podría mostrar "Guardado" con datos que nunca se enviaron).
+    setAutoguardadoStatus('Cambios sin guardar');
+    toast.success('Borrador recuperado. Guardando en el servidor...');
     setDraftRecovery(null);
   };
 
   const descartarBorrador = () => {
     if (draftRecovery) localStorage.removeItem(draftRecovery.key);
     setDraftRecovery(null);
+  };
+
+  // Convierte el error de una petición en un mensaje legible: FastAPI puede devolver
+  // detail como string o como una lista de errores de validación (422), que nunca debe
+  // mostrarse como "[object Object]" en un toast.
+  const extraerMensajeError = (error, fallback) => {
+    const detail = error.response?.data?.detail;
+    if (!detail) return fallback;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map(d => (typeof d === 'string' ? d : d.msg)).filter(Boolean).join('; ') || fallback;
+    }
+    return fallback;
+  };
+
+  // Mensaje de estado según el tipo de falla definitiva (no reintentable), para no decir
+  // "revisa tu conexión" cuando en realidad es un problema de permisos o de datos.
+  const mensajeFallaDefinitiva = (status) => {
+    if (status === 403) return 'Sin guardar — no tienes permiso para esta acción';
+    if (status === 400 || status === 422) return 'Sin guardar — revisa los datos ingresados';
+    return 'Sin guardar — revisa tu conexión';
   };
 
   // Reintenta automáticamente ante fallas de red/servidor (5xx o sin respuesta) antes de
@@ -1101,6 +1147,7 @@ const EvaluacionOftalmologica = () => {
       }
       
       // === MODO ONLINE ===
+      const intentoIniciadoEn = new Date().toISOString();
       try {
         setAutoguardadoStatus('Guardando...');
         const token = localStorage.getItem('token');
@@ -1129,7 +1176,9 @@ const EvaluacionOftalmologica = () => {
         setAutoguardadoStatus(`Guardado a las ${now}`);
         lastSavedRef.current = new Date();
         // Guardado confirmado por el servidor: ya no hay nada en riesgo en este navegador
-        clearDraftLocal(evaluacionActual?.id, formData.paciente_id);
+        // (a menos que el usuario haya seguido escribiendo durante la petición; en ese
+        // caso el borrador más nuevo se conserva, ver clearDraftLocal).
+        clearDraftLocal(evaluacionActual?.id, formData.paciente_id, intentoIniciadoEn);
       } catch (error) {
         const status = error.response?.status;
         if (status === 423) {
@@ -1139,8 +1188,8 @@ const EvaluacionOftalmologica = () => {
           // Error de cliente definitivo (validación, permisos, etc.): se avisa SIEMPRE
           // de forma visible. Los datos ya escritos quedan a salvo en el respaldo local
           // (se guarda en cada cambio, ver efecto de "Respaldo local continuo").
-          setAutoguardadoStatus('Sin guardar — revisa tu conexión');
-          toast.error('No se pudo guardar automáticamente. Tu información quedó respaldada en este navegador.', { id: 'autosave-error' });
+          setAutoguardadoStatus(mensajeFallaDefinitiva(status));
+          toast.error(extraerMensajeError(error, 'No se pudo guardar automáticamente. Tu información quedó respaldada en este navegador.'), { id: 'autosave-error' });
         } else {
           // Tras agotar los reintentos: error de red o del servidor (5xx / sin respuesta).
           // Se guarda en la cola offline para reintentar al reconectar.
@@ -1154,6 +1203,7 @@ const EvaluacionOftalmologica = () => {
           if (savedId) {
             const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
             setAutoguardadoStatus(`Guardado offline ${now}`);
+            toast.warning('No se pudo conectar con el servidor. Tu información se guardó en este navegador y se sincronizará sola.', { id: 'autosave-offline' });
           } else {
             setAutoguardadoStatus('Sin guardar — revisa tu conexión');
           }
@@ -1174,6 +1224,15 @@ const EvaluacionOftalmologica = () => {
   const cargarEvaluacion = async (evaluacion, comoHistorial = true) => {
     // Evitar un autoguardado espurio por el cambio de formData que provoca esta carga
     skipAutoguardadoRef.current = true;
+    // Datos del paciente ya mostrados en el encabezado (ej. por la búsqueda/selección
+    // previa). Si el registro a cargar es legacy y no trae estos campos, se conservan
+    // los actuales en vez de vaciar el encabezado ("| 0 años | -").
+    const pacienteActual = {
+      paciente_nombre: formData.paciente_nombre,
+      paciente_edad: formData.paciente_edad,
+      paciente_sexo: formData.paciente_sexo,
+      paciente_expediente: formData.paciente_expediente,
+    };
     // Guardar un snapshot de la evaluación en curso (del día) para poder regresar a ella
     if (comoHistorial) {
       if (!viendoHistorial) {
@@ -1268,6 +1327,12 @@ const EvaluacionOftalmologica = () => {
       medicamentos_previos: Array.isArray(evaluacion.medicamentos_previos) ? evaluacion.medicamentos_previos : [],
       diagnosticos: Array.isArray(evaluacion.diagnosticos) ? evaluacion.diagnosticos : [],
       procedimientos: Array.isArray(evaluacion.procedimientos) ? evaluacion.procedimientos : [],
+      // Si el registro (legacy) no trae estos datos denormalizados del paciente,
+      // se conservan los que ya estaban en pantalla en vez de vaciar el encabezado.
+      paciente_nombre: evaluacion.paciente_nombre || pacienteActual.paciente_nombre || '',
+      paciente_edad: evaluacion.paciente_edad || pacienteActual.paciente_edad || 0,
+      paciente_sexo: evaluacion.paciente_sexo || pacienteActual.paciente_sexo || '',
+      paciente_expediente: evaluacion.paciente_expediente || pacienteActual.paciente_expediente || '',
       antecedentes: { ...evaluacionVacia.antecedentes, ...evaluacion.antecedentes },
       examen: migratedExamen,
       lectura_examenes: evaluacion.lectura_examenes || '',
@@ -1288,7 +1353,7 @@ const EvaluacionOftalmologica = () => {
       },
       recetas: migratedRecetas
     });
-    setSearchPaciente(evaluacion.paciente_nombre || '');
+    setSearchPaciente(evaluacion.paciente_nombre || pacienteActual.paciente_nombre || '');
     setAutoguardadoStatus('');
     cargarNotaPaciente(evaluacion.paciente_id);
     // ¿Hay un borrador local de esta evaluación más reciente que su último guardado conocido?
@@ -1380,6 +1445,7 @@ const EvaluacionOftalmologica = () => {
     }
     
     setSaving(true);
+    const intentoIniciadoEn = new Date().toISOString();
     try {
       const token = localStorage.getItem('token');
       let evaluacionId = evaluacionActual?.id;
@@ -1458,7 +1524,8 @@ const EvaluacionOftalmologica = () => {
       const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
       setAutoguardadoStatus(`Guardado a las ${now}`);
       // Guardado manual confirmado por el servidor: el respaldo local ya no es necesario
-      clearDraftLocal(evaluacionId, formData.paciente_id);
+      // (si se siguió escribiendo durante la petición, ese borrador más nuevo se conserva)
+      clearDraftLocal(evaluacionId, formData.paciente_id, intentoIniciadoEn);
       fetchEvaluaciones();
     } catch (error) {
       if (error.response?.status === 423) {
@@ -1468,8 +1535,9 @@ const EvaluacionOftalmologica = () => {
         // Tras agotar los reintentos (o un error de validación/permisos definitivo):
         // se avisa siempre de forma visible. Lo escrito queda respaldado localmente
         // (ver "Respaldo local continuo"), nunca se pierde en silencio.
-        setAutoguardadoStatus('Sin guardar — revisa tu conexión');
-        toast.error(error.response?.data?.detail || 'No se pudo guardar en el servidor. Tu información quedó respaldada en este navegador.');
+        const status = error.response?.status;
+        setAutoguardadoStatus(mensajeFallaDefinitiva(status));
+        toast.error(extraerMensajeError(error, 'No se pudo guardar en el servidor. Tu información quedó respaldada en este navegador.'));
       }
     } finally {
       setSaving(false);
@@ -1825,7 +1893,7 @@ const EvaluacionOftalmologica = () => {
         >
           <span className={`inline-block w-2 h-2 rounded-full ${!isOnline ? 'bg-red-500 animate-pulse' : getEstadoGuardadoDot(autoguardadoStatus)}`} />
           <span className="text-xs font-medium text-gray-700">
-            {!isOnline ? 'Sin conexión' : (autoguardadoStatus || 'Guardado')}
+            {!isOnline ? 'Sin conexión' : (autoguardadoStatus || 'Sin cambios')}
           </span>
         </div>
       )}
@@ -2200,8 +2268,9 @@ const EvaluacionOftalmologica = () => {
           </div>
         </div>
 
-        {/* Layout de 3 Columnas */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Layout de 3 Columnas (padding inferior extra: deja espacio para el indicador
+            de guardado flotante y evita que quede pegado a los últimos acordeones) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-16">
           
           {/* COLUMNA IZQUIERDA: Antecedentes y Medicamentos */}
           <div className="space-y-4">
