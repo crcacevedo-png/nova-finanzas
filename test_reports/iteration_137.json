@@ -1,0 +1,35 @@
+{
+  "summary": "Round 3 re-check of the Evaluación Oftalmológica save reliability work. Backend: test_evaluacion_guardado_confiable.py ran 9 passed, 2 skipped (the legacy skips are expected). Frontend: (1) CRITICAL offline-queue overwrite, reproduced with the exact round-2 steps on an EXISTING evaluation: FIXED. 500 on PATCH led to 'Guardado offline' with the queue holding 'TEST_R3 OLD FAIL'. After unrouting, typing ' NEW' reached 'Guardado a las' and the queue was immediately null. After 36s the queue was still null and the server held 'TEST_R3 OLD FAIL NEW'; no stale PATCH was sent. The same fix also works for the manual 'Guardar' button on an existing evaluation and for the autosave POST (create) path. (2) Header fallback: FIXED. A legacy record for today was inserted in Mongo with paciente_nombre='' for Paciente106. Opening it by selecting the patient in the search box, or via ?paciente_id, shows 'Paciente106 Demo U5 / EXP-202610-0237 | 71 años | Femenino' and the search input is filled. NEW REMAINING DATA BUG (same family as the critical one): on a NEW evaluation, the autosave POST fails until 'Guardado offline'; then the doctor clicks the manual 'Guardar'. The stale queue entry is NOT cleared, and ~30s later syncPendingData POSTs it, creating a DUPLICATE evaluation for the same patient and day that holds the OLD text. Regression smoke tests all pass: normal patient selection header; floating indicator visible at every scroll position; 'Sin cambios' when idle; 422 shows 'Sin guardar — revisa los datos ingresados'; draft recovery dialog -> Recuperar -> 'Guardado a las', with the server holding the draft text; opening an evaluation from Historial loads all its data.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "NEW evaluation: autosave POST 5xx -> 'Guardado offline' (queue entry data.id=null) -> backend recovers -> user clicks manual 'Guardar' -> 30s sync",
+        "issue": "Duplicate evaluation with stale data, reproduced on Paciente108. Server ends with 2 evaluations for 2026-11-11: 'PterigionTEST_R3_MANUAL OLD' (from the stale queue sync) and 'PterigionTEST_R3_MANUAL OLD NEW' (from the manual save). The UI shows 'Guardado a las' the whole time. RCA: guardarEvaluacion() calls limpiarColaOfflinePara(evaluacionId, ...) where evaluacionId is the NEW id returned by the POST. The matcher only falls back to the paciente_id match when evalId is falsy (`!evalId && !item.data?.id && item.data?.paciente_id === pacienteId`), so the 'create' entry (data.id null) is never matched. The syncPendingData safeguard also requires item.data.id, so it does not catch this either. POST /api/evaluaciones has no one-per-day dedupe, so a duplicate gets created. Fix: in limpiarColaOfflinePara, also match entries with `!item.data?.id && item.data?.paciente_id === pacienteId` even when evalId is set, OR pass the pre-save id (evaluacionActual?.id, which is null here) as well as the new id. Optionally, in syncPendingData, skip create entries for the current paciente when evaluacionActual has a real id and lastSavedRef >= item.timestamp. The autosave create path works because evaluacionActual?.id in its closure is still null.",
+        "affected_selectors": ["[data-testid=eval-guardar-btn]", "[data-testid=autoguardado-floating-indicator]"]
+      }
+    ],
+    "design_issues": [
+      {"screen": "Evaluación after a successful save", "issues": ["The warning toast 'No se pudo conectar con el servidor...' (id autosave-offline) stays on screen after the next save succeeds ('Guardado a las'), which is contradictory. Consider toast.dismiss('autosave-offline') on success."]},
+      {"screen": "Evaluación header with ?paciente_id (new evaluation)", "issues": ["The search input is empty and shrinks to an icon, and the patient name box wraps onto 4 lines (cosmetic, already seen in round 2)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_evaluacion_guardado_confiable.py", "/app/test_reports/pytest/pytest_results_137.xml"],
+  "action_items": [
+    "HIGH: limpiarColaOfflinePara must also clear the paciente 'create' queue entry (data.id null) when the manual guardarEvaluacion() POST creates the evaluation. Right now the 30s sync re-POSTs the stale snapshot and creates a duplicate evaluation holding old data.",
+    "LOW: dismiss the 'autosave-offline' warning toast once a save is confirmed."
+  ],
+  "critical_code_review_comments": [
+    "limpiarColaOfflinePara matching is asymmetric: it only matches by paciente when evalId is null. Callers that pass a freshly created id (guardarEvaluacion) miss the create entry.",
+    "Not exercised: true browser-offline mode (navigator.onLine=false) sets evaluacionActual.id='offline_xxx' while the first queued entry has data.id=null. After reconnecting, autosave POSTs and calls limpiarColaOfflinePara('offline_xxx'), which also would not match a data.id=null entry. Likely the same duplicate risk; worth covering with the same fix.",
+    "Opening ?paciente_id for a patient with no evaluation today but with a prefilled cita motivo triggers an automatic POST right away (status 'Cambios sin guardar' with no user input), creating an evaluation just by viewing the patient. This was already the behavior; flagging for awareness."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (9 passed, 2 expected skips)", "frontend": "~90% (both target fixes verified; 1 remaining duplicate-on-manual-save-of-new-eval path)"},
+  "seed_data_creation": "All cleaned up. Created then deleted: c98e0057 (TEST_R3, María García), 1ae6d209 and fcaf3212 (Paciente108), fd3ba391 (Paciente109), ea62ce11 (Paciente107), and the Mongo-inserted legacy record 6f8c7d8b (Paciente106). All were deleted via DELETE /api/evaluaciones/{id} (200).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Container date is 2026-11-11 (GT). Demo patients Paciente101-110 have no evaluation for today. To reproduce the remaining bug: page.route(BASE+'/api/evaluaciones') with POST -> 500 BEFORE navigating to ?paciente_id=<pid>, type, wait for 'Guardado offline', unroute, type more, click [data-testid=eval-guardar-btn], wait 36s, then GET /api/evaluaciones?paciente_id=<pid> and count today's evaluations (expect 1). Legacy header test: insert into Mongo evaluaciones_oftalmologicas with paciente_nombre='' for today and select that patient via [data-testid=search-paciente] -> [data-testid=eval-paciente-option-<pid>]. The floating indicator only renders when a patient is selected (by design).",
+  "rca of the issue": "See integration_issues[0]."
+}

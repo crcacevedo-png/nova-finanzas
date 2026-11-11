@@ -876,8 +876,13 @@ const EvaluacionOftalmologica = () => {
   const limpiarColaOfflinePara = useCallback((evalId, pacienteId, hastaTimestampIso = null) => {
     setPendingSync(prev => {
       const restantes = prev.filter(item => {
+        // Coincide si es la misma evaluación ya existente (por id), O si es una entrada
+        // de "crear" (sin id, encolada antes de que existiera la evaluación) del mismo
+        // paciente: una vez que se confirma CUALQUIER guardado de ese paciente hoy (ya sea
+        // porque ya tenía id, o porque este guardado ACABA de crearlo), esa entrada vieja de
+        // "crear" queda superada y reenviarla crearía una evaluación duplicada con datos viejos.
         const esDeEstaEvaluacion = (evalId && item.data?.id === evalId) ||
-          (!evalId && !item.data?.id && item.data?.paciente_id === pacienteId);
+          (!item.data?.id && item.data?.paciente_id === pacienteId);
         if (!esDeEstaEvaluacion) return true; // no toca entradas de otras evaluaciones
         // Si se siguió escribiendo (y falló de nuevo) DESPUÉS de iniciado este guardado
         // exitoso, esa entrada es más nueva que lo que se acaba de confirmar: se conserva.
@@ -945,12 +950,16 @@ const EvaluacionOftalmologica = () => {
     for (const item of pendingSync) {
       if (item.synced) continue;
 
-      // Salvaguarda extra: si esta entrada es de la evaluación que está abierta AHORA y
-      // ya hay un guardado online confirmado posterior a cuando se encoló, se descarta en
-      // vez de reenviar una foto vieja que pisaría datos más nuevos del servidor.
+      // Salvaguarda extra: si esta entrada es de la evaluación que está abierta AHORA
+      // (por id, o por ser una entrada de "crear" del mismo paciente que ya se guardó)
+      // y ya hay un guardado online confirmado posterior a cuando se encoló, se descarta
+      // en vez de reenviar una foto vieja que pisaría datos más nuevos o crearía un
+      // duplicado en el servidor.
+      const esEntradaDeLaEvaluacionActual =
+        (item.data?.id && evaluacionActual?.id === item.data.id) ||
+        (!item.data?.id && evaluacionActual?.id && item.data?.paciente_id === formData?.paciente_id);
       if (
-        item.data?.id &&
-        evaluacionActual?.id === item.data.id &&
+        esEntradaDeLaEvaluacionActual &&
         lastSavedRef.current &&
         new Date(item.timestamp) <= lastSavedRef.current
       ) {
@@ -1001,7 +1010,7 @@ const EvaluacionOftalmologica = () => {
       setPendingSync(unsyncedItems);
       setSyncStatus('pending');
     }
-  }, [isOnline, pendingSync, evaluacionActual, fetchEvaluaciones]);
+  }, [isOnline, pendingSync, evaluacionActual, fetchEvaluaciones, formData?.paciente_id]);
 
   // Detectar cambios en la conexión
   useEffect(() => {
@@ -1215,6 +1224,9 @@ const EvaluacionOftalmologica = () => {
         const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
         setAutoguardadoStatus(`Guardado a las ${now}`);
         lastSavedRef.current = new Date();
+        // Si había un aviso de "sin conexión" de un intento anterior, ya no aplica
+        toast.dismiss('autosave-offline');
+        toast.dismiss('autosave-error');
         // Guardado confirmado por el servidor: ya no hay nada en riesgo en este navegador
         // (a menos que el usuario haya seguido escribiendo durante la petición; en ese
         // caso el borrador más nuevo se conserva, ver clearDraftLocal).
