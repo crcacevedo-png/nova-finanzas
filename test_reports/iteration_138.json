@@ -1,0 +1,18 @@
+{
+  "summary": "Round 4 re-check of the Evaluación Oftalmológica reliable-save fixes. RESULT: FINAL PASS, nothing left open. (1) HIGH fix for the duplicate evaluation: the first POST /api/evaluaciones was forced to 500. The client tried 4 times (1 + 3 retries), the status became 'Guardado offline', and a 'create' entry was queued in localStorage (data.id = null, motivo 'DUP_TEST_1'). The route was then removed and 'DUP_TEST_2' typed. Autosave created the evaluation (status 'Guardado a las'), and the queue key novavision_evaluaciones_offline was removed right away (null). After waiting 37s there was still only ONE evaluation for the patient today, with motivo_consulta 'DUP_TEST_2'. The page sent no extra POST, and the queue was still empty. (2) LOW fix: the orange warning toast 'No se pudo conectar con el servidor' was visible after the failure (count 1) and gone after the next successful save (count 0). (3) Smoke test: a later edit went out as a PATCH to /autoguardar and the status turned green, and the floating indicator [data-testid=autoguardado-floating-indicator] stays visible after scrolling. (4) backend/tests/test_evaluacion_guardado_confiable.py: 9 passed, 2 skipped (same as before).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_evaluacion_guardado_confiable.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "limpiarColaOfflinePara: the new matcher (evalId && item.data.id===evalId) || (!item.data.id && item.data.paciente_id===pacienteId) is correct. Entries queued after the successful save began are kept, so newer failed edits are not lost.",
+    "syncPendingData safeguard: the 'create' branch still needs evaluacionActual?.id to be set, which is correct (it only drops an entry once a server-confirmed evaluation exists)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created a temporary patient TEST_Dup Guardado R4 (id 8099cb7a-201b-49cc-979d-76e1268a7cfc) and its evaluation 3c237cfc-d3f0-40d8-94fa-ea0b1ca2637c. Both were deleted by id afterwards: evaluation through the API; the patient through the API (soft delete), then hard-deleted by id in Mongo. No seed or user data was touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "overall_status": "PASS DEFINITIVO - Fase 1 MVP guardado confiable lista para marcar como resuelta",
+  "context_for_next_testing_agent": "Duplicate repro: page.route('**/api/evaluaciones') fulfilling POST with 500 BEFORE navigating to /evaluacion-oftalmologica?paciente_id=<pid>, fill [data-testid=motivo-consulta-input], wait for 'offline' in [data-testid=autoguardado-status] (~8s with retries), unroute, fill again, wait 'Guardado a las', then wait 37s and GET /api/evaluaciones?paciente_id=<pid>. DELETE /api/patients/{id} is a soft delete (is_active=False)."
+}
