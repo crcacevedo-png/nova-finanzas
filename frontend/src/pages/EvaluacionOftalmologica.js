@@ -869,6 +869,33 @@ const EvaluacionOftalmologica = () => {
     setDraftRecovery(null);
   };
 
+  // Limpia (local + estado) las entradas de la cola offline que ya quedaron superadas
+  // por un guardado ONLINE confirmado de esa misma evaluación/paciente. Sin esto, el
+  // sync periódico (cada 30s) puede reenviar una foto vieja encolada durante una falla
+  // anterior y pisar datos más nuevos ya guardados en el servidor.
+  const limpiarColaOfflinePara = useCallback((evalId, pacienteId, hastaTimestampIso = null) => {
+    setPendingSync(prev => {
+      const restantes = prev.filter(item => {
+        const esDeEstaEvaluacion = (evalId && item.data?.id === evalId) ||
+          (!evalId && !item.data?.id && item.data?.paciente_id === pacienteId);
+        if (!esDeEstaEvaluacion) return true; // no toca entradas de otras evaluaciones
+        // Si se siguió escribiendo (y falló de nuevo) DESPUÉS de iniciado este guardado
+        // exitoso, esa entrada es más nueva que lo que se acaba de confirmar: se conserva.
+        if (hastaTimestampIso && new Date(item.timestamp) > new Date(hastaTimestampIso)) return true;
+        return false; // superada por el guardado online que acaba de confirmarse
+      });
+      if (restantes.length !== prev.length) {
+        if (restantes.length === 0) {
+          localStorage.removeItem(OFFLINE_STORAGE_KEY);
+          setSyncStatus('synced');
+        } else {
+          localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(restantes));
+        }
+      }
+      return restantes;
+    });
+  }, []);
+
   // Convierte el error de una petición en un mensaje legible: FastAPI puede devolver
   // detail como string o como una lista de errores de validación (422), que nunca debe
   // mostrarse como "[object Object]" en un toast.
@@ -917,7 +944,20 @@ const EvaluacionOftalmologica = () => {
     
     for (const item of pendingSync) {
       if (item.synced) continue;
-      
+
+      // Salvaguarda extra: si esta entrada es de la evaluación que está abierta AHORA y
+      // ya hay un guardado online confirmado posterior a cuando se encoló, se descarta en
+      // vez de reenviar una foto vieja que pisaría datos más nuevos del servidor.
+      if (
+        item.data?.id &&
+        evaluacionActual?.id === item.data.id &&
+        lastSavedRef.current &&
+        new Date(item.timestamp) <= lastSavedRef.current
+      ) {
+        item.synced = true; // superada: se descarta de la cola sin reenviarla
+        continue;
+      }
+
       try {
         if (item.data.id && !item.data.id.startsWith('offline_')) {
           // Actualizar evaluación existente
@@ -1179,6 +1219,7 @@ const EvaluacionOftalmologica = () => {
         // (a menos que el usuario haya seguido escribiendo durante la petición; en ese
         // caso el borrador más nuevo se conserva, ver clearDraftLocal).
         clearDraftLocal(evaluacionActual?.id, formData.paciente_id, intentoIniciadoEn);
+        limpiarColaOfflinePara(evaluacionActual?.id, formData.paciente_id, intentoIniciadoEn);
       } catch (error) {
         const status = error.response?.status;
         if (status === 423) {
@@ -1216,18 +1257,26 @@ const EvaluacionOftalmologica = () => {
         clearTimeout(autoguardadoRef.current);
       }
     };
-  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones, isOnline, saveOfflineData, clearDraftLocal]);
+  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones, isOnline, saveOfflineData, clearDraftLocal, limpiarColaOfflinePara]);
 
   // Cargar evaluación
   // comoHistorial=true: se abre una evaluación del historial (guarda snapshot para "volver").
   // comoHistorial=false: se continúa como la evaluación en curso (del día), sin modo historial.
-  const cargarEvaluacion = async (evaluacion, comoHistorial = true) => {
+  const cargarEvaluacion = async (evaluacion, comoHistorial = true, pacienteOverride = null) => {
     // Evitar un autoguardado espurio por el cambio de formData que provoca esta carga
     skipAutoguardadoRef.current = true;
     // Datos del paciente ya mostrados en el encabezado (ej. por la búsqueda/selección
     // previa). Si el registro a cargar es legacy y no trae estos campos, se conservan
-    // los actuales en vez de vaciar el encabezado ("| 0 años | -").
-    const pacienteActual = {
+    // los actuales en vez de vaciar el encabezado ("| 0 años | -"). Cuando quien llama
+    // acaba de seleccionar un paciente en el mismo evento (ej. seleccionarPaciente), pasa
+    // `pacienteOverride` explícito: leer formData aquí sería una closure obsoleta (el
+    // setFormData del paciente recién seleccionado aún no se refleja en este cierre).
+    const pacienteActual = pacienteOverride ? {
+      paciente_nombre: pacienteOverride.nombre_completo || pacienteOverride.full_name || '',
+      paciente_edad: pacienteOverride.edad ?? pacienteOverride.age ?? 0,
+      paciente_sexo: pacienteOverride.gender || '',
+      paciente_expediente: pacienteOverride.record_number || '',
+    } : {
       paciente_nombre: formData.paciente_nombre,
       paciente_edad: formData.paciente_edad,
       paciente_sexo: formData.paciente_sexo,
@@ -1526,6 +1575,7 @@ const EvaluacionOftalmologica = () => {
       // Guardado manual confirmado por el servidor: el respaldo local ya no es necesario
       // (si se siguió escribiendo durante la petición, ese borrador más nuevo se conserva)
       clearDraftLocal(evaluacionId, formData.paciente_id, intentoIniciadoEn);
+      limpiarColaOfflinePara(evaluacionId, formData.paciente_id, intentoIniciadoEn);
       fetchEvaluaciones();
     } catch (error) {
       if (error.response?.status === 423) {
@@ -1568,7 +1618,7 @@ const EvaluacionOftalmologica = () => {
     const hoyGt = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
     const evalHoy = (lista || []).find(e => (e.fecha || '') === hoyGt && !e.imported);
     if (evalHoy) {
-      await cargarEvaluacion(evalHoy, false);
+      await cargarEvaluacion(evalHoy, false, paciente);
       toast.info('Se continúa la evaluación de hoy de este paciente');
       return;
     }

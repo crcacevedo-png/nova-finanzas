@@ -6,7 +6,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
 PACIENTE_ID = "8c8723a3-bed5-467a-b894-9500bd191e02"  # María García López (seed)
-LEGACY_EVAL_ID = "0aa16779-7517-43e7-930c-303c0a55a5c7"
+LEGACY_EVAL_ID = "75837fc6-020b-46b6-bbac-a553923eb634"  # round-2 legacy record (nested nulls)
 
 
 @pytest.fixture(scope="module")
@@ -37,6 +37,19 @@ class TestLegacyRecord:
         d = r.json()
         assert "TEST_LEGACY_NULL" in d["motivo_consulta"]
         assert d["diagnosticos"] == [] or isinstance(d["diagnosticos"], list)
+
+    # Nested-null healing on the round-2 legacy record
+    def test_get_legacy_nested_nulls_healed(self, s):
+        r = s.get(f"{API}/evaluaciones/{LEGACY_EVAL_ID}", timeout=30)
+        if r.status_code == 404:
+            pytest.skip("legacy record already removed")
+        assert r.status_code == 200, r.text
+        d = r.json()
+        for dx in d["diagnosticos"]:
+            assert dx.get("descripcion") is not None
+        for m in d.get("medicamentos_actuales") or []:
+            assert isinstance(m, dict)
+        assert isinstance((d.get("recomendaciones") or {}).get("estudios_a_realizar", []), list)
 
     def test_list_includes_legacy_no_500(self, s):
         r = s.get(f"{API}/evaluaciones", params={"paciente_id": PACIENTE_ID}, timeout=30)
