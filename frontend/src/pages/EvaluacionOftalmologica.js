@@ -64,6 +64,34 @@ const formatFechaHistorial = (f) => {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
 };
 
+// Clasifica el texto del estado de autoguardado en uno de 4 estados visuales
+// (Guardando / Guardado / Reintentando / Sin guardar), siguiendo la paleta ya usada
+// en el resto del sistema. Se usa tanto en el badge del encabezado como en el
+// indicador flotante fijo que permanece visible al hacer scroll por el formulario.
+const getEstadoGuardadoClase = (status) => {
+  if (!status) return 'bg-gray-100 text-gray-500';
+  if (status === 'Cambios sin guardar') return 'bg-blue-100 text-blue-700';
+  if (status.includes('Reintentando')) return 'bg-amber-100 text-amber-700';
+  if (status.includes('Sin guardar')) return 'bg-red-100 text-red-700';
+  if (status.includes('offline') || status.includes('localmente')) return 'bg-amber-100 text-amber-700';
+  if (status.includes('Guardado')) return 'bg-green-100 text-green-700';
+  if (status.includes('Guardando')) return 'bg-blue-100 text-blue-700';
+  return 'bg-gray-100 text-gray-500';
+};
+
+// Mismo criterio que getEstadoGuardadoClase, pero como color sólido para el punto
+// indicador del badge flotante fijo.
+const getEstadoGuardadoDot = (status) => {
+  if (!status) return 'bg-gray-300';
+  if (status === 'Cambios sin guardar') return 'bg-blue-500';
+  if (status.includes('Reintentando')) return 'bg-amber-500 animate-pulse';
+  if (status.includes('Sin guardar')) return 'bg-red-500';
+  if (status.includes('offline') || status.includes('localmente')) return 'bg-amber-500';
+  if (status.includes('Guardado')) return 'bg-green-500';
+  if (status.includes('Guardando')) return 'bg-blue-500 animate-pulse';
+  return 'bg-gray-300';
+};
+
 // Determina si el formulario tiene datos clínicos reales (para no autoguardar borradores vacíos)
 const tieneDatosClinicos = (fd) => {
   if (!fd) return false;
@@ -300,6 +328,13 @@ const EvaluacionOftalmologica = () => {
   const syncIntervalRef = useRef(null);
   
   const OFFLINE_STORAGE_KEY = 'novavision_evaluaciones_offline';
+
+  // ===== Guardado confiable: reintentos + respaldo local continuo mientras se escribe =====
+  const DRAFT_STORAGE_PREFIX = 'novavision_eval_draft_';
+  const RETRY_DELAYS_MS = [1000, 2000, 4000]; // 3 reintentos automáticos (1s, 2s, 4s) antes de avisar que falló
+  const draftDebounceRef = useRef(null);
+  // Borrador local recuperable detectado al abrir una evaluación (si existe, se ofrece al usuario)
+  const [draftRecovery, setDraftRecovery] = useState(null); // { key, draft, label }
   
   const canEdit = hasPermission('view_evaluacion');
   // Las evaluaciones de días anteriores son EDITABLES (el usuario puede corregir/continuar),
@@ -743,6 +778,88 @@ const EvaluacionOftalmologica = () => {
     }
   }, []);
 
+  // ==================== RESPALDO LOCAL CONTINUO (borrador) ====================
+  // Independiente de la cola de sincronización offline: se escribe en CADA cambio
+  // del formulario (debounced), representando siempre "lo último que el médico
+  // escribió, confirmado o no en el servidor". Se limpia cuando un guardado real
+  // contra el servidor se confirma (online, 2xx), para no mostrar el aviso de
+  // recuperación si nunca hubo nada en riesgo.
+  const getDraftKey = useCallback((evalId, pacienteId) => {
+    if (evalId && !String(evalId).startsWith('offline_')) return `${DRAFT_STORAGE_PREFIX}${evalId}`;
+    if (pacienteId) return `${DRAFT_STORAGE_PREFIX}nueva_${pacienteId}`;
+    return null;
+  }, []);
+
+  const saveDraftLocal = useCallback((data, evalId) => {
+    const key = getDraftKey(evalId, data.paciente_id);
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify({ data, ts: new Date().toISOString() }));
+    } catch (e) {
+      // localStorage lleno u otro error: no bloquea al usuario, solo se pierde el respaldo
+      console.warn('No se pudo guardar el borrador local:', e);
+    }
+  }, [getDraftKey]);
+
+  const clearDraftLocal = useCallback((evalId, pacienteId) => {
+    const key = getDraftKey(evalId, pacienteId);
+    if (key) localStorage.removeItem(key);
+  }, [getDraftKey]);
+
+  // Revisa si existe un borrador local más reciente que el último guardado confirmado
+  // del servidor para esta evaluación/paciente, y si lo hay, lo ofrece para recuperar.
+  const revisarBorradorLocal = useCallback((evalId, pacienteId, referenciaServidorIso) => {
+    const key = getDraftKey(evalId, pacienteId);
+    if (!key) return;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (!draft?.ts || !draft?.data) {
+        localStorage.removeItem(key);
+        return;
+      }
+      // Solo ofrecer recuperar si el borrador es posterior al último guardado conocido
+      // del servidor (si no hay referencia -ej. evaluación nueva-, cualquier borrador cuenta).
+      if (referenciaServidorIso && new Date(draft.ts) <= new Date(referenciaServidorIso)) {
+        localStorage.removeItem(key);
+        return;
+      }
+      setDraftRecovery({ key, draft, evalId, pacienteId });
+    } catch (e) {
+      console.warn('No se pudo leer el borrador local:', e);
+    }
+  }, [getDraftKey]);
+
+  const recuperarBorrador = () => {
+    if (!draftRecovery) return;
+    skipAutoguardadoRef.current = true;
+    setFormData(draftRecovery.draft.data);
+    toast.success('Borrador recuperado. Revisa los datos antes de continuar.');
+    setDraftRecovery(null);
+  };
+
+  const descartarBorrador = () => {
+    if (draftRecovery) localStorage.removeItem(draftRecovery.key);
+    setDraftRecovery(null);
+  };
+
+  // Reintenta automáticamente ante fallas de red/servidor (5xx o sin respuesta) antes de
+  // darse por vencido; errores de cliente (4xx) se consideran definitivos y no se reintentan.
+  const intentarConReintentos = async (fn, onReintento) => {
+    for (let intento = 0; intento <= RETRY_DELAYS_MS.length; intento++) {
+      try {
+        return await fn();
+      } catch (error) {
+        const status = error.response?.status;
+        const esReintentable = !status || status >= 500 || status === 429;
+        if (!esReintentable || intento === RETRY_DELAYS_MS.length) throw error;
+        onReintento && onReintento(intento + 1, RETRY_DELAYS_MS.length);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[intento]));
+      }
+    }
+  };
+
   // Sincronizar datos pendientes cuando hay conexión
   const syncPendingData = useCallback(async () => {
     if (!isOnline || pendingSync.length === 0) return;
@@ -917,6 +1034,19 @@ const EvaluacionOftalmologica = () => {
     return () => clearInterval(interval);
   }, [evaluacionActual]);
 
+  // Respaldo local continuo (borrador): se guarda en cada cambio real del usuario,
+  // independiente de si el autoguardado contra el servidor tiene éxito o no.
+  useEffect(() => {
+    if (isReadOnly || !formData.paciente_id || skipAutoguardadoRef.current) return;
+    if (draftDebounceRef.current) clearTimeout(draftDebounceRef.current);
+    draftDebounceRef.current = setTimeout(() => {
+      saveDraftLocal(formData, evaluacionActual?.id);
+    }, 800);
+    return () => {
+      if (draftDebounceRef.current) clearTimeout(draftDebounceRef.current);
+    };
+  }, [formData, evaluacionActual?.id, isReadOnly, saveDraftLocal]);
+
   // Autoguardado - funciona tanto online como offline
   useEffect(() => {
     // No autoguardar si es solo lectura o no hay paciente seleccionado
@@ -975,41 +1105,46 @@ const EvaluacionOftalmologica = () => {
         setAutoguardadoStatus('Guardando...');
         const token = localStorage.getItem('token');
         
-        if (evaluacionActual?.id && !String(evaluacionActual.id).startsWith('offline_')) {
-          // Actualizar evaluación existente
-          await axios.patch(
-            `${API_URL}/evaluaciones/${evaluacionActual.id}/autoguardar`,
-            formData,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } else {
-          // Crear nueva evaluación automáticamente
-          const response = await axios.post(
-            `${API_URL}/evaluaciones`,
-            formData,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          setEvaluacionActual(response.data);
-          fetchEvaluaciones(); // Actualizar lista
-        }
+        await intentarConReintentos(async () => {
+          if (evaluacionActual?.id && !String(evaluacionActual.id).startsWith('offline_')) {
+            // Actualizar evaluación existente
+            await axios.patch(
+              `${API_URL}/evaluaciones/${evaluacionActual.id}/autoguardar`,
+              formData,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } else {
+            // Crear nueva evaluación automáticamente
+            const response = await axios.post(
+              `${API_URL}/evaluaciones`,
+              formData,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setEvaluacionActual(response.data);
+            fetchEvaluaciones(); // Actualizar lista
+          }
+        }, (intento, total) => setAutoguardadoStatus(`Reintentando... (${intento}/${total})`));
         
         const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
         setAutoguardadoStatus(`Guardado a las ${now}`);
         lastSavedRef.current = new Date();
+        // Guardado confirmado por el servidor: ya no hay nada en riesgo en este navegador
+        clearDraftLocal(evaluacionActual?.id, formData.paciente_id);
       } catch (error) {
         const status = error.response?.status;
         if (status === 423) {
           toast.error('Expediente sellado. No se puede editar.');
           setEvaluacionActual(prev => ({ ...prev, sellado: true }));
-        } else if (status === 422 || status === 400) {
-          // El servidor rechazó los datos (p. ej. evaluación aún vacía). No encolar offline.
-          setAutoguardadoStatus('');
-        } else if (status && status < 500) {
-          // Otro error de cliente (403/404, etc.): no tiene sentido guardar offline
-          setAutoguardadoStatus('No se pudo guardar');
+        } else if (status && status < 500 && status !== 429) {
+          // Error de cliente definitivo (validación, permisos, etc.): se avisa SIEMPRE
+          // de forma visible. Los datos ya escritos quedan a salvo en el respaldo local
+          // (se guarda en cada cambio, ver efecto de "Respaldo local continuo").
+          setAutoguardadoStatus('Sin guardar — revisa tu conexión');
+          toast.error('No se pudo guardar automáticamente. Tu información quedó respaldada en este navegador.', { id: 'autosave-error' });
         } else {
-          // Error de red o del servidor (5xx / sin respuesta): guardar offline
-          console.warn('Error de red, guardando offline:', error);
+          // Tras agotar los reintentos: error de red o del servidor (5xx / sin respuesta).
+          // Se guarda en la cola offline para reintentar al reconectar.
+          console.warn('Error de red tras reintentos, guardando offline:', error);
           setAutoguardadoStatus('Guardando localmente...');
           const dataToSave = {
             ...formData,
@@ -1020,7 +1155,7 @@ const EvaluacionOftalmologica = () => {
             const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
             setAutoguardadoStatus(`Guardado offline ${now}`);
           } else {
-            setAutoguardadoStatus('Error al guardar');
+            setAutoguardadoStatus('Sin guardar — revisa tu conexión');
           }
         }
       }
@@ -1031,7 +1166,7 @@ const EvaluacionOftalmologica = () => {
         clearTimeout(autoguardadoRef.current);
       }
     };
-  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones, isOnline, saveOfflineData]);
+  }, [formData, evaluacionActual?.id, isReadOnly, fetchEvaluaciones, isOnline, saveOfflineData, clearDraftLocal]);
 
   // Cargar evaluación
   // comoHistorial=true: se abre una evaluación del historial (guarda snapshot para "volver").
@@ -1126,6 +1261,13 @@ const EvaluacionOftalmologica = () => {
     setFormData({
       ...evaluacionVacia,
       ...evaluacion,
+      // Autocura campos heredados de evaluaciones legacy (ej. importadas) guardados
+      // en null en vez de lista vacía: sin esto, el próximo guardado de este mismo
+      // registro puede fallar (ver fix de guardado confiable).
+      medicamentos_actuales: Array.isArray(evaluacion.medicamentos_actuales) ? evaluacion.medicamentos_actuales : [],
+      medicamentos_previos: Array.isArray(evaluacion.medicamentos_previos) ? evaluacion.medicamentos_previos : [],
+      diagnosticos: Array.isArray(evaluacion.diagnosticos) ? evaluacion.diagnosticos : [],
+      procedimientos: Array.isArray(evaluacion.procedimientos) ? evaluacion.procedimientos : [],
       antecedentes: { ...evaluacionVacia.antecedentes, ...evaluacion.antecedentes },
       examen: migratedExamen,
       lectura_examenes: evaluacion.lectura_examenes || '',
@@ -1149,6 +1291,8 @@ const EvaluacionOftalmologica = () => {
     setSearchPaciente(evaluacion.paciente_nombre || '');
     setAutoguardadoStatus('');
     cargarNotaPaciente(evaluacion.paciente_id);
+    // ¿Hay un borrador local de esta evaluación más reciente que su último guardado conocido?
+    revisarBorradorLocal(evaluacion.id, evaluacion.paciente_id, evaluacion.ultimo_autoguardado || evaluacion.fecha_actualizacion);
   };
 
   // Regresar a la evaluación del día (en curso) tras haber abierto una del historial
@@ -1189,6 +1333,8 @@ const EvaluacionOftalmologica = () => {
       nivel_interes: 'interesado',
       notas: ''
     });
+    // ¿Hay un borrador local sin confirmar de una evaluación nueva para este paciente?
+    revisarBorradorLocal(null, formData.paciente_id, null);
   };
 
   // Limpiar borradores vacíos generados por el autoguardado (solo admin/superadmin)
@@ -1238,27 +1384,29 @@ const EvaluacionOftalmologica = () => {
       const token = localStorage.getItem('token');
       let evaluacionId = evaluacionActual?.id;
       
-      if (evaluacionActual?.id) {
-        // Actualizar
-        const response = await axios.put(
-          `${API_URL}/evaluaciones/${evaluacionActual.id}`,
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setEvaluacionActual(response.data);
-        evaluacionId = response.data.id;
-        toast.success('Evaluación guardada correctamente');
-      } else {
-        // Crear nueva
-        const response = await axios.post(
-          `${API_URL}/evaluaciones`,
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setEvaluacionActual(response.data);
-        evaluacionId = response.data.id;
-        toast.success('Evaluación creada correctamente');
-      }
+      await intentarConReintentos(async () => {
+        if (evaluacionActual?.id) {
+          // Actualizar
+          const response = await axios.put(
+            `${API_URL}/evaluaciones/${evaluacionActual.id}`,
+            formData,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setEvaluacionActual(response.data);
+          evaluacionId = response.data.id;
+          toast.success('Evaluación guardada correctamente');
+        } else {
+          // Crear nueva
+          const response = await axios.post(
+            `${API_URL}/evaluaciones`,
+            formData,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setEvaluacionActual(response.data);
+          evaluacionId = response.data.id;
+          toast.success('Evaluación creada correctamente');
+        }
+      }, (intento, total) => setAutoguardadoStatus(`Reintentando... (${intento}/${total})`));
       
       // Guardar historial médico del paciente (antecedentes y medicamentos persisten)
       try {
@@ -1309,13 +1457,19 @@ const EvaluacionOftalmologica = () => {
       
       const now = new Date().toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala' });
       setAutoguardadoStatus(`Guardado a las ${now}`);
+      // Guardado manual confirmado por el servidor: el respaldo local ya no es necesario
+      clearDraftLocal(evaluacionId, formData.paciente_id);
       fetchEvaluaciones();
     } catch (error) {
       if (error.response?.status === 423) {
         toast.error('Expediente sellado. No se puede modificar.');
         setEvaluacionActual(prev => ({ ...prev, sellado: true }));
       } else {
-        toast.error(error.response?.data?.detail || 'Error al guardar');
+        // Tras agotar los reintentos (o un error de validación/permisos definitivo):
+        // se avisa siempre de forma visible. Lo escrito queda respaldado localmente
+        // (ver "Respaldo local continuo"), nunca se pierde en silencio.
+        setAutoguardadoStatus('Sin guardar — revisa tu conexión');
+        toast.error(error.response?.data?.detail || 'No se pudo guardar en el servidor. Tu información quedó respaldada en este navegador.');
       }
     } finally {
       setSaving(false);
@@ -1353,6 +1507,8 @@ const EvaluacionOftalmologica = () => {
 
     // No hay evaluación de hoy: formulario en blanco (se registrará como la del día al guardar)
     cargarNotaPaciente(paciente.id, true);
+    // ¿Hay un borrador local sin confirmar de una evaluación nueva para este paciente?
+    revisarBorradorLocal(null, paciente.id, null);
     
     // Cargar historial médico del paciente (antecedentes y medicamentos)
     try {
@@ -1659,6 +1815,38 @@ const EvaluacionOftalmologica = () => {
   return (
     <Layout>
       <Toaster position="top-right" richColors />
+
+      {/* Indicador de guardado fijo: permanece visible aunque se haga scroll por el
+          formulario (puede ser largo). No bloquea ni interrumpe el llenado. */}
+      {formData.paciente_id && !isReadOnly && (
+        <div
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full shadow-lg border border-gray-200 bg-white/95 backdrop-blur px-3 py-2"
+          data-testid="autoguardado-floating-indicator"
+        >
+          <span className={`inline-block w-2 h-2 rounded-full ${!isOnline ? 'bg-red-500 animate-pulse' : getEstadoGuardadoDot(autoguardadoStatus)}`} />
+          <span className="text-xs font-medium text-gray-700">
+            {!isOnline ? 'Sin conexión' : (autoguardadoStatus || 'Guardado')}
+          </span>
+        </div>
+      )}
+
+      {/* Aviso de borrador local recuperable (detectado al abrir la evaluación) */}
+      <Dialog open={!!draftRecovery} onOpenChange={(open) => { if (!open) descartarBorrador(); }}>
+        <DialogContent data-testid="draft-recovery-dialog">
+          <DialogHeader>
+            <DialogTitle>Se encontró contenido sin guardar</DialogTitle>
+            <DialogDescription>
+              Hay cambios de esta evaluación que no se confirmaron en el servidor
+              {draftRecovery?.draft?.ts ? ` (respaldados el ${new Date(draftRecovery.draft.ts).toLocaleString('es-GT', { timeZone: 'America/Guatemala' })})` : ''}.
+              ¿Deseas recuperarlos o descartarlos y continuar con la última versión guardada?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={descartarBorrador} data-testid="draft-recovery-discard">Descartar</Button>
+            <Button onClick={recuperarBorrador} className="bg-indigo-600 hover:bg-indigo-700 text-white" data-testid="draft-recovery-restore">Recuperar borrador</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Print Styles - Optimizado para Media Carta HORIZONTAL (8.5" x 5.5" landscape) */}
       <style>{`
@@ -1841,12 +2029,7 @@ const EvaluacionOftalmologica = () => {
               
               {/* Estado de guardado */}
               {autoguardadoStatus && (
-                <Badge data-testid="autoguardado-status" className={`text-xs ${
-                  autoguardadoStatus.includes('Guardado') ? 'bg-green-100 text-green-700' :
-                  autoguardadoStatus.includes('Guardando') || autoguardadoStatus.includes('localmente') ? 'bg-blue-100 text-blue-700' :
-                  autoguardadoStatus.includes('offline') ? 'bg-amber-100 text-amber-700' :
-                  'bg-orange-100 text-orange-700'
-                }`}>
+                <Badge data-testid="autoguardado-status" className={`text-xs ${getEstadoGuardadoClase(autoguardadoStatus)}`}>
                   {autoguardadoStatus}
                 </Badge>
               )}

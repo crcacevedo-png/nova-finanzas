@@ -20,7 +20,8 @@ from models.evaluacion_oftalmologica import (
     EvaluacionOftalmologicaResponse,
     EvaluacionOftalmologicaListResponse,
     CatalogoItemResponse,
-    MedicamentosProcedimientosIGSS
+    MedicamentosProcedimientosIGSS,
+    normalizar_items_evaluacion_legacy
 )
 
 # PDF imports
@@ -98,34 +99,60 @@ async def actualizar_catalogo(coleccion: str, nombre: str):
 
 
 async def procesar_catalogos_evaluacion(evaluacion_data: dict):
-    """Procesa y actualiza los catálogos con datos de la evaluación"""
-    # Medicamentos actuales
-    for med in evaluacion_data.get("medicamentos_actuales", []):
-        if med.get("nombre"):
-            await actualizar_catalogo("catalogo_medicamentos", med["nombre"])
-    
-    # Medicamentos previos
-    for med in evaluacion_data.get("medicamentos_previos", []):
-        if med.get("nombre"):
-            await actualizar_catalogo("catalogo_medicamentos", med["nombre"])
-    
-    # Diagnósticos
-    for diag in evaluacion_data.get("diagnosticos", []):
-        if diag.get("descripcion"):
-            await actualizar_catalogo("catalogo_diagnosticos", diag["descripcion"])
-    
-    # Estudios
-    recomendaciones = evaluacion_data.get("recomendaciones", {})
-    for estudio in recomendaciones.get("estudios_a_realizar", []):
-        if estudio.get("estudio"):
-            await actualizar_catalogo("catalogo_estudios", estudio["estudio"])
-    
-    # Medicamentos de receta
-    recetas = evaluacion_data.get("recetas", {})
-    medicamentos_receta = recetas.get("medicamentos", {})
-    for item in medicamentos_receta.get("items", []):
-        if item.get("medicamento"):
-            await actualizar_catalogo("catalogo_medicamentos", item["medicamento"])
+    """Procesa y actualiza los catálogos con datos de la evaluación.
+    Nunca lanza excepción: un campo mal formado (ej. heredado de una evaluación
+    legacy con listas en null, o un item que no sea un dict) no debe convertir
+    un guardado ya exitoso en una respuesta de error para el frontend."""
+    try:
+        # Medicamentos actuales
+        for med in (evaluacion_data.get("medicamentos_actuales") or []):
+            if isinstance(med, dict) and med.get("nombre"):
+                await actualizar_catalogo("catalogo_medicamentos", med["nombre"])
+
+        # Medicamentos previos
+        for med in (evaluacion_data.get("medicamentos_previos") or []):
+            if isinstance(med, dict) and med.get("nombre"):
+                await actualizar_catalogo("catalogo_medicamentos", med["nombre"])
+
+        # Diagnósticos
+        for diag in (evaluacion_data.get("diagnosticos") or []):
+            if isinstance(diag, dict) and diag.get("descripcion"):
+                await actualizar_catalogo("catalogo_diagnosticos", diag["descripcion"])
+
+        # Estudios
+        recomendaciones = evaluacion_data.get("recomendaciones") or {}
+        for estudio in (recomendaciones.get("estudios_a_realizar") or []):
+            if isinstance(estudio, dict) and estudio.get("estudio"):
+                await actualizar_catalogo("catalogo_estudios", estudio["estudio"])
+
+        # Medicamentos de receta
+        recetas = evaluacion_data.get("recetas") or {}
+        medicamentos_receta = recetas.get("medicamentos") or {}
+        for item in (medicamentos_receta.get("items") or []):
+            if isinstance(item, dict) and item.get("medicamento"):
+                await actualizar_catalogo("catalogo_medicamentos", item["medicamento"])
+    except Exception as e:
+        import logging
+        logging.getLogger("evaluaciones").warning(
+            "procesar_catalogos_evaluacion falló, no bloquea el guardado de la evaluación %s: %s",
+            evaluacion_data.get("id"), e
+        )
+
+
+def sanear_campos_legacy(update_data: dict) -> dict:
+    """Corrige, en el momento del guardado, campos heredados de evaluaciones
+    antiguas (importadas de Access u otra causa) que quedaron en null en vez de
+    su valor por defecto, o con items de texto suelto en vez de objeto. Sin esto,
+    cada vez que se vuelve a guardar esa misma evaluación el campo dañado puede
+    romper el procesamiento posterior (procesar_catalogos_evaluacion) o la
+    validación de la respuesta. Usado por el PATCH de autoguardado, que recibe un
+    dict sin validar por pydantic."""
+    for campo in ("diagnosticos", "medicamentos_actuales", "medicamentos_previos", "procedimientos"):
+        if campo in update_data and update_data[campo] is None:
+            update_data[campo] = []
+    if "recomendaciones" in update_data and update_data["recomendaciones"] is None:
+        update_data["recomendaciones"] = {}
+    return normalizar_items_evaluacion_legacy(update_data)
 
 
 # ==================== AUDIT HELPER ====================
@@ -1542,7 +1569,7 @@ async def update_evaluacion(
         raise HTTPException(status_code=423, detail=f"Expediente sellado. {mensaje}")
     
     now = datetime.now(timezone.utc).isoformat()
-    update_data = evaluacion.model_dump(exclude_unset=True)
+    update_data = sanear_campos_legacy(evaluacion.model_dump(exclude_unset=True))
     
     # Si se actualiza paciente_id, enriquecer datos
     if "paciente_id" in update_data:
@@ -1624,6 +1651,7 @@ async def autoguardar_evaluacion(
     ]
     
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
+    update_data = sanear_campos_legacy(update_data)
     # Normalizar sección IGSS (medicamentos {nombre, frecuencia} + estudios)
     if "igss_med_proc" in update_data:
         update_data["igss_med_proc"] = MedicamentosProcedimientosIGSS(

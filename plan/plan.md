@@ -1,63 +1,52 @@
-# Manual Operativo del Superadministrador — NovaVisión ERP
+# Autoguardado Confiable en Evaluaciones Oftalmológicas
 
-Un manual en PDF, en español, que explica cómo operar correctamente todos los módulos de NovaVisión ERP desde la cuenta de superadmin. Se entrega como archivo descargable en este chat, listo para imprimir o compartir con quien asuma ese rol.
+Hoy, al llenar una Evaluación Oftalmológica, algunos médicos y usuarios pierden información porque el autoguardado o el guardado manual fallan sin ningún aviso en pantalla. Este plan corrige esa causa de fondo y agrega una protección para que, aunque algo vuelva a fallar, el trabajo del médico nunca se pierda.
 
 ## Para quién es
 
-- El superadmin actual del sistema (uso diario y de referencia).
-- Cualquier persona que en el futuro reciba el rol de superadmin o admin y necesite ponerse al día sin depender de explicaciones verbales.
+- Todo médico o usuario que llena una Evaluación Oftalmológica (no es un caso aislado de una sola persona; se reportó en varios).
+- Indirectamente, los pacientes: una evaluación incompleta o perdida puede afectar su atención y el historial clínico.
 
-## Qué cubre el documento
+## Funcionalidad principal y experiencia
 
-Manual operativo completo, organizado por módulo, cada uno con los pasos para usarlo correctamente y qué cuidar para que no se generen datos inconsistentes:
+- **Guardado que no se pierde en silencio**: cada vez que el sistema intenta guardar (autoguardado o botón manual) y falla, ya no queda en silencio — se reintenta automáticamente unas cuantas veces de forma invisible para el médico.
+- **Respaldo mientras escribe**: mientras el médico completa la evaluación, lo que va escribiendo se respalda en su propio navegador. Si el guardado contra el servidor falla repetidamente (ej. se cae la conexión), al volver a abrir esa misma evaluación el sistema le ofrece recuperar lo que tenía escrito, en vez de empezar de cero.
+- **Estado de guardado siempre visible**: un indicador pequeño y constante ("Guardando...", "Guardado", "Reintentando...", "Sin guardar — revisa tu conexión") para que el médico sepa en todo momento si su información está a salvo, sin tener que adivinar.
+- **Corrección de la causa real**: se investiga y corrige por qué el guardado falla hoy para varios usuarios (no es algo nuevo del último despliegue; viene pasando desde hace tiempo), de modo que en condiciones normales ni siquiera se necesite el reintento.
 
-- **Pacientes**: alta, edición, búsqueda, datos de institución/seguro/IGSS.
-- **Agenda**: programación de citas, sincronización con Google Calendar.
-- **Sala de Operaciones**: registrar/editar/cancelar/reprogramar cirugías, Pre-Ops, LIO, equipo e insumos.
-- **Procedimientos de Anestesia**: registros automáticos desde cirugía, cierre mensual, pago individual por procedimiento, exportación Excel/PDF.
-- **Evaluaciones Oftalmológicas**: autoguardado, diagnósticos persistentes, recetas.
-- **Óptica y Punto de Venta (POS)**: ventas, cobros, FEL (factura electrónica), ventas del día.
-- **Caja**: apertura/cierre de caja, conciliación, cuentas por cobrar.
-- **Facturación Electrónica (FEL)**: certificación, consulta, anulación.
-- **Roles y Permisos**: qué controla cada rol (admin, médico, usuario, anestesia, óptica, administrador_igss) y cómo ajustar permisos sin romper accesos.
-- **Respaldos**: respaldo semanal automático y cómo verificarlo.
-- **Correos automáticos**: cierre del día (18:00) e informe diario de anestesia (17:00) — qué contienen, a quién llegan y cómo cambiar destinatarios.
-- **Solución de problemas comunes**: ej. un correo automático no llegó, un usuario no ve un menú que debería, un enlace de pago no confirma, un mes de anestesia aparece cerrado y no se puede editar, etc. — causa probable y qué revisar primero.
+## Flujo de uso
 
-No incluye capturas de pantalla (solo texto e instrucciones paso a paso, con los nombres exactos de botones/menús entre comillas) ni valores reales de contraseñas o llaves — para esas se indica dónde se gestionan, nunca el valor.
+1. El médico abre la Evaluación Oftalmológica de un paciente y empieza a llenar los campos.
+2. El sistema autoguarda en segundo plano según ya lo hace hoy; el indicador de estado muestra "Guardando..." y luego "Guardado".
+3. Si un guardado falla (ej. problema de red momentáneo), el sistema reintenta solo; el indicador muestra "Reintentando..." sin interrumpir al médico.
+4. Si el guardado sigue sin poder completarse, el indicador avisa claramente ("Sin guardar") y lo escrito queda respaldado en el navegador.
+5. Si el médico cierra o recarga esa evaluación sin que se haya confirmado el guardado, al volver a abrirla el sistema le ofrece recuperar el respaldo local antes de perderlo.
 
-## Cómo se entrega y se usa
+## Estilo de la experiencia
 
-1. Se genera el documento como PDF.
-2. Se comparte el archivo en este mismo chat para descarga directa.
-3. El superadmin lo abre, usa el índice para saltar a la sección que necesita, o lo lee completo una vez al recibirlo.
-4. Puede imprimirse o guardarse como referencia permanente.
+- Discreto y no intrusivo: el indicador de estado vive en una esquina fija de la pantalla de evaluación, con colores claros (ej. verde "Guardado", ámbar "Reintentando", rojo "Sin guardar") siguiendo la paleta ya usada en el resto del sistema.
+- Ningún bloqueo de pantalla ni ventanas emergentes molestas durante el llenado normal; solo se interrumpe al médico con un aviso explícito si realmente hay datos en riesgo de perderse.
 
-## Estilo del documento
-
-- Portada con el nombre del sistema y fecha de emisión.
-- Índice al inicio con los módulos como en la lista de arriba.
-- Cada sección numerada, con pasos en listas claras y los nombres de botones/menús citados tal como aparecen en el sistema (ej. "clic en 'Registrar cirugía'").
-- Recuadros destacados para advertencias importantes (ej. "no cerrar el mes de anestesia hasta confirmar todos los pagos").
-- Sección final de solución de problemas en formato pregunta → causa probable → qué hacer.
-- Tipografía y colores simples, pensados para lectura en pantalla o impresión en blanco y negro.
-
-## Fases
+## Fases de implementación
 
 **Fase 1 — MVP (se construye ahora)**
-Manual completo en PDF con todos los módulos listados arriba y la sección de solución de problemas, entregado en este chat.
+- Diagnóstico y corrección de la causa raíz del guardado/autoguardado fallido en Evaluación Oftalmológica para todos los roles que la usan.
+- Reintento automático ante fallos de guardado.
+- Respaldo local del borrador mientras se escribe, con opción de recuperarlo si el guardado no se completó.
+- Indicador visible de estado de guardado (Guardando / Guardado / Reintentando / Sin guardar).
 
-**Fase 2 — futuro**
-Agregar capturas de pantalla reales a cada sección una vez que el usuario confirme que el diseño actual de cada módulo ya es estable y no cambiará pronto.
+**Fase 2 — Resiliencia ampliada**
+- Manejo de edición simultánea de una misma evaluación desde dos sesiones o dispositivos distintos (evitar que uno sobrescriba al otro).
+- Aviso a superadmin/admin cuando se detectan fallos de guardado recurrentes, para actuar antes de que un médico lo reporte.
 
-**Fase 3 — futuro**
-Versiones cortas tipo "hoja de referencia rápida" derivadas del manual completo, una por rol (admin, médico, usuario, anestesia, óptica), con solo lo que cada rol necesita.
+**Fase 3 — Extender el mismo estándar de guardado confiable**
+- Aplicar el mismo mecanismo de reintento + respaldo local + indicador de estado a otras pantallas de captura de datos largos del sistema (ej. notas de cirugía, otras fichas clínicas extensas), para que ningún formulario del ERP pierda información silenciosamente.
 
 ## Supuestos
 
-- El documento se escribe en español, igual que el resto del sistema.
-- Se basa en las funcionalidades ya implementadas y documentadas a la fecha; no describe funciones pendientes del backlog.
-- Se entrega como un único archivo PDF enlazado en el chat, no por correo.
-- No se incluyen capturas de pantalla en esta fase (elegido por el usuario).
-- No se incluyen contraseñas, llaves ni datos sensibles reales — solo referencia a dónde se gestionan.
-- El documento es de uso interno del superadmin; no se publica dentro de la aplicación.
+- El problema afecta a varios médicos/usuarios de forma general (no es un dato puntual de un solo paciente o un solo usuario que haya que corregir manualmente).
+- El problema es anterior a los últimos despliegues; no se asume que lo causó un cambio reciente, por lo que la corrección se enfoca en el mecanismo de guardado existente, no en revertir algo puntual.
+- "Respaldo en el navegador" significa que el borrador no guardado se conserva temporalmente en ese navegador (no es una copia adicional permanente en la base de datos ni se sincroniza entre dispositivos); si el médico cambia de computadora antes de que el guardado se complete, ese respaldo local no estará disponible ahí.
+- El indicador de estado y el respaldo se construyen primero para la pantalla de Evaluación Oftalmológica, que es donde se reportó el problema; no se asume que se necesite en otras pantallas en esta primera fase.
+- No se requiere ninguna integración de terceros nueva; es una mejora interna de confiabilidad sobre el guardado que ya existe.
+- El trabajo se construye y se verifica primero en el ambiente de pruebas (preview) antes de desplegarse a producción, siguiendo el mismo proceso ya usado para cambios anteriores.

@@ -296,6 +296,36 @@ class ProximaCita(BaseModel):
     cita_id: Optional[str] = None
 
 
+# Campo "identificador" usado para reconstruir un dict mínimo válido cuando un item de
+# estas listas llegó como texto suelto (legacy) en vez de objeto — mismo criterio que la
+# migración ya aplicada en el frontend para igss_med_proc (string -> {nombre/descripcion, ...}).
+LEGACY_LIST_ITEM_KEY_FIELD = {
+    "medicamentos_actuales": "nombre",
+    "medicamentos_previos": "nombre",
+    "diagnosticos": "descripcion",
+    "procedimientos": "descripcion",
+}
+
+
+def normalizar_items_evaluacion_legacy(data: dict) -> dict:
+    """Convierte items de texto suelto (legacy) de las listas clínicas en el objeto
+    mínimo válido, y descarta cualquier item que no sea ni dict ni texto. Evita que un
+    documento viejo con una lista parcialmente migrada rompa la validación (al guardar
+    o al leer) con un 422/500 que deja al usuario sin saber qué pasó con su guardado."""
+    for campo, key_field in LEGACY_LIST_ITEM_KEY_FIELD.items():
+        valor = data.get(campo)
+        if not isinstance(valor, list):
+            continue
+        normalizados = []
+        for item in valor:
+            if isinstance(item, dict):
+                normalizados.append(item)
+            elif isinstance(item, str) and item.strip():
+                normalizados.append({key_field: item.strip()})
+        data[campo] = normalizados
+    return data
+
+
 # ==================== EVALUACIÓN COMPLETA ====================
 
 class EvaluacionOftalmologicaBase(BaseModel):
@@ -351,10 +381,32 @@ class EvaluacionOftalmologicaBase(BaseModel):
 
 
 class EvaluacionOftalmologicaCreate(EvaluacionOftalmologicaBase):
-    pass
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_none_values(cls, data):
+        # El formulario puede heredar campos en null de una evaluación anterior/legacy
+        # (ej. importada desde Access) al armar un borrador "nuevo" a partir de ella.
+        # Se descartan para que apliquen los valores por defecto (listas/objetos vacíos)
+        # en vez de que la validación rechace la petición con 422 y el guardado se
+        # pierda silenciosamente en el frontend. Mismo criterio ya usado en
+        # EvaluacionOftalmologicaResponse para lecturas de documentos legacy.
+        if isinstance(data, dict):
+            data = {k: v for k, v in data.items() if v is not None}
+            data = normalizar_items_evaluacion_legacy(data)
+        return data
 
 
 class EvaluacionOftalmologicaUpdate(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _normalizar(cls, data):
+        # Mismo saneo que en Create: descarta None explícitos (el campo queda "no
+        # enviado" para exclude_unset) y normaliza items legacy en texto suelto.
+        if isinstance(data, dict):
+            data = normalizar_items_evaluacion_legacy({k: v for k, v in data.items()})
+            data = {k: v for k, v in data.items() if v is not None}
+        return data
+
     paciente_id: Optional[str] = None
     paciente_nombre: Optional[str] = None
     paciente_edad: Optional[int] = None
@@ -391,10 +443,12 @@ class EvaluacionOftalmologicaResponse(EvaluacionOftalmologicaBase):
     @model_validator(mode="before")
     @classmethod
     def _drop_none_values(cls, data):
-        # Documentos antiguos/parciales pueden tener campos en null; se descartan
-        # para que apliquen los valores por defecto y no falle la validación.
+        # Documentos antiguos/parciales pueden tener campos en null, o items de texto
+        # suelto en listas que ya migraron a objetos; se normalizan para que apliquen
+        # los valores por defecto y no falle la validación al leer el documento.
         if isinstance(data, dict):
-            return {k: v for k, v in data.items() if v is not None}
+            data = {k: v for k, v in data.items() if v is not None}
+            data = normalizar_items_evaluacion_legacy(data)
         return data
 
     id: str
