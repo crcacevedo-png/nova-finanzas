@@ -8,15 +8,6 @@ import axios from 'axios';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const EMPTY_IGSS = { unit: '', unit_id: '', nog_id: '', nog_number: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' };
-// Médicos fijos para "Agregar a Agenda" de cirugías IGSS (Fase 1). Dra. Rocío Muñoz usa
-// la agenda general de la clínica a nivel de negocio, pero técnicamente es el mismo
-// mecanismo: un médico con agenda activa en el sistema.
-const AGENDA_IGSS_MEDICOS = [
-  'Dr. Cristian Acevedo',
-  'Dra. Mariamercedes Palma',
-  'Dr. Manuel de la Cruz',
-  'Dra. Rocío Muñoz',
-];
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Trash2, X, Calendar, Clock, User, Building2,
@@ -67,6 +58,15 @@ const ANESTHESIA_TYPES = [
   { value: 'local', label: 'Local' },
   { value: 'local_asistida', label: 'Local Asistida' },
   { value: 'general', label: 'General' },
+];
+// Médicos fijos para "Agregar a Agenda" de cirugías IGSS (Fase 1). Dra. Rocío Muñoz usa
+// la agenda general de la clínica a nivel de negocio, pero técnicamente es el mismo
+// mecanismo: un médico con agenda activa en el sistema.
+const AGENDA_IGSS_MEDICOS = [
+  'Dr. Cristian Acevedo',
+  'Dra. Mariamercedes Palma',
+  'Dr. Manuel de la Cruz',
+  'Dra. Rocío Muñoz',
 ];
 
 const INSTITUTIONS = [
@@ -1626,7 +1626,7 @@ const SalaOperaciones = () => {
               <Button variant="outline" onClick={() => setSurgeryDialogOpen(false)} disabled={submitting}>
                 Cancelar
               </Button>
-              {formData.institution === 'IGSS' && (
+              {formData.institution === 'IGSS' && !editMode && (
                 <Button
                   variant="outline"
                   onClick={handleAgregarAAgenda}
@@ -1694,7 +1694,7 @@ const SalaOperaciones = () => {
                 </div>
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setAgendarDialogOpen(false)} disabled={agendarConfirmando}>
+                  <Button variant="outline" onClick={() => setAgendarDialogOpen(false)} disabled={agendarConfirmando} data-testid="btn-agendar-cerrar">
                     Cerrar
                   </Button>
                   <Button
@@ -1714,7 +1714,7 @@ const SalaOperaciones = () => {
                 <p className="text-sm text-gray-500">
                   {agendarMedicos.find((m) => m.id === agendarMedicoId)?.name} — {agendarSurgery?.date} {agendarSurgery?.time}
                 </p>
-                <Button onClick={() => setAgendarDialogOpen(false)} className="btn-primary mt-2">
+                <Button onClick={() => setAgendarDialogOpen(false)} className="btn-primary mt-2" data-testid="btn-agendar-cerrar-confirmacion">
                   Cerrar
                 </Button>
               </div>

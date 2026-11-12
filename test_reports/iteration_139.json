@@ -1,0 +1,37 @@
+{
+  "summary": "Tested 'Agregar a Agenda' for IGSS surgeries from start to finish in the real UI, plus API contract checks. Everything passed: the button shows only when Institución=IGSS (hidden for Seguro Privado and Novavision, and for an existing Seguro Privado surgery in edit mode). Pressing it saves the surgery (POST /api/surgeries 200, row appears in the list). The modal opens with the summary (Paciente/IGSS/Procedimiento/Fecha-Hora) and exactly the 4 doctors in the requested order. 'Confirmar' stays disabled until a doctor is picked, and the picked doctor is highlighted (border-teal-600 bg-teal-50). The confirmation screen shows the check icon, 'Cita agregada a la agenda' and '{médico} — fecha hora'. In /agenda, on 2026-12-15 in Dr. Cristian Acevedo's column, the card shows the patient name, the green IGSS badge, 'Procedimiento: ...' and 8:45 AM. Choosing Dra. Rocío Muñoz also works (cita created at 09:15 on her agenda). Cancelling with 'Cerrar' or the X keeps the surgery and creates no cita. An IGSS form with missing fields shows a validation toast, with no save and no modal. Regression checks passed: Seguro Privado + 'Guardar registro' creates the surgery, and editing it saves (PUT 200). One real issue: in EDIT mode for an IGSS surgery that is already scheduled, the button still shows, and it created a second identical cita (same doctor, date and time) without any warning.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/agenda/citas", "issue": "No check for an active cita with the same medico_id, fecha and hora_inicio. PUT /agenda/citas/{id} does check this (409). This is what allowed the duplicate cita through 'Agregar a Agenda'. It may be on purpose (sobrecupo), so main agent should decide."},
+      {"endpoint": "DELETE /api/surgeries/{id}", "issue": "Existing issue: deleting a surgery leaves its notas_cirugia document behind. The tester removed the 6 test notes by surgery_id."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SalaOperaciones Registrar/Editar cirugía footer", "issue": "'Agregar a Agenda' also shows in edit mode (editMode=true) for IGSS surgeries. Pressing it again after the surgery was already scheduled created a duplicate cita (2 identical citas for Dr. Cristian Acevedo on 2026-12-15 08:45), with no warning. Suggestion: show the button only when creating (!editMode), or warn when a cita already exists for that patient, doctor, date and time.", "selector": "[data-testid='btn-agregar-a-agenda']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Agregar a Agenda modal", "issues": ["The 'Cerrar' buttons (main step and confirmation step) have no data-testid. Suggest btn-cerrar-agendar and agendar-confirmacion-cerrar.", "The Agenda card also shows the time and '• Cirugía' in addition to the 3 requested fields. This comes from the existing CitaCard design and is acceptable."]},
+      {"screen": "Registrar cirugía", "issues": ["The Hora, Fecha, Tipo de anestesia and Institución inputs/selects have no data-testid (tests use combobox index 3/5)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_agendar_cirugia_igss.py", "/app/tests/verify_agendar_cleanup.py", "/app/test_reports/pytest/agendar_cirugia.xml"],
+  "action_items": [
+    "Hide 'Agregar a Agenda' in editMode, or detect an existing cita for that surgery to avoid duplicates (optionally store cita_id on the surgery).",
+    "Optional: add data-testid to the modal's Cerrar buttons and to the Institución/Anestesia selects and Hora/Fecha inputs."
+  ],
+  "critical_code_review_comments": [
+    "SalaOperaciones.js: `const AGENDA_IGSS_MEDICOS` is declared between import statements (before `import {Plus,...} from 'lucide-react'`). It works because imports are hoisted, but it breaks import/first lint. Move it below all imports.",
+    "Doctors are matched by exact name (d.name === nombre). In production, if a doctor name differs by accents or spaces, or two doctors share a name, the option silently disappears. Consider matching by id from config, or normalizing the name.",
+    "SalaOperaciones.js is about 2190 lines. It should be split (e.g. extract AgendarCirugiaDialog into its own component).",
+    "handleAgregarAAgenda: if the patient is not linked, the surgery is saved and an error toast is shown. That is correct, but the modal is never offered, so the user can't schedule it later."
+  ],
+  "updated_files": ["/app/backend/tests/test_agendar_cirugia_igss.py", "/app/tests/verify_agendar_cleanup.py", "/app/tests/ui_agendar_helpers.py"],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "95% (all requested flows pass; 1 duplicate-on-edit issue)"},
+  "seed_data_creation": "None kept. Created 6 TEST_ surgeries and 4 citas with patient 4ceb89de (Paciente110 Demo U5) on Dec 15–18, 2026. All deleted by id (API DELETE), plus the 6 orphan notas_cirugia by surgery_id. Verified 0 leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login superadmin/nova2024. Combobox indices in the Registrar cirugía dialog: 0=time, 1=surgeon, 2=assistant, 3=anesthesia, 4=date, 5=institution. In list rows, button nth(-3) is the eye/detail button; nth(1) toggles Pre-Ops. Agenda: fill [data-testid=agenda-fecha-input] with YYYY-MM-DD. Use /app/tests/verify_agendar_cleanup.py to list and clean citas for the test patient."
+}
