@@ -47,6 +47,11 @@ def _destinatarios_anestesia():
     return [e.strip() for e in raw.split(",") if e.strip()]
 
 
+def _destinatarios_produccion_medico():
+    raw = os.environ.get("INFORME_PRODUCCION_PALMA_EMAILS", "")
+    return [e.strip() for e in raw.split(",") if e.strip()]
+
+
 def _parse_fecha_param(fecha: Optional[str]) -> str:
     """Valida que 'fecha' (si se provee) tenga formato YYYY-MM-DD; si no, usa hoy (Guatemala)."""
     if not fecha:
@@ -496,6 +501,132 @@ async def cron_informe_anestesia_diario(request: Request, background_tasks: Back
 async def _run_cron_informe_anestesia(fecha_dia: str):
     try:
         resultado = await enviar_informe_anestesia_diario(fecha_dia)
+        logger.info(f"Informe de anestesia {fecha_dia} enviado: {len(resultado['enviados'])} ok, {len(resultado['errores'])} errores, {resultado['resumen']['total_count']} procedimientos")
+    except Exception as e:
+        logger.error(f"Error enviando informe de anestesia {fecha_dia}: {e}")
+
+
+# ==================== CIERRE DE PRODUCCIÓN DIARIO — DRA. MARIAMERCEDES PALMA ====================
+def build_produccion_medico_daily_html(fecha_dia: str, data: dict, pdf_url: str) -> str:
+    rows_html = ""
+    for r in data.get("items", []):
+        rows_html += (
+            f'<tr><td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap">{escape(str(r["fecha"]))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9">{escape(str(r["numero_venta"]))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9">{escape(str(r["paciente_nombre"]))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#6b7280">{escape(str(r["nombre"]))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:center">{escape(str(r["cantidad"]))}</td>'
+            f'<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap">{escape(_q(r["monto"]))}</td></tr>'
+        )
+    if not rows_html:
+        rows_html = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#9ca3af">Sin producción registrada este día</td></tr>'
+
+    fecha = escape(_fecha_legible(fecha_dia))
+    medico = escape(str(data.get("medico_nombre", "")))
+    generado = escape(now_gt().strftime("%d/%m/%Y %H:%M"))
+    pdf_url_safe = escape(pdf_url)
+
+    return (
+        f'<div style="background:#f3f4f6;padding:24px 0;font-family:Arial,Helvetica,sans-serif">'
+        f'<table role="presentation" width="720" align="center" cellpadding="0" cellspacing="0" '
+        f'style="max-width:720px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb">'
+        f'<tr><td style="background:#0f172a;padding:22px 28px">'
+        f'<div style="color:#ffffff;font-size:20px;font-weight:700">NovaVisión — Cierre de Producción Diario</div>'
+        f'<div style="color:#94a3b8;font-size:13px;margin-top:2px">{medico} · {fecha}</div></td></tr>'
+        f'<tr><td style="padding:16px 18px 2px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        f'<td style="padding:6px;" valign="top"><div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;background:#ffffff">'
+        f'<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">Ventas</div>'
+        f'<div style="font-size:19px;font-weight:700;color:#0F6E56;margin-top:3px">{data.get("num_ventas", 0)}</div></div></td>'
+        f'<td style="padding:6px;" valign="top"><div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;background:#ffffff">'
+        f'<div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">Total del día</div>'
+        f'<div style="font-size:19px;font-weight:700;color:#0F6E56;margin-top:3px">{escape(_q(data.get("total_monto")))}</div></div></td>'
+        f'</tr></table></td></tr>'
+        f'<tr><td style="padding:14px 24px 6px"><div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:6px">Detalle de producción</div>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12px;color:#374151;border:1px solid #e5e7eb;border-radius:8px">'
+        f'<tr style="background:#f8fafc"><th style="padding:7px 8px;text-align:left">Fecha</th>'
+        f'<th style="padding:7px 8px;text-align:left">N° Venta</th>'
+        f'<th style="padding:7px 8px;text-align:left">Paciente</th>'
+        f'<th style="padding:7px 8px;text-align:left">Producto / Servicio</th>'
+        f'<th style="padding:7px 8px;text-align:center">Cantidad</th>'
+        f'<th style="padding:7px 8px;text-align:right">Monto</th></tr>{rows_html}</table></td></tr>'
+        f'<tr><td style="padding:10px 24px 20px;text-align:center">'
+        f'<a href="{pdf_url_safe}" style="display:inline-block;background:#0F6E56;color:#ffffff;text-decoration:none;'
+        f'font-size:13px;font-weight:700;padding:10px 22px;border-radius:8px">Descargar PDF del cierre</a></td></tr>'
+        f'<tr><td style="padding:4px 28px 24px"><div style="font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:12px">'
+        f'Reporte generado automáticamente por NovaVisión ERP el {generado} (hora de Guatemala). '
+        f'El enlace de descarga expira en {_REPORT_LINK_TTL_LABEL}. '
+        f'Nunca solicitamos contraseñas ni datos de tarjeta por correo.</div></td></tr>'
+        f'</table></div>'
+    )
+
+
+async def enviar_informe_produccion_medico_diario(fecha_dia: str) -> dict:
+    """Calcula el cierre de producción diario de la Dra. Palma (clínica + Óptica)
+    y lo envía por correo (con enlace de descarga del PDF) a los destinatarios
+    fijos. Si no tuvo producción ese día, igual se envía el cierre en cero."""
+    from routes.ventas import (
+        _obtener_produccion_medico_dia, _make_prod_medico_report_token, PRODUCCION_MEDICO_PALMA_NOMBRE,
+    )
+    data = await _obtener_produccion_medico_dia(fecha_dia, PRODUCCION_MEDICO_PALMA_NOMBRE)
+    token = _make_prod_medico_report_token(fecha_dia, data["medico_nombre"])
+    pdf_url = f"{APP_PUBLIC_URL}/api/ventas/produccion-medico/daily-report/pdf?token={token}"
+    html = build_produccion_medico_daily_html(fecha_dia, data, pdf_url)
+    subject = f"Cierre de producción diario — {data['medico_nombre']} — {_fecha_legible(fecha_dia)} ({_q(data.get('total_monto'))})"
+    destinatarios = _destinatarios_produccion_medico()
+    enviados, errores = [], []
+    for correo in destinatarios:
+        try:
+            email_id = await send_email(to=correo, subject=subject, html=html)
+            enviados.append({"to": correo, "id": email_id})
+        except HTTPException as e:
+            errores.append({"to": correo, "error": e.detail})
+        except Exception as e:
+            errores.append({"to": correo, "error": str(e)})
+    return {"fecha": fecha_dia, "enviados": enviados, "errores": errores, "resumen": data}
+
+
+@router.post("/ventas/produccion-medico/daily-report/enviar")
+async def enviar_informe_produccion_medico_manual(
+    fecha: Optional[str] = None,
+    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+):
+    """Envío manual del cierre de producción diario de la Dra. Palma por correo."""
+    fecha_dia = _parse_fecha_param(fecha)
+    destinatarios = _destinatarios_produccion_medico()
+    if not destinatarios:
+        raise HTTPException(status_code=400, detail="No hay destinatarios configurados")
+    resultado = await enviar_informe_produccion_medico_diario(fecha_dia)
+    if resultado["errores"] and not resultado["enviados"]:
+        raise HTTPException(status_code=502, detail=f"No se pudo enviar el cierre: {resultado['errores'][0]['error']}")
+    return {
+        "message": f"Cierre enviado a {len(resultado['enviados'])} destinatario(s)",
+        "destinatarios": [e["to"] for e in resultado["enviados"]],
+        "errores": resultado["errores"],
+    }
+
+
+@router.post("/cron/produccion-medico-diario")
+async def cron_produccion_medico_diario(request: Request, background_tasks: BackgroundTasks):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else ""
+    if not WEBHOOK_CRON_SECRET or not token or not hmac.compare_digest(token, WEBHOOK_CRON_SECRET):
+        raise HTTPException(status_code=401, detail="No autorizado")
+    fecha_dia = today_str_gt()
+    background_tasks.add_task(_run_cron_produccion_medico, fecha_dia)
+    return {"status": "accepted", "fecha": fecha_dia}
+
+
+async def _run_cron_produccion_medico(fecha_dia: str):
+    try:
+        resultado = await enviar_informe_produccion_medico_diario(fecha_dia)
+        logger.info(
+            f"Cierre de producción (Dra. Palma) {fecha_dia} enviado: {len(resultado['enviados'])} ok, "
+            f"{len(resultado['errores'])} errores, total {resultado['resumen']['total_monto']}"
+        )
+    except Exception as e:
+        logger.error(f"Error enviando cierre de producción (Dra. Palma) {fecha_dia}: {e}")
+
         logger.info(f"Informe de anestesia {fecha_dia} enviado: {len(resultado['enviados'])} ok, {len(resultado['errores'])} errores, {resultado['resumen']['total_count']} procedimientos")
     except Exception as e:
         logger.error(f"Error enviando informe de anestesia {fecha_dia}: {e}")

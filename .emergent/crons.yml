@@ -23,3 +23,11 @@ crons:
     method: POST
     # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
     enabled: true
+  - name: produccion-palma
+    description: "Envia por correo el cierre de produccion diario de la Dra. Palma (17:00 Guatemala)"
+    cron: "0 17 * * *"
+    timezone: "America/Guatemala"
+    endpoint: "{{BASE_URL}}/api/cron/produccion-medico-diario"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

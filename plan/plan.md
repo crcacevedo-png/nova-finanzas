@@ -1,53 +1,51 @@
-# Desglose de Producción por Médico que Refiere
+# Cierre de Producción Diario — Dra. Mariamercedes Palma
 
-En el Dashboard Financiero, la lista "Ventas por médico que refiere" se vuelve interactiva: al hacer clic en el nombre de un médico se abre el detalle completo de su producción, con filtro de fechas propio y exportación a Excel.
+Cada día a las 5:00 PM (hora Guatemala), el sistema envía automáticamente a dra.mpalma@gmail.com un PDF con el detalle de su producción personal del día. Funciona igual que el informe diario de anestesia que ya se envía por correo, pero con el contenido y horario propios de la Dra. Palma.
 
 ## Para quién es
+- La Dra. Mariamercedes Palma, quien recibe el correo diario en su bandeja.
+- La administración de la clínica, que deja de tener que armar este cierre manualmente.
 
-Administradores y Superadministradores que hoy consultan el Dashboard Financiero y la lista "Ventas por médico que refiere", y necesitan ver el detalle detrás de cada monto sin tener que buscarlo manualmente en otras pantallas.
-
-## Funcionalidad principal y experiencia
-
-- En la lista "Ventas por médico que refiere" (la misma que ya existe hoy en el Dashboard Financiero), el **nombre de cada médico se vuelve clicable**.
-- Al hacer clic se abre un desglose con:
-  - Nombre del médico y el rango de fechas que se está mostrando.
-  - Un resumen con el total de artículos/servicios y el monto total de ese rango.
-  - Una tabla con **una fila por cada producto o servicio vendido** que esté asociado a ese médico (si una venta tuvo 3 artículos, aparecen 3 filas). Cada fila muestra: fecha, número de venta, paciente, producto o servicio, cantidad y monto.
-- El desglose **abre con el mismo rango de fechas que ya se está viendo en el Dashboard Financiero** en ese momento (por ejemplo, si el dashboard muestra "este mes", el desglose abre mostrando ese mismo mes).
-- Dentro del desglose, se puede **cambiar el rango de fechas** (por ejemplo, para ver otro mes o un rango personalizado) sin tener que cerrar la ventana; la tabla y los totales se actualizan según el nuevo rango elegido.
-- Botón para **exportar a Excel** el contenido del desglose tal como se está viendo (con el rango de fechas seleccionado en ese momento), incluyendo el resumen de totales.
-- Solo "Ventas por médico que refiere" obtiene esta función por ahora; la lista "Ventas por cajero" y el resto del Dashboard Financiero quedan exactamente igual que hoy.
+## Funcionalidad principal
+- Un nuevo cron diario a las **5:00 PM hora Guatemala**, independiente de los dos que ya existen a las 6:00 PM (informe de anestesia y cierre diario general).
+- El reporte reúne **toda su producción del día como médico que refiere**, sin importar la categoría:
+  - Ventas de la clínica general donde ella aparece como médico que refiere.
+  - Ventas de Óptica (armazones, lentes, lentes de contacto, accesorios) donde ella aparece como médico que refiere.
+- Contenido del PDF: un renglón por cada producto/servicio vendido ese día (fecha, número de venta, paciente, producto/servicio, cantidad, monto), con el total general al final — mismo nivel de detalle que el desglose de producción por médico que ya existe en el Dashboard.
+- Se envía como **PDF adjunto**, con el mismo estilo del informe de anestesia (membrete, tabla clara, total destacado).
+- Si ese día no tuvo producción, igual llega el correo mostrando el cierre en cero, para que el envío sea predecible todos los días.
+- Es un reporte de solo lectura: no modifica ninguna venta, cron o pantalla existente.
 
 ## Flujo de uso
+No requiere ninguna acción manual:
+1. A las 5:00 PM hora Guatemala, el sistema reúne las ventas de clínica general del día donde la Dra. Palma es el médico que refiere.
+2. Reúne también las ventas de Óptica del día donde ella es el médico que refiere, en cualquier categoría.
+3. Arma un solo PDF combinado con el detalle línea por línea y el total.
+4. Envía el PDF por correo a dra.mpalma@gmail.com.
 
-1. El usuario entra al Dashboard Financiero y ve la lista "Ventas por médico que refiere" con el período que ya tenía seleccionado.
-2. Hace clic sobre el nombre de un médico.
-3. Se abre el desglose de ese médico, ya filtrado con el mismo período del dashboard, mostrando el resumen de totales y la tabla de artículos/servicios vendidos.
-4. Si quiere revisar otro período, cambia el rango de fechas dentro del desglose; la tabla y los totales se recalculan.
-5. Si necesita el detalle para otro uso (reportes, respaldo, revisión contable), presiona "Exportar a Excel" y descarga el archivo con lo que está viendo en pantalla.
-6. Cierra el desglose y vuelve al Dashboard Financiero, que permanece sin cambios.
+Para confirmar que llegó, basta con revisar su correo después de las 5:00 PM; esta fase no agrega una pantalla dentro del sistema para verlo.
 
-## UI/UX feel
-
-Mismo estilo visual que el resto del sistema: el desglose se presenta como un panel/ventana sobre el Dashboard Financiero (sin navegar a otra pantalla), con una tabla clara, totales destacados en la parte superior y un selector de fechas sencillo. El nombre del médico se distingue visualmente como elemento clicable (por ejemplo, subrayado o con un color distinto al pasar el mouse) para que sea evidente que se puede abrir el detalle.
+## Estilo del PDF
+Se mantiene la misma línea visual que el informe de anestesia ya existente: encabezado con el nombre de la clínica y la fecha, tabla ordenada con las columnas del detalle, y el total resaltado al final.
 
 ## Fases de implementación
+**Fase 1 (MVP — se construye ahora)**
+- Cron diario a las 5:00 PM hora Guatemala.
+- Combinación de ventas de clínica general + Óptica, en cualquier categoría, filtradas por Dra. Mariamercedes Palma como médico que refiere.
+- PDF con detalle línea por línea y total.
+- Envío automático a dra.mpalma@gmail.com.
+- Envío también en los días sin producción (reporte en cero).
 
-**Fase 1 — MVP (se construye ahora)**
-- Nombre del médico clicable en "Ventas por médico que refiere".
-- Desglose con una fila por producto/servicio vendido, resumen de totales, filtro de fechas propio que inicia con el período del dashboard y se puede cambiar.
-- Exportación a Excel del desglose filtrado.
+**Fase 2**
+- Pantalla de administración para cambiar el correo destino o el horario sin pedírselo al equipo de desarrollo.
+- Historial de los reportes enviados, con opción de reenviar uno puntual.
 
-**Fase 2 — Acceso directo a la venta completa**
-- Desde una fila del desglose, poder abrir el detalle completo de esa venta (todos los artículos de esa venta, forma de pago, etc.), no solo la fila de ese médico.
-
-**Fase 3 — Extender a otras listas**
-- Aplicar esta misma función de clic + desglose + exportar también a "Ventas por cajero" y a otras listas similares del Dashboard Financiero.
+**Fase 3**
+- Extender este mismo "cierre de producción personal" a otros médicos que quieran su propio reporte diario, eligiéndolos de una lista en vez de dejarlo fijo a un solo médico.
 
 ## Supuestos
-
-- "Producción" de un médico corresponde a las ventas donde ese médico está registrado como médico que refiere, exactamente el mismo criterio que ya usa la lista actual para calcular sus totales — no se agrega ni se excluye ninguna venta por otro criterio.
-- El archivo Excel incluye las mismas columnas que se ven en pantalla (fecha, número de venta, paciente, producto/servicio, cantidad, monto) más el resumen de totales.
-- El acceso al desglose queda disponible para los mismos roles que ya pueden ver hoy el Dashboard Financiero; no se amplía ni se restringe el acceso a nadie más.
-- El selector de fechas del desglose es independiente: cambiarlo dentro del desglose no modifica el período que se está viendo en el resto del Dashboard Financiero.
-- La fila "Sin médico" (ventas sin médico que refiere asignado) también es clicable y muestra su propio desglose, igual que cualquier otro nombre de la lista.
+- Hoy la clínica general y Óptica llevan catálogos de médicos separados; la coincidencia con "Dra. Mariamercedes Palma" se hará por nombre en ambos catálogos. Si el nombre está escrito de forma distinta en alguno de los dos, se ajustará durante la construcción.
+- "Producción" significa ventas donde ella está registrada como médico que refiere (igual que el resto del sistema lo define hoy), no procedimientos que ella haya realizado personalmente.
+- El reporte cubre únicamente las ventas del día del envío (hora Guatemala); no es un reporte de rango de fechas.
+- En esta fase el correo destino y el horario quedan fijos en la configuración del sistema, igual que el informe de anestesia; cambiarlos más adelante se maneja como un ajuste de configuración, no desde una pantalla.
+- Si el envío falla, se registra igual que los demás reportes automáticos existentes, sin agregar alertas adicionales en esta fase.

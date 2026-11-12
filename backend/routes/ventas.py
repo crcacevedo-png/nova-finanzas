@@ -11,6 +11,7 @@ from utils.timezone import now_gt, today_str_gt, dia_gt_a_rango_utc, GUATEMALA_T
 from pymongo import ReturnDocument
 import uuid
 import logging
+import os
 
 logger = logging.getLogger("ventas")
 
@@ -1223,6 +1224,275 @@ async def analisis_produccion_detalle_medico_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=\"{fname_ascii}\"; filename*=UTF-8''{fname_utf8}"}
     )
+
+
+# ==================== CIERRE DE PRODUCCIÓN DIARIO POR MÉDICO (Clínica + Óptica) ====================
+# Informe de solo lectura usado por el cron de las 17:00 (hora Guatemala) para
+# enviar por correo la producción diaria de un médico que refiere específico,
+# combinando ventas de clínica general y ventas de Óptica en cualquier categoría
+# (armazones, lentes, lentes de contacto, accesorios). Fase 1: fijo a la
+# Dra. Mariamercedes Palma; parametrizado por nombre para poder extenderlo a
+# otros médicos en una fase futura sin rehacer la lógica.
+import re as _re_medico
+import unicodedata as _unicodedata_medico
+
+PRODUCCION_MEDICO_PALMA_NOMBRE = "Mariamercedes Palma"
+_PROD_MEDICO_TOKEN_SECRET = os.environ.get("WEBHOOK_CRON_SECRET", "")
+_PROD_MEDICO_TOKEN_TTL_DAYS = 21
+
+
+def _normalizar_nombre_medico(s: str) -> str:
+    s = (s or "").lower()
+    s = _unicodedata_medico.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = _re_medico.sub(r"^(dra?\.?\s+)+", "", s)
+    s = _re_medico.sub(r"[^a-z\s]", " ", s)
+    return _re_medico.sub(r"\s+", " ", s).strip()
+
+
+def _regex_nombre_medico(nombre_buscado: str) -> str:
+    """Regex que exige que todos los tokens del nombre (en cualquier orden) estén
+    presentes, para tolerar prefijos (Dra./Dr.) y variaciones de orden/formato."""
+    tokens = _normalizar_nombre_medico(nombre_buscado).split()
+    return "".join(f"(?=.*{_re_medico.escape(t)})" for t in tokens) or ".*"
+
+
+async def _resolver_doctor_por_nombre(nombre_buscado: str) -> Optional[dict]:
+    """Busca en el catálogo compartido de médicos (db.doctors, usado tanto por el
+    POS de clínica como por el POS de Óptica) uno cuyo nombre normalizado
+    contenga todos los tokens del nombre buscado."""
+    db = get_db()
+    tokens = _normalizar_nombre_medico(nombre_buscado).split()
+    if not tokens:
+        return None
+    docs = await db.doctors.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    for d in docs:
+        if all(t in _normalizar_nombre_medico(d.get("name", "")) for t in tokens):
+            return d
+    return None
+
+
+def _items_venta_optica(sale: dict) -> list:
+    """Normaliza los renglones de una venta de Óptica (formato V2 con items
+    genéricos, o formato legacy con armazón/lente de contacto/lentes) al mismo
+    formato de fila usado por el desglose de producción."""
+    items = []
+    if sale.get("items_v2"):
+        for it in sale["items_v2"]:
+            items.append({
+                "nombre": it.get("name", ""),
+                "cantidad": it.get("quantity", 0) or 0,
+                "monto": round(it.get("subtotal", 0) or 0, 2),
+            })
+        return items
+    if sale.get("frame_id") and sale.get("frame_price"):
+        items.append({"nombre": "Armazón", "cantidad": 1, "monto": round(sale.get("frame_price", 0) or 0, 2)})
+    if sale.get("contact_lens_id") and sale.get("contact_lens_price"):
+        items.append({"nombre": "Lente de contacto", "cantidad": 1, "monto": round(sale.get("contact_lens_price", 0) or 0, 2)})
+    for li in sale.get("lens_items", []) or []:
+        items.append({
+            "nombre": li.get("lens_type_name") or "Lente",
+            "cantidad": li.get("quantity", 0) or 0,
+            "monto": round(li.get("subtotal", 0) or 0, 2),
+        })
+    return items
+
+
+async def _obtener_produccion_medico_dia(fecha_dia: str, nombre_medico: str) -> dict:
+    """Reúne, para un día (YYYY-MM-DD, hora Guatemala) y un médico que refiere
+    (identificado por nombre), toda su producción: ventas de clínica general +
+    ventas de Óptica en cualquier categoría, donde aparece como médico que
+    refiere. Un renglón por producto/servicio vendido, con el total general."""
+    db = get_db()
+    ini, fin = dia_gt_a_rango_utc(fecha_dia)
+    doctor = await _resolver_doctor_por_nombre(nombre_medico)
+    patron = _regex_nombre_medico(nombre_medico)
+    nombre_resuelto = doctor["name"] if doctor else nombre_medico
+
+    # ---- Clínica general ----
+    or_clinica = [{"medico_nombre": {"$regex": patron, "$options": "i"}}]
+    if doctor:
+        or_clinica.append({"medico_id": doctor["id"]})
+    ventas_clinica = await db.ventas.find({
+        "origen": "clinica", "estado": "completada",
+        "fecha": {"$gte": ini, "$lte": fin}, "$or": or_clinica,
+    }, {"_id": 0}).sort("fecha", 1).to_list(5000)
+
+    # ---- Óptica (cualquier categoría: armazones, lentes, contacto, accesorios) ----
+    or_optica = [{"doctor_name": {"$regex": patron, "$options": "i"}}]
+    if doctor:
+        or_optica.append({"doctor_id": doctor["id"]})
+    ventas_optica = await db.optica_sales.find({
+        "status": {"$ne": "cancelado"},
+        "created_at": {"$gte": ini, "$lte": fin}, "$or": or_optica,
+    }, {"_id": 0}).sort("created_at", 1).to_list(5000)
+
+    filas = []
+    for v in ventas_clinica:
+        try:
+            fecha_corta = datetime.fromisoformat(v["fecha"]).astimezone(GUATEMALA_TZ).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            fecha_corta = (v.get("fecha") or "")[:16]
+        for item in v.get("items", []):
+            filas.append({
+                "orden": v.get("fecha", ""), "fecha": fecha_corta,
+                "numero_venta": v.get("numero_venta", ""),
+                "paciente_nombre": v.get("paciente_nombre") or "Consumidor Final",
+                "nombre": item.get("nombre", ""),
+                "cantidad": item.get("cantidad", 0) or 0,
+                "monto": round(item.get("subtotal", 0) or 0, 2),
+            })
+    for v in ventas_optica:
+        try:
+            fecha_corta = datetime.fromisoformat(v["created_at"]).astimezone(GUATEMALA_TZ).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            fecha_corta = (v.get("created_at") or "")[:16]
+        for item in _items_venta_optica(v):
+            filas.append({
+                "orden": v.get("created_at", ""), "fecha": fecha_corta,
+                "numero_venta": v.get("order_number", ""),
+                "paciente_nombre": v.get("patient_name") or "Consumidor Final",
+                "nombre": item["nombre"], "cantidad": item["cantidad"], "monto": item["monto"],
+            })
+    filas.sort(key=lambda f: f["orden"])
+    for f in filas:
+        f.pop("orden", None)
+
+    total_monto = round(
+        sum(v.get("total", 0) or 0 for v in ventas_clinica) + sum(v.get("total", 0) or 0 for v in ventas_optica), 2
+    )
+    return {
+        "fecha": fecha_dia,
+        "medico_nombre": nombre_resuelto,
+        "num_ventas": len(ventas_clinica) + len(ventas_optica),
+        "total_items": sum(f["cantidad"] for f in filas),
+        "total_monto": total_monto,
+        "items": filas,
+    }
+
+
+def render_produccion_medico_pdf(fecha_dia: str, data: dict) -> bytes:
+    """PDF del cierre de producción diario de un médico (mismo estilo visual que
+    el informe diario de anestesia: encabezado, tabla, total resaltado)."""
+    import io as _io
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+
+    output = _io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=0.5 * inch,
+                             leftMargin=0.5 * inch, topMargin=0.6 * inch, bottomMargin=0.6 * inch)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('T', parent=styles['Heading1'], fontSize=15, alignment=TA_CENTER,
+                                  textColor=colors.HexColor('#0F6E56'), spaceAfter=6)
+    sub_style = ParagraphStyle('S', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER,
+                                textColor=colors.grey, spaceAfter=14)
+    try:
+        y, m, d = fecha_dia.split('-')
+        fecha_legible = f"{d}/{m}/{y}"
+    except (AttributeError, ValueError):
+        fecha_legible = fecha_dia
+    elements = [
+        Paragraph(f"NovaVisión — Cierre de Producción Diario — {data['medico_nombre']}", title_style),
+        Paragraph(
+            f"Fecha: {fecha_legible} &nbsp;|&nbsp; Ventas: {data['num_ventas']} "
+            f"&nbsp;|&nbsp; Total del día: Q {data['total_monto']:,.2f}",
+            sub_style,
+        ),
+    ]
+    cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=8, leading=10)
+
+    def _cell(text):
+        return Paragraph(str(text if text not in (None, "") else "—"), cell_style)
+
+    table_data = [["Fecha", "N° Venta", "Paciente", "Producto / Servicio", "Cantidad", "Monto"]]
+    style_cmds = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0F6E56')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('ALIGN', (-2, 0), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (-3, 0), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#0F6E56')),
+    ]
+    for r in data["items"]:
+        table_data.append([
+            _cell(r["fecha"]), _cell(r["numero_venta"]), _cell(r["paciente_nombre"]), _cell(r["nombre"]),
+            str(r["cantidad"]), f"Q {r['monto']:,.2f}",
+        ])
+    table = Table(table_data, colWidths=[1.0 * inch, 0.95 * inch, 1.45 * inch, 2.15 * inch, 0.7 * inch, 0.85 * inch], repeatRows=1)
+    table.setStyle(TableStyle(style_cmds))
+    elements.append(table)
+    elements.append(Spacer(1, 0.2 * inch))
+    total_style = ParagraphStyle('Tot', parent=styles['Normal'], fontSize=12, alignment=TA_RIGHT)
+    elements.append(Paragraph(f"<b>TOTAL DEL DÍA: Q {data['total_monto']:,.2f}</b>", total_style))
+    if not data["items"]:
+        elements.append(Paragraph("Sin producción registrada este día.", sub_style))
+
+    doc.build(elements)
+    output.seek(0)
+    return output.read()
+
+
+def _make_prod_medico_report_token(fecha_dia: str, medico_nombre: str, ttl_days: int = _PROD_MEDICO_TOKEN_TTL_DAYS) -> str:
+    """Token opaco, firmado y con expiración para el enlace público (sin login)
+    de descarga del PDF del cierre de producción diario de un médico."""
+    import time as _time, hmac as _hmac, hashlib as _hashlib, base64 as _base64
+    if not _PROD_MEDICO_TOKEN_SECRET:
+        raise HTTPException(status_code=503, detail="No se puede generar el enlace del informe (falta configuración)")
+    expires_at = int(_time.time()) + ttl_days * 86400
+    payload = f"prodmedico|{fecha_dia}|{medico_nombre}|{expires_at}"
+    sig = _hmac.new(_PROD_MEDICO_TOKEN_SECRET.encode(), payload.encode(), _hashlib.sha256).hexdigest()
+    raw = f"{payload}|{sig}".encode()
+    return _base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _verify_prod_medico_report_token(token: str) -> Optional[tuple]:
+    import hmac as _hmac, hashlib as _hashlib, base64 as _base64, binascii as _binascii, time as _time
+    if not _PROD_MEDICO_TOKEN_SECRET:
+        return None
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        raw = _base64.urlsafe_b64decode(padded.encode()).decode("utf-8")
+        marcador, fecha_dia, medico_nombre, expires_at, sig = raw.split("|")
+        expires_at_int = int(expires_at)
+    except (ValueError, UnicodeDecodeError, _binascii.Error):
+        return None
+    if marcador != "prodmedico":
+        return None
+    payload = f"{marcador}|{fecha_dia}|{medico_nombre}|{expires_at}"
+    expected = _hmac.new(_PROD_MEDICO_TOKEN_SECRET.encode(), payload.encode(), _hashlib.sha256).hexdigest()
+    if not _hmac.compare_digest(sig.encode(), expected.encode()):
+        return None
+    if expires_at_int < int(_time.time()):
+        return None
+    return fecha_dia, medico_nombre
+
+
+@router.get("/produccion-medico/daily-report/pdf")
+async def download_produccion_medico_pdf(token: str = Query(...)):
+    """Descarga pública (vía enlace firmado, sin login) del PDF del cierre de
+    producción diario de un médico, enviado por correo. El enlace expira."""
+    resultado = _verify_prod_medico_report_token(token)
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Enlace inválido o expirado")
+    fecha_dia, medico_nombre = resultado
+    data = await _obtener_produccion_medico_dia(fecha_dia, medico_nombre)
+    pdf_bytes = render_produccion_medico_pdf(fecha_dia, data)
+    from fastapi.responses import StreamingResponse
+    import io as _io
+    return StreamingResponse(
+        _io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename=produccion_{fecha_dia}.pdf"},
+    )
+
 
 
 # ==================== DASHBOARD DE VENTAS DE CLÍNICA ====================
