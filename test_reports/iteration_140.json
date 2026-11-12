@@ -1,0 +1,16 @@
+{
+  "summary": "Round 2 (final) of 'Agregar a Agenda' for IGSS surgeries: rechecked the duplicate-cita fix and ran a short smoke test of the main flow in the real UI (superadmin). All checks passed. CREATE mode with Institución=IGSS: btn-agregar-a-agenda is visible, the save returns POST /api/surgeries 200, and the modal lists exactly the 4 doctors in order (Cristian Acevedo, Mariamercedes Palma, Manuel de la Cruz, Rocío Muñoz). Confirming creates the cita (POST 200) and shows 'Cita agregada a la agenda — Dr. Cristian Acevedo — 2026-12-16 08:45'. In /agenda on 2026-12-16 the card is in Dr. Cristian Acevedo's column with the patient name, the IGSS badge and 'Procedimiento: TEST_Faco R2'. EDIT mode on that same IGSS surgery (title 'Editar cirugía — Paciente110 Demo U5'): btn-agregar-a-agenda is not rendered (count 0) and the footer has only Cancelar and Guardar registro. Guardar registro sends PUT 200, the dialog closes, the observations change was saved (checked with GET) and no new cita was created (the API still shows exactly 1 cita for the patient on 2026-12-16). The duplicate-cita bug from iteration_139 is resolved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/tests/verify_agendar_cleanup.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Design note, no action needed for Phase 1: hiding the button in edit mode also means that an IGSS surgery saved with only 'Guardar registro' can no longer be scheduled from the surgery screen. The user has to create the cita manually in /agenda. This is within the agreed scope, and linking the cita to the surgery is planned for Phase 3."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request)", "frontend": "100%"},
+  "seed_data_creation": "Created 1 TEST surgery (9e5dc8b6-a2b8-4d8d-8253-3b0f3f0637d3) and 1 cita (91d2f4bf-ee90-4616-a858-460ffb3ae50b) for patient 'Paciente110 Demo U5'. Both were deleted by id (200), and a GET on the surgery now returns 404.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login superadmin/nova2024. Opening the edit form: view-surgery-{id} -> detail-edit-surgery-btn. Form tips: fill input[type=time] and input[type=date] inside the dialog; the 'Tipo de anestesia *' and 'Institución *' selects can be found via div:has(> label:text-is(...)) [role=combobox]. Check and clean up citas with /app/tests/verify_agendar_cleanup.py (needs REACT_APP_BACKEND_URL exported)."
+}
