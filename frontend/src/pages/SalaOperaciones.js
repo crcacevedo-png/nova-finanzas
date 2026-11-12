@@ -2,15 +2,26 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { surgeryApi, formatCurrency, doctorApi, patientApi, getGuatemalaDate, getGuatemalaTimeHM } from '../services/api';
+import { agendaApi } from '../services/agendaApi';
 import { PatientEditDialog } from '../components/PatientEditDialog';
 import axios from 'axios';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const EMPTY_IGSS = { unit: '', unit_id: '', nog_id: '', nog_number: '', sps: '', affiliation_number: '', code: '', procedure_cost: '' };
+// Médicos fijos para "Agregar a Agenda" de cirugías IGSS (Fase 1). Dra. Rocío Muñoz usa
+// la agenda general de la clínica a nivel de negocio, pero técnicamente es el mismo
+// mecanismo: un médico con agenda activa en el sistema.
+const AGENDA_IGSS_MEDICOS = [
+  'Dr. Cristian Acevedo',
+  'Dra. Mariamercedes Palma',
+  'Dr. Manuel de la Cruz',
+  'Dra. Rocío Muñoz',
+];
 import { 
   Plus, Search, Filter, Download, ChevronDown, ChevronRight,
   Eye, Trash2, X, Calendar, Clock, User, Building2,
-  Stethoscope, Activity, Package, FileText, UserPlus, Upload
+  Stethoscope, Activity, Package, FileText, UserPlus, Upload,
+  CalendarPlus, CheckCircle2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -215,6 +226,15 @@ const SalaOperaciones = () => {
   const [catalogInsumos, setCatalogInsumos] = useState([]);
   const [catalogEquipos, setCatalogEquipos] = useState([]);
   const [anesthesiaTypes, setAnesthesiaTypes] = useState([]);
+
+  // "Agregar a Agenda" (cirugías IGSS)
+  const [agendarDialogOpen, setAgendarDialogOpen] = useState(false);
+  const [agendarSurgery, setAgendarSurgery] = useState(null);
+  const [agendarMedicos, setAgendarMedicos] = useState([]);
+  const [agendarMedicoId, setAgendarMedicoId] = useState('');
+  const [agendarCargandoMedicos, setAgendarCargandoMedicos] = useState(false);
+  const [agendarConfirmando, setAgendarConfirmando] = useState(false);
+  const [agendarListo, setAgendarListo] = useState(false);
 
   useEffect(() => {
     const cargarCatalogo = async () => {
@@ -484,28 +504,32 @@ const SalaOperaciones = () => {
     setSurgeryDialogOpen(true);
   };
 
-  const handleSaveSurgery = async () => {
-    // Validaciones
+  const validarFormularioCirugia = () => {
     if (!formData.date || !formData.time || !formData.patient_name || !formData.procedure ||
         !formData.surgeon || !formData.eye || !formData.anesthesia_type || 
         !formData.anesthesiologist || !formData.institution) {
       toast.error('Complete todos los campos obligatorios');
-      return;
+      return false;
     }
     
     if (formData.institution === 'IGSS') {
       const igss = formData.igss_data;
       if (!igss.unit || !igss.sps || !igss.affiliation_number || !igss.code || !igss.procedure_cost) {
         toast.error('Complete todos los campos de IGSS');
-        return;
+        return false;
       }
     }
     
     if (formData.institution === 'Seguro Privado' && !formData.insurance_name.trim()) {
       toast.error('Ingrese el nombre del seguro');
-      return;
+      return false;
     }
-    
+    return true;
+  };
+
+  // Guarda la cirugía (crear o actualizar) y devuelve el registro guardado, o null si falló.
+  // Reutilizado tanto por "Guardar registro" como por "Agregar a Agenda".
+  const guardarCirugia = async () => {
     setSubmitting(true);
     try {
       const payload = {
@@ -516,21 +540,83 @@ const SalaOperaciones = () => {
         } : null
       };
       
+      let saved;
       if (editMode) {
-        await surgeryApi.update(selectedSurgery.id, payload);
+        const res = await surgeryApi.update(selectedSurgery.id, payload);
+        saved = res.data;
         toast.success('Cirugía actualizada');
       } else {
-        await surgeryApi.create(payload);
+        const res = await surgeryApi.create(payload);
+        saved = res.data;
         toast.success('Cirugía registrada');
       }
       
-      setSurgeryDialogOpen(false);
       fetchSurgeries();
+      return saved;
     } catch (error) {
       console.error('Error saving surgery:', error);
       toast.error(error.response?.data?.detail || 'Error al guardar');
+      return null;
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveSurgery = async () => {
+    if (!validarFormularioCirugia()) return;
+    const saved = await guardarCirugia();
+    if (saved) setSurgeryDialogOpen(false);
+  };
+
+  const handleAgregarAAgenda = async () => {
+    if (!validarFormularioCirugia()) return;
+    const saved = await guardarCirugia();
+    if (!saved) return;
+    if (!saved.patient_id) {
+      toast.error('No se puede agregar a la agenda: el paciente no está vinculado a un expediente del sistema.');
+      setSurgeryDialogOpen(false);
+      return;
+    }
+    setSurgeryDialogOpen(false);
+    setAgendarSurgery(saved);
+    setAgendarMedicoId('');
+    setAgendarListo(false);
+    setAgendarDialogOpen(true);
+    setAgendarCargandoMedicos(true);
+    try {
+      const res = await agendaApi.getMedicosAgenda();
+      const todos = res.data?.data || [];
+      const encontrados = AGENDA_IGSS_MEDICOS
+        .map((nombre) => todos.find((d) => d.name === nombre))
+        .filter(Boolean);
+      setAgendarMedicos(encontrados);
+    } catch (error) {
+      setAgendarMedicos([]);
+    } finally {
+      setAgendarCargandoMedicos(false);
+    }
+  };
+
+  const handleConfirmarAgendar = async () => {
+    const medico = agendarMedicos.find((m) => m.id === agendarMedicoId);
+    if (!medico || !agendarSurgery) return;
+    setAgendarConfirmando(true);
+    try {
+      await agendaApi.createCita({
+        paciente_id: agendarSurgery.patient_id,
+        paciente_nombre: agendarSurgery.patient_name,
+        medico_id: medico.id,
+        medico_nombre: medico.name,
+        fecha: agendarSurgery.date,
+        hora_inicio: agendarSurgery.time,
+        tipo_cita: 'Cirugía',
+        notas: `Procedimiento: ${agendarSurgery.procedure}`,
+      });
+      setAgendarListo(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'No se pudo agregar la cita a la agenda');
+    } finally {
+      setAgendarConfirmando(false);
     }
   };
 
@@ -1540,10 +1626,99 @@ const SalaOperaciones = () => {
               <Button variant="outline" onClick={() => setSurgeryDialogOpen(false)} disabled={submitting}>
                 Cancelar
               </Button>
-              <Button onClick={handleSaveSurgery} disabled={submitting} className="btn-primary">
+              {formData.institution === 'IGSS' && (
+                <Button
+                  variant="outline"
+                  onClick={handleAgregarAAgenda}
+                  disabled={submitting}
+                  className="border-teal-600 text-teal-700 hover:bg-teal-50"
+                  data-testid="btn-agregar-a-agenda"
+                >
+                  <CalendarPlus className="w-4 h-4 mr-2" />
+                  Agregar a Agenda
+                </Button>
+              )}
+              <Button onClick={handleSaveSurgery} disabled={submitting} className="btn-primary" data-testid="btn-guardar-registro">
                 {submitting ? 'Guardando...' : 'Guardar registro'}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Agregar a Agenda (cirugías IGSS): elegir médico responsable */}
+        <Dialog open={agendarDialogOpen} onOpenChange={(open) => { if (!open) setAgendarDialogOpen(false); }}>
+          <DialogContent className="max-w-md" data-testid="dialog-agendar-cirugia">
+            {!agendarListo ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>Agregar a Agenda</DialogTitle>
+                  <DialogDescription>
+                    La cirugía ya quedó guardada. Elige el médico responsable para crear la cita en su agenda.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1 border border-gray-200">
+                    <p><span className="font-semibold uppercase text-xs text-gray-500">Paciente:</span> {agendarSurgery?.patient_name}</p>
+                    <p><span className="font-semibold uppercase text-xs text-gray-500">Institución:</span> IGSS</p>
+                    <p><span className="font-semibold uppercase text-xs text-gray-500">Procedimiento:</span> {agendarSurgery?.procedure}</p>
+                    <p><span className="font-semibold uppercase text-xs text-gray-500">Fecha/Hora:</span> {agendarSurgery?.date} {agendarSurgery?.time}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs uppercase text-gray-500 mb-2 block">Médico responsable</Label>
+                    {agendarCargandoMedicos ? (
+                      <p className="text-sm text-gray-500">Cargando médicos...</p>
+                    ) : agendarMedicos.length === 0 ? (
+                      <p className="text-sm text-red-600">No se encontraron los médicos configurados para agendar. Contacta al administrador.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {agendarMedicos.map((medico) => (
+                          <button
+                            key={medico.id}
+                            type="button"
+                            onClick={() => setAgendarMedicoId(medico.id)}
+                            data-testid={`agendar-medico-option-${medico.id}`}
+                            className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors ${
+                              agendarMedicoId === medico.id
+                                ? 'border-teal-600 bg-teal-50 text-teal-800'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            {medico.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAgendarDialogOpen(false)} disabled={agendarConfirmando}>
+                    Cerrar
+                  </Button>
+                  <Button
+                    onClick={handleConfirmarAgendar}
+                    disabled={!agendarMedicoId || agendarConfirmando}
+                    className="btn-primary"
+                    data-testid="btn-confirmar-agendar"
+                  >
+                    {agendarConfirmando ? 'Agendando...' : 'Confirmar y agendar'}
+                  </Button>
+                </DialogFooter>
+              </>
+            ) : (
+              <div className="py-6 text-center space-y-3" data-testid="agendar-confirmacion">
+                <CheckCircle2 className="w-12 h-12 text-teal-600 mx-auto" />
+                <p className="text-lg font-semibold text-gray-800">Cita agregada a la agenda</p>
+                <p className="text-sm text-gray-500">
+                  {agendarMedicos.find((m) => m.id === agendarMedicoId)?.name} — {agendarSurgery?.date} {agendarSurgery?.time}
+                </p>
+                <Button onClick={() => setAgendarDialogOpen(false)} className="btn-primary mt-2">
+                  Cerrar
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
