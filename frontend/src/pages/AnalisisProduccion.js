@@ -207,8 +207,8 @@ const AnalisisProduccion = () => {
         open={detalleOpen}
         onOpenChange={setDetalleOpen}
         medico={medicoSeleccionado}
-        desdeInicial={desde}
-        hastaInicial={hasta}
+        desdeInicial={data?.desde || desde}
+        hastaInicial={data?.hasta || hasta}
       />
     </Layout>
   );
@@ -279,6 +279,7 @@ const DetalleMedicoModal = ({ open, onOpenChange, medico, desdeInicial, hastaIni
 
   useEffect(() => {
     if (open && medico) {
+      setDetalle(null);
       setDesde(desdeInicial);
       setHasta(hastaInicial);
       fetchDetalle(desdeInicial, hastaInicial);
@@ -295,16 +296,17 @@ const DetalleMedicoModal = ({ open, onOpenChange, medico, desdeInicial, hastaIni
   };
 
   const descargarExcel = async () => {
+    if (!detalle) return;
     setDescargando(true);
     try {
       const res = await axios.get(`${API_URL}/ventas/analisis/medico-detalle/excel`, {
-        params: { medico_id: medico.medico_id, desde, hasta },
+        params: { medico_id: medico.medico_id, desde: detalle.desde, hasta: detalle.hasta },
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `produccion_${(detalle?.medico_nombre || 'medico').replace(/\s+/g, '_')}_${desde}_a_${hasta}.xlsx`);
+      link.setAttribute('download', `produccion_${(detalle?.medico_nombre || 'medico').replace(/\s+/g, '_')}_${detalle.desde}_a_${detalle.hasta}.xlsx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -387,7 +389,7 @@ const DetalleMedicoModal = ({ open, onOpenChange, medico, desdeInicial, hastaIni
                       <TableCell className="text-sm">{item.paciente_nombre}</TableCell>
                       <TableCell className="text-sm">{item.nombre}</TableCell>
                       <TableCell className="text-right">{item.cantidad}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(item.monto)}</TableCell>
+                      <TableCell className="text-right font-medium whitespace-nowrap">{formatCurrency(item.monto)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

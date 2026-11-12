@@ -1108,7 +1108,7 @@ async def _obtener_detalle_medico(medico_id: str, desde: str, hasta: str):
     db = get_db()
     f_desde, f_hasta, ini, fin = _resolver_rango_medico_detalle(desde, hasta)
 
-    query_medico = {"$or": [{"medico_id": None}, {"medico_id": {"$exists": False}}]} if medico_id == "sin" else {"medico_id": medico_id}
+    query_medico = {"$or": [{"medico_id": None}, {"medico_id": ""}, {"medico_id": {"$exists": False}}]} if medico_id == "sin" else {"medico_id": medico_id}
     ventas = await db.ventas.find({
         "origen": "clinica",
         "estado": "completada",
@@ -1177,6 +1177,7 @@ async def analisis_produccion_detalle_medico_excel(
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
     from fastapi.responses import StreamingResponse
+    from urllib.parse import quote
 
     detalle = await _obtener_detalle_medico(medico_id, desde, hasta)
     titulo = f"Producción de {detalle['medico_nombre']} — {detalle['desde']} a {detalle['hasta']}"
@@ -1215,11 +1216,12 @@ async def analisis_produccion_detalle_medico_excel(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fname = f"produccion_{detalle['medico_nombre'].replace(' ', '_')}_{detalle['desde']}_a_{detalle['hasta']}.xlsx"
+    fname_ascii = f"produccion_{detalle['medico_nombre'].replace(' ', '_').encode('ascii', 'ignore').decode('ascii')}_{detalle['desde']}_a_{detalle['hasta']}.xlsx"
+    fname_utf8 = quote(f"produccion_{detalle['medico_nombre'].replace(' ', '_')}_{detalle['desde']}_a_{detalle['hasta']}.xlsx")
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={fname}"}
+        headers={"Content-Disposition": f"attachment; filename=\"{fname_ascii}\"; filename*=UTF-8''{fname_utf8}"}
     )
 
 

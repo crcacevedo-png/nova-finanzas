@@ -1,0 +1,39 @@
+{
+  "summary": "Probé la funcionalidad 'Desglose de Producción por Médico que Refiere' de punta a punta. Backend: 20/20 pytest pasan. Comprobé que el monto total, el n° de ventas y el nombre del médico del detalle coinciden con por_medico de /analisis para cada médico (incluido 'sin') en 3 rangos. También probé el Excel (xlsx válido con Content-Type correcto, total en la última fila, tanto para médico real como para 'sin' y para un rango vacío), fechas invertidas, fechas inválidas (400), parámetros faltantes (422) y médico inexistente (vacío). admin y usuario reciben 403 en ambos endpoints y sin autenticación da 401/403. Frontend (superadmin, 1920x1080): solo los nombres de por-medico son clicables (botones con subrayado al pasar el mouse y cursor pointer); por-cajero y por-categoria tienen 0 botones. El modal de Dr. Carlos Méndez abre con 'Este mes' (2026-11-01..2026-11-12) precargado y su monto Q 900.00 coincide EXACTAMENTE con la fila principal (3 artículos en 2 filas). Con un rango de 2020 aparece el mensaje 'Sin ventas en este rango de fechas', Q 0.00, y el modal sigue abierto. Con octubre muestra Q 672.00 y 3 filas. El Excel se descargó con el rango de octubre. Al cerrar, la página conserva 'Este mes'. 'Sin médico' abre su propio desglose (Q 805.00). Al cambiar a Hoy o a Rango (octubre aplicado) el modal precarga el nuevo período y su monto coincide con la fila principal (Q 672). KPIs, tendencia, top productos y tablas de cajero y categoría se ven bien. Hay un bug de borde (menor) en modo Rango.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/ventas/analisis/medico-detalle?medico_id=sin", "issue": "El filtro de 'sin' es {medico_id: null | no existe}, pero /analisis agrupa cualquier valor falsy (incluido '') como 'sin'. Hoy hay 0 ventas con medico_id='' así que los totales cuadran, pero si alguna venta guarda medico_id='' el desglose de 'Sin médico' no cuadrará con la fila principal. Sugerencia: añadir {medico_id: ''} al $or."},
+      {"endpoint": "GET /api/ventas/analisis/medico-detalle/excel", "issue": "El header Content-Disposition lleva el nombre del médico sin comillas y sin codificar (filename=produccion_Dr._Carlos_Méndez_...). Funciona con caracteres latin-1, pero un nombre con caracteres fuera de latin-1 daría error al codificar el header. Sugerencia: usar filename*=UTF-8''<urlencoded>. El frontend no se ve afectado porque arma su propio nombre de archivo."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AnalisisProduccion -> DetalleMedicoModal (modo Rango)", "issue": "En modo 'Rango', si el usuario cambia los inputs Desde/Hasta de la página SIN presionar Aplicar y luego abre un médico, el modal toma las fechas sin aplicar (desdeInicial={desde} es el estado del input) y no el rango que la página está mostrando. Reproducido: con octubre aplicado (fila Q 672.00), cambié los inputs a 2026-11-01..2026-11-30 sin aplicar, abrí el médico y el modal mostró 2026-11-01..2026-11-30 con Q 900.00 = no coincide con la fila. Solución: pasar desdeInicial={data?.desde} y hastaInicial={data?.hasta}.", "selector": "[data-testid='medico-link-*']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Modal detalle médico", "issues": ["La columna Monto se parte en 2 líneas ('Q' / '300.00') en un modal de 3xl. Conviene agregar whitespace-nowrap a la celda Monto (y quizás a Fecha).", "El botón 'Exportar a Excel' (btn-primary) se ve con poca saturación o desvanecido aunque está habilitado; puede confundirse con un botón deshabilitado.", "El título muestra brevemente el nombre del médico anterior mientras carga el nuevo, porque el estado 'detalle' no se limpia al cambiar de médico (detalle?.medico_nombre tiene prioridad). Cosmético."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_analisis_medico_detalle.py", "/app/test_reports/pytest/pytest_medico_detalle.xml"],
+  "action_items": [
+    "(LOW) Pasar data?.desde / data?.hasta (el rango aplicado) al DetalleMedicoModal en vez del estado de los inputs de la página",
+    "(LOW) Incluir medico_id == '' en el filtro 'sin' de _obtener_detalle_medico para igualar la agrupación de /analisis",
+    "(LOW) Codificar el filename del Content-Disposition con RFC 5987 (filename*=UTF-8'')",
+    "(COSMÉTICO) Poner whitespace-nowrap en la celda Monto del modal; hacer setDetalle(null) al abrir con un médico nuevo"
+  ],
+  "critical_code_review_comments": [
+    "DetalleMedicoModal: desdeInicial/hastaInicial se toman del estado editable de los inputs, no del rango aplicado (data.desde/data.hasta)",
+    "Exportar a Excel usa las fechas actuales de los inputs del modal aunque no se haya presionado Aplicar, así que el Excel puede no coincidir con la tabla visible. Es aceptable según el requerimiento ('rango seleccionado en el modal'), pero conviene exportar el rango aplicado (detalle.desde/hasta) para que siempre coincida.",
+    "Los endpoints son de solo lectura, están correctamente protegidos con require_superadmin_dep y excluyen _id"
+  ],
+  "updated_files": ["/app/backend/tests/test_analisis_medico_detalle.py"],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "95% (all requested flows pass; 1 low-priority edge bug in Rango mode)"},
+  "test_credentials": "superadmin/nova2024, admin/Admin2024$, usuario/user2024 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Ninguno (funcionalidad de solo lectura)",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fecha del servidor 2026-11-12. Datos de clínica: Dr. Carlos Méndez (a8bb541a-7fcb-49ab-bd20-32788f57acb5) tiene 5 ventas (2026-10-14..2026-11-06); 'Este mes' = Q 900, octubre = Q 672. 'Sin médico' en el mes = Q 805. Ejecutar: REACT_APP_BACKEND_URL=... pytest tests/test_analisis_medico_detalle.py -p no:xdist. No revisé la redirección del frontend para roles que no son superadmin (no cambió en esta funcionalidad); el 403 del backend sí está comprobado.",
+  "rca of the issue": "Bug del modo Rango: AnalisisProduccion.js línea ~210 pasa al modal el estado del input (desde/hasta), que se edita en vivo, en lugar del rango aplicado que devuelve /analisis (data.desde/data.hasta). Reproducción: Rango -> aplicar 2026-10-01..31 -> cambiar los inputs a noviembre sin aplicar -> clic en el médico -> el modal muestra noviembre. Solución: usar data?.desde / data?.hasta."
+}
