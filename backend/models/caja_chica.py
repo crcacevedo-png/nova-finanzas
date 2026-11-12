@@ -15,9 +15,11 @@ class MovimientoCajaChicaBase(BaseModel):
     @field_validator("fecha")
     @classmethod
     def validar_fecha(cls, v):
-        import re
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", v or ""):
-            raise ValueError("fecha debe tener formato YYYY-MM-DD")
+        from datetime import datetime
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            raise ValueError("fecha debe ser una fecha válida en formato YYYY-MM-DD")
         return v
 
     @model_validator(mode="after")
@@ -45,9 +47,13 @@ class MovimientoCajaChicaUpdate(BaseModel):
     @field_validator("fecha")
     @classmethod
     def validar_fecha(cls, v):
-        import re
-        if v is not None and not re.match(r"^\d{4}-\d{2}-\d{2}$", v):
-            raise ValueError("fecha debe tener formato YYYY-MM-DD")
+        from datetime import datetime
+        if v is None:
+            return v
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            raise ValueError("fecha debe ser una fecha válida en formato YYYY-MM-DD")
         return v
 
 

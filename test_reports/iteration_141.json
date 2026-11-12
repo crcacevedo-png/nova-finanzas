@@ -1,0 +1,34 @@
+{
+  "summary": "First test round for 'Caja Chica — Óptica' (MVP Fase 1). Backend: 9/9 pytest tests passed. They cover access for every role (optica/admin/superadmin allowed, usuario gets 403, no token gets 401/403); the egreso check that rejects a missing or blank solicitante/motivo with 422 and saves nothing; 422 for monto<=0, a bad fecha format or a bad tipo; the running balance across 2026-01 and 2026-02; the owner editing their own movement; a blank solicitante on egreso edit giving 400; admin editing an optica movement giving 403; superadmin editing anyone's movement; delete giving 403 for optica and admin, 200 for superadmin, then 404; the mes filter; the monthly report (Feb saldo acumulado includes the Jan ingreso); and the Excel export (spreadsheetml content-type, file opens with openpyxl). Frontend (Playwright, desktop): as optica, 'Caja Chica' is the first sidebar item and starts at Q0.00; ingreso Q1000 saved; saving an egreso without solicitante/motivo shows a toast and keeps the dialog open without saving; with the fields filled, totals become Q1000/Q250/Q750; editing the ingreso to 1200 gives saldo Q950; no delete buttons shown; the report for 2026-02 shows Ingresos 0 / Egresos 250 / Saldo acumulado 950 plus the detail table; Excel downloads caja_chica_2026-02.xlsx. As admin: first nav item, no edit button on optica's movements, edit button on its own new ingreso, no delete. As usuario: no nav-caja-chica, and going straight to /caja-chica redirects to /pacientes. As superadmin: first nav item, edit and delete on all rows, edited optica's egreso, deleted every movement through the AlertDialog. Final state is Q0.00 and the collection has 0 documents.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/caja-chica/informe?mes=abc and /informe/excel", "issue": "The mes parameter is not validated. mes=abc returns 200 with an empty month and a saldo_acumulado built from the string comparison fecha <= 'abc-31', which effectively means all records. Should return 422 unless mes matches ^\\d{4}-(0[1-9]|1[0-2])$."},
+      {"endpoint": "POST/PUT /api/caja-chica/movimientos", "issue": "The fecha check is regex-only, so 2026-02-31 or 2026-13-01 are accepted. Consider datetime.strptime. Future dates are also accepted (possibly intended)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Caja Chica historial", "issues": ["The 'Ingreso a caja chica' detail text (text-slate-400) has low contrast on a white background. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_caja_chica_optica.py", "/app/test_reports/pytest/caja_chica.xml"],
+  "action_items": [
+    "(Minor) Validate the mes query param format (YYYY-MM) on /informe and /informe/excel and return 422 when it is invalid",
+    "(Minor) Use strict date parsing for fecha so impossible dates like 2026-02-31 are rejected"
+  ],
+  "critical_code_review_comments": [
+    "Duplicate PERMISSIONS dicts in server.py and config/permissions.py are still tech debt (already acknowledged). Both currently match for the caja_chica keys.",
+    "require_permission uses current_user.permissions when set. Users with custom stored permissions that lack view_caja_chica will not get access unless their permissions are migrated. Worth confirming for the production optica users (dianadlc, diana).",
+    "Users with a custom menu config stored in the DB (not the defaults) also need 'caja_chica_optica' added, otherwise the nav item stays hidden even with the permission (Layout checks isMenuEnabled).",
+    "_calcular_totales loads every document into memory to add up amounts. Fine for an MVP; consider a Mongo $group aggregation later."
+  ],
+  "updated_files": ["/app/backend/tests/test_caja_chica_optica.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None left behind. All test movements were deleted (API teardown, plus superadmin UI delete). caja_chica_movimientos count = 0.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login is rate limited to 5/min per IP, so space out logins. Login payload is {username,password} and returns access_token, which the frontend stores in localStorage 'token'. Run the tests with: REACT_APP_BACKEND_URL=... pytest tests/test_caja_chica_optica.py -p no:xdist (the tests are sequential and share tokens)."
+}

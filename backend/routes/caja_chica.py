@@ -2,6 +2,7 @@
 # Caja Chica de Óptica: ingresos, egresos, saldo continuo e informe mensual.
 
 import io
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -20,6 +21,14 @@ from models.caja_chica import (
 )
 
 router = APIRouter(prefix="/caja-chica", tags=["Caja Chica Óptica"])
+
+MES_REGEX = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+def _validar_mes(mes: str) -> str:
+    if not MES_REGEX.match(mes):
+        raise HTTPException(status_code=422, detail="mes debe tener formato YYYY-MM (ej. 2026-02)")
+    return mes
 
 
 def _puede_editar(existing: dict, current_user: dict) -> bool:
@@ -57,6 +66,7 @@ async def get_movimientos(
     """Historial de movimientos, más recientes primero."""
     query = {}
     if mes:
+        _validar_mes(mes)
         query["fecha"] = {"$gte": f"{mes}-01", "$lte": f"{mes}-31"}
     if tipo in ("ingreso", "egreso"):
         query["tipo"] = tipo
@@ -167,6 +177,7 @@ async def get_informe_mensual(
     current_user: dict = Depends(require_permission("view_caja_chica")),
 ):
     """Informe de fin de mes: totales del mes + saldo acumulado + detalle de movimientos."""
+    _validar_mes(mes)
     return await _construir_informe_mensual(mes)
 
 
@@ -176,6 +187,7 @@ async def exportar_informe_excel(
     current_user: dict = Depends(require_permission("view_caja_chica")),
 ):
     """Descarga del informe de fin de mes en Excel."""
+    _validar_mes(mes)
     informe = await _construir_informe_mensual(mes)
 
     import openpyxl
