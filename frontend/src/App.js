@@ -51,6 +51,7 @@ import ReporteRentabilidad from './pages/inventario/ReporteRentabilidad';
 import Sociedades from './pages/inventario/Sociedades';
 // Punto de Venta (POS)
 import PuntoVenta from './pages/PuntoVenta';
+import VentasDelDia from './pages/VentasDelDia';
 import VentasClinica from './pages/VentasClinica';
 import AnalisisProduccion from './pages/AnalisisProduccion';
 import './App.css';
@@ -452,6 +453,16 @@ function AppRoutes() {
             <PuntoVenta />
           </ProtectedRoute>
         } 
+      />
+
+      {/* Ventas del Día - vista de solo lectura para el rol 'usuario' */}
+      <Route
+        path="/ventas-del-dia"
+        element={
+          <ProtectedRoute requiredMenu="ventas_del_dia">
+            <VentasDelDia />
+          </ProtectedRoute>
+        }
       />
 
       {/* ==================== VENTAS DE CLÍNICA (revisión y análisis - solo superadmin) ==================== */}

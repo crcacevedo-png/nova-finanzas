@@ -290,6 +290,14 @@ AVAILABLE_MENUS = {
         "category": "inventario",
         "description": "Control de lotes y fechas de vencimiento"
     },
+    "ventas_del_dia": {
+        "id": "ventas_del_dia",
+        "label": "Ventas del Día",
+        "path": "/ventas-del-dia",
+        "icon": "Receipt",
+        "category": "inventario",
+        "description": "Consulta de ventas del día y su detalle (solo lectura)"
+    },
     "inventario_kardex": {
         "id": "inventario_kardex",
         "label": "Kardex",
@@ -389,7 +397,7 @@ DEFAULT_MENU_CONFIG = {
     "usuario": [
         "pacientes", "evaluacion_oftalmologica", "crm_cirugias", "agenda",
         "sala_operaciones",
-        "inventario_panel", "inventario_productos", "inventario_lotes"
+        "inventario_panel", "inventario_productos", "inventario_lotes", "ventas_del_dia"
     ],
     "optica": [
         "pacientes", "optica_dashboard", "optica_armazones", "optica_lentes_contacto",
