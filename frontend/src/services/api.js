@@ -327,6 +327,21 @@ export const surgeryNoteApi = {
   close: (id) => axios.post(`${API_URL}/surgery-notes/${id}/close`),
 };
 
+// Caja Chica Óptica API
+export const cajaChicaApi = {
+  getResumen: () => axios.get(`${API_URL}/caja-chica/resumen`),
+  getMovimientos: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.mes) queryParams.append('mes', params.mes);
+    if (params.tipo) queryParams.append('tipo', params.tipo);
+    return axios.get(`${API_URL}/caja-chica/movimientos?${queryParams.toString()}`);
+  },
+  create: (data) => axios.post(`${API_URL}/caja-chica/movimientos`, data),
+  update: (id, data) => axios.put(`${API_URL}/caja-chica/movimientos/${id}`, data),
+  delete: (id) => axios.delete(`${API_URL}/caja-chica/movimientos/${id}`),
+  getInforme: (mes) => axios.get(`${API_URL}/caja-chica/informe?mes=${mes}`),
+};
+
 
 // Frame Inventory API (Inventario de Aros)
 export const frameApi = {

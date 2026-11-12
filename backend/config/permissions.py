@@ -37,6 +37,9 @@ PERMISSIONS = {
         "view_optica_reports": True,
         "manage_doctors": True,
         "manage_lens_catalog": True,
+        # Caja Chica Óptica
+        "view_caja_chica": True,
+        "delete_caja_chica": True,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -76,6 +79,9 @@ PERMISSIONS = {
         "view_optica_reports": False,
         "manage_doctors": False,
         "manage_lens_catalog": False,
+        # Caja Chica Óptica (admin puede ver y usar, para supervisión; no eliminar)
+        "view_caja_chica": True,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -118,6 +124,9 @@ PERMISSIONS = {
         "view_optica_reports": False,
         "manage_doctors": False,
         "manage_lens_catalog": False,
+        # Sin acceso a Caja Chica (solo personal de Óptica, Admin y SuperAdmin)
+        "view_caja_chica": False,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -162,7 +171,10 @@ PERMISSIONS = {
         "manage_optica_expenses": True,
         "view_optica_reports": True,
         "manage_doctors": True,
-        "manage_lens_catalog": True
+        "manage_lens_catalog": True,
+        # Caja Chica Óptica
+        "view_caja_chica": True,
+        "delete_caja_chica": False
     },
     "medico": {
         "view_dashboard": False,
@@ -195,6 +207,9 @@ PERMISSIONS = {
         "view_optica_reports": False,
         "manage_doctors": False,
         "manage_lens_catalog": False,
+        # Sin acceso a Caja Chica
+        "view_caja_chica": False,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,

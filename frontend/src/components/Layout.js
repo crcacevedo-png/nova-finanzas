@@ -47,7 +47,8 @@ import {
   KeyRound,
   DatabaseBackup,
   BarChart3,
-  Watch
+  Watch,
+  PiggyBank
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
@@ -91,7 +92,12 @@ const Layout = ({ children }) => {
 
   // Items principales del sidebar - Filtrados por configuración de menús
   const navItems = [];
-  
+
+  // Caja Chica Óptica - primera opción del menú, visible para personal de Óptica, Admin y SuperAdmin
+  if (hasPermission('view_caja_chica') && isMenuEnabled('caja_chica_optica')) {
+    navItems.push({ path: '/caja-chica', icon: PiggyBank, label: 'Caja Chica', testId: 'nav-caja-chica' });
+  }
+
   // Dashboard del Sistema - Solo SuperAdmin y si está habilitado
   if (isSuperAdmin && isMenuEnabled('dashboard')) {
     navItems.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'nav-dashboard' });

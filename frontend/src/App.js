@@ -31,6 +31,7 @@ import AuditLogs from './pages/AuditLogs';
 import Respaldos from './pages/Respaldos';
 import EvaluacionOftalmologica from './pages/EvaluacionOftalmologica';
 import Caja from './pages/Caja';
+import CajaChica from './pages/CajaChica';
 import CierreDiario from './pages/CierreDiario';
 import Agenda from './pages/Agenda';
 import CRMCirugias from './pages/CRMCirugias';
@@ -399,6 +400,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredPermission="manage_caja">
             <Caja />
+          </ProtectedRoute>
+        } 
+      />
+
+      {/* Caja Chica Óptica - Ingresos y egresos de caja chica */}
+      <Route 
+        path="/caja-chica" 
+        element={
+          <ProtectedRoute requiredPermission="view_caja_chica">
+            <CajaChica />
           </ProtectedRoute>
         } 
       />

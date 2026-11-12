@@ -119,6 +119,14 @@ AVAILABLE_MENUS = {
         "category": "clinica",
         "description": "Gestión de médicos y especialistas"
     },
+    "caja_chica_optica": {
+        "id": "caja_chica_optica",
+        "label": "Caja Chica",
+        "path": "/caja-chica",
+        "icon": "PiggyBank",
+        "category": "principal",
+        "description": "Control de ingresos y egresos de caja chica de Óptica"
+    },
     # Módulo Óptica
     "optica_dashboard": {
         "id": "optica_dashboard",
@@ -376,7 +384,7 @@ DEFAULT_MENU_CONFIG = {
         "finanzas_pagos", "finanzas_proveedores", "finanzas_gastos_fijos", "finanzas_autorizaciones",
         "inventario_panel", "inventario_bodegas", "inventario_productos",
         "inventario_lotes", "inventario_kardex", "inventario_categorias", "inventario_pos",
-        "inventario_sociedades", "gestion_nog"
+        "inventario_sociedades", "gestion_nog", "caja_chica_optica"
     ],
     "usuario": [
         "pacientes", "evaluacion_oftalmologica", "crm_cirugias", "agenda",
@@ -385,7 +393,8 @@ DEFAULT_MENU_CONFIG = {
     ],
     "optica": [
         "pacientes", "optica_dashboard", "optica_armazones", "optica_lentes_contacto",
-        "optica_tipos_lente", "optica_accesorios", "optica_pos", "optica_cxc", "optica_compras"
+        "optica_tipos_lente", "optica_accesorios", "optica_pos", "optica_cxc", "optica_compras",
+        "caja_chica_optica"
     ],
     "administrador_igss": [
         "pacientes", "unidades_igss", "gestion_nog"

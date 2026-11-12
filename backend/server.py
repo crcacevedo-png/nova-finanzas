@@ -349,6 +349,9 @@ PERMISSIONS = {
         "manage_lens_catalog": True,
         # Permisos de Auditoría (Solo SuperAdmin)
         "view_audit_logs": True,
+        # Caja Chica Óptica
+        "view_caja_chica": True,
+        "delete_caja_chica": True,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -390,6 +393,9 @@ PERMISSIONS = {
         "manage_lens_catalog": False,
         # Sin acceso a Auditoría
         "view_audit_logs": False,
+        # Caja Chica Óptica (admin puede ver y usar, para supervisión; no eliminar)
+        "view_caja_chica": True,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -434,6 +440,9 @@ PERMISSIONS = {
         "manage_lens_catalog": False,
         # Sin acceso a Auditoría
         "view_audit_logs": False,
+        # Sin acceso a Caja Chica (solo personal de Óptica, Admin y SuperAdmin)
+        "view_caja_chica": False,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -481,6 +490,9 @@ PERMISSIONS = {
         "manage_lens_catalog": True,
         # Sin acceso a Auditoría
         "view_audit_logs": False,
+        # Caja Chica Óptica
+        "view_caja_chica": True,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": False,
         "view_evaluacion": False,
@@ -521,6 +533,9 @@ PERMISSIONS = {
         "manage_lens_catalog": False,
         # Sin acceso a Auditoría
         "view_audit_logs": False,
+        # Sin acceso a Caja Chica
+        "view_caja_chica": False,
+        "delete_caja_chica": False,
         # Permisos clínicos
         "view_agenda": True,
         "view_evaluacion": True,
@@ -3084,6 +3099,10 @@ api_router.include_router(caja_router, tags=["Caja"])
 api_router.include_router(caja_catalogos_router, tags=["Caja - Catálogos"])
 api_router.include_router(caja_cxc_router, tags=["Caja - CxC"])
 api_router.include_router(caja_cierres_financieros_router, tags=["Caja - Cierres Financieros"])
+
+# Caja Chica de Óptica
+from routes.caja_chica import router as caja_chica_router
+api_router.include_router(caja_chica_router, tags=["Caja Chica Óptica"])
 
 # Servicio de correo (cierre diario por email + cron)
 from routes.email_service import router as email_service_router

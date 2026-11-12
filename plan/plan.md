@@ -1,65 +1,65 @@
-# Agendar cita IGSS desde Registro de Cirugía
+# Caja Chica — Óptica
 
-Al registrar una cirugía para un paciente IGSS, el personal podrá agregarlo directamente a la agenda del médico responsable con un solo clic, sin salir del formulario de cirugía. El resto del registro de la cirugía (llegada del paciente, descuento de NOG, creación de expediente) no cambia.
+Un menú nuevo para que el personal de Óptica lleve el control del dinero de caja chica: cuánto dinero entra, quién pide dinero y para qué, y cuánto queda disponible. A fin de mes, se puede generar un informe de los movimientos.
 
 ## Para quién es
 
-Personal de Sala de Operaciones / recepción que registra cirugías de pacientes IGSS y necesita coordinar, en el mismo momento, la cita de ese paciente en la agenda del médico tratante.
+- Personal de Óptica (rol usuario): registra los ingresos y egresos del día a día.
+- Admin y Superadmin: también pueden ver y usar Caja Chica, para supervisión.
+- Solo Superadmin puede eliminar un registro (ingreso o egreso) ya guardado.
 
 ## Funcionalidad principal y experiencia
 
-- En el formulario "Registrar cirugía", cuando la Institución seleccionada es **IGSS**, aparece un botón adicional **"Agregar a Agenda"** justo al lado de "Guardar registro". Para cualquier otra institución, el formulario se ve y funciona exactamente igual que hoy.
-- Al presionar "Agregar a Agenda":
-  1. Se guarda el registro de la cirugía (misma validación de campos requeridos que "Guardar registro").
-  2. Se abre un modal para elegir el médico responsable de la cita, con **4 opciones fijas**:
-     1. Dr. Cristian Acevedo — se agenda en su propia agenda.
-     2. Dra. Mariamercedes Palma — se agenda en su propia agenda.
-     3. Dr. Manuel de la Cruz — se agenda en su propia agenda.
-     4. Dra. Rocío Muñoz — se agenda en la agenda general de la clínica (no en una agenda personal).
-  3. Al confirmar el médico, se crea el evento en la agenda correspondiente, usando la misma fecha y hora ya ingresadas para la cirugía.
-- El evento creado en la agenda muestra, de forma visible, únicamente estos 3 datos:
-  1. Nombre del paciente
-  2. Institución (IGSS)
-  3. Procedimiento a realizar
-- Si el usuario cierra el modal de selección de médico sin confirmar, la cirugía queda guardada igual; solo se omite el paso de agendar.
+- **Registrar un ingreso**: monto y fecha. Se usa tanto para el monto inicial de caja chica como para cualquier monto adicional que se reciba después durante el mes.
+- **Registrar un egreso**: quién solicitó el dinero, para qué lo solicitó, monto y fecha.
+- **Saldo continuo**: la pantalla muestra en todo momento el total ingresado, el total de egresos y el saldo disponible (ingresos menos egresos). Este saldo no se reinicia cada mes; lo que sobra de un mes pasa al siguiente.
+- **Historial de movimientos**: lista de todos los ingresos y egresos registrados, con quién los capturó.
+- **Edición**: la persona que registró un ingreso o egreso puede editarlo después (por ejemplo, para corregir un error de captura).
+- **Eliminación restringida**: solo Superadmin puede eliminar un ingreso o un egreso.
+- **Informe de fin de mes**: se elige un mes y se obtiene un resumen (totales de ingresos, egresos y saldo, más el detalle de cada movimiento). El informe se puede ver en pantalla o descargar en Excel.
 
 ## Flujo de uso
 
-1. El usuario llena "Registrar cirugía" como hoy y selecciona Institución = IGSS.
-2. Aparece el botón "Agregar a Agenda" junto a "Guardar registro".
-3. El usuario presiona "Agregar a Agenda" → el sistema valida y guarda la cirugía.
-4. Se abre el modal con los 4 médicos como opciones.
-5. El usuario elige uno y confirma.
-6. El sistema crea el evento en la agenda del médico elegido (o en la agenda de la clínica si elige a la Dra. Muñoz), con la fecha/hora de la cirugía y los 3 datos visibles (paciente, IGSS, procedimiento).
-7. El modal se cierra con una confirmación visual. El resto del proceso (NOG, expediente, llegada del paciente) continúa exactamente igual que hoy.
+1. Una persona de Óptica, Admin o Superadmin abre el menú "Caja Chica".
+2. Ve el saldo actual: total ingresado, total de egresos y saldo disponible.
+3. Cuando se recibe dinero para caja chica (el monto inicial o un refuerzo durante el mes), lo registra como ingreso (monto + fecha).
+4. Cuando alguien solicita dinero de caja chica, se registra como egreso: quién lo solicitó, para qué, cuánto y en qué fecha.
+5. Si algún dato quedó mal capturado, quien lo registró puede entrar y corregirlo.
+6. A fin de mes (o cuando se necesite), se elige el mes a revisar y se genera el informe: un resumen en pantalla con los totales y el detalle de movimientos, con opción de descargarlo en Excel.
+7. Si un registro debe eliminarse por completo, solo Superadmin puede hacerlo.
 
 ## UI/UX feel
 
-Mismo estilo visual ya usado en el modal de "Registrar cirugía" (fondo claro, secciones con etiquetas en mayúsculas, inputs redondeados). El modal de selección de médico es simple: una lista de 4 opciones tipo botón/radio, un resumen de los 3 datos que se van a agendar (paciente, institución, procedimiento) para que el usuario confirme antes de agendar, y una confirmación clara de que el evento quedó creado.
+Mismo estilo visual ya usado en el resto del sistema (paneles claros, tablas con totales destacados). El saldo disponible se muestra de forma prominente en la parte superior del menú. Los ingresos y egresos se distinguen claramente en la lista de movimientos (por ejemplo, con color o etiqueta).
+
+En el menú de navegación, "Caja Chica" se coloca como la primera opción, por encima de todos los demás menús existentes.
 
 ## Fases de implementación
 
 **Fase 1 — MVP (se construye ahora)**
-- Botón "Agregar a Agenda" visible solo para Institución = IGSS.
-- Guardado de la cirugía + modal de selección entre los 4 médicos fijos.
-- Creación del evento en la agenda correspondiente (propia de cada médico, o general de la clínica para la Dra. Muñoz), con la misma fecha/hora de la cirugía.
-- El evento muestra únicamente los 3 datos: paciente, institución IGSS, procedimiento.
+- Registrar ingresos (monto + fecha).
+- Registrar egresos (quién solicitó, para qué, monto, fecha).
+- Saldo continuo: total ingresado, total egresado, saldo disponible.
+- Historial de movimientos.
+- Edición de un movimiento por quien lo registró.
+- Eliminación de un movimiento restringida a Superadmin.
+- Informe de fin de mes: resumen en pantalla + descarga en Excel.
+- Acceso para personal de Óptica, Admin y Superadmin.
 
-**Fase 2 — Ajuste de horario**
-- Permitir elegir una fecha/hora distinta a la de la cirugía al agendar (por ejemplo, para una cita previa o posterior con el médico).
-- Aviso si el horario elegido ya choca con otra cita del médico.
+**Fase 2 — Comprobantes y categorías**
+- Adjuntar un comprobante o foto de recibo a cada egreso.
+- Clasificar los egresos por categoría (por ejemplo: papelería, limpieza, transporte) y ver el informe desglosado por categoría.
 
-**Fase 3 — Extensión del flujo**
-- Ofrecer este mismo botón "Agregar a Agenda" para otras instituciones/seguros, no solo IGSS.
-- Permitir editar o cancelar desde la cirugía el evento de agenda que se creó, manteniendo el vínculo entre ambos registros.
+**Fase 3 — Controles adicionales**
+- Aviso cuando el saldo disponible baja de un monto mínimo definido.
+- Aprobación previa de egresos grandes antes de descontarlos del saldo.
+- Más de una caja chica (por ejemplo, una por sucursal) en vez de una sola para Óptica.
 
 ## Supuestos
 
-- Los 4 médicos ya existen en el sistema con su agenda activa hoy; solo se conectan a este flujo nuevo (confirmado por el usuario).
-- El evento de agenda usa la misma fecha y hora que ya se ingresó para la cirugía; no se pide una fecha/hora aparte en el modal (confirmado por el usuario).
-- "Agregar a Agenda" guarda la cirugía y abre el modal en un solo paso (confirmado por el usuario); no es necesario presionar "Guardar registro" por separado antes.
-- El botón sigue las mismas reglas de validación de campos obligatorios que ya tiene "Guardar registro".
-- Cualquier usuario que hoy puede registrar una cirugía también puede usar este botón; no se agrega un permiso nuevo.
-- El evento creado respeta las reglas de agenda que ya existen hoy (por ejemplo, si hoy se permiten o no citas dobles en el mismo horario, se mantiene igual); no se agrega lógica nueva de conflictos en esta fase.
-- En el evento de agenda solo se muestran los 3 datos pedidos (paciente, institución, procedimiento); ningún otro dato de la cirugía (cirujano, anestesia, ojo a operar, etc.) se agrega al evento en esta fase.
-- Si el usuario cancela el modal de selección de médico después de guardada la cirugía, el registro de la cirugía queda guardado; no se revierte nada.
+- La moneda es Quetzales (Q), igual que el resto del sistema.
+- "Quién solicitó el dinero" se captura como texto libre (nombre), no como una lista de empleados del sistema.
+- El informe de fin de mes se puede generar para cualquier mes pasado, no solo el mes en curso.
+- No se pide adjuntar comprobante o foto de recibo en esta fase (queda para la Fase 2).
+- El saldo disponible inicia en Q0.00 hasta que se registre el primer ingreso.
+- La fecha de un ingreso o egreso se puede ingresar manualmente (no tiene que ser la fecha en que se captura en el sistema), para reflejar la fecha real en que ocurrió el movimiento.
