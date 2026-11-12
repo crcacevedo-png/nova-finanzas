@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
-import { ventasApi, formatCurrency, formatTime, getGuatemalaDate } from '../services/api';
+import { ventasApi, formatCurrency, formatTime, formatDate, getGuatemalaDate } from '../services/api';
 import { Receipt, ChevronRight, RefreshCw, ShoppingBag } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -142,7 +142,7 @@ const VentasDelDia = () => {
           <DialogHeader>
             <DialogTitle>Detalle de Venta</DialogTitle>
             <DialogDescription>
-              {ventaDetalle?.numero_venta} • {ventaDetalle?.fecha?.split('T')[0]}
+              {ventaDetalle?.numero_venta} • {ventaDetalle?.fecha && formatDate(ventaDetalle.fecha)}
             </DialogDescription>
           </DialogHeader>
 

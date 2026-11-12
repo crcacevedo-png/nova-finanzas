@@ -1,0 +1,34 @@
+{
+  "summary": "Tested the new read-only 'Ventas del Día' submenu for the 'usuario' role, backend and UI. Backend: 9/9 pytest passed. GET /ventas/hoy, /resumen-dia and /{id} return 200 for usuario. A test sale (VTA-20261112-0003, Q300, created by admin after admin opened a caja) showed up for usuario with the correct numero_venta, client, time, seller and amount. Usuario gets 403 on anular. UI: as usuario, Inventario expands to Panel | Productos | Lotes y Vencimientos | Ventas del Día. Clicking the item goes to /ventas-del-dia. The summary showed 1 / Q 300.00 and the list showed both rows. The detail dialog shows number, date, client, seller, items, subtotal, total and payment method, and Cerrar closes it. The only button on the page is 'Actualizar'. admin and optica do not see the menu item and are redirected to /pacientes when they open the URL directly. Superadmin also has no sidebar item, but opening /ventas-del-dia directly renders the page. This happens because superadmin skips menu checks everywhere in the app (harmless). The empty state was not tested live because there were already sales today; it was checked by reading the code. Cleanup is done: the test sale was voided (inventory returned) and admin's caja was closed with efectivo_contado=100.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/ventas/hoy, /resumen-dia, /{id}", "issue": "The review says these need only a login, but they use get_current_user_dependency(), which requires the manage_sales permission. Usuario has manage_sales=true so it works today. If manage_sales is ever removed from usuario, the page breaks with 403. The UI is read-only, but usuario can still create sales through POST /api/ventas because it has manage_sales and manage_caja."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VentasDelDia dialog date", "issue": "The date in DialogDescription uses fecha.split('T')[0], which is the UTC date. Sales made after 18:00 Guatemala time will show the next day's date. Use a GT-timezone formatter instead.", "selector": "[data-testid='dialog-detalle-venta']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ventas-del-dia", "issues": ["Voided ('anulada') sales appear in the list but are not counted in 'Ventas registradas hoy' (1 shown, 2 rows). This matches the backend but may confuse users. Consider a note or filter."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ventas_del_dia_usuario.py"],
+  "action_items": [
+    "Optional: show the dialog date in Guatemala timezone instead of UTC split",
+    "Optional: decide whether the 'usuario' role should keep manage_sales, since it lets them create sales via the API even though the UI is read-only",
+    "Optional: mark or explain that voided sales are excluded from the summary count"
+  ],
+  "critical_code_review_comments": [
+    "/ventas endpoints are gated by manage_sales (SEC-003), not just login. The review statement is inaccurate.",
+    "Superadmin skips requiredMenu checks app-wide, so /ventas-del-dia is reachable by URL for superadmin. This is by design and the page is read-only."
+  ],
+  "updated_files": ["/app/backend/tests/test_ventas_del_dia_usuario.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created sale VTA-20261112-0003 (id 2b5794f0-ea97-46cd-9131-1237bc845341), now voided. Opened and then closed admin's caja for 2026-11-12 (id 20b3d7de...). The closed caja record stays, because one caja per user per day is allowed. Superadmin already had a closed caja today, so admin was used instead.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use test file test_ventas_del_dia_usuario.py. Run with '-k \"not zz\"' to create data, and '-k zz' to clean up (state is saved in /tmp/vdd_state.json). Admin already has a closed caja for 2026-11-12, so on the same day another user is needed to open one."
+}
