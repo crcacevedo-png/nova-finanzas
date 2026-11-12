@@ -1426,7 +1426,7 @@ def render_produccion_medico_pdf(fecha_dia: str, data: dict) -> bytes:
             _cell(r["fecha"]), _cell(r["numero_venta"]), _cell(r["paciente_nombre"]), _cell(r["nombre"]),
             str(r["cantidad"]), f"Q {r['monto']:,.2f}",
         ])
-    table = Table(table_data, colWidths=[1.0 * inch, 0.95 * inch, 1.45 * inch, 2.15 * inch, 0.7 * inch, 0.85 * inch], repeatRows=1)
+    table = Table(table_data, colWidths=[0.95 * inch, 1.3 * inch, 1.15 * inch, 1.75 * inch, 0.55 * inch, 0.85 * inch], repeatRows=1)
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
     elements.append(Spacer(1, 0.2 * inch))

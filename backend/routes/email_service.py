@@ -626,7 +626,3 @@ async def _run_cron_produccion_medico(fecha_dia: str):
         )
     except Exception as e:
         logger.error(f"Error enviando cierre de producción (Dra. Palma) {fecha_dia}: {e}")
-
-        logger.info(f"Informe de anestesia {fecha_dia} enviado: {len(resultado['enviados'])} ok, {len(resultado['errores'])} errores, {resultado['resumen']['total_count']} procedimientos")
-    except Exception as e:
-        logger.error(f"Error enviando informe de anestesia {fecha_dia}: {e}")

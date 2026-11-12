@@ -1,0 +1,32 @@
+{
+  "summary": "Independent backend verification of 'Cierre de Producción Diario — Dra. Mariamercedes Palma'. 16/16 new pytest tests pass against public URL. Verified: Dra. Palma resolves in db.doctors (also tolerant 'mariamercedes palma' lowercase w/o prefix -> canonical 'Dra. Mariamercedes Palma' in PDF); cron webhook 401 w/o auth, wrong bearer, raw secret w/o 'Bearer'; 200 {status:accepted, fecha:2026-11-12} in ~0.15s with correct secret; background send logged 'Cierre de producción (Dra. Palma) 2026-11-12 enviado: 1 ok, 0 errores, total 0' with httpx 202 Accepted. PDF endpoint: 404 for garbage/tampered-date/wrong-secret/expired tokens, 422 missing token, 200 application/pdf for valid token. Empty day 2020-01-01 -> valid PDF with 'Sin producción registrada' and Q 0.00. Combined aggregation with Mongo-inserted clinic venta (total 111) + optica sale status=pagado (items_v2 frame 200 + lens_type 100, total 300): PDF showed all 3 item rows, both sale numbers, Ventas: 2, TOTAL Q 411.00; after setting optica status=cancelado: optica rows gone, clinic remains, total Q 111.00. Test docs cleaned (verified 0 remaining). Manual send: 401/403 unauthenticated, 403 for 'usuario' role. Regression: GET /api/ventas/analisis 200 (superadmin); anesthesia cron 401 w/o auth and 200 + emails sent with auth. crons.yml entry 'produccion-palma' valid (0 17 * * *, America/Guatemala, {{BASE_URL}}/api/cron/produccion-medico-diario, POST, enabled).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "_run_cron_produccion_medico (routes/email_service.py lines ~630-632)", "issue": "Leftover copy-paste code at end of file: after logger.error(...) inside the except block there is a stray `logger.info(f\"Informe de anestesia ... {resultado['resumen']['total_count']} ...\")` plus a duplicate unreachable `except Exception` clause. If enviar_informe_produccion_medico_diario raises, the except block will then raise UnboundLocalError/NameError on `resultado` (and 'total_count' key does not exist in produccion resumen). Delete lines 630-632."},
+      {"endpoint": "email send (shared send_email)", "issue": "No retry/backoff on email provider 429. When I fired produccion + anestesia crons back-to-back, anesthesia 2nd recipient got 'HTTP/1.1 429 Too Many Requests' (1 ok, 1 error). Scheduled times differ (17:00 vs 18:00) so Palma is unaffected, but cierre-diario and informe-anestesia both run at 18:00 and could collide. Consider small delay/retry on 429."},
+      {"endpoint": "GET /api/ventas/produccion-medico/daily-report/pdf", "issue": "Total del día uses venta.total (incl. IVA/discounts for clinic) while row 'Monto' uses item subtotal (pre-IVA), so rows don't sum to the total for real clinic sales (e.g. item 150 vs total 168). Matches spec, but may confuse the doctor; consider a note or IVA row."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [
+    {"screen": "Produccion PDF", "issues": ["N° Venta column (0.95in) wraps sale numbers mid-word (e.g. 'TEST_ORD_P / ALMA'); real 'VTA-20261112-0001' likely wraps too. Widen column or reduce font."]}
+  ]},
+  "test_report_links": ["/app/backend/tests/test_produccion_palma_independent.py", "/app/test_reports/pytest/pytest_prod_palma.xml"],
+  "action_items": [
+    "Remove stray leftover lines 630-632 at end of routes/email_service.py (_run_cron_produccion_medico except block references undefined resultado/total_count)",
+    "Optional: retry/backoff on email 429",
+    "Optional: widen N° Venta column in render_produccion_medico_pdf"
+  ],
+  "critical_code_review_comments": [
+    "email_service.py tail has dead/buggy copy-paste code in _run_cron_produccion_medico except path",
+    "Signed tokens appear in uvicorn access logs (same as anesthesia report) — low risk, informational",
+    "Optica sales with status 'pendiente' (unpaid CxC) are counted as production (status != cancelado) — per spec, confirm with user if intended",
+    "_resolver_doctor_por_nombre loads up to 1000 active doctors and matches in Python — fine for current scale"
+  ],
+  "updated_files": ["/app/backend/tests/test_produccion_palma_independent.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A (not requested)"},
+  "seed_data_creation": "Inserted 1 db.ventas (numero_venta TEST_VTA_PALMA) and 1 db.optica_sales (order_number TEST_ORD_PALMA) via pymongo; both deleted by id in finally block (verified 0 remaining).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run tests/test_produccion_palma_independent.py with -p no:xdist. Tokens are generated in-test via HMAC with WEBHOOK_CRON_SECRET from backend/.env. pdf_text strips newlines since reportlab wraps cells. Real emails were sent once by cron for produccion (1 recipient) and anestesia (2 recipients, one hit 429) on 2026-11-12 — avoid re-firing crons."
+}

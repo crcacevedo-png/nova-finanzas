@@ -16,8 +16,11 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Confirmar deploy y validación en producción de la Sesión 57 (2026-02): fix de "Confirmar Venta" deshabilitado en el POS de Óptica.
 - Investigación sin causa raíz confirmada: "Tipo de Compra" IGSS desactualizado en un PDF de producción — pendiente de que el usuario indique el PDF/reporte exacto para reproducir.
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
+- Confirmar que el nuevo cron "produccion-palma" (17:00 Guatemala, envía el cierre de producción diario combinado clínica+óptica de la Dra. Palma a `INFORME_PRODUCCION_PALMA_EMAILS`) quedó activo en producción tras el próximo deploy, y validar que el correo real llega a la bandeja configurada.
 
 ## P1 — Próximos pasos conocidos (mencionados por el usuario o como continuación natural)
+- Cierre de Producción Diario (Dra. Palma) — Fase 2: pantalla de administración para cambiar el correo destino o el horario sin pedírselo al equipo de desarrollo; historial de los reportes enviados con opción de reenviar uno puntual.
+- Cierre de Producción Diario (Dra. Palma) — Fase 3: extender el mismo "cierre de producción personal" a otros médicos que quieran su propio reporte diario, eligiéndolos de una lista en vez de dejarlo fijo a un solo médico.
 - Manual del Superadministrador — Fase 2: agregar capturas de pantalla reales a cada sección una vez el usuario confirme que el diseño de cada módulo ya es estable y no cambiará pronto.
 - Manual del Superadministrador — Fase 3: hojas de referencia rápida por rol (admin, médico, usuario, anestesia, óptica) derivadas del manual completo.
 - Revisión opcional de otros parseos de fecha-solo-día con el mismo patrón de riesgo (`new Date(str)` sin hora) señalados por el testing agent pero no confirmados como bug real: `EvaluacionOftalmologica.js` (cálculo de edad desde fecha de nacimiento), `HistorialPagos.js` (filtro de rango de fechas), `Sociedades.js` y `CRMCirugias.js` (si sus campos de fecha son `YYYY-MM-DD` plano).
