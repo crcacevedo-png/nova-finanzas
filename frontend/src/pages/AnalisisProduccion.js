@@ -10,8 +10,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '../components/ui/table';
 import {
-  BarChart3, TrendingUp, ShoppingCart, Receipt, Users, Stethoscope, Tag, Package
+  BarChart3, TrendingUp, ShoppingCart, Receipt, Users, Stethoscope, Tag, Package, FileSpreadsheet, X
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+} from '../components/ui/dialog';
+import { toast, Toaster } from 'sonner';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -71,10 +75,19 @@ const AnalisisProduccion = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo]);
 
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  const [medicoSeleccionado, setMedicoSeleccionado] = useState(null);
+
+  const abrirDetalleMedico = (medico) => {
+    setMedicoSeleccionado(medico);
+    setDetalleOpen(true);
+  };
+
   const kpis = data?.kpis || {};
 
   return (
     <Layout>
+      <Toaster position="top-right" richColors />
       <div className="space-y-6 p-1" data-testid="analisis-produccion-page">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -174,7 +187,7 @@ const AnalisisProduccion = () => {
               <Card className="card-teal" data-testid="por-medico">
                 <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Stethoscope className="w-5 h-5 text-teal-600" /> Ventas por médico que refiere</CardTitle></CardHeader>
                 <CardContent>
-                  <RankTable rows={data?.por_medico} labelKey="medico_nombre" valueFmt={(r) => formatCurrency(r.monto)} sub={(r) => `${r.num_ventas} ventas`} empty="Sin datos" />
+                  <RankTable rows={data?.por_medico} labelKey="medico_nombre" valueFmt={(r) => formatCurrency(r.monto)} sub={(r) => `${r.num_ventas} ventas`} empty="Sin datos" onRowClick={(r) => abrirDetalleMedico(r)} />
                 </CardContent>
               </Card>
             </div>
@@ -189,11 +202,19 @@ const AnalisisProduccion = () => {
           </>
         )}
       </div>
+
+      <DetalleMedicoModal
+        open={detalleOpen}
+        onOpenChange={setDetalleOpen}
+        medico={medicoSeleccionado}
+        desdeInicial={desde}
+        hastaInicial={hasta}
+      />
     </Layout>
   );
 };
 
-const RankTable = ({ rows, labelKey, valueFmt, sub, empty }) => {
+const RankTable = ({ rows, labelKey, valueFmt, sub, empty, onRowClick }) => {
   if (!rows || rows.length === 0) return <p className="text-center text-slate-400 py-8">{empty}</p>;
   const max = Math.max(...rows.map(r => Math.abs(r.monto ?? r.cantidad ?? 0)), 1);
   return (
@@ -209,7 +230,18 @@ const RankTable = ({ rows, labelKey, valueFmt, sub, empty }) => {
         {rows.map((r, i) => (
           <TableRow key={i}>
             <TableCell><Badge variant="outline">{i + 1}</Badge></TableCell>
-            <TableCell className="font-medium truncate max-w-[220px]">{r[labelKey]}</TableCell>
+            <TableCell className="font-medium truncate max-w-[220px]">
+              {onRowClick ? (
+                <button
+                  type="button"
+                  className="text-teal-700 hover:text-teal-900 hover:underline decoration-dotted underline-offset-2 text-left"
+                  onClick={() => onRowClick(r)}
+                  data-testid={`medico-link-${r.medico_id}`}
+                >
+                  {r[labelKey]}
+                </button>
+              ) : r[labelKey]}
+            </TableCell>
             <TableCell className="text-right">
               <div className="font-semibold text-slate-800">{valueFmt(r)}</div>
               <div className="text-xs text-slate-400">{sub(r)}</div>
@@ -222,3 +254,154 @@ const RankTable = ({ rows, labelKey, valueFmt, sub, empty }) => {
 };
 
 export default AnalisisProduccion;
+
+const DetalleMedicoModal = ({ open, onOpenChange, medico, desdeInicial, hastaInicial }) => {
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const [detalle, setDetalle] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [descargando, setDescargando] = useState(false);
+
+  const fetchDetalle = useCallback(async (f_desde, f_hasta) => {
+    if (!medico) return;
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/ventas/analisis/medico-detalle`, {
+        params: { medico_id: medico.medico_id, desde: f_desde, hasta: f_hasta },
+      });
+      setDetalle(res.data);
+    } catch (error) {
+      toast.error('No se pudo cargar el desglose del médico');
+    } finally {
+      setLoading(false);
+    }
+  }, [medico]);
+
+  useEffect(() => {
+    if (open && medico) {
+      setDesde(desdeInicial);
+      setHasta(hastaInicial);
+      fetchDetalle(desdeInicial, hastaInicial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, medico]);
+
+  const aplicarRango = () => {
+    if (!desde || !hasta) {
+      toast.error('Selecciona ambas fechas');
+      return;
+    }
+    fetchDetalle(desde, hasta);
+  };
+
+  const descargarExcel = async () => {
+    setDescargando(true);
+    try {
+      const res = await axios.get(`${API_URL}/ventas/analisis/medico-detalle/excel`, {
+        params: { medico_id: medico.medico_id, desde, hasta },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `produccion_${(detalle?.medico_nombre || 'medico').replace(/\s+/g, '_')}_${desde}_a_${hasta}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('No se pudo descargar el Excel');
+    } finally {
+      setDescargando(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" data-testid="dialog-detalle-medico">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Stethoscope className="w-5 h-5 text-teal-600" />
+            Producción de {detalle?.medico_nombre || medico?.medico_nombre}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Desde</label>
+            <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} data-testid="detalle-medico-desde" className="w-40" />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Hasta</label>
+            <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} data-testid="detalle-medico-hasta" className="w-40" />
+          </div>
+          <Button variant="outline" onClick={aplicarRango} data-testid="detalle-medico-aplicar-rango">Aplicar</Button>
+          <Button
+            className="btn-primary ml-auto"
+            onClick={descargarExcel}
+            disabled={!detalle || descargando}
+            data-testid="detalle-medico-exportar-excel"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2" /> {descargando ? 'Descargando...' : 'Exportar a Excel'}
+          </Button>
+        </div>
+
+        {loading ? (
+          <p className="text-center text-slate-400 py-10">Cargando desglose...</p>
+        ) : detalle ? (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="card-teal">
+                <CardContent className="p-4">
+                  <p className="text-xs text-slate-500">Artículos / servicios</p>
+                  <p className="text-xl font-bold text-slate-800" data-testid="detalle-medico-total-items">{detalle.total_items}</p>
+                </CardContent>
+              </Card>
+              <Card className="card-teal">
+                <CardContent className="p-4">
+                  <p className="text-xs text-slate-500">Monto total ({detalle.num_ventas} ventas)</p>
+                  <p className="text-xl font-bold metric-teal" data-testid="detalle-medico-total-monto">{formatCurrency(detalle.total_monto)}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {detalle.items.length === 0 ? (
+              <p className="text-center text-slate-400 py-10">Sin ventas en este rango de fechas</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>N° Venta</TableHead>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead>Producto / Servicio</TableHead>
+                    <TableHead className="text-right">Cant.</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detalle.items.map((item, i) => (
+                    <TableRow key={i} data-testid={`detalle-medico-fila-${i}`}>
+                      <TableCell className="text-xs">{item.fecha}</TableCell>
+                      <TableCell className="text-xs font-mono">{item.numero_venta}</TableCell>
+                      <TableCell className="text-sm">{item.paciente_nombre}</TableCell>
+                      <TableCell className="text-sm">{item.nombre}</TableCell>
+                      <TableCell className="text-right">{item.cantidad}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(item.monto)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </>
+        ) : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="detalle-medico-cerrar">
+            <X className="w-4 h-4 mr-2" /> Cerrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

@@ -1090,6 +1090,139 @@ async def analisis_produccion(
     }
 
 
+def _resolver_rango_medico_detalle(desde: Optional[str], hasta: Optional[str]):
+    if not desde or not hasta:
+        raise HTTPException(status_code=400, detail="desde y hasta son obligatorios (formato YYYY-MM-DD)")
+    f_desde, f_hasta = desde, hasta
+    if f_desde > f_hasta:
+        f_desde, f_hasta = f_hasta, f_desde
+    try:
+        ini = dia_gt_a_rango_utc(f_desde)[0]
+        fin = dia_gt_a_rango_utc(f_hasta)[1]
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Fechas inválidas (use formato YYYY-MM-DD)")
+    return f_desde, f_hasta, ini, fin
+
+
+async def _obtener_detalle_medico(medico_id: str, desde: str, hasta: str):
+    db = get_db()
+    f_desde, f_hasta, ini, fin = _resolver_rango_medico_detalle(desde, hasta)
+
+    query_medico = {"$or": [{"medico_id": None}, {"medico_id": {"$exists": False}}]} if medico_id == "sin" else {"medico_id": medico_id}
+    ventas = await db.ventas.find({
+        "origen": "clinica",
+        "estado": "completada",
+        "fecha": {"$gte": ini, "$lte": fin},
+        **query_medico,
+    }, {"_id": 0}).sort("fecha", 1).to_list(20000)
+
+    medico_nombre = "Sin médico"
+    filas = []
+    total_monto = 0.0
+    total_items = 0
+    for v in ventas:
+        if v.get("medico_nombre"):
+            medico_nombre = v["medico_nombre"]
+        try:
+            fecha_corta = datetime.fromisoformat(v["fecha"]).astimezone(GUATEMALA_TZ).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            fecha_corta = (v.get("fecha") or "")[:16]
+        for item in v.get("items", []):
+            cantidad = item.get("cantidad", 0) or 0
+            monto = round(item.get("subtotal", 0) or 0, 2)
+            filas.append({
+                "fecha": fecha_corta,
+                "numero_venta": v.get("numero_venta", ""),
+                "paciente_nombre": v.get("paciente_nombre") or "Consumidor Final",
+                "nombre": item.get("nombre", ""),
+                "cantidad": cantidad,
+                "monto": monto,
+            })
+            total_items += cantidad
+
+    total_monto = round(sum(v.get("total", 0) or 0 for v in ventas), 2)
+
+    return {
+        "medico_id": medico_id,
+        "medico_nombre": medico_nombre,
+        "desde": f_desde,
+        "hasta": f_hasta,
+        "num_ventas": len(ventas),
+        "total_items": total_items,
+        "total_monto": total_monto,
+        "items": filas,
+    }
+
+
+@router.get("/analisis/medico-detalle")
+async def analisis_produccion_detalle_medico(
+    medico_id: str = Query(...),
+    desde: str = Query(...),
+    hasta: str = Query(...),
+    current_user: dict = Depends(require_superadmin_dep())
+):
+    """Desglose línea por línea de la producción de un médico que refiere, en un rango de fechas."""
+    return await _obtener_detalle_medico(medico_id, desde, hasta)
+
+
+@router.get("/analisis/medico-detalle/excel")
+async def analisis_produccion_detalle_medico_excel(
+    medico_id: str = Query(...),
+    desde: str = Query(...),
+    hasta: str = Query(...),
+    current_user: dict = Depends(require_superadmin_dep())
+):
+    """Exporta a Excel el desglose de producción de un médico que refiere."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse
+
+    detalle = await _obtener_detalle_medico(medico_id, desde, hasta)
+    titulo = f"Producción de {detalle['medico_nombre']} — {detalle['desde']} a {detalle['hasta']}"
+    headers = ["Fecha", "N° Venta", "Paciente", "Producto / Servicio", "Cantidad", "Monto (Q)"]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Producción médico"
+    ws.merge_cells("A1:F1")
+    ws["A1"] = titulo
+    ws["A1"].font = Font(size=13, bold=True)
+    ws["A1"].alignment = Alignment(horizontal="center")
+    ws.append([f"N° de ventas: {detalle['num_ventas']}  |  Total artículos/servicios: {detalle['total_items']}  |  Monto total: Q {detalle['total_monto']:,.2f}"])
+    ws.merge_cells(f"A2:F2")
+    ws["A2"].font = Font(italic=True)
+    ws.append([])
+    ws.append(headers)
+    header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+    for col in range(1, len(headers) + 1):
+        c = ws.cell(row=4, column=col)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = header_fill
+    for fila in detalle["items"]:
+        ws.append([
+            fila["fecha"], fila["numero_venta"], fila["paciente_nombre"],
+            fila["nombre"], fila["cantidad"], fila["monto"],
+        ])
+    ws.append([])
+    ws.append(["", "", "", "", "TOTAL", detalle["total_monto"]])
+    ws.cell(row=ws.max_row, column=5).font = Font(bold=True)
+    ws.cell(row=ws.max_row, column=6).font = Font(bold=True)
+    widths = [18, 18, 28, 32, 10, 14]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"produccion_{detalle['medico_nombre'].replace(' ', '_')}_{detalle['desde']}_a_{detalle['hasta']}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"}
+    )
+
+
 # ==================== DASHBOARD DE VENTAS DE CLÍNICA ====================
 
 def _rango_mes_utc(year: int, month: int):
