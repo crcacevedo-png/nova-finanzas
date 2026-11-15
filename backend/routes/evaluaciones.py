@@ -24,15 +24,6 @@ from models.evaluacion_oftalmologica import (
     normalizar_items_evaluacion_legacy
 )
 
-# PDF imports
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch, cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage, KeepTogether, KeepInFrame
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfgen import canvas as _pdfcanvas
 import base64 as _base64
 import os as _os
 
@@ -416,6 +407,15 @@ async def get_evaluacion_pdf(
     current_user: dict = Depends(get_current_user)
 ):
     """Generar PDF de evaluación oftalmológica completa"""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch, cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, Image as RLImage, KeepTogether, KeepInFrame
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas as _pdfcanvas
+
     evaluacion = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
     if not evaluacion:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
