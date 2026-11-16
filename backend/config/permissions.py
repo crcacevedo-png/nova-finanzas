@@ -139,9 +139,9 @@ PERMISSIONS = {
         "manage_recetas": False,
         "view_sala_operaciones": True,
         "manage_sala_operaciones": True,
-        # Cuentas por Cobrar (Clínica/Finanzas) - solo lectura, sin registrar abonos/anular
+        # Cuentas por Cobrar (Clínica/Finanzas) - puede ver y registrar abonos/anular
         "view_cuentas_cobrar": True,
-        "manage_cuentas_cobrar": False
+        "manage_cuentas_cobrar": True
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
