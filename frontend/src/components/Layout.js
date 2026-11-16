@@ -152,7 +152,7 @@ const Layout = ({ children }) => {
     if (isMenuEnabled('finanzas_pos')) finanzasItems.push({ path: '/punto-venta', icon: Store, label: 'Punto de Venta', testId: 'nav-punto-venta' });
     if (isSuperAdmin) finanzasItems.push({ path: '/ventas-clinica', icon: TrendingUp, label: 'Ventas', testId: 'nav-ventas-clinica' });
     if (isMenuEnabled('finanzas_caja')) finanzasItems.push({ path: '/caja', icon: Wallet, label: 'Caja', testId: 'nav-caja' });
-    if (isMenuEnabled('finanzas_cxc')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
+    if (isMenuEnabled('finanzas_cxc') && hasPermission('view_cuentas_cobrar')) finanzasItems.push({ path: '/cuentas-cobrar-finanzas', icon: CreditCard, label: 'Cuentas por Cobrar', testId: 'nav-cxc-finanzas' });
     if (isMenuEnabled('finanzas_gastos')) finanzasItems.push({ path: '/gastos', icon: Receipt, label: 'Gastos', testId: 'nav-gastos' });
     if (isMenuEnabled('finanzas_pagos')) finanzasItems.push({ path: '/historial-pagos', icon: History, label: 'Historial de pagos', testId: 'nav-historial-pagos' });
     if (isAdminOrSuperAdmin && isMenuEnabled('finanzas_gastos_fijos')) finanzasItems.push({ path: '/configuracion/gastos-fijos', icon: CalendarClock, label: 'Gastos Fijos', testId: 'nav-gastos-fijos' });

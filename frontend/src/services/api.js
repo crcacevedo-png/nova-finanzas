@@ -292,7 +292,7 @@ export const patientApi = {
     if (filters.gender) params.append('gender', filters.gender);
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
-    return `${API_URL}/patients/export/excel?${params.toString()}`;
+    return axios.get(`${API_URL}/patients/export/excel?${params.toString()}`, { responseType: 'blob' });
   },
   exportPdf: (filters = {}) => {
     const params = new URLSearchParams();
@@ -303,9 +303,9 @@ export const patientApi = {
     if (filters.gender) params.append('gender', filters.gender);
     if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.append('dateTo', filters.dateTo);
-    return `${API_URL}/patients/export/pdf?${params.toString()}`;
+    return axios.get(`${API_URL}/patients/export/pdf?${params.toString()}`, { responseType: 'blob' });
   },
-  downloadTemplate: () => `${API_URL}/patients/export/template`,
+  downloadTemplate: () => axios.get(`${API_URL}/patients/export/template`, { responseType: 'blob' }),
 };
 
 // ==================== OPTICA APIs ====================

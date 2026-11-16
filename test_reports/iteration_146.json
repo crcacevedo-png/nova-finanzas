@@ -1,0 +1,51 @@
+{
+  "summary": "Re-checked the iteration_145 fixes for the administrador_igss role and looked for regressions in superadmin, admin, usuario, optica, anestesia and medico (medico checked through the API only). Backend: 69/69 pytest cases pass. Two of them first failed because of bugs in my test (wrong response key; a required month query parameter) and passed after I fixed the test. 2 medico cases were skipped once by the login rate limit and passed on a rerun. The backend fixes work. Frontend has 2 problems. (1) REGRESSION: /cuentas-cobrar-finanzas now redirects away for EVERY role, including superadmin and admin. (2) The Excel and PDF export buttons in Pacientes still do not download anything in the browser; the new tab shows 403 Not authenticated. Everything else asked for passes: the igss.admin landing page and sidebar, the URL blocks, CRM access, IGSS units and NOG, Sala de Operaciones for every role, anestesia Cierre mensual, optica Cuentas por Cobrar, and the Insumos buttons per role.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login (server.py:2645) and server.py's PERMISSIONS (line 318)", "issue": "server.py keeps its own copy of the permission matrix, and the login and /me responses come from it. The new keys view_cuentas_cobrar and manage_cuentas_cobrar were added only to config/permissions.py, so the login response leaves them out for superadmin, admin and usuario (checked: both are None). Backend checks still pass because routes/auth.py reads config/permissions.py. This is the root cause of frontend regression #1."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "App.js /cuentas-cobrar-finanzas ProtectedRoute(requiredPermission='view_cuentas_cobrar')", "issue": "REGRESSION. The route now redirects for superadmin (to /dashboard) and for admin and usuario (to /pacientes), whether opened by direct URL or from the Finanzas > Cuentas por Cobrar sidebar link (checked for admin). hasPermission reads the permissions from the login response, and those lack view_cuentas_cobrar (see the backend note). Nobody can reach Cuentas por Cobrar Finanzas from the UI any more.", "selector": "[data-testid='nav-cxc-finanzas'], [data-testid='cxc-finanzas-page']", "priority": "CRITICAL"},
+      {"component": "Pacientes.js handleExportExcel/handleExportPdf/handleDownloadTemplate (lines 483-495)", "issue": "Each button calls window.open(url) on /api/patients/export/*. The backend accepts only a Bearer token (no cookie), so the new tab returns 403 {\"detail\":\"Not authenticated\"} and nothing downloads. The backend export itself works: it returns 200 with a valid xlsx or pdf when called with a Bearer token. The bug existed before this change and affects every role. Fix: download through axios with responseType:'blob' (as surgeriesApi.downloadTemplate already does) and build a Blob URL.", "selector": "[data-testid='export-excel-button'], [data-testid='export-pdf-button']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Sidebar Finanzas > Cuentas por Cobrar", "issue": "Layout.js:166 shows nav-cxc-finanzas when the user has manage_sales. The route needs view_cuentas_cobrar. In server.py the optica role has manage_sales=True but no view_cuentas_cobrar, so even after the main fix optica would see a link that only redirects. Gate the nav item with hasPermission('view_cuentas_cobrar').", "affected_selectors": ["[data-testid='nav-cxc-finanzas']"]}
+    ],
+    "design_issues": [
+      {"screen": "Óptica > Cuentas por Cobrar", "issues": ["Several older accounts (CXC-OPT-202608-0002..0005) show the patient as 'undefined undefined' (existing data or rendering problem)."]},
+      {"screen": "CuentasCobrarFinanzas.js", "issues": ["Only the page container has a data-testid. Tabs, buttons and dialogs have none."]}
+    ]
+  },
+  "passed_checks": [
+    "igss.admin: lands on /pacientes. Sidebar shows only Pacientes, Evaluación Oftalmológica and IGSS (Unidades IGSS, NOG). /api/menu-config/my-menus returns no sala_operaciones, agenda, quirofano_* or optica_accesorios.",
+    "igss.admin: direct URLs /sala-operaciones, /cuentas-cobrar-finanzas, /agenda and /quirofano/insumos-equipos redirect to /pacientes. /crm-cirugias loads (API 200).",
+    "igss.admin backend: GET /api/surgeries and /surgeries/options return 403, all /api/cuentas-cobrar/* return 403, patient exports (Excel and PDF) return 200 with valid files, /api/patients/import/stats returns 200.",
+    "igss.admin: Unidades IGSS (17 rows) and NOG (83 rows) load with no API errors.",
+    "Sala de Operaciones loads 20 rows for superadmin, admin, usuario and anestesia. GET /api/surgeries returns 200 for medico.",
+    "Backend cuentas-cobrar: superadmin, admin and usuario get 200 on reads. Usuario gets 403 when creating a responsable, voiding an account or creating a clinic account. Admin can create and deactivate a responsable.",
+    "Optica: /optica/cuentas-cobrar loads (18 rows plus the summary). The account detail returns 200. An abono with an invalid amount returns a validation error, not 403.",
+    "Anestesia: lands on /sala-operaciones. Proced. de Anestesia > Cierre mensual loads.",
+    "Insumos y Equipos Qx: usuario and anestesia see no Agregar, edit or power buttons. Admin sees them, and creating, editing and deactivating an item through the UI all return 200."
+  ],
+  "test_report_links": ["/app/backend/tests/test_rbac_fixes_regression.py", "/app/test_reports/pytest/rbac_regression.xml"],
+  "action_items": [
+    "CRITICAL: add 'view_cuentas_cobrar' and 'manage_cuentas_cobrar' to the PERMISSIONS matrix in server.py (line ~318) for superadmin and admin (true/true) and usuario (true/false). Better, make server.py import PERMISSIONS and resolve_permissions from config/permissions.py so there is only one matrix. Then confirm the login response includes the keys and /cuentas-cobrar-finanzas loads for superadmin, admin and usuario.",
+    "HIGH: change the Pacientes Excel, PDF and Plantilla buttons to download through axios with responseType 'blob' and the Bearer header, instead of window.open.",
+    "MEDIUM: in Layout.js, gate nav-cxc-finanzas with hasPermission('view_cuentas_cobrar') instead of manage_sales."
+  ],
+  "critical_code_review_comments": [
+    "server.py and config/permissions.py each keep their own PERMISSIONS, resolve_permissions and /auth/login. Every permission change must now be made twice, which is what caused this regression. Consolidate them.",
+    "/api/quirofano/catalog DELETE only deactivates items, so test-created insumos remain as inactive rows."
+  ],
+  "updated_files": ["/app/backend/tests/test_rbac_fixes_regression.py"],
+  "success_rate": {"backend": "100% (69/69 after test fixes)", "frontend": "~85% (2 failures: CxC Finanzas redirect regression; Pacientes export buttons)"},
+  "seed_data_creation": "Created and then deactivated (soft delete only) the catalog insumo 'TEST_RBAC_Insumo_ED' (id 4e728f5a-1660-4378-8041-48f419d63154) and the CxC responsable 'TEST_resp_rbac' (id 11be38b3-3985-4ac9-84e9-d1b8d5037401). No real data was changed.",
+  "test_credentials": "Read from /app/memory/test_credentials.md. Every account worked. Note the login rate limit of 5 per minute per IP.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run /app/backend/tests/test_rbac_fixes_regression.py with -p no:xdist (the login rate limit is 5/min; sessions are cached per role). After the fix, retest in the UI: /cuentas-cobrar-finanzas for superadmin, admin and usuario, and the Pacientes Excel/PDF buttons (watch for a download event instead of a popup with 403).",
+  "rca of the issue": "Cuentas por Cobrar redirect: the frontend's hasPermission reads user.permissions from the login response. That endpoint is POST /api/auth/login in server.py (line 2645), which resolves permissions from server.py's own PERMISSIONS dict (line 318). The new keys were added only to config/permissions.py, which routes/auth.py uses for backend checks. So the backend allows access while the frontend route guard denies it. Reproduce: log in as superadmin and open /cuentas-cobrar-finanzas; you land on /dashboard. Export buttons: window.open sends no Authorization header, and the backend has no cookie auth, so the request gets 403 Not authenticated."
+}

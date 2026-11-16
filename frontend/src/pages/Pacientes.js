@@ -480,18 +480,59 @@ const Pacientes = () => {
     }
   };
 
-  const handleExportExcel = () => {
-    const url = patientApi.exportExcel(filters);
-    window.open(url, '_blank');
+  const handleExportExcel = async () => {
+    try {
+      const response = await patientApi.exportExcel(filters);
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'pacientes_novavision.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Error al exportar a Excel');
+    }
   };
 
-  const handleExportPdf = () => {
-    const url = patientApi.exportPdf(filters);
-    window.open(url, '_blank');
+  const handleExportPdf = async () => {
+    try {
+      const response = await patientApi.exportPdf(filters);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'pacientes_novavision.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Error al exportar a PDF');
+    }
   };
 
-  const handleDownloadTemplate = () => {
-    window.open(patientApi.downloadTemplate(), '_blank');
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await patientApi.downloadTemplate();
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'plantilla_pacientes.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Error al descargar la plantilla');
+    }
   };
 
   const clearFilters = () => {

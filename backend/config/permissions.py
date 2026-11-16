@@ -183,7 +183,10 @@ PERMISSIONS = {
         "manage_lens_catalog": True,
         # Caja Chica Óptica
         "view_caja_chica": True,
-        "delete_caja_chica": False
+        "delete_caja_chica": False,
+        # Cuentas por Cobrar de la clínica (Óptica gestiona también CxC/Caja de clínica)
+        "view_cuentas_cobrar": True,
+        "manage_cuentas_cobrar": True
     },
     "medico": {
         "view_dashboard": False,
