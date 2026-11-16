@@ -3,6 +3,8 @@
 Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (sesión donde se originó).
 
 ## P0 — Bloqueadores / pendientes de confirmación en producción
+- **Replicar en producción la corrección de menús del rol "administrador_igss" (2026-11-16)**: en preview se removieron `sala_operaciones`, `agenda`, `quirofano_insumos`, `quirofano_anestesia` y `optica_accesorios` del menú del rol (quedó solo Pacientes, Unidades IGSS, Evaluación Oftalmológica) porque el rol nunca tuvo los permisos de backend para esas áreas. El cambio NO se propaga solo a producción (es un documento en `db.menu_configurations`); el usuario (como superadmin) debe repetirlo manualmente en producción desde Configuración > Roles y Permisos > Menús para el rol `administrador_igss` (usuario real: `sandrac`).
+- **Desplegar a producción los fixes de seguridad de la auditoría del rol administrador_igss (2026-11-16)**: Cuentas por Cobrar, listado de Cirugías, CRM Cirugías y exportación de Pacientes ya NO exigían ningún permiso de backend (cualquier usuario autenticado podía leer/escribir datos financieros reales). Ver detalle completo en CHANGELOG.
 - Desplegar a producción los 3 fixes del bug de Órdenes IGSS (advertencia de NOG no catalogado, badge "Pendiente de catalogar" en Producción IGSS, botón de migración de NOG legacy). Una vez desplegado: (1) el usuario debe registrar el NOG 31461093 en el catálogo de "UNIDAD PERIFÉRICA ZONA 5" para resolver el caso puntual reportado; (2) correr el botón "Migrar pacientes con NOG legacy" en producción para los 12 pacientes identificados.
 - Desplegar a producción el nuevo permiso "Gestionar Equipo e Insumos" (`manage_sala_operaciones_insumos`) y, una vez desplegado, activarlo para el rol "sop" (creado en producción) desde "Gestión de Usuarios" → "Roles", más confirmar el menú "Sala de Operaciones" habilitado en "Menús por Rol" para ese rol.
 - Confirmar que el cron "informe-anestesia-diario" (17:00 Guatemala, envía a draherreranestesia@gmail.com) quedó activo en producción tras el próximo deploy, y validar que el correo real llega a esa bandeja (no se tiene acceso a esa cuenta para verificarlo desde aquí).
@@ -33,7 +35,6 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - NOG: exportación de la lista + alertas automáticas al 90%/100% de cupo; control de vigencia/vencimiento.
 - Completar valores faltantes en registros IGSS/seguro importados desde la hoja de cálculo original.
 - Confirmar si el rol "medico" debería tener el menú "sala_operaciones" por defecto (en preview no lo tiene, pero test_credentials.md documenta que sí debería verlo; no bloquea el backend, que ya funciona vía API para medico).
-- Confirmar si "administrador_igss" debe seguir siendo de solo lectura en Sala de Operaciones (hoy no tiene `manage_sala_operaciones`).
 - Sala de Operaciones: agregar una insignia visual "Cancelada" en las filas canceladas del listado (hoy solo se ven atenuadas/grises).
 - Evaluar si Admin también debería poder cancelar/reprogramar/eliminar cirugías (Fase 2 del plan de Sesión 55, no solicitado aún).
 - Vista de auditoría de quién canceló/reprogramó/eliminó cada cirugía y cuándo (Fase 3 del plan de Sesión 55).
@@ -44,6 +45,8 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Al cancelar una venta de Óptica con Cuenta por Cobrar asociada, la cuenta por cobrar queda abierta (no se cancela junto con la venta) — pre-existente, no introducido por el fix reciente.
 - Evaluar si el mismo problema de "Confirmar Venta deshabilitado al escribir el monto sin presionar +" también debería corregirse en el Punto de Venta de la Clínica (no se tocó, usa código separado).
 - Sala de Operaciones / Procedimientos de Anestesia: cuando el mes de anestesia de una cirugía ya está "cerrado" (pagado), editar esa cirugía en Sala de Operaciones NO actualiza el registro de anestesia correspondiente (protección intencional), pero hoy no se avisa al usuario — evaluar agregar un aviso visible ("Este procedimiento pertenece a un mes de anestesia ya cerrado; los cambios no se reflejarán en el cierre") en vez de un fallo silencioso.
+- Gatear el link "Cuentas por Cobrar" del menú de Finanzas para el rol óptica con `view_cuentas_cobrar` (hoy usa `manage_sales`, funciona pero por una permiso distinto al que exige la ruta) — hallazgo menor de la auditoría del rol administrador_igss (2026-11-16).
+- Habilitar el menú `finanzas_cxc` para el rol "usuario" si debe poder navegar a Cuentas por Cobrar desde el sidebar (hoy solo es alcanzable por URL directa, aunque ya tiene el permiso `view_cuentas_cobrar` de solo lectura) — hallazgo de la auditoría del rol administrador_igss (2026-11-16).
 
 ## P2 — Pausado / depende de terceros
 - FEL/Digifact: activación de producción pendiente de certificado SAT/Digifact, aprovisionamiento y credenciales seguras del usuario.

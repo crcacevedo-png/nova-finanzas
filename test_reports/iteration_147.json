@@ -1,0 +1,24 @@
+{
+  "summary": "Focused re-check of the 2 regressions from iteration_146. Both fixes work. FIX 1: the login and /me responses now include view_cuentas_cobrar/manage_cuentas_cobrar (superadmin T/T, admin T/T, usuario T/F, optica T/T). /cuentas-cobrar-finanzas loads by direct URL for superadmin, admin, usuario and optica, and through the sidebar link nav-cxc-finanzas for superadmin, admin and optica. On the backend, usuario can view (clinica, resumen, responsables = 200) and gets 403 on create responsable, anular and abono. igss.admin gets 403 / redirect. optica's own /optica/cuentas-cobrar still loads. FIX 2: Pacientes Excel, PDF and Plantilla now trigger real browser downloads (valid xlsx/pdf files) for igss.admin and superadmin. No new tab opens and no 403 appears. Regression check: igss.admin still lands on /pacientes with the sidebar Pacientes | Evaluación Oftalmológica | IGSS. /sala-operaciones, /agenda, /quirofano/insumos-equipos and /cuentas-cobrar-finanzas all redirect it to /pacientes. One minor UX gap: usuario sees a 'Registrar Abono' button that the backend rejects with 403.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CuentasCobrarFinanzas.js CXC detail dialog (onRegistrarAbono, line ~428)", "issue": "usuario (manage_cuentas_cobrar=false) can open an account detail and sees the 'Registrar Abono' button. POST /api/cuentas-cobrar/{id}/abono returns 403 for usuario, so the user gets an error after filling in the form. The button should be hidden or disabled when hasPermission('manage_cuentas_cobrar') is false.", "selector": "[role='dialog'] button:has-text('Registrar Abono')", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter147_cxc_perms_and_exports.py", "/app/test_reports/pytest/pytest_iter147.xml"],
+  "action_items": ["(Low) Gate the 'Registrar Abono' button in the CuentasCobrarFinanzas detail dialog on hasPermission('manage_cuentas_cobrar')"],
+  "critical_code_review_comments": [
+    "The permission matrix is still duplicated in server.py and config/permissions.py (known tech debt). A unit test that asserts both dicts are equal for the CxC keys would stop this regression from coming back.",
+    "Layout.js optica branch: the nav-cxc-finanzas link is gated on manage_sales while the route needs view_cuentas_cobrar. It works today, but the link and the route should check the same permission.",
+    "usuario has no nav-cxc-finanzas link in the sidebar because the menu config finanzas_cxc is not enabled for that role. The page is reachable by URL only. Enable the menu if usuario should navigate there."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter147_cxc_perms_and_exports.py"],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% for the requested fixes (1 low-priority UX gap)"},
+  "seed_data_creation": "None. No records were created: the create responsable test got 403 as expected.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Both iteration_146 regressions are fixed. test_iter147_cxc_perms_and_exports.py covers CxC permissions in login/me, CxC view/manage per role and the patient export endpoints. Downloads were verified in Playwright with page.expect_download on export-excel-button, export-pdf-button and download-template-button."
+}

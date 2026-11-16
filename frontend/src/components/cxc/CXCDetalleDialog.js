@@ -12,6 +12,7 @@ import {
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
+import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatDate } from '../../services/api';
 import { getTipoResponsableInfo, getEstadoIcon, getEstadoConfig } from './constants';
 
@@ -21,6 +22,7 @@ const CXCDetalleDialog = ({
   cuenta,
   onRegistrarAbono
 }) => {
+  const { hasPermission } = useAuth();
   const getEstadoBadge = (estado) => {
     const config = getEstadoConfig(estado);
     return (
@@ -181,7 +183,8 @@ const CXCDetalleDialog = ({
           </Button>
           {cuenta && 
            cuenta.estado !== 'Pagado' && 
-           cuenta.estado !== 'Anulado' && (
+           cuenta.estado !== 'Anulado' &&
+           hasPermission('manage_cuentas_cobrar') && (
             <Button 
               className="bg-blue-600 hover:bg-blue-700"
               onClick={onRegistrarAbono}
