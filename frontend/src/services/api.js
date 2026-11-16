@@ -125,7 +125,7 @@ export const surgeryApi = {
     return axios.get(`${API_URL}/surgeries${queryString ? `?${queryString}` : ''}`);
   },
   getById: (id) => axios.get(`${API_URL}/surgeries/${id}`),
-  getOptions: () => axios.get(`${API_URL}/surgeries/options`),
+  getOptions: (params) => axios.get(`${API_URL}/surgeries/options`, { params }),
   create: (data) => axios.post(`${API_URL}/surgeries`, data),
   update: (id, data) => axios.put(`${API_URL}/surgeries/${id}`, data),
   delete: (id) => axios.delete(`${API_URL}/surgeries/${id}`),

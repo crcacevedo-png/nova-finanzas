@@ -212,14 +212,21 @@ async def get_surgeries(
 
 
 @router.get("/options")
-async def get_surgery_options(current_user: dict = Depends(get_current_user)):
-    """Obtener opciones únicas para filtros (cirujanos, instituciones, anestesiólogos, meses)"""
-    surgeons = await db.surgeries.distinct("surgeon")
-    institutions = await db.surgeries.distinct("institution")
-    anesthesiologists = await db.surgeries.distinct("anesthesiologist")
+async def get_surgery_options(
+    month: Optional[str] = Query(None, description="YYYY-MM: si se indica, cirujanos/instituciones se limitan a ese mes"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Obtener opciones únicas para filtros (cirujanos, instituciones, anestesiólogos, meses).
+    Si se indica `month`, los cirujanos e instituciones devueltos son solo los que
+    tienen cirugías registradas ese mes (filtro en cascada: mes -> cirujano)."""
     dates = await db.surgeries.distinct("date")
     months = sorted({d[:7] for d in dates if d and len(d) >= 7}, reverse=True)
-    
+
+    scope = {"date": {"$regex": f"^{re.escape(month)}"}} if month else {}
+    surgeons = await db.surgeries.distinct("surgeon", scope)
+    institutions = await db.surgeries.distinct("institution", scope)
+    anesthesiologists = await db.surgeries.distinct("anesthesiologist", scope)
+
     return {
         "surgeons": sorted([s for s in surgeons if s]),
         "institutions": sorted([i for i in institutions if i]),

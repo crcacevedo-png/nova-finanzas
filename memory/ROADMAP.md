@@ -17,6 +17,7 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Investigación sin causa raíz confirmada: "Tipo de Compra" IGSS desactualizado en un PDF de producción — pendiente de que el usuario indique el PDF/reporte exacto para reproducir.
 - Confirmar que el usuario importó exitosamente las 192 cirugías pendientes a producción vía el importador de Excel.
 - Confirmar que el nuevo cron "produccion-palma" (17:00 Guatemala, envía el cierre de producción diario combinado clínica+óptica de la Dra. Palma a `INFORME_PRODUCCION_PALMA_EMAILS`) quedó activo en producción tras el próximo deploy, y validar que el correo real llega a la bandeja configurada.
+- **Bloqueador de plataforma escalado a soporte (2026-11-15)**: los crons `informe-anestesia-diario` y `produccion-palma` no se registran en el scheduler de producción (solo `cierre-diario`/`respaldo-semanal`, los más antiguos, disparan). Root cause de plataforma (reconciliación de crons de producción desactualizada, el pipeline de deploy no la fuerza). Pendiente respuesta de soporte Emergent para una reconciliación manual del job; mientras tanto, reenviar manualmente ambos reportes diarios si el usuario nota que faltaron (vía el webhook con `WEBHOOK_CRON_SECRET`).
 
 ## P1 — Próximos pasos conocidos (mencionados por el usuario o como continuación natural)
 - Cierre de Producción Diario (Dra. Palma) — Fase 2: pantalla de administración para cambiar el correo destino o el horario sin pedírselo al equipo de desarrollo; historial de los reportes enviados con opción de reenviar uno puntual.
@@ -42,6 +43,7 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Punto de Venta de Óptica: mostrar en el diálogo de pago cuánto se "agregará" del monto escrito aún no confirmado con "+" (ej. "Se agregará Q45.00 (Efectivo) al confirmar"), para que el usuario entienda el nuevo comportamiento sin ambigüedad.
 - Al cancelar una venta de Óptica con Cuenta por Cobrar asociada, la cuenta por cobrar queda abierta (no se cancela junto con la venta) — pre-existente, no introducido por el fix reciente.
 - Evaluar si el mismo problema de "Confirmar Venta deshabilitado al escribir el monto sin presionar +" también debería corregirse en el Punto de Venta de la Clínica (no se tocó, usa código separado).
+- Sala de Operaciones / Procedimientos de Anestesia: cuando el mes de anestesia de una cirugía ya está "cerrado" (pagado), editar esa cirugía en Sala de Operaciones NO actualiza el registro de anestesia correspondiente (protección intencional), pero hoy no se avisa al usuario — evaluar agregar un aviso visible ("Este procedimiento pertenece a un mes de anestesia ya cerrado; los cambios no se reflejarán en el cierre") en vez de un fallo silencioso.
 
 ## P2 — Pausado / depende de terceros
 - FEL/Digifact: activación de producción pendiente de certificado SAT/Digifact, aprovisionamiento y credenciales seguras del usuario.

@@ -85,6 +85,47 @@ class TestSurgeryList:
         assert "institutions" in data
         assert "anesthesiologists" in data
         print(f"Options: {len(data['surgeons'])} surgeons, {len(data['institutions'])} institutions")
+        test_data['global_options'] = data
+
+    def test_05b_get_surgery_options_scoped_by_month(self):
+        """Filtro en cascada: /surgeries/options?month=YYYY-MM devuelve solo
+        cirujanos/instituciones con cirugías registradas ese mes."""
+        headers = {"Authorization": f"Bearer {tokens['superadmin']}"}
+        global_months = requests.get(f"{BASE_URL}/api/surgeries/options", headers=headers).json()["months"]
+        assert global_months, "Se necesita al menos un mes con cirugías para esta prueba"
+        month = global_months[0]
+
+        scoped = requests.get(f"{BASE_URL}/api/surgeries/options", params={"month": month}, headers=headers)
+        assert scoped.status_code == 200, f"Failed to get scoped options: {scoped.text}"
+        scoped_data = scoped.json()
+
+        # Cada cirujano devuelto para ese mes debe tener al menos una cirugía real ese mes
+        for surgeon in scoped_data["surgeons"]:
+            check = requests.get(
+                f"{BASE_URL}/api/surgeries",
+                params={"month": month, "surgeon": surgeon, "limit": 1},
+                headers=headers,
+            ).json()
+            assert check["total"] >= 1, f"{surgeon} no tiene cirugías en {month} pero apareció en options"
+
+        # La lista de meses no debe reducirse por el filtro (el combo de mes es independiente)
+        assert scoped_data["months"] == global_options_months_snapshot(headers)
+
+        # Un cirujano que NO tiene cirugías ese mes no debe aparecer en la lista escopeada
+        global_surgeons = set(test_data['global_options']['surgeons'])
+        missing_in_month = global_surgeons - set(scoped_data["surgeons"])
+        if missing_in_month:
+            some_absent = next(iter(missing_in_month))
+            check_absent = requests.get(
+                f"{BASE_URL}/api/surgeries",
+                params={"month": month, "surgeon": some_absent, "limit": 1},
+                headers=headers,
+            ).json()
+            assert check_absent["total"] == 0
+
+
+def global_options_months_snapshot(headers):
+    return requests.get(f"{BASE_URL}/api/surgeries/options", headers=headers).json()["months"]
 
 
 class TestSurgeryCRUD:

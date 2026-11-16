@@ -306,8 +306,14 @@ const SalaOperaciones = () => {
 
   const fetchOptions = async () => {
     try {
-      const response = await surgeryApi.getOptions();
+      const response = await surgeryApi.getOptions(filterMonth ? { month: filterMonth } : undefined);
       setOptions(response.data);
+      // Filtro en cascada: si el cirujano/institución elegido ya no tiene
+      // cirugías en el mes seleccionado, lo regresamos a "Todos" en vez de
+      // dejar una combinación que siempre muestra 0 resultados.
+      if (filterSurgeon && !response.data.surgeons.includes(filterSurgeon)) {
+        setFilterSurgeon('');
+      }
     } catch (error) {
       console.error('Error fetching options:', error);
     }
@@ -908,6 +914,18 @@ const SalaOperaciones = () => {
                 </div>
               </div>
               
+              <Select value={filterMonth || "all"} onValueChange={(v) => setFilterMonth(v === "all" ? "" : v)}>
+                <SelectTrigger className="w-[160px]" data-testid="filter-month">
+                  <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los meses</SelectItem>
+                  {options.months.map(m => (
+                    <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={filterSurgeon || "all"} onValueChange={(v) => setFilterSurgeon(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-[180px]" data-testid="filter-surgeon">
                   <SelectValue placeholder="Todos los cirujanos" />
@@ -928,18 +946,6 @@ const SalaOperaciones = () => {
                   <SelectItem value="all">Todas las instituciones</SelectItem>
                   {INSTITUTIONS.map(i => (
                     <SelectItem key={i} value={i}>{i}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Select value={filterMonth || "all"} onValueChange={(v) => setFilterMonth(v === "all" ? "" : v)}>
-                <SelectTrigger className="w-[160px]" data-testid="filter-month">
-                  <SelectValue placeholder="Mes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los meses</SelectItem>
-                  {options.months.map(m => (
-                    <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
