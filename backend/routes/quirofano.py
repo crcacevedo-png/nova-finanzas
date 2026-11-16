@@ -8,6 +8,7 @@
 """
 import uuid
 import io
+import re
 import time
 import hmac
 import base64
@@ -195,7 +196,7 @@ async def _resolve_type_value(type_id: Optional[str], type_name: Optional[str]):
     if type_name:
         label = ANESTHESIA_LABELS.get(type_name, type_name)
         t = await db.anesthesia_types.find_one(
-            {"name": {"$regex": f"^{label}$", "$options": "i"}, "active": True}, {"_id": 0}
+            {"name": {"$regex": f"^{re.escape(label)}$", "$options": "i"}, "active": True}, {"_id": 0}
         )
         if t:
             return t["id"], t["name"], t.get("value", 0)
