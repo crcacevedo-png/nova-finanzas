@@ -112,7 +112,7 @@ async def get_surgery_candidates(
     tipo_cirugia: Optional[str] = None,
     prioridad: Optional[str] = None,
     origen: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_patients"))
 ):
     """Listar candidatos a cirugía con filtros"""
     query = {}
@@ -181,7 +181,7 @@ async def get_surgery_candidates(
 
 
 @router.get("/stats")
-async def get_crm_stats(current_user: dict = Depends(get_current_user)):
+async def get_crm_stats(current_user: dict = Depends(require_permission("view_patients"))):
     """Obtener estadísticas del CRM"""
     # Por estado
     estado_pipeline = [
@@ -244,7 +244,7 @@ async def get_surgery_types(current_user: dict = Depends(get_current_user)):
 @router.get("/{candidate_id}", response_model=SurgeryCandidateResponse)
 async def get_surgery_candidate(
     candidate_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_patients"))
 ):
     """Obtener detalle de un candidato"""
     candidate = await db.surgery_crm.find_one({"id": candidate_id}, {"_id": 0})

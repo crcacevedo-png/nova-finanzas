@@ -1,0 +1,70 @@
+{
+  "summary": "Full audit of role administrador_igss (igss.admin / IgssAdmin2024$). I ran 32 API checks (26 pass, 6 fail) and drove the UI with Playwright: login, every sidebar item, about 20 URLs entered directly, and the visible action buttons. Login works and lands on /pacientes, not on /sala-operaciones as test_credentials.md says. Sidebar seen: Pacientes, Evaluación Oftalmológica, Agenda, Sala de Operaciones group (Cirugías, Insumos y Equipos Qx, Proced. de Anestesia), IGSS group (Unidades IGSS, NOG). Óptica/Accesorios does not appear because the role lacks view_optica. Core IGSS features work: Pacientes, Unidades IGSS CRUD, NOG and Evaluación. Several suspicions in the review request turned out WRONG: GET /api/surgeries requires only authentication, so Cirugías loads the FULL surgery list of every institution. The Anestesia page does not fail: it hides the Cierre tab by role and shows only Tipos de anestesia, read-only. Real defects found: the Agenda menu item silently redirects to /pacientes; patient Excel and PDF export return 500 for this role (KeyError record_number); there are visible buttons that fail with 403 (Plantilla Excel in Sala, Agregar/Editar insumo). The worst problem is a permission leak: Cuentas por Cobrar (clinic + óptica financial data) and CRM Cirugías are fully readable by this role through a URL typed directly into the address bar, and the CxC write endpoints (abono/anular/crear) only check authentication.",
+  "landing_after_login": "/pacientes (ProtectedRoute defaultPage for any role other than superadmin/anestesia). test_credentials.md is outdated: it says /sala-operaciones.",
+  "sidebar_observed": ["nav-pacientes Pacientes", "nav-evaluacion Evaluación Oftalmológica", "nav-agenda Agenda", "nav-sala-operaciones-group > nav-sala-operaciones Cirugías, nav-quirofano-insumos Insumos y Equipos Qx, nav-quirofano-anestesia Proced. de Anestesia", "nav-igss > nav-unidades-igss Unidades IGSS, nav-gestion-nog NOG"],
+  "menu_item_results": {
+    "Pacientes": "OK – the list loads (17,904 patients, ALL institutions incl. Particular, not only IGSS). Excel, PDF, Plantilla and Nuevo Paciente buttons are visible. The Nuevo Paciente dialog opens. Create→edit→search via API OK. Excel/PDF export return 500 (opened in a new tab, which shows 'Internal Server Error').",
+    "Evaluación Oftalmológica": "OK – the full editor loads with no API errors",
+    "Agenda": "BROKEN – a click silently redirects to /pacientes. The /agenda route requires the view_agenda permission, which the role does not have, yet the menu item is shown because menu 'agenda' is enabled. (Backend GET /api/agenda/citas returns 200 for any authenticated user.)",
+    "Cirugías (/sala-operaciones)": "Loads the FULL list (Seguro Privado, Novavision, IGSS…) with no error: GET /api/surgeries and /surgeries/options only need authentication. The detail dialog opens (read-only). 'Plantilla Excel' gives toast 'Error al descargar la plantilla' (403 GET surgeries/template, needs view_sala_operaciones). Write endpoints are protected (manage_sala_operaciones).",
+    "Insumos y Equipos Qx": "Loads read-only, but the Agregar, Editar (pencil) and activate/deactivate (power) buttons are visible. Agregar→Guardar shows toast \"Se requiere rol ['admin', 'superadmin'] para esta acción\" (403 POST /api/quirofano/catalog).",
+    "Proced. de Anestesia": "Loads with no error. The frontend hides the 'Cierre mensual' tab (canSeeCierre role check) and shows only 'Tipos de anestesia', read-only. No 403 fires in the UI. The backend closure endpoint returns 403 as expected. The review's suspicion of a blank screen or error is NOT confirmed.",
+    "Unidades IGSS": "OK – list, alerts, Catálogo/Producción tabs load. API create/update/get/delete of a TEST_ unit and GET nogs all return 200. The Mantenimiento endpoint is allowed (MANTENIMIENTO_ROLES includes administrador_igss).",
+    "NOG": "OK – the list of 83 NOG and the totals load, and the Nuevo NOG button is visible. I did not create a NOG through the UI."
+  },
+  "direct_url_results": {
+    "blocked_redirect_to_pacientes": ["/dashboard-financiero", "/dashboard", "/optica/dashboard", "/optica/accesorios", "/optica/cuentas-cobrar", "/configuracion/usuarios (route does not exist → fallback)", "/usuarios", "/caja-chica", "/caja", "/analisis-produccion", "/cierre-diario", "/auditoria", "/respaldos", "/agenda"],
+    "LEAKS_real_data_shown": ["/cuentas-cobrar-finanzas – full clinic CxC: totals Q16,470.40, 21 accounts, responsables tab (GET /api/cuentas-cobrar/clinica 200; /optica 200 as well)", "/crm-cirugias – surgery candidates list (GET /api/surgery-crm 200)"],
+    "route_open_but_backend_403_shell_with_errors": ["/configuracion/proveedores (toast 'Error al cargar los proveedores', 403 GET suppliers)", "/gastos (toast 'Error al cargar los gastos', 403 expenses/bank-accounts)", "/punto-venta (403 ventas/bodega-pos, caja/estado)", "/inventario (403 inventario/panel, alertas)"]
+  },
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET/POST /api/cuentas-cobrar/clinica, /optica, /responsables, POST /{id}/abono, PUT /{id}/anular", "issue": "These endpoints only use Depends(get_current_user), with no role or permission check. administrador_igss (and any authenticated role) can read the full CxC financial data and, per the code, register payments, void accounts and create or delete responsables. I verified the GETs live and did NOT run the writes, to avoid changing real data.", "priority": "CRITICAL"},
+      {"endpoint": "GET /api/surgeries, /api/surgeries/options", "issue": "Only get_current_user, so the full surgery list of every institution is exposed to IGSS admin. Add require_permission('view_sala_operaciones'), or filter to IGSS patients if the role should see only IGSS surgeries.", "priority": "HIGH"},
+      {"endpoint": "GET /api/patients/export/excel and /export/pdf", "issue": "500 KeyError 'record_number' at routes/patients.py lines 1113 and 1201 (some patient documents lack record_number). This breaks the Excel/PDF buttons for EVERY role, not only IGSS. Use enriched.get('record_number','').", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/surgery-crm", "issue": "Readable by administrador_igss (requires only view_patients or auth)"},
+      {"endpoint": "GET /api/agenda/citas", "issue": "200 for any authenticated user, while the frontend route requires view_agenda (inconsistent)"},
+      {"endpoint": "/api/patients/import/validate, /import/batch, /import/template, /import/stats", "issue": "require_role(['admin','superadmin']) although the role has import_patients=true, so this permission is unusable. POST /api/patients/import is a 501 placeholder."},
+      {"endpoint": "GET /api/quirofano/catalog, /anesthesia/types, /anesthesia/records", "issue": "Open to any authenticated user (anesthesia records include patient names)"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Layout sidebar – Agenda", "issue": "Shown because isMenuEnabled('agenda') is true, but the /agenda route requires view_agenda, so a click silently bounces to /pacientes", "selector": "[data-testid='nav-agenda']", "priority": "HIGH"},
+      {"component": "Pacientes – Excel/PDF buttons", "issue": "window.open shows 'Internal Server Error' (backend 500) and the UI gives no feedback", "selector": "[data-testid='export-excel-button'], [data-testid='export-pdf-button']", "priority": "HIGH"},
+      {"component": "InsumosEquiposQuirurgicos", "issue": "The Agregar, Editar and activate/deactivate buttons are shown to non-admin roles; saving fails with a 403 toast", "selector": "button:has-text('Agregar')", "priority": "MEDIUM"},
+      {"component": "SalaOperaciones", "issue": "The 'Plantilla Excel' button is shown without view_sala_operaciones and gives toast 'Error al descargar la plantilla' (403)", "selector": "button:has-text('Plantilla Excel')", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Route guards", "issue": "/cuentas-cobrar-finanzas, /crm-cirugias, /configuracion/proveedores, /gastos and /punto-venta have no requiredPermission or role, and /inventario has none for this role. Any role can open them by URL: two show real data, the others show error shells.", "affected_selectors": ["App.js ProtectedRoute for these paths"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_igss_admin_role_audit.py", "/app/test_reports/pytest/igss_admin_audit.xml"],
+  "action_items": [
+    "Decide the scope of Sala de Operaciones, Insumos and Anestesia for administrador_igss. If out of scope, remove sala_operaciones, quirofano_insumos and quirofano_anestesia (and optica_accesorios, which is useless) from db.menu_configurations for this role. If in scope, grant view_sala_operaciones.",
+    "Agenda: either grant view_agenda to the role or remove 'agenda' from its enabled menus. Also gate the nav item with hasPermission('view_agenda') in Layout.js.",
+    "Secure /api/cuentas-cobrar/* (read AND write) with proper permissions (e.g. manage_caja/manage_sales), and add a requiredPermission on the /cuentas-cobrar-finanzas route.",
+    "Add a permission check to GET /api/surgeries and /surgeries/options (view_sala_operaciones).",
+    "Gate the /crm-cirugias, /gastos, /punto-venta, /configuracion/proveedores and /inventario routes with requiredPermission/requiredMenu.",
+    "Fix the KeyError 'record_number' in export_patients_excel (line 1113) and export_patients_pdf (line 1201) with .get().",
+    "Hide the Insumos Agregar/Editar/toggle buttons and the Sala 'Plantilla Excel' button for roles without permission.",
+    "Align patients import: the role has import_patients, but the import endpoints require the admin role.",
+    "Clarify whether IGSS admin should see only IGSS patients: the list currently shows all 17,904, including Particular.",
+    "Update test_credentials.md: landing page is /pacientes, and the menus include quirofano_insumos, quirofano_anestesia and optica_accesorios."
+  ],
+  "critical_code_review_comments": [
+    "Layout.js builds the Agenda, Cirugías, Insumos and Anestesia items from isMenuEnabled only, while App.js guards /agenda with requiredPermission='view_agenda'. Menu config and the route guard disagree.",
+    "Many backend routers rely on get_current_user only (cuentas_cobrar.py, surgeries list, quirofano catalog/records, agenda citas). Authorization is enforced inconsistently.",
+    "ProcedimientosAnestesia.js and InsumosEquiposQuirurgicos.js hardcode role lists (['admin','superadmin','anestesia']) instead of permissions. Anestesia hides UI correctly; Insumos does not hide its buttons.",
+    "Pacientes export uses window.open, so the user gets no error feedback on a backend failure."
+  ],
+  "updated_files": ["/app/backend/tests/test_igss_admin_role_audit.py"],
+  "success_rate": {"backend": "81% (26/32; the 6 failures are real defects: 2× export 500, import template 403, 3× permission leaks)", "frontend": "6 of the 8 menu items work as intended for the role (Agenda broken, Cirugías over-exposes data); direct URL blocking 14/20 correct, 2 data leaks"},
+  "seed_data_creation": "Created and removed: 1 TEST_UNIDAD_* IGSS unit (deleted), 1 TEST_Igss Audit* patient (soft-deleted via superadmin). No other data changed. The POST of the insumo TEST_igss_insumo was rejected with 403, so nothing was created.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use tests/test_igss_admin_role_audit.py (one login per module; login is rate-limited to 5/min). After fixes, the BLOCKED list should pass, ALLOWED export excel/pdf should return 200, and nav-agenda should either be gone or open /agenda. The browser_automation tool rewrites screenshot paths: use plain names without expressions."
+}

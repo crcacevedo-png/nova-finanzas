@@ -846,15 +846,17 @@ const SalaOperaciones = () => {
             <p className="text-slate-500 text-sm">Registro de cirugías oftalmológicas</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={handleDownloadTemplate}
-              data-testid="download-template-btn"
-              title="Descargar plantilla Excel para ingreso de cirugías históricas/programadas"
-            >
-              <FileText className="w-4 h-4 mr-2 text-teal-600" />
-              Plantilla Excel
-            </Button>
+            {hasPermission('view_sala_operaciones') && (
+              <Button
+                variant="outline"
+                onClick={handleDownloadTemplate}
+                data-testid="download-template-btn"
+                title="Descargar plantilla Excel para ingreso de cirugías históricas/programadas"
+              >
+                <FileText className="w-4 h-4 mr-2 text-teal-600" />
+                Plantilla Excel
+              </Button>
+            )}
             {isSuperAdmin && (
               <Button
                 variant="outline"

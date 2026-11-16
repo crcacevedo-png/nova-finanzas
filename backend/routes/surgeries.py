@@ -157,7 +157,7 @@ async def get_surgeries(
     date_to: Optional[str] = Query(None, alias="dateTo"),
     sort_by: str = Query("date", alias="sortBy"),
     sort_order: str = Query("desc", alias="sortOrder"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Listar cirugías con filtros y paginación"""
     query = {}
@@ -214,7 +214,7 @@ async def get_surgeries(
 @router.get("/options")
 async def get_surgery_options(
     month: Optional[str] = Query(None, description="YYYY-MM: si se indica, cirujanos/instituciones se limitan a ese mes"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_sala_operaciones"))
 ):
     """Obtener opciones únicas para filtros (cirujanos, instituciones, anestesiólogos, meses).
     Si se indica `month`, los cirujanos e instituciones devueltos son solo los que

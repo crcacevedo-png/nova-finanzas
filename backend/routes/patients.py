@@ -1110,11 +1110,11 @@ async def export_patients_excel(
         for row, patient in enumerate(patients, 2):
             enriched = await enrich_patient(patient)
             data = [
-                enriched["record_number"], enriched["first_name"], enriched["last_name"],
-                enriched["gender"].capitalize(), enriched["birth_date"], enriched["age"],
-                enriched.get("profession", ""), enriched["phone"], enriched.get("email", ""),
-                enriched.get("dpi", ""), enriched["referral_institution_label"],
-                enriched.get("igss_unit_name", ""), enriched.get("igss_nog", ""), enriched["created_at"][:10]
+                enriched.get("record_number", ""), enriched.get("first_name", ""), enriched.get("last_name", ""),
+                (enriched.get("gender") or "").capitalize(), enriched.get("birth_date", ""), enriched.get("age", ""),
+                enriched.get("profession", ""), enriched.get("phone", ""), enriched.get("email", ""),
+                enriched.get("dpi", ""), enriched.get("referral_institution_label", ""),
+                enriched.get("igss_unit_name", ""), enriched.get("igss_nog", ""), (enriched.get("created_at") or "")[:10]
             ]
             for col, value in enumerate(data, 1):
                 cell = ws.cell(row=row, column=col, value=value)
@@ -1198,9 +1198,9 @@ async def export_patients_pdf(
         for patient in patients:
             enriched = await enrich_patient(patient)
             table_data.append([
-                enriched["record_number"], enriched["full_name"], enriched["gender"].capitalize(),
-                str(enriched["age"]), enriched["phone"], enriched.get("dpi", "-"),
-                enriched["referral_institution_label"],
+                enriched.get("record_number", ""), enriched.get("full_name", ""), (enriched.get("gender") or "").capitalize(),
+                str(enriched.get("age", "")), enriched.get("phone", ""), enriched.get("dpi", "-"),
+                enriched.get("referral_institution_label", ""),
                 enriched.get("igss_unit_name", "") or "-", enriched.get("igss_nog", "") or "-"
             ])
         
@@ -1504,7 +1504,7 @@ def extract_patient_data(item: ImportPatientItem) -> dict:
 @router.post("/import/validate", response_model=ImportValidationResult)
 async def validate_import_data(
     patients: List[ImportPatientItem] = Body(...),
-    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+    current_user: dict = Depends(require_permission("import_patients"))
 ):
     """
     Validar datos de importación antes de procesar.
@@ -1607,7 +1607,7 @@ async def validate_import_data(
 @router.post("/import/batch", response_model=ImportResult)
 async def import_patients_batch(
     request: ImportBatchRequest,
-    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+    current_user: dict = Depends(require_permission("import_patients"))
 ):
     """
     Importar un lote de pacientes.
@@ -1758,7 +1758,7 @@ async def import_patients_batch(
 
 @router.get("/import/template")
 async def get_import_template(
-    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+    current_user: dict = Depends(require_permission("import_patients"))
 ):
     """
     Obtener plantilla JSON para importación.
@@ -1818,7 +1818,7 @@ async def get_import_template(
 
 @router.get("/import/stats")
 async def get_import_stats(
-    current_user: dict = Depends(require_role(["admin", "superadmin"]))
+    current_user: dict = Depends(require_permission("import_patients"))
 ):
     """
     Obtener estadísticas de importaciones realizadas.

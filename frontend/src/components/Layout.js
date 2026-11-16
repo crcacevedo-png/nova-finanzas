@@ -125,8 +125,8 @@ const Layout = ({ children }) => {
     navItems.push({ path: '/crm-cirugias', icon: Stethoscope, label: 'CRM Cirugías', testId: 'nav-crm-cirugias' });
   }
   
-  // Agenda de Pacientes - Visible si está habilitado
-  if (isMenuEnabled('agenda')) {
+  // Agenda de Pacientes - Visible si está habilitado Y el rol tiene permiso para verla
+  if (isMenuEnabled('agenda') && hasPermission('view_agenda')) {
     navItems.push({ path: '/agenda', icon: CalendarDays, label: 'Agenda', testId: 'nav-agenda' });
   }
 
@@ -142,7 +142,7 @@ const Layout = ({ children }) => {
 
   // Sala de Operaciones sub-items - Filtrados por configuración de menús
   const salaOpItems = [];
-  if (isMenuEnabled('sala_operaciones')) salaOpItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Cirugías', testId: 'nav-sala-operaciones' });
+  if (isMenuEnabled('sala_operaciones') && hasPermission('view_sala_operaciones')) salaOpItems.push({ path: '/sala-operaciones', icon: Scissors, label: 'Cirugías', testId: 'nav-sala-operaciones' });
   if (isMenuEnabled('quirofano_insumos')) salaOpItems.push({ path: '/quirofano/insumos-equipos', icon: Package, label: 'Insumos y Equipos Qx', testId: 'nav-quirofano-insumos' });
   if (isMenuEnabled('quirofano_anestesia')) salaOpItems.push({ path: '/quirofano/anestesia', icon: Syringe, label: 'Proced. de Anestesia', testId: 'nav-quirofano-anestesia' });
 

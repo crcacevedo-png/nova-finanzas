@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import axios from 'axios';
 import { toast, Toaster } from 'sonner';
+import { useAuth } from '../context/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,6 +16,8 @@ import { Plus, Pencil, Power, Package, Wrench } from 'lucide-react';
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const CatalogSection = ({ tipo, icon: Icon, titulo }) => {
+  const { user } = useAuth();
+  const canManage = user?.role === 'admin' || user?.role === 'superadmin';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,9 +75,11 @@ const CatalogSection = ({ tipo, icon: Icon, titulo }) => {
     <div data-testid={`catalog-section-${tipo}`}>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-500">Catálogo de {titulo.toLowerCase()} (sin precio)</p>
-        <Button onClick={openNew} className="bg-teal-600 hover:bg-teal-700 text-white" data-testid={`catalog-add-${tipo}`}>
-          <Plus className="w-4 h-4 mr-2" /> Agregar
-        </Button>
+        {canManage && (
+          <Button onClick={openNew} className="bg-teal-600 hover:bg-teal-700 text-white" data-testid={`catalog-add-${tipo}`}>
+            <Plus className="w-4 h-4 mr-2" /> Agregar
+          </Button>
+        )}
       </div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -97,8 +102,12 @@ const CatalogSection = ({ tipo, icon: Icon, titulo }) => {
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-right space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(it)} data-testid={`catalog-edit-${it.id}`}><Pencil className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => toggleActive(it)} data-testid={`catalog-toggle-${it.id}`}><Power className="w-4 h-4" /></Button>
+                  {canManage && (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(it)} data-testid={`catalog-edit-${it.id}`}><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => toggleActive(it)} data-testid={`catalog-toggle-${it.id}`}><Power className="w-4 h-4" /></Button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

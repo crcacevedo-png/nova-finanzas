@@ -321,7 +321,7 @@ function AppRoutes() {
       <Route 
         path="/cuentas-cobrar-finanzas" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="view_cuentas_cobrar">
             <CuentasCobrarFinanzas />
           </ProtectedRoute>
         } 
@@ -341,7 +341,7 @@ function AppRoutes() {
       <Route 
         path="/sala-operaciones" 
         element={
-          <ProtectedRoute requiredMenu="sala_operaciones">
+          <ProtectedRoute requiredMenu="sala_operaciones" requiredPermission="view_sala_operaciones">
             <SalaOperaciones />
           </ProtectedRoute>
         } 
@@ -389,7 +389,7 @@ function AppRoutes() {
       <Route 
         path="/crm-cirugias" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredPermission="view_patients">
             <CRMCirugias />
           </ProtectedRoute>
         } 

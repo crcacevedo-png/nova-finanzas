@@ -13,7 +13,7 @@ from utils.timezone import now_gt
 from bson import ObjectId
 import uuid
 
-from routes.auth import get_current_user
+from routes.auth import require_permission, require_any_permission
 from config.database import db
 
 router = APIRouter()
@@ -160,7 +160,7 @@ async def listar_responsables(
     tipo: Optional[str] = None,
     search: Optional[str] = None,
     is_active: bool = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_cuentas_cobrar"))
 ):
     """Lista responsables de CxC (médicos, instituciones, seguros, etc.)"""
     query = {"is_active": is_active}
@@ -181,7 +181,7 @@ async def listar_responsables(
 @router.post("/responsables", response_model=ResponsableCxCResponse)
 async def crear_responsable(
     responsable: ResponsableCxCCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_cuentas_cobrar"))
 ):
     """Crear nuevo responsable de CxC"""
     now = datetime.now(timezone.utc).isoformat()
@@ -204,7 +204,7 @@ async def crear_responsable(
 async def actualizar_responsable(
     responsable_id: str,
     data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_cuentas_cobrar"))
 ):
     """Actualizar responsable"""
     now = datetime.now(timezone.utc).isoformat()
@@ -226,7 +226,7 @@ async def actualizar_responsable(
 @router.delete("/responsables/{responsable_id}")
 async def desactivar_responsable(
     responsable_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_cuentas_cobrar"))
 ):
     """Desactivar responsable (soft delete)"""
     result = await db.responsables_cxc.update_one(
@@ -248,7 +248,7 @@ async def listar_cxc_optica(
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_any_permission(["view_optica", "view_cuentas_cobrar"]))
 ):
     """Listar cuentas por cobrar de Óptica"""
     query = {"origen": "optica"}
@@ -274,7 +274,7 @@ async def listar_cxc_optica(
 
 @router.get("/optica/resumen")
 async def resumen_cxc_optica(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_any_permission(["view_optica", "view_cuentas_cobrar"]))
 ):
     """Resumen de CxC de Óptica"""
     cuentas = await db.cuentas_por_cobrar.find(
@@ -306,7 +306,7 @@ async def resumen_cxc_optica(
 @router.post("/optica", response_model=CxCResponse)
 async def crear_cxc_optica(
     cuenta: CxCOpticaCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_any_permission(["view_optica", "manage_cuentas_cobrar"]))
 ):
     """Crear cuenta por cobrar de Óptica"""
     now = datetime.now(timezone.utc)
@@ -352,7 +352,7 @@ async def listar_cxc_clinica(
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_cuentas_cobrar"))
 ):
     """Listar cuentas por cobrar de Clínica NovaVision"""
     query = {"origen": "clinica"}
@@ -385,7 +385,7 @@ async def listar_cxc_clinica(
 
 @router.get("/clinica/resumen")
 async def resumen_cxc_clinica(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("view_cuentas_cobrar"))
 ):
     """Resumen de CxC de Clínica"""
     cuentas = await db.cuentas_por_cobrar.find(
@@ -429,7 +429,7 @@ async def resumen_cxc_clinica(
 @router.post("/clinica", response_model=CxCResponse)
 async def crear_cxc_clinica(
     cuenta: CxCClinicaCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_cuentas_cobrar"))
 ):
     """Crear cuenta por cobrar de Clínica"""
     now = datetime.now(timezone.utc)
@@ -486,7 +486,7 @@ async def crear_cxc_clinica(
 @router.get("/{cuenta_id}")
 async def obtener_cuenta(
     cuenta_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_any_permission(["view_cuentas_cobrar", "view_optica"]))
 ):
     """Obtener detalle de una cuenta por cobrar"""
     cuenta = await db.cuentas_por_cobrar.find_one(
@@ -504,7 +504,7 @@ async def obtener_cuenta(
 async def registrar_abono(
     cuenta_id: str,
     abono: AbonoCxC,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_any_permission(["manage_cuentas_cobrar", "view_optica"]))
 ):
     """Registrar abono a cuenta por cobrar"""
     cuenta = await db.cuentas_por_cobrar.find_one({"id": cuenta_id})
@@ -628,7 +628,7 @@ async def registrar_abono(
 async def anular_cuenta(
     cuenta_id: str,
     motivo: str = Query(..., min_length=5),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("manage_cuentas_cobrar"))
 ):
     """Anular cuenta por cobrar"""
     cuenta = await db.cuentas_por_cobrar.find_one({"id": cuenta_id})

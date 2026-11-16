@@ -45,7 +45,10 @@ PERMISSIONS = {
         "view_evaluacion": True,
         "manage_recetas": True,
         "view_sala_operaciones": True,
-        "manage_sala_operaciones": True
+        "manage_sala_operaciones": True,
+        # Cuentas por Cobrar (Clínica/Finanzas)
+        "view_cuentas_cobrar": True,
+        "manage_cuentas_cobrar": True
     },
     "admin": {
         "view_dashboard": True,
@@ -87,7 +90,10 @@ PERMISSIONS = {
         "view_evaluacion": True,
         "manage_recetas": True,
         "view_sala_operaciones": True,
-        "manage_sala_operaciones": True
+        "manage_sala_operaciones": True,
+        # Cuentas por Cobrar (Clínica/Finanzas)
+        "view_cuentas_cobrar": True,
+        "manage_cuentas_cobrar": True
     },
     "usuario": {
         "view_dashboard": True,
@@ -132,7 +138,10 @@ PERMISSIONS = {
         "view_evaluacion": True,
         "manage_recetas": False,
         "view_sala_operaciones": True,
-        "manage_sala_operaciones": True
+        "manage_sala_operaciones": True,
+        # Cuentas por Cobrar (Clínica/Finanzas) - solo lectura, sin registrar abonos/anular
+        "view_cuentas_cobrar": True,
+        "manage_cuentas_cobrar": False
     },
     "optica": {
         # Sin acceso al módulo de finanzas general
