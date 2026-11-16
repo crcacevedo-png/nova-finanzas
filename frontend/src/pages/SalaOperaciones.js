@@ -1009,9 +1009,10 @@ const SalaOperaciones = () => {
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Fecha</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Hora</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Paciente</TableHead>
-                      <TableHead className="text-xs uppercase text-slate-500 font-semibold">Procedimiento</TableHead>
+                      <TableHead className="text-xs uppercase text-slate-500 font-semibold w-[110px]">Procedimiento</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">LIO</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Cirujano</TableHead>
+                      <TableHead className="text-xs uppercase text-slate-500 font-semibold">Ayudante</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Ojo</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Anestesia</TableHead>
                       <TableHead className="text-xs uppercase text-slate-500 font-semibold">Pre-Ops</TableHead>
@@ -1043,9 +1044,10 @@ const SalaOperaciones = () => {
                           <TableCell className="text-sm">{formatDateDisplay(surgery.date)}</TableCell>
                           <TableCell className="text-sm">{surgery.time}</TableCell>
                           <TableCell className="font-medium">{surgery.patient_name}</TableCell>
-                          <TableCell className="text-sm">{surgery.procedure}</TableCell>
+                          <TableCell className="text-sm truncate max-w-[110px]" title={surgery.procedure}>{surgery.procedure}</TableCell>
                           <TableCell className="text-sm" data-testid={`surgery-lio-${surgery.id}`}>{surgery.lio || '—'}</TableCell>
                           <TableCell className="text-sm">{surgery.surgeon}</TableCell>
+                          <TableCell className="text-sm text-slate-500">{surgery.assistant_surgeon || '—'}</TableCell>
                           <TableCell>{getEyeBadge(surgery.eye)}</TableCell>
                           <TableCell className="text-sm">{getAnesthesiaLabel(surgery.anesthesia_type)}</TableCell>
                           <TableCell>
@@ -1124,7 +1126,7 @@ const SalaOperaciones = () => {
                         {/* Expanded Row */}
                         {expandedRows[surgery.id] && (
                           <TableRow>
-                            <TableCell colSpan={12} className="bg-slate-50 p-0">
+                            <TableCell colSpan={13} className="bg-slate-50 p-0">
                               <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Equipment Column */}
                                 <div>
