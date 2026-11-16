@@ -263,17 +263,18 @@ const CierreTab = ({ canClose }) => {
       <div className="space-y-3">
         {(data?.por_anestesiologo || []).map((g, i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto" data-testid={`anesthesia-anest-${i}`}>
-            <div className="flex items-center justify-between mb-2 min-w-[840px]">
+            <div className="flex items-center justify-between mb-2 min-w-[940px]">
               <span className="font-bold text-gray-900">{g.anesthesiologist}</span>
               <span className="font-bold text-emerald-700">{formatCurrency(g.total)} <span className="text-xs font-normal text-gray-400">({g.count - g.count_pagado} de {g.count} pendientes)</span></span>
             </div>
-            <table className="w-full text-sm min-w-[840px]">
+            <table className="w-full text-sm min-w-[940px]">
               <thead>
                 <tr className="text-xs text-gray-400 border-b border-gray-100">
                   <th className="py-1.5 text-left font-medium">Fecha</th>
                   <th className="py-1.5 text-left font-medium">Paciente</th>
                   <th className="py-1.5 text-left font-medium">Procedimiento</th>
                   <th className="py-1.5 text-left font-medium">Médico responsable</th>
+                  <th className="py-1.5 text-left font-medium">Ayudante</th>
                   <th className="py-1.5 text-left font-medium">Institución</th>
                   <th className="py-1.5 text-left font-medium">Tipo de anestesia</th>
                   <th className="py-1.5 text-right font-medium">Honorario</th>
@@ -287,18 +288,19 @@ const CierreTab = ({ canClose }) => {
                     <td className="py-1.5 text-gray-900 font-medium">{d.patient_name || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.procedure || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.surgeon || '—'}</td>
+                    <td className="py-1.5 text-gray-600">{d.assistant_surgeon || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.institution || '—'}</td>
                     <td className="py-1.5 text-gray-500">{d.tipo}</td>
                     <td className="py-1.5 text-right font-medium">{formatCurrency(d.value)}</td>
                     <td className="py-1.5 text-center">
                       {canClose && !data?.closed ? (
                         d.paid ? (
-                          <Button variant="ghost" size="sm" disabled={payingId === d.id} onClick={() => marcarPago(d.id, false)} className="h-7 px-2 text-xs text-gray-500 hover:text-amber-600" data-testid={`unpay-record-${d.id}`}>
-                            <RotateCcw className="w-3.5 h-3.5 mr-1" />Pagado
+                          <Button variant="ghost" size="icon" disabled={payingId === d.id} onClick={() => marcarPago(d.id, false)} className="h-7 w-7 text-gray-500 hover:text-amber-600" title="Revertir a pendiente" data-testid={`unpay-record-${d.id}`}>
+                            <RotateCcw className="w-3.5 h-3.5" />
                           </Button>
                         ) : (
-                          <Button variant="outline" size="sm" disabled={payingId === d.id} onClick={() => marcarPago(d.id, true)} className="h-7 px-2 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50" data-testid={`pay-record-${d.id}`}>
-                            <Check className="w-3.5 h-3.5 mr-1" />Marcar pagado
+                          <Button variant="outline" size="icon" disabled={payingId === d.id} onClick={() => marcarPago(d.id, true)} className="h-7 w-7 border-emerald-200 text-emerald-700 hover:bg-emerald-50" title="Marcar pagado" data-testid={`pay-record-${d.id}`}>
+                            <Check className="w-3.5 h-3.5" />
                           </Button>
                         )
                       ) : (

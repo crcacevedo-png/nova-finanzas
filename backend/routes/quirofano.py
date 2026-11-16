@@ -386,7 +386,7 @@ async def _build_closure(month: str, medico: Optional[str] = None, institucion: 
     surgeries_map = {}
     if surgery_ids:
         surgeries = await db.surgeries.find(
-            {"id": {"$in": surgery_ids}}, {"_id": 0, "id": 1, "procedure": 1, "surgeon": 1, "institution": 1}
+            {"id": {"$in": surgery_ids}}, {"_id": 0, "id": 1, "procedure": 1, "surgeon": 1, "institution": 1, "assistant_surgeon": 1}
         ).to_list(len(surgery_ids))
         surgeries_map = {s["id"]: s for s in surgeries}
     por_anest = {}
@@ -422,6 +422,7 @@ async def _build_closure(month: str, medico: Optional[str] = None, institucion: 
             "patient_name": r.get("patient_name") or "",
             "procedure": surg.get("procedure") or "",
             "surgeon": surg.get("surgeon") or "",
+            "assistant_surgeon": surg.get("assistant_surgeon") or "",
             "institution": surg.get("institution") or "",
             "tipo": tname,
             "value": round(valor, 2),
