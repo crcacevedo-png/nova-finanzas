@@ -272,7 +272,7 @@ const CierreTab = ({ canClose }) => {
                 <tr className="text-xs text-gray-400 border-b border-gray-100">
                   <th className="py-1.5 text-left font-medium">Fecha</th>
                   <th className="py-1.5 text-left font-medium">Paciente</th>
-                  <th className="py-1.5 text-left font-medium">Procedimiento</th>
+                  <th className="py-1.5 text-left font-medium w-[90px]">Procedimiento</th>
                   <th className="py-1.5 text-left font-medium">Médico responsable</th>
                   <th className="py-1.5 text-left font-medium">Ayudante</th>
                   <th className="py-1.5 text-left font-medium">Institución</th>
@@ -286,7 +286,7 @@ const CierreTab = ({ canClose }) => {
                   <tr key={j} className={d.paid ? 'opacity-50' : ''} data-testid={`anesthesia-detail-row-${i}-${j}`}>
                     <td className="py-1.5 text-gray-500 whitespace-nowrap">{formatDateOnly(d.date)}</td>
                     <td className="py-1.5 text-gray-900 font-medium">{d.patient_name || '—'}</td>
-                    <td className="py-1.5 text-gray-600">{d.procedure || '—'}</td>
+                    <td className="py-1.5 text-gray-600 truncate max-w-[90px]" title={d.procedure}>{d.procedure || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.surgeon || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.assistant_surgeon || '—'}</td>
                     <td className="py-1.5 text-gray-600">{d.institution || '—'}</td>
