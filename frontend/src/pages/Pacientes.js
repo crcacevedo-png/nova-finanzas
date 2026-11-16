@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -85,6 +85,7 @@ const extractErrorMessage = (error, fallback) => {
 const Pacientes = () => {
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [patients, setPatients] = useState([]);
   const [igssUnits, setIgssUnits] = useState([]);
   const [filterNogs, setFilterNogs] = useState([]);
@@ -194,15 +195,24 @@ const Pacientes = () => {
     fetchPatients();
   }, [fetchPatients]);
 
-  // Abrir el expediente directamente al llegar con ?id= (p.ej. desde la Agenda "Ver paciente")
+  // Abrir el expediente directamente al llegar con ?id= (p.ej. desde la Agenda "Ver paciente").
+  // Depende de location.search (no []) para que reaccione a cada navegación repetida desde
+  // Agenda, ya que el componente no se remonta si solo cambia el query param.
   useEffect(() => {
-    const pid = new URLSearchParams(window.location.search).get('id');
+    const pid = new URLSearchParams(location.search).get('id');
     if (pid) {
       patientApi.getById(pid)
         .then(res => { setSelectedPatient(res.data); setDetailDialogOpen(true); })
-        .catch(() => {});
+        .catch((error) => {
+          console.error('Error al abrir paciente desde ?id=', error);
+          if (error?.response?.status === 404) {
+            toast.error('El paciente ya no existe o fue eliminado');
+          } else {
+            toast.error('No se pudo abrir el expediente del paciente');
+          }
+        });
     }
-  }, []);
+  }, [location.search]);
 
   // Detección de pacientes nuevos creados por otros usuarios (aviso discreto)
   const knownPatientIdsRef = useRef(new Set());
@@ -1485,7 +1495,15 @@ const Pacientes = () => {
         </Dialog>
 
         {/* Detail Dialog */}
-        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <Dialog
+          open={detailDialogOpen}
+          onOpenChange={(open) => {
+            setDetailDialogOpen(open);
+            if (!open && new URLSearchParams(location.search).get('id')) {
+              navigate('/pacientes', { replace: true });
+            }
+          }}
+        >
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--text-primary)' }}>
