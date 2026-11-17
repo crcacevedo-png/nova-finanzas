@@ -1,0 +1,36 @@
+{
+  "summary": "Frontend-only test of Fase 4 Bloque 1 'Regla de cobro' (Libro IGSS). Tested as superadmin: /igss/libro 5-figure resumen strip (matches GET /nogs/resumen exactly), 3 revision cards (sin_orden 52 == config, cirugias 71 == /cirugias-por-marcar total, detenidas == /en-curso-sin-movimiento?dias=90 total), sin-orden tabs, cirugias view (fecha, paciente, procedimiento, SPS / 'Sin orden (sin SPS)', 'N días'), Marcar realizada (toast, row disappears, count 71->70, completas +1 since the order became completa), detenidas view ('En curso' badge, '1 de 3 dosis', 10/01/2025), Cerrar sin completar dialog (empty motivo -> 'Indique el motivo'; confirm -> toast, row gone, cerradas 0->1). Patient ficha (PatientEditDialog in /pacientes): new estado labels, cerrar button only on en_curso, cerrada motivo text, 'Cirugía programada · 15/03/2026 (aún no realizada)' line. FOUND AND FIXED A CRITICAL BUG: the order-row action buttons in the patient ficha submitted the patient form. NOG unit dialog: totals use the new labels, avance shows 'X / 10' plus the desglose, order badges use the new labels. /igss/nog totals show numbers, cupos/desglose OK, Listado oficial label 'Desde (fecha en que se completó)' OK. No undefined/NaN. Mobile 390px: no page overflow, tables scroll inside their container. Roles: igss.admin can open /igss/libro; usuario is redirected to /pacientes.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "POST /api/igss-units/libro/ordenes/{id}/anular", "issue": "It accepts an order that is already 'cerrada' (cerrada -> anulada, 200). Confirm this is intended. It changes the audit trail of a closed order."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OrdenesIgssPaciente FilaOrden (inside the PatientEditDialog / Pacientes edit <form>)", "issue": "FIXED BY TESTER. The Editar, Cerrar sin completar, Anular and Reasignar buttons had no type='button'. They sat inside the patient <form>, so clicking any of them submitted the form: the patient was saved with the toast 'Paciente actualizado exitosamente' and the edit dialog closed together with the just-opened cerrar/anular dialog. Closing or annulling an order from the ficha was impossible. Fix: added type='button' to those 4 buttons.", "selector": "[data-testid^=orden-cerrar-], [data-testid^=orden-editar-], [data-testid^=orden-anular-], [data-testid^=reasignar-]", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/igss/libro Interruptor", "issues": ["React console error: a <div> (Badge) is nested inside a <p> (LibroIGSS.js line 49-51, the title with the Encendido/Apagado badge). Hydration warning, pre-existing. Change the <p> to a <div>."]},
+      {"screen": "NOG unit dialog / Listado oficial", "issues": ["The Desde/Hasta filters use the browser's native date input (mm/dd/yyyy) instead of the shadcn calendar"]},
+      {"screen": "/igss/libro cirugias view", "issues": ["70+ rows render with no pagination or max-height, so the page gets very long. Consider a limit, a scroll area or a search."]},
+      {"screen": "/igss/libro mobile", "issues": ["Double padding (Layout p-6 + page p-6) leaves little width at 390px. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/setup_libro_ui.py"],
+  "action_items": [
+    "Review the tester fix in OrdenesIgssPaciente.js (type='button' on the row action buttons). Also check the other places where OrdenesIgssPaciente is rendered inside a <form> (Agenda.js line ~2776, PatientEditDialog.js line 361); these are now covered by the same fix.",
+    "Change the <p> wrapping the Badge in LibroIGSS.js Interruptor to a <div> (hydration console error)",
+    "Optional: use the shadcn date picker in the Listado oficial filters; add pagination or a scroll area to the cirugias-por-marcar list",
+    "Decide whether anular should be allowed on 'cerrada' orders"
+  ],
+  "critical_code_review_comments": [
+    "estadoOrden() falls back to 'Reservada' for unknown states, which hides data problems. Prefer a neutral 'Desconocido' label.",
+    "The edit (pencil) button is still shown on 'cerrada' orders. Check whether editing a closed order is allowed by the backend or whether the button should be hidden.",
+    "TarjetasRevision counts use cirugias.length / detenidas.length. This is fine while the backends return everything (total == len(data)), but it breaks if pagination is added."
+  ],
+  "updated_files": ["/app/frontend/src/components/igss/OrdenesIgssPaciente.js", "/app/tests/setup_libro_ui.py"],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "95% (1 critical bug found, fixed and verified)"},
+  "seed_data_creation": "Created NOG TESTUI18412 (unit CAMIP 2 BARRANQUILLA), patient 'TEST_UI Libro81118', 3 orders (TESTUI-81118, TESTUI2-81118, TESTUI3-81118) and 3 surgeries. Cleanup: orders annulled, surgeries deleted, patient deactivated, NOG deactivated (it cannot be deleted because it has orders). Two orphan surgeries created by a failed setup run were deleted. Also marked my own TEST surgery as realizada through the UI; no real surgeries were touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Setup script /app/tests/setup_libro_ui.py creates the detenida/programada scenario (needs a NOG_ID env var or it creates a new NOG; IGSS patients need a dpi and gender 'masculino'; surgeries need patient_name). Server date in preview is ~2026-11-17. OrdenesIgssPaciente is rendered inside <form> elements, so any new button there needs type='button'."
+}

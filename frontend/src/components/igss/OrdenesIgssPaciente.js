@@ -20,7 +20,7 @@ const Atenciones = ({ orden, onReasignar }) => (
           {a.excede_dosis && <span className="ml-1 text-red-600 font-medium">(excede dosis)</span>}
         </span>
         {ESTADOS_ACTIVOS.includes(orden.estado) && (
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onReasignar(orden, a)} data-testid={`reasignar-${a.ref_id}`}>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" type="button" onClick={() => onReasignar(orden, a)} data-testid={`reasignar-${a.ref_id}`}>
             <Shuffle className="w-3 h-3 mr-1" /> Reasignar
           </Button>
         )}
@@ -59,11 +59,11 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasi
           <Badge variant="outline" className={cls} data-testid={`orden-estado-${o.id}`}>{label}</Badge>
           {o.estado !== 'anulada' && (
             <>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onEditar} title="Editar" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" type="button" onClick={onEditar} title="Editar" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
               {o.estado === 'en_curso' && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-600" onClick={onCerrar} title="Cerrar sin completar" data-testid={`orden-cerrar-${o.id}`}><CircleSlash className="w-3.5 h-3.5" /></Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-600" type="button" onClick={onCerrar} title="Cerrar sin completar" data-testid={`orden-cerrar-${o.id}`}><CircleSlash className="w-3.5 h-3.5" /></Button>
               )}
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" type="button" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
             </>
           )}
         </div>
