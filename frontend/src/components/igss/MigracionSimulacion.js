@@ -92,6 +92,11 @@ const Resultado = ({ sim }) => {
       </div>
       <Bloqueos sim={sim} />
       <Advertencias lista={sim.advertencias} />
+      {t.ordenes_reubicadas > 0 && (
+        <p className="text-sm text-amber-900" data-testid="mig-reubicadas">
+          {n(t.ordenes_reubicadas)} No. SPS del par de unidades duplicadas se reubican en la unidad activa. Detalle una por una en la hoja «Órdenes reubicadas» del Excel.
+        </p>
+      )}
       <div className="grid xl:grid-cols-2 gap-4">
         <Tabla titulo="Por unidad" testId="mig-por-unidad"
           cols={['Unidad', 'A migrar', 'Consumidas', 'Pendientes', 'No migrables', 'Pend. de SPS']}
@@ -105,7 +110,8 @@ const Resultado = ({ sim }) => {
       </div>
       <p className="text-xs text-slate-500" data-testid="mig-historial">
         Historial ignorado (solo se cuenta): {n(t.evaluaciones_historicas_ignoradas)} evaluaciones ({n(t.evaluaciones_anteriores_al_contrato)} anteriores al contrato,
-        {' '}{n(t.evaluaciones_sin_unidad_igss_en_la_fecha)} sin unidad IGSS en esa fecha) y {n(t.cirugias_anteriores_al_contrato)} cirugías anteriores al contrato.
+        {' '}{n(t.evaluaciones_sin_unidad_igss_en_la_fecha)} anteriores a la primera actividad IGSS del paciente o, si no tiene ninguna, a la creación de su expediente)
+        {' '}y {n(t.cirugias_anteriores_al_contrato)} cirugías anteriores al contrato.
         {' '}{n(t.ordenes_ya_en_libro_con_atenciones_nuevas)} órdenes que ya están en el libro recibirían atenciones · {n(t.revisar_fecha)} para revisar fecha.
       </p>
     </div>

@@ -1,7 +1,7 @@
 # Libro IGSS — Fase 4 paso (a): simulación de migración (solo lectura, solo superadmin).
 # Clasificación de órdenes, no migrables, pendientes de SPS, historial ignorado; unidades
 # duplicadas (advertencia) y mismo No. SPS en dos unidades duplicadas (bloqueo); filtro por
-# unidad; Excel de 5 hojas; invariancia total de datos (dbHash). Prefijo TEST_, se borra al final.
+# unidad; reubicación del par duplicado; Excel de 6 hojas; invariancia total de datos (dbHash). Prefijo TEST_, se borra al final.
 import asyncio
 import io
 import os
@@ -21,11 +21,14 @@ API = f"{os.environ['REACT_APP_BACKEND_URL'].rstrip('/')}/api"
 SIM = f"{API}/igss-units/migracion/simular"
 
 TAG = uuid.uuid4().hex[:6]
-U, DU1, DU2 = (f"TEST_mig_{k}_{TAG}" for k in ("unit", "dup1", "dup2"))
-N1, N2, NBC, N3, ND1, ND2 = (f"TEST_mig_{k}_{TAG}" for k in ("n1", "n2", "bc", "n3", "nd1", "nd2"))
+U, DU1, DU2, U2, DA1, DA2 = (f"TEST_mig_{k}_{TAG}" for k in ("unit", "dup1", "dup2", "u2", "da1", "da2"))
+UNIDADES = [U, DU1, DU2, U2, DA1, DA2]
+N1, N2, NBC, N3, ND1, ND2, N4, ND3, NA1, NA2 = (f"TEST_mig_{k}_{TAG}" for k in (
+    "n1", "n2", "bc", "n3", "nd1", "nd2", "n4", "nd3", "na1", "na2"))
 NUM1, NUM2, NUM3, NUMD = f"TMIG1{TAG}", f"TMIG2{TAG}", f"TMIG3{TAG}", f"TMIGD{TAG}"
-P = {k: f"TEST_mig_p{k}_{TAG}" for k in range(1, 15)}
-SPS = {k: f"TMIG-{k}-{TAG}".upper() for k in "ABCDEFGHXYZ"}
+NUM4, NUMD2, NUMA = f"TMIG4{TAG}", f"TMIGE{TAG}", f"TMIGA{TAG}"
+P = {k: f"TEST_mig_p{k}_{TAG}" for k in range(1, 20)}
+SPS = {k: f"TMIG-{k}-{TAG}".upper() for k in "ABCDEFGHIJKLXYZ"}
 LIBRO_ID, LEG1 = f"TEST_mig_libro_{TAG}", f"TEST_mig_leg1_{TAG}"
 COLECCIONES = ["igss_nogs", "igss_nog_acreditaciones", "igss_produccion", "igss_ordenes_libro", "igss_atenciones_sin_orden",
                "patients", "evaluaciones_oftalmologicas", "surgeries", "igss_units", "audit_logs", "igss_libro_config"]
@@ -86,31 +89,45 @@ def seed():
         await db.igss_units.insert_many([
             {"id": U, "name": f"TEST_MIG Unidad {TAG}", "is_active": True, "created_at": "2025-01-01T00:00:00+00:00"},
             {"id": DU1, "name": f"TEST_MIG Duplicada {TAG}", "is_active": False, "created_at": "2026-01-01T00:00:00+00:00"},
-            {"id": DU2, "name": f"TEST_MIG  duplicada  {TAG}", "is_active": True, "created_at": "2026-02-01T00:00:00+00:00"}])
+            {"id": DU2, "name": f"TEST_MIG  duplicada  {TAG}", "is_active": True, "created_at": "2026-02-01T00:00:00+00:00"},
+            {"id": U2, "name": f"TEST_MIG Fechas {TAG}", "is_active": True, "created_at": "2025-01-01T00:00:00+00:00"},
+            # Mismo nombre solo al quitar tildes: advertencia, pero NO se reubica (solo espacios y mayúsculas)
+            {"id": DA1, "name": f"TEST_MIG Clínica {TAG}", "is_active": False, "created_at": "2026-01-01T00:00:00+00:00"},
+            {"id": DA2, "name": f"TEST_MIG Clinica {TAG}", "is_active": True, "created_at": "2026-02-01T00:00:00+00:00"}])
         await db.igss_nogs.insert_many([
             _nog(N1, NUM1, fecha_asignacion="2026-01-01"), _nog(N2, NUM2, cantidad=5),
             _nog(NBC, "", servicio="Servicio BC", tipo_compra="baja_cuantia", sin_tope=True, fecha_asignacion="2026-01-01"),
             _nog(N3, NUM3, is_active=False, cantidad=1, fecha_asignacion="2025-01-01"),
-            _nog(ND1, NUMD, unidad=DU1, fecha_asignacion="2026-01-01"), _nog(ND2, NUMD, unidad=DU2, fecha_asignacion="2026-01-01")])
+            _nog(ND1, NUMD, unidad=DU1, fecha_asignacion="2026-01-01"), _nog(ND2, NUMD, unidad=DU2, fecha_asignacion="2026-01-01"),
+            _nog(N4, NUM4, unidad=U2, created_at="2026-06-01T12:00:00+00:00"),
+            _nog(ND3, NUMD2, unidad=DU1, fecha_asignacion="2026-01-01"),
+            _nog(NA1, NUMA, unidad=DA1, fecha_asignacion="2026-01-01"), _nog(NA2, NUMA, unidad=DA2, fecha_asignacion="2026-01-01")])
         await db.patients.insert_many([
             _pac(1, [_ord(NUM1, SPS["A"], LEG1)]), _pac(2, [_ord(NUM2, SPS["B"])]),
             _pac(3, [_ord("BAJA CUANTIA", SPS["C"], proc="Servicio BC")]), _pac(4, [_ord("NOEXISTE99", SPS["D"])]),
             _pac(5, [_ord(NUM1, SPS["E"])]), _pac(6, [_ord(NUM1, SPS["E"])]), _pac(7, [_ord(NUM1, "")]),
             _pac(8, created_at="2026-01-01T12:00:00+00:00"), _pac(9), _pac(10),
             _pac(11, [_ord(NUMD, SPS["X"])], unidad=DU1), _pac(12, [_ord(NUMD, SPS["X"])], unidad=DU2),
-            _pac(13, [_ord(NUMD, SPS["Y"])], unidad=DU2), _pac(14, [_ord(NUMD, SPS["Z"])], unidad=DU1)])
+            _pac(13, [_ord(NUMD, SPS["Y"])], unidad=DU2), _pac(14, [_ord(NUMD, SPS["Z"])], unidad=DU1),
+            _pac(15, [_ord(NUM4, SPS["I"])], unidad=U2), _pac(16, [_ord(NUM4, SPS["J"])], unidad=U2),
+            _pac(17, [_ord(NUMD2, SPS["K"])], unidad=DU1), _pac(19, [_ord(NUMA, SPS["L"])], unidad=DA1)])
         await db.igss_nog_acreditaciones.insert_many([
             _acr(1, P[1], N1, SPS["A"], "2026-02-01T15:00:00+00:00"),
             _acr(7, P[7], N1, "", "2026-02-10T15:00:00+00:00"),
             _acr(8, P[8], N2, "", "2026-04-01T15:00:00+00:00", anulada=True),
             # Mismo patrón que producción: orden en una unidad y acreditación en el NOG de su duplicada
-            _acr(14, P[14], ND2, SPS["Z"], "2026-03-01T15:00:00+00:00", unidad=DU2)])
+            _acr(14, P[14], ND2, SPS["Z"], "2026-03-01T15:00:00+00:00", unidad=DU2),
+            _acr(15, P[15], N4, "", "2026-05-01T15:00:00+00:00", unidad=U2),
+            # Cupo en la activa y orden en la inactiva con un NOG que la activa no tiene: no se migra
+            _acr(17, P[17], ND2, SPS["K"], "2026-03-01T15:00:00+00:00", unidad=DU2),
+            _acr(19, P[19], NA2, SPS["L"], "2026-03-01T15:00:00+00:00", unidad=DA2)])
         await db.evaluaciones_oftalmologicas.insert_many([
             _ev("1a", P[1], "2025-12-15", igss_no_sps=SPS["A"]), _ev("1b", P[1], "2026-03-01", igss_orden_id=LEG1),
             _ev("2", P[2], "2025-06-01", igss_nog=NUM2), _ev("3", P[3], "2026-04-01", igss_no_sps=SPS["C"]),
             _ev("4", P[4], "2026-05-01", igss_no_sps=SPS["D"]), _ev("7a", P[7], "2025-11-01"),
             _ev("7b", P[7], "2026-06-01"), _ev("8", P[8], "2026-03-15"),
-            _ev("10", P[10], "2026-09-01", igss_no_sps=SPS["H"])])
+            _ev("10", P[10], "2026-09-01", igss_no_sps=SPS["H"]),
+            _ev("15", P[15], "2026-04-15", igss_no_sps=SPS["I"]), _ev("16", P[16], "2026-01-10", igss_no_sps=SPS["J"])])
         await db.igss_produccion.insert_one({"evaluacion_id": f"TEST_mig_ev3_{TAG}", "pagado": True, "costo_override": 75.0})
         await db.surgeries.insert_many([
             _cx(1, P[9], "2026-07-01", SPS["F"]), _cx(2, P[9], "2026-08-01", SPS["F"]),
@@ -123,8 +140,8 @@ def seed():
     yield
 
     async def clean(db):
-        await db.igss_units.delete_many({"id": {"$in": [U, DU1, DU2]}})
-        await db.igss_nogs.delete_many({"unidad_id": {"$in": [U, DU1, DU2]}})
+        await db.igss_units.delete_many({"id": {"$in": UNIDADES}})
+        await db.igss_nogs.delete_many({"unidad_id": {"$in": UNIDADES}})
         await db.patients.delete_many({"id": {"$in": list(P.values())}})
         await db.igss_nog_acreditaciones.delete_many({"id": {"$regex": f"^TEST_mig_acr.*_{TAG}$"}})
         await db.evaluaciones_oftalmologicas.delete_many({"id": {"$regex": f"^TEST_mig_ev.*_{TAG}$"}})
@@ -195,7 +212,19 @@ def test_orden_con_fecha_asignacion_excluye_anteriores(sim):
 def test_sin_fechas_incluye_todo_y_marca_revisar(sim):
     o = _orden(sim["u"], SPS["B"])
     assert o and o["nog_id"] == N2 and o["estado"] == "atendida"
-    assert o["revisar_fecha"] is True and "Revisar fecha" in o["observaciones"] and o["fecha_primera_atencion"] == "2025-06-01"
+    assert o["revisar_fecha"] is True and o["fecha_primera_atencion"] == "2025-06-01"
+    assert "Revisar fecha: sin ninguna fecha de referencia" in o["observaciones"]
+
+
+def test_fecha_de_respaldo_no_excluye_y_marca_solo_mas_de_90_dias(sim):
+    i, j = _orden(sim["todo"], SPS["I"]), _orden(sim["todo"], SPS["J"])
+    # Respaldo = la más antigua entre la acreditación del mismo paciente y entrada y el registro de la entrada
+    assert i["fecha_referencia"] == "2026-05-01" and i["fuente_referencia"] == "Acreditación de la orden"
+    assert i["evaluaciones"] == 1 and i["excluidas_anteriores"] == 0 and i["revisar_fecha"] is False
+    assert not any(x.startswith("Revisar fecha") for x in i["observaciones"])
+    assert j["fecha_referencia"] == "2026-06-01" and j["fuente_referencia"] == "Registro de la entrada del catálogo"
+    assert j["evaluaciones"] == 1 and j["excluidas_anteriores"] == 0 and j["revisar_fecha"] is True
+    assert "Revisar fecha: 1 atención(es) de más de 90 días antes del 01/06/2026" in j["observaciones"]
 
 
 def test_baja_cuantia_y_procedimiento(sim):
@@ -244,25 +273,49 @@ def test_unidades_duplicadas_advertencia_y_bloqueo_por_sps(sim):
     todo = sim["todo"]
     adv = next(a for a in todo["advertencias"] if {u["unidad_id"] for u in a["unidades"]} == {DU1, DU2})
     assert [u["unidad_id"] for u in adv["unidades"]] == [DU1, DU2]  # la más antigua primero
-    bloq = {b["no_sps"]: b for b in todo["bloqueos"] if set(b["unidades_ids"]) == {DU1, DU2}}
-    assert set(bloq) == {SPS["X"], SPS["Z"]}  # Y solo está en una unidad: no bloquea
-    assert {u["unidad_id"] for u in bloq[SPS["Z"]]["usos"]} == {DU1, DU2}
-    assert todo["aplicacion_permitida"] is False and todo["bloqueos_totales"] >= 2
-    # Filtro por la unidad duplicada: mismos bloqueos; por la otra unidad: ninguno
-    assert {b["no_sps"] for b in sim["dup"]["bloqueos"]} == {SPS["X"], SPS["Z"]}
-    assert all(o["unidad_id"] == DU1 for o in sim["dup"]["ordenes"]) and sim["dup"]["totales"]["unidades_duplicadas"] == 1
+    # Par reubicable (solo difiere en espacios y mayúsculas): ya no bloquea
+    assert not [b for b in todo["bloqueos"] if set(b["unidades_ids"]) == {DU1, DU2}]
+    # Par que solo coincide al quitar tildes: no se reubica y el mismo No. SPS sigue bloqueando
+    bloq = {b["no_sps"]: b for b in todo["bloqueos"] if set(b["unidades_ids"]) == {DA1, DA2}}
+    assert set(bloq) == {SPS["L"]} and {u["unidad_id"] for u in bloq[SPS["L"]]["usos"]} == {DA1, DA2}
+    assert todo["aplicacion_permitida"] is False
+    assert sim["dup"]["bloqueos"] == [] and sim["dup"]["totales"]["unidades_duplicadas"] == 1
+    assert all(o["unidad_id"] == DU1 for o in sim["dup"]["ordenes"])
+
+
+def test_reubicacion_en_la_unidad_activa(sim):
+    todo = sim["todo"]
+    r = {f["no_sps"]: f for f in todo["reubicadas"] if f["unidad_origen_id"] == DU1}
+    assert set(r) == {SPS["X"], SPS["Z"], SPS["K"]}  # Y y L no se reubican
+    assert all(f["unidad_destino_id"] == DU2 for f in r.values())
+    # Mismo paciente, cupo en la activa y orden en la inactiva: una sola orden en la activa
+    z = _orden(todo, SPS["Z"])
+    assert z["unidad_id"] == DU2 and z["nog_id"] == ND2 and z["paciente_id"] == P[14]
+    assert r[SPS["Z"]]["resultado"] == "Se migra en la unidad activa"
+    assert r[SPS["Z"]]["cupo_origen"].startswith(f"{NUMD} — sin cupo descontado")
+    assert r[SPS["Z"]]["cupo_destino"].startswith(f"{NUMD} — cupo descontado")
+    # Dos pacientes distintos con el mismo No. SPS: no se inventa a quién pertenece
+    assert r[SPS["X"]]["resultado"].startswith("No se migra: El No. SPS") and _orden(todo, SPS["X"]) is None
+    # El NOG de la hoja no existe en la unidad activa: ese caso no se migra
+    assert r[SPS["K"]]["resultado"] == f"No se migra: Reubicación: el NOG {NUMD2} no existe en la unidad activa"
+    nm = next(x for x in todo["no_migrables"] if x["no_sps"] == SPS["K"])
+    assert nm["unidad_id"] == DU1 and nm["motivo_agrupado"] == "NOG no existe en la unidad activa (reubicación)"
+    assert _orden(todo, SPS["K"])["unidad_id"] == DU2  # el cupo de la activa sí migra
+    assert {f["no_sps"] for f in sim["dup"]["reubicadas"]} == set(r) and todo["totales"]["ordenes_reubicadas"] >= 3
     assert sim["u"]["bloqueos"] == [] and sim["u"]["advertencias"] == [] and sim["u"]["aplicacion_permitida"] is False
 
 
-def test_excel_cinco_hojas(sim):
+def test_excel_seis_hojas(sim):
     for contenido in (sim["excel"], sim["excel2"]):
         wb = load_workbook(io.BytesIO(contenido))
-        assert wb.sheetnames == ["Resumen", "Por NOG", "Órdenes", "No migrables", "Pendientes de SPS"]
+        assert wb.sheetnames == ["Resumen", "Por NOG", "Órdenes", "No migrables", "Pendientes de SPS", "Órdenes reubicadas"]
     wb = load_workbook(io.BytesIO(sim["excel"]))
     cab = {h: [c.value for c in wb[h][1]] for h in wb.sheetnames[1:]}
     assert cab["Por NOG"][-3:-1] == ["Contador actual (acreditados)", "Acreditaciones vigentes hoy"]
     assert cab["Órdenes"][:12] == ["Unidad", "Modalidad", "NOG", "No. SPS", "Expediente", "Paciente", "Afiliación",
                                    "Procedimiento", "Fecha 1ª atención", "Estado propuesto", "Dosis autorizadas", "Origen"]
+    assert cab["Órdenes reubicadas"] == ["Unidad de origen", "Unidad de destino", "NOG", "No. SPS", "Expediente", "Paciente",
+                                         "Cupo en la unidad de origen", "Cupo en la unidad de destino", "Resultado"]
     for h in ("No migrables", "Pendientes de SPS"):
         assert cab[h][-2:] == ["No. SPS correcto", "Revisado por"]
         filas = list(wb[h].iter_rows(min_row=2, values_only=True))
@@ -272,6 +325,8 @@ def test_excel_cinco_hojas(sim):
     resumen = [row[0] for row in wb["Resumen"].iter_rows(values_only=True) if row and row[0]]
     assert "Total que NO se migra" in resumen and "Año de primera atención" in resumen
     assert "Motivo de no migración" in resumen
+    assert any(x.startswith("  · anteriores a la primera actividad IGSS del paciente") for x in resumen)
+    assert not any("sin unidad IGSS en esa fecha" in str(x) for x in resumen)
 
 
 def test_detalle_false_y_unidad_inexistente(sa):

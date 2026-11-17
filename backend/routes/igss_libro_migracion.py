@@ -25,6 +25,7 @@ router = APIRouter(prefix="/igss-units/migracion", tags=["IGSS - Libro (migraci�
 SOLO_SUPERADMIN = require_role(["superadmin"])
 
 FECHA_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DIAS_REVISAR = 90
 # Orígenes de acreditación cuya fecha es la del ingreso real de la orden (no un recálculo).
 ORIGENES_INGRESO = ("asignacion", "reasignacion", "evaluacion")
 SIN_ATENCION = "Sin atención (queda pendiente)"
@@ -34,6 +35,8 @@ TIPO_CASO = {"orden": "Orden", "evaluacion": "Evaluación", "cirugia": "Cirugía
 # (inicio del motivo, motivo agrupado, qué falta para poder migrarlo). El orden importa.
 REGLAS_MOTIVO = [
     ("Orden del paciente sin No. SPS", "Orden sin No. SPS", "El No. SPS de la hoja de autorización"),
+    ("Reubicación:", "NOG no existe en la unidad activa (reubicación)",
+     "Registrar el NOG en el catálogo de la unidad activa"),
     ("El NOG ", "NOG no está en el catálogo de la unidad",
      "Registrar el NOG en el catálogo de la unidad o corregir el NOG de la orden"),
     ("Sin NOG indicado", "Orden sin NOG", "Indicar el NOG o la entrada de Baja Cuantía de la orden"),
@@ -56,17 +59,24 @@ CRITERIOS = [
     "Solo lectura: la simulación no crea, edita ni borra ningún dato.",
     "Se migra toda orden con unidad IGSS, No. SPS y entrada del catálogo (NOG o Baja Cuantía), de cualquier año, "
     "incluidas las de entradas inactivas o completas. Nunca se crea una orden con No. SPS vacío, provisional o inventado.",
-    "Atenciones de cada orden: evaluaciones reales y cirugías realizadas con fecha igual o posterior a la fecha de "
-    "asignación de su entrada del catálogo; si la entrada no la tiene, la fecha de ingreso de la orden; si tampoco "
-    "existe, se incluyen todas y la orden queda marcada 'Revisar fecha'.",
+    "Atenciones de cada orden: evaluaciones reales y cirugías realizadas. Si la entrada del catálogo tiene fecha de "
+    "asignación, se excluyen las anteriores a esa fecha. Si no la tiene, no se excluye ninguna: la fecha de respaldo es "
+    "la más antigua entre la acreditación de la orden (mismo paciente y entrada) y el registro de la entrada en el "
+    "catálogo, y la orden se marca 'Revisar fecha' (dato informativo) solo si tiene una atención de más de 90 días "
+    "antes de esa fecha o si no hay ninguna fecha.",
     "Fecha de ingreso de una orden anterior al libro: la de su acreditación (asignación, reasignación o evaluación).",
     "Sin No. SPS: la atención o la acreditación vigente va a 'Pendientes de SPS' (no suma a consumidos ni a reservados).",
-    "Historial ignorado (solo se cuenta): atenciones anteriores al contrato y evaluaciones de pacientes que aún no "
-    "tenían unidad IGSS en esa fecha.",
+    "Historial ignorado (solo se cuenta): atenciones anteriores a la fecha de asignación del contrato y evaluaciones "
+    "anteriores a la primera actividad IGSS del paciente (primera acreditación, orden del libro, evaluación con NOG o "
+    "No. SPS, o cirugía IGSS); si el paciente no tiene ninguna, anteriores a la creación de su expediente.",
     "Contadores acumulados desde el inicio del contrato (no se reinician por año). Órdenes agrupadas por el año de su "
     "primera atención.",
-    "Unidades con el mismo nombre: advertencia, no impide aplicar. Un mismo No. SPS vigente en dos unidades "
-    "duplicadas: bloqueo, la aplicación se negará mientras exista.",
+    "Unidades con el mismo nombre: advertencia, no impide aplicar.",
+    "Par de unidades duplicadas (mismo nombre sin contar espacios ni mayúsculas, una activa y una inactiva): si un "
+    "mismo No. SPS está en las dos, la orden se crea en la unidad activa; si su NOG no existe en la unidad activa, ese "
+    "caso no se migra. Detalle en la hoja 'Órdenes reubicadas'. Solo aplica a ese par, nunca como regla general.",
+    "Un mismo No. SPS vigente en dos unidades duplicadas que no se pudo reubicar: bloqueo, la aplicación se negará "
+    "mientras exista.",
 ]
 
 _PAC_PROJ = {"_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1, "igss_afiliacion": 1,
@@ -92,6 +102,10 @@ def _dia_gt(iso) -> str:
 
 def _nombre(p: dict) -> str:
     return f"{(p or {}).get('first_name', '')} {(p or {}).get('last_name', '')}".strip()
+
+
+def _dias_antes(fecha: str, ref: str) -> int:
+    return (datetime.strptime(ref, "%Y-%m-%d") - datetime.strptime(fecha, "%Y-%m-%d")).days
 
 
 def _min(fechas) -> str:
@@ -149,6 +163,15 @@ class Catalogo:
         return None, f"Baja Cuantía: la unidad tiene {len(bcs)} entradas y no se pudo identificar cuál"
 
 
+    def equivalente(self, unidad_id: str, entrada: dict):
+        """La misma entrada (por número, o Baja Cuantía por servicio) en otra unidad."""
+        if (entrada.get("numero") or "").strip():
+            return self.por_numero.get((unidad_id, normalizar_sps(entrada["numero"])))
+        srv = entrada.get("nombre_servicio_norm") or norm_txt(entrada.get("nombre_servicio"))
+        cand = [n for n in self.bc.get(unidad_id, []) if (n.get("nombre_servicio_norm") or norm_txt(n.get("nombre_servicio"))) == srv]
+        return cand[0] if len(cand) == 1 else None
+
+
 class Simulacion:
     """Cruza órdenes del paciente, acreditaciones, evaluaciones, cirugías y el libro actual."""
 
@@ -162,7 +185,8 @@ class Simulacion:
         self.libro_por_clave = {(o["unidad_id"], o["no_sps"]): o for o in d["libro"]}
         self.en_libro = {(a.get("tipo"), a.get("ref_id")) for o in d["libro"] for a in o.get("atenciones") or []}
         self.cands, self.por_pac_sps, self.legado_por_id, self.legado_por_nog = {}, {}, {}, {}
-        self.entradas_pac, self.inicio_igss = {}, {}
+        self.entradas_pac, self.inicio_igss, self.acred_pac_nog = {}, {}, {}
+        self.reubicadas = []
         self.sueltas, self.pac_sin_sps = [], []
         self.pendientes_sps, self.no_migrables, self.migrables, self.ya_en_libro = [], [], [], []
         self.hist = Counter()
@@ -230,6 +254,9 @@ class Simulacion:
             if a.get("anulada") is True:
                 continue
             entrada, sps = self.cat.por_id.get(a.get("nog_id")), normalizar_sps(a.get("no_sps"))
+            k = (pid, (entrada or {}).get("id"))
+            if entrada and dia and a.get("origen") in ORIGENES_INGRESO and dia < self.acred_pac_nog.get(k, "9999"):
+                self.acred_pac_nog[k] = dia
             if not sps:
                 self.pendientes_sps.append(self._pendiente("cupo_sin_sps", a.get("id"), pid, entrada, dia,
                                                            unidad=a.get("unidad_id"), nombre=a.get("paciente_nombre")))
@@ -316,6 +343,60 @@ class Simulacion:
                     c["cirugias"].append(at)
             elif realizada:
                 self.sueltas.append((at, entrada, motivo))
+
+    # ---------- reubicación (par de unidades duplicadas) ----------
+
+    @staticmethod
+    def _cupo(c) -> str:
+        if not c["entradas"]:
+            return f"Sin entrada del catálogo ({', '.join(sorted(c['fuentes']))})"
+        descontado = "cupo descontado" if "acreditación" in c["fuentes"] else "sin cupo descontado"
+        return (f"{', '.join(sorted(etiqueta_catalogo(e) for e in c['entradas'].values()))} — {descontado} "
+                f"({', '.join(sorted(c['fuentes']))})")
+
+    def reubicar(self, pares):
+        """Mismo No. SPS en las dos unidades de un par duplicado: la orden va a la unidad activa,
+        con la misma entrada del catálogo; si esa entrada no existe en la activa, no se migra."""
+        for vieja, activa in pares:
+            comunes = {k[1] for k in self.cands if k[0] == vieja} & {k[1] for k in self.cands if k[0] == activa}
+            for sps in sorted(comunes):
+                origen, destino = self.cands[(vieja, sps)], self.cands[(activa, sps)]
+                if not origen["entradas"] or (vieja, sps) in self.libro_por_clave:
+                    continue
+                fila = {"unidad_origen_id": vieja, "unidad_destino_id": activa, "no_sps": sps,
+                        "nog": ", ".join(sorted(etiqueta_catalogo(e) for e in origen["entradas"].values())),
+                        **self._pac_datos(origen["pacientes"] | destino["pacientes"]),
+                        "cupo_origen": self._cupo(origen), "cupo_destino": self._cupo(destino), "resultado": ""}
+                equiv = {i: self.cat.equivalente(activa, e) for i, e in origen["entradas"].items()}
+                faltan = sorted(etiqueta_catalogo(origen["entradas"][i]) for i, e in equiv.items() if not e)
+                del self.cands[(vieja, sps)]
+                if faltan:
+                    motivo = f"Reubicación: el NOG {', '.join(faltan)} no existe en la unidad activa"
+                    self.no_migrables.append(self._caso(
+                        "orden", vieja, _min(origen["ingresos"]), motivo, origen["pacientes"],
+                        list(origen["entradas"].values()), sps, origen["fuentes"],
+                        len(origen["evaluaciones"]) + len(origen["cirugias"])))
+                    fila["resultado"] = f"No se migra: {motivo}"
+                else:
+                    destino["pacientes"] |= origen["pacientes"]
+                    destino["entradas"].update({e["id"]: e for e in equiv.values()})
+                    destino["fuentes"] |= origen["fuentes"]
+                    destino["cx_vinculadas"] += origen["cx_vinculadas"]
+                    for k in ("motivos", "ingresos", "evaluaciones", "cirugias"):
+                        destino[k] += origen[k]
+                    destino["codigo"] = destino["codigo"] or origen["codigo"]
+                    destino["procedimiento"] = destino["procedimiento"] or origen["procedimiento"]
+                self.reubicadas.append(fila)
+
+    def _resultado_reubicadas(self):
+        migran = {(o["unidad_id"], o["no_sps"]) for o in self.migrables}
+        motivos = {(x["unidad_id"], x["no_sps"]): x["motivo"] for x in self.no_migrables if x["no_sps"]}
+        for f in self.reubicadas:
+            key = (f["unidad_destino_id"], f["no_sps"])
+            f["resultado"] = f["resultado"] or (
+                "Se migra en la unidad activa" if key in migran else
+                "Ya está en el libro de la unidad activa" if key in self.libro_por_clave else
+                f"No se migra: {motivos.get(key, 'revisar con la hoja física')}")
 
     # ---------- clasificación ----------
 
@@ -414,6 +495,7 @@ class Simulacion:
                     [{"evaluacion": "evaluación", "cirugia": "cirugía"}[at["tipo"]]], 1,
                     nombre=at.get("paciente_nombre", "")))
         self._ordenes_probables()
+        self._resultado_reubicadas()
 
     def _ordenes_probables(self):
         """Para cada cupo sin SPS, la orden con SPS del mismo paciente y NOG (si es una sola)."""
@@ -430,15 +512,22 @@ class Simulacion:
         unidad = entrada.get("unidad_id", "")
         ingreso = _min(c["ingresos"])
         asignacion = _dia(entrada.get("fecha_asignacion"))
-        ref = asignacion or ingreso
-        evs, ev_fuera = self._filtrar(c["evaluaciones"], ref, unidad)
-        cxs, cx_fuera = self._filtrar(c["cirugias"], ref, unidad)
+        acred = _min([ingreso, self.acred_pac_nog.get((pid, entrada["id"]), "")])
+        respaldo = _min([acred, _dia_gt(entrada.get("created_at"))])
+        evs, ev_fuera = self._filtrar(c["evaluaciones"], asignacion, unidad)
+        cxs, cx_fuera = self._filtrar(c["cirugias"], asignacion, unidad)
         dentro = sorted(evs + cxs, key=lambda a: a["fecha"])
+        tempranas = [] if asignacion or not respaldo else [
+            a for a in dentro if a["fecha"] and _dias_antes(a["fecha"], respaldo) > DIAS_REVISAR]
+        revisar = not asignacion and (not respaldo or bool(tempranas))
+        fuente = ("Asignación del NOG" if asignacion else "Acreditación de la orden" if respaldo and respaldo == acred
+                  else "Registro de la entrada del catálogo" if respaldo else "")
         tipo = "procedimiento" if c["cx_vinculadas"] else "consulta"
         p = self.pacs.get(pid) or {}
         obs = []
-        if not ref:
-            obs.append("Revisar fecha")
+        if revisar:
+            obs.append(f"Revisar fecha: {len(tempranas)} atención(es) de más de {DIAS_REVISAR} días antes del "
+                       f"{fmt_fecha(respaldo)}" if respaldo else "Revisar fecha: sin ninguna fecha de referencia")
         if entrada.get("is_active") is False:
             obs.append("Entrada del catálogo inactiva")
         if tipo == "procedimiento":
@@ -456,12 +545,12 @@ class Simulacion:
             "codigo": c["codigo"], "procedimiento": c["procedimiento"] or entrada.get("nombre_servicio", ""),
             "tipo": tipo, "dosis_autorizadas": max(1, len(cxs)) if tipo == "procedimiento" else 1,
             "estado": "atendida" if dentro else "pendiente", "fecha_ingreso": ingreso,
-            "fecha_referencia": ref, "fuente_referencia": "Asignación del NOG" if asignacion else "Ingreso de la orden" if ingreso else "",
+            "fecha_referencia": asignacion or respaldo, "fuente_referencia": fuente,
             "fecha_primera_atencion": _min(a["fecha"] for a in dentro),
             "evaluaciones": len(evs), "cirugias": len(cxs), "fechas_atenciones": [a["fecha"] for a in dentro],
             "atenciones": [{k: a[k] for k in ("tipo", "ref_id", "fecha", "medico")} for a in dentro],
             "excluidas_anteriores": len(ev_fuera) + len(cx_fuera), "resuelve_sin_orden": resueltas,
-            "revisar_fecha": not ref, "origen": sorted(c["fuentes"]), "precio": float(entrada.get("precio") or 0),
+            "revisar_fecha": revisar, "origen": sorted(c["fuentes"]), "precio": float(entrada.get("precio") or 0),
             **self._estados(c["evaluaciones"]), "observaciones": obs,
         }
 
@@ -534,6 +623,21 @@ def _grupos_duplicados(units: dict) -> list:
         grupos.setdefault(norm_txt(u.get("name")), []).append(uid)
     return [sorted(ids, key=lambda i: units[i].get("created_at") or "") for k, ids in sorted(grupos.items())
             if k and len(ids) > 1]
+
+
+def _pares_duplicados(units: dict) -> list:
+    """(inactiva, activa): exactamente dos unidades con el mismo nombre sin contar espacios ni mayúsculas."""
+    grupos = {}
+    for uid, u in units.items():
+        k = " ".join(str(u.get("name") or "").split()).lower()
+        if k:
+            grupos.setdefault(k, []).append(uid)
+    pares = []
+    for ids in grupos.values():
+        activas = [i for i in ids if units[i].get("is_active", True) is not False]
+        if len(ids) == 2 and len(activas) == 1:
+            pares.append((next(i for i in ids if i != activas[0]), activas[0]))
+    return pares
 
 
 def _advertencias(grupos, units, d, s) -> list:
@@ -647,6 +751,7 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
     s.acreditaciones(d["acreds"])
     s.evaluaciones(d["evals"])
     s.cirugias(d["cxs"])
+    s.reubicar(_pares_duplicados(units))
     s.clasificar()
     grupos = _grupos_duplicados(units)
     advertencias, bloqueos = _advertencias(grupos, units, d, s), _bloqueos(grupos, units, s)
@@ -660,6 +765,10 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
     no_migrables = sorted(filter(de_unidad, s.no_migrables), key=lambda x: _orden_caso(x, units))
     pendientes = sorted(filter(de_unidad, s.pendientes_sps), key=lambda x: _orden_caso(x, units))
     ya_en_libro = list(filter(de_unidad, s.ya_en_libro))
+    reubicadas = [f for f in s.reubicadas if not unidad_id or unidad_id in (f["unidad_origen_id"], f["unidad_destino_id"])]
+    for f in reubicadas:
+        f["unidad_origen"] = units.get(f["unidad_origen_id"], {}).get("name", "")
+        f["unidad_destino"] = units.get(f["unidad_destino_id"], {}).get("name", "")
     resumen = list(filter(de_unidad, resumen))
     if unidad_id:
         advertencias = [a for a in advertencias if any(u["unidad_id"] == unidad_id for u in a["unidades"])]
@@ -689,6 +798,7 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
         "cirugias_anteriores_al_contrato": hist["cirugia_anterior_contrato"],
         "nogs_con_sobrecupo": sum(1 for f in resumen if f["sobrecupo"]),
         "unidades_duplicadas": len(advertencias),
+        "ordenes_reubicadas": len(reubicadas),
         "bloqueos": len(bloqueos_unidad),
     }
     return {
@@ -701,7 +811,7 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
         "unidades": sorted(({"id": u["id"], "name": u.get("name", ""), "is_active": u.get("is_active", True) is not False}
                             for u in units.values()), key=lambda u: u["name"]),
         "resumen_nog": resumen, "ordenes": ordenes, "no_migrables": no_migrables, "pendientes_sps": pendientes,
-        "ya_en_libro": ya_en_libro,
+        "ya_en_libro": ya_en_libro, "reubicadas": reubicadas,
     }
 
 
@@ -737,10 +847,12 @@ def _hoja_resumen(ws, sim):
         ("Órdenes que ya están en el libro y recibirían atenciones", t["ordenes_ya_en_libro_con_atenciones_nuevas"]),
         (f"{t['evaluaciones_historicas_ignoradas']} evaluaciones históricas ignoradas", t["evaluaciones_historicas_ignoradas"]),
         ("  · anteriores a la fecha de asignación del contrato", t["evaluaciones_anteriores_al_contrato"]),
-        ("  · paciente aún sin unidad IGSS en esa fecha", t["evaluaciones_sin_unidad_igss_en_la_fecha"]),
+        ("  · anteriores a la primera actividad IGSS del paciente (o a la creación de su expediente si no tiene ninguna)",
+         t["evaluaciones_sin_unidad_igss_en_la_fecha"]),
         ("Cirugías anteriores al contrato ignoradas", t["cirugias_anteriores_al_contrato"]),
         ("Entradas del catálogo que quedarían sobre su cupo", t["nogs_con_sobrecupo"]),
         ("Unidades duplicadas (advertencia)", t["unidades_duplicadas"]),
+        ("No. SPS del par duplicado reubicados en la unidad activa", t["ordenes_reubicadas"]),
         ("No. SPS repetidos en unidades duplicadas (bloqueo)", t["bloqueos"])]) + 2
     r = _tabla(ws, r, ["Unidad", "Órdenes a migrar", "Consumidas", "Pendientes", "No migrables", "Pendientes de SPS"],
                [(u["unidad"], u["a_migrar"], u["consumidas"], u["pendientes"], u["no_migrables"], u["pendientes_sps"])
@@ -793,6 +905,10 @@ def simulacion_excel(sim: dict) -> io.BytesIO:
          [(x["unidad"], fmt_fecha(x["fecha"]), x["etiqueta"], x["nog"] or "Sin NOG identificado", x["expediente"],
            x["paciente_nombre"], x["igss_afiliacion"], x["procedimiento"], x["medico"], x["orden_probable"])
           for x in sim["pendientes_sps"]]),
+        ("Órdenes reubicadas", ["Unidad de origen", "Unidad de destino", "NOG", "No. SPS", "Expediente", "Paciente",
+                                "Cupo en la unidad de origen", "Cupo en la unidad de destino", "Resultado"],
+         [(f["unidad_origen"], f["unidad_destino"], f["nog"], f["no_sps"], f["expediente"], f["paciente_nombre"],
+           f["cupo_origen"], f["cupo_destino"], f["resultado"]) for f in sim["reubicadas"]]),
     ]
     for nombre, titulos, filas in hojas:
         hoja = wb.create_sheet(nombre)
@@ -814,7 +930,7 @@ async def simular(unidad_id: Optional[str] = None, detalle: bool = Query(True),
     detalle=false devuelve solo totales y desgloses (pantalla)."""
     sim = await simular_migracion(unidad_id)
     if not detalle:
-        for k in ("resumen_nog", "ordenes", "no_migrables", "pendientes_sps", "ya_en_libro"):
+        for k in ("resumen_nog", "ordenes", "no_migrables", "pendientes_sps", "ya_en_libro", "reubicadas"):
             sim.pop(k)
     return sim
 
