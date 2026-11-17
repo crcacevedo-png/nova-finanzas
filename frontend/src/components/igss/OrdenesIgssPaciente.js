@@ -38,8 +38,8 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onReasignar }) =>
   const [cls, label] = ESTADO[o.estado] || ESTADO.pendiente;
   return (
     <div className="border border-slate-200 rounded-lg p-3 bg-white" data-testid={`orden-libro-${o.id}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <button type="button" onClick={onToggle} className="flex items-start gap-2 text-left">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+        <button type="button" onClick={onToggle} className="flex items-start gap-2 text-left min-w-0 sm:flex-1">
           {abierta ? <ChevronDown className="w-4 h-4 mt-0.5 text-slate-400" /> : <ChevronRight className="w-4 h-4 mt-0.5 text-slate-400" />}
           <div>
             <div className="text-sm font-semibold text-slate-800">
@@ -52,8 +52,8 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onReasignar }) =>
             </div>
           </div>
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-700" data-testid={`orden-dosis-${o.id}`}>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-medium text-slate-700 whitespace-nowrap" data-testid={`orden-dosis-${o.id}`}>
             {o.tipo === 'procedimiento' ? `Dosis aplicadas ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : `${o.total_atenciones} atención(es)`}
           </span>
           <Badge variant="outline" className={cls} data-testid={`orden-estado-${o.id}`}>{label}</Badge>

@@ -280,7 +280,7 @@ const Dashboard = () => {
         {/* Alertas de contratos NOG (IGSS) */}
         {puedeVerLibroIgss(user) && (
           <NogAlertasBanner
-            onVer={(a) => navigate(`/configuracion/unidades-igss?nogUnidad=${a.unidad_id}&nog=${a.nog_id}&nombre=${encodeURIComponent(a.unidad_nombre || '')}`)}
+            onVer={(a) => navigate(`/igss/unidades?nogUnidad=${a.unidad_id}&nog=${a.nog_id}&nombre=${encodeURIComponent(a.unidad_nombre || '')}`)}
           />
         )}
 

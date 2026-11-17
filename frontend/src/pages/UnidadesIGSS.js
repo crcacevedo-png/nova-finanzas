@@ -185,7 +185,6 @@ const UnidadesIGSS = () => {
   const [nogInicial, setNogInicial] = useState(null);
   const [alertReload, setAlertReload] = useState(0);
   const [resumen, setResumen] = useState(null);
-  const [reconciliando, setReconciliando] = useState(false);
   const [mantOpen, setMantOpen] = useState(false);
   const [mantPreview, setMantPreview] = useState(null);
   const [mantLoading, setMantLoading] = useState(false);
@@ -225,21 +224,6 @@ const UnidadesIGSS = () => {
     setNogUnit(unit);
     setNogInicial(nogId);
     setNogDialogOpen(true);
-  };
-
-  const handleReconciliar = async () => {
-    try {
-      setReconciliando(true);
-      const res = await igssNogApi.reconciliarTodo();
-      const n = res.data?.pacientes_reconciliados ?? 0;
-      toast.success(`Consumo de NOG recalculado (${n} pacientes revisados)`);
-      setAlertReload((v) => v + 1);
-      fetchUnits();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Error al recalcular el consumo de NOG');
-    } finally {
-      setReconciliando(false);
-    }
   };
 
   const abrirMantenimiento = async () => {
@@ -348,7 +332,7 @@ const UnidadesIGSS = () => {
       const u = units.find((x) => x.id === uId)
         || { id: uId, name: params.get('nombre') || '', code: '' };
       abrirNogsUnidad(u, nId || null);
-      navigate('/configuracion/unidades-igss', { replace: true });
+      navigate('/igss/unidades', { replace: true });
     }
   }, [location.search, units]);
 
@@ -458,17 +442,6 @@ const UnidadesIGSS = () => {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Actualizar
               </Button>
-              {verLibro && <Button
-                variant="outline"
-                onClick={handleReconciliar}
-                disabled={reconciliando}
-                className="btn-outline"
-                data-testid="reconciliar-nog-button"
-                title="Recalcula el consumo de todos los NOG según los pacientes asignados"
-              >
-                <RotateCcw className={`w-4 h-4 mr-2 ${reconciliando ? 'animate-spin' : ''}`} />
-                {reconciliando ? 'Recalculando...' : 'Recalcular consumo'}
-              </Button>}
               <Button
                 variant="outline"
                 onClick={abrirMantenimiento}

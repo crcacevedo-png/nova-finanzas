@@ -336,8 +336,8 @@ const GestionNOG = () => {
                         <div className="text-[11px] text-slate-400 whitespace-nowrap">{n.consumidos} atend. · {n.reservados} reserv.</div>
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-slate-700">{n.sin_tope ? '—' : n.disponibles}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{fmtQ(n.precio)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-800" data-testid={`nog-monto-total-${n.id}`}>{fmtQ(n.monto_total)}</td>
+                      <td className="px-4 py-3 text-right text-slate-600 whitespace-nowrap">{fmtQ(n.precio)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-800 whitespace-nowrap" data-testid={`nog-monto-total-${n.id}`}>{fmtQ(n.monto_total)}</td>
                       <td className="px-4 py-3"><EstadoBadge estado={n.estado} /></td>
                       <td className="px-4 py-3">
                         {puedeEditar && <div className="flex items-center justify-end gap-1">

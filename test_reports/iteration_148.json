@@ -1,0 +1,51 @@
+{
+  "summary": "Frontend testing of Libro IGSS Fase 3 (reading counters, alerts, exports and Producción from the libro). I seeded TEST_ data by API with /app/tests/seed_igss_fase3_ui.py: 1 unit, NOG cantidad 10, a second NOG at 90 %, a Baja Cuantía entry, a patient, and orders (consulta atendida, pendiente, anulada, procedimiento with 3 doses applied, BC atendida, plus 8 pendientes on the 90 % NOG). Then I tested with Playwright as superadmin, admin, igss.admin, usuario and medico_test. Features 1, 2, 4, 5, 6 and 7 work end to end. Feature 3 passes, but the Dashboard check could not be done for usuario/medico_test because those roles have no Dashboard access and are sent to /pacientes. Feature 8 passes in part: Sala de Operaciones could not be reached as medico_test (role has no menu in preview), and the NOG filter in Pacientes is hidden for 'usuario'. One real bug: the Dashboard alert 'Ver' button goes to a route that does not exist. Excel contents were checked with openpyxl.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/igss-units/{unit_id}/nogs-activos", "issue": "For libro roles, pacientes_asignados is still counted from the legacy patients.igss_nog field, not from the libro, so the Pacientes NOG filter label '(X pac. · usados/cantidad)' mixes old and new sources. Baja Cuantía entries (numero '') are left out of the selector on purpose (filter numero $nin ['', None])."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Dashboard NogAlertasBanner onVer + UnidadesIGSS deep-link effect", "issue": "The 'Ver' button on a Dashboard alert navigates to /configuracion/unidades-igss?nogUnidad=..&nog=.. . No such route exists in App.js, so DefaultRedirect sends the user back to /dashboard and the NOG dialog never opens. Confirmed in the UI: after clicking, the URL was /dashboard. UnidadesIGSS.js line 351 also does navigate('/configuracion/unidades-igss', {replace:true}) after the auto-open. Fix: use /igss/unidades in both places (Dashboard.js line ~283 and UnidadesIGSS.js line 351).", "selector": "[data-testid=nog-alerta-ver-{nog_id}] on /dashboard", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Pacientes NOG filter for the 'usuario' role (feature 8)", "issue": "Pacientes.js wraps the whole NOG filter in puedeVerLibroIgss(user), so 'usuario' sees only the Unidad IGSS filter. Neither filter-igss-nog-select nor filter-igss-nog is rendered. The review request expected the NOG filter to work for 'usuario' without counters. The backend nogs-activos already returns a version without counters for that role. Either show the select (no counters) for non-libro roles or confirm that hiding it is intended.", "affected_selectors": ["filter-igss-nog-select", "filter-igss-nog"]},
+      {"flow": "Sala de Operaciones as medico_test (feature 8)", "issue": "medico_test cannot open /sala-operaciones in preview and is redirected to /pacientes; the menu shows only Agenda, Pacientes and Evaluación. There is no menu_configurations doc for role 'medico', and DEFAULT_MENU_CONFIG['medico'] = [pacientes, agenda, evaluacion_oftalmologica], which contradicts /app/memory/test_credentials.md (it lists sala_operaciones). This is not a Fase 3 regression. I checked the surgery-igss-nog selector as superadmin instead: it lists the unit's NOGs plus 'Escribir NOG libre…' with no errors.", "affected_selectors": ["register-surgery-btn", "surgery-igss-nog"]}
+    ],
+    "design_issues": [
+      {"screen": "/igss/nog table", "issues": ["Large amounts in the 'Monto total' column wrap onto two lines ('Q' on one line, '96,000.00' on the next). Add whitespace-nowrap."]},
+      {"screen": "NogsUnidadDialog", "issues": ["The 'Pacientes sin NOG asignado (1)' section listed the test patient even though they had 11 orders in the libro. It still reads the legacy patients.igss_nog field and can mislead now that the libro is the source of truth.", "The header button 'Recalcular consumo' (global, legacy) is still on /igss/unidades. The per-NOG Recalcular button is gone as required."]},
+      {"screen": "Patient view > Órdenes IGSS (libro)", "issues": ["Inconsistent row layout: for atendida orders the dosis/badge/actions drop to a second line, while pendiente/anulada orders keep them inline."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/seed_igss_fase3_ui.py"],
+  "action_items": [
+    "Fix the Dashboard alert 'Ver' link: change /configuracion/unidades-igss to /igss/unidades in Dashboard.js and UnidadesIGSS.js (line 351).",
+    "Decide on the Pacientes NOG filter for non-libro roles ('usuario'): show the select without counters (as the review request expects) or document that it is hidden.",
+    "Optional: count pacientes_asignados in nogs-activos and the 'Pacientes sin NOG asignado' list from the libro instead of the legacy patients.igss_nog field.",
+    "Optional: medico role menu config in preview lacks sala_operaciones, which contradicts test_credentials.md."
+  ],
+  "critical_code_review_comments": [
+    "Dashboard.js onVer and UnidadesIGSS.js deep-link effect use a stale route (/configuracion/unidades-igss).",
+    "Pacientes.js puedeVerLibroIgss gate hides the NOG filter for every non-libro role, not just the counters.",
+    "igss_libro_lecturas.listar_nogs_activos: pacientes_asignados is aggregated from patients.igss_nog (legacy).",
+    "GestionNOG.js (495 lines), NogsUnidadDialog.js (526) and igss_libro_lecturas.py (551) are under the 700-line limit. All the required data-testids are present."
+  ],
+  "updated_files": ["/app/tests/seed_igss_fase3_ui.py (new, seed helper only)"],
+  "success_rate": {"backend": "skipped (frontend only)", "frontend": "~90% (31/34 checks; 1 bug, 2 role-related deviations)"},
+  "verified_passing": [
+    "1. /igss/nog: 5 cards present; Cupos column shows '3 / 10' and '2 atend. · 1 reserv.' (anulada not counted, 3-dose procedimiento counted once); per-row download works (Listado_oficial_TESTQA683bc.xlsx, sheets Resumen + NOG); Listado oficial dialog: no-unit toast 'Elija la unidad IGSS', desde>hasta toast, download works and the dialog closes. Excel checked: Resumen + one sheet per NOG + 'Baja Cuantía', one row per atendida order, '3 / 3' with dose dates '12/11/2026, 13/11/2026, 14/11/2026', footer totals, date range filters on 1ª atención (11–30 Nov excluded the 10 Nov order).",
+    "4. At 90 %: creating the 9th order from the patient view > Nueva orden shows toast 'TESTQA90683bc ya ocupa 9 de 10 cupos (90.0 %)...'. Banner shows '9/10 cupos (90%) · 0 atendidas · 9 reservadas · 1 disponibles' on Dashboard and /igss/unidades for superadmin and on /igss/unidades for igss.admin.",
+    "5. UnidadesIGSS: 'NOG disponibles' and 'Órdenes consumidas' cards present; NOG dialog shows Consumidos/Reservados, Avance '2 atendidas · 1 reservadas · 7 disp.', no Recalcular button; expanding a NOG lists the atendida, pendiente and 3/3 procedimiento orders and leaves out the anulada; per-NOG and unit 'Listado oficial' downloads work with the date filter.",
+    "6. Producción: Rango mode shows 3 rows (one per atendida order; none for pendiente or anulada); prod-dosis '3 / 3'; Pagado checkbox and costo 150 persist after reload and update the totals; Exportar downloads produccion_igss.xlsx; Imprimir shows only for orders with an evaluación; the card is labelled 'Órdenes'.",
+    "3/7. Roles: usuario and medico_test have no nav-gestion-nog and /igss/nog redirects to /pacientes; no 403 calls were seen; the API returns 403 for /nogs/alertas and /nogs/all for both roles; admin sees NOG under the IGSS group and /igss/nog loads; igss.admin sees NOG, Unidades IGSS with Producción and the banner.",
+    "Note: admin has no Unidades IGSS menu or permission in preview (/igss/unidades redirects). This is existing role config; the request only required NOG for admin."
+  ],
+  "seed_data_creation": "Created by API: unit 'TEST_QA Unidad 683bc', 3 NOG/BC entries, patient 'TEST_QA Paciente 683bc', 14 orders, 2 evaluaciones, 3 surgeries. I deleted all of them afterwards from MongoDB by the exact ids created (/tmp/qa_seed.json). No seed or production data was touched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Use /app/tests/seed_igss_fase3_ui.py to seed (it writes ids to /tmp/qa_seed.json); delete by those ids afterwards. Login rate limit is about 5/min, so wait 30–40 s between multi-login scripts. In the sidebar, the IGSS group (nav-igss) must be clicked open before nav-gestion-nog is in the DOM. Retest: Dashboard alert 'Ver' should open /igss/unidades with nogs-unidad-dialog; Pacientes NOG filter for 'usuario'.",
+  "rca of the issue": "Dashboard 'Ver': the Unidades IGSS route was moved from /configuracion/unidades-igss to /igss/unidades, but Dashboard.js onVer and the UnidadesIGSS.js history-replace still use the old path. The * route's DefaultRedirect sends the user to their default page (/dashboard), so the click looks like it does nothing. Steps: as superadmin with a NOG at 90 % or more, open /dashboard, click nog-alerta-ver-{id}; the URL stays /dashboard. Fix: replace the path with /igss/unidades."
+}

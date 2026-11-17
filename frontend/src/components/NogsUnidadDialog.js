@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, Pencil, Trash2, Download, Users, ChevronDown, ChevronRight,
+  Plus, Pencil, Trash2, Download, ChevronDown, ChevronRight,
   AlertTriangle, XCircle, FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -306,7 +306,6 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
   const nogs = data?.nogs || [];
   const totales = data?.totales || {};
   const fuera = data?.pacientes_nog_no_catalogado || [];
-  const sinNog = data?.pacientes_sin_nog || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -440,15 +439,15 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
         )}
 
         {/* Pacientes de la unidad fuera del catálogo / sin NOG */}
-        {!loading && (fuera.length > 0 || sinNog.length > 0) && (
+        {!loading && fuera.length > 0 && (
           <div className="space-y-4">
             {fuera.length > 0 && (
               <div data-testid="nog-fuera-catalogo">
                 <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 mb-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Pacientes con NOG fuera del catálogo ({fuera.length})
+                  Pacientes con NOG escrito fuera del catálogo ({fuera.length})
                 </div>
-                <p className="text-xs text-gray-500 mb-2">Tienen un NOG escrito que aún no existe en el catálogo. Crea ese NOG para acreditarlos automáticamente.</p>
+                <p className="text-xs text-gray-500 mb-2">Dato anterior al libro: su ficha tiene un número de NOG que no existe en el catálogo. Regístrelo antes de migrar sus órdenes al libro.</p>
                 <div className="overflow-x-auto border rounded-lg">
                   <Table>
                     <TableHeader><TableRow>
@@ -463,32 +462,6 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
                           <TableCell className="font-mono text-xs">{p.record_number || '—'}</TableCell>
                           <TableCell className="text-sm">{p.full_name}</TableCell>
                           <TableCell className="text-xs font-medium text-amber-700">{p.igss_nog}</TableCell>
-                          <TableCell className="text-xs">{p.phone || '—'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-            {sinNog.length > 0 && (
-              <div data-testid="nog-sin-nog">
-                <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-2">
-                  <Users className="w-4 h-4" />
-                  Pacientes sin NOG asignado ({sinNog.length})
-                </div>
-                <div className="overflow-x-auto border rounded-lg">
-                  <Table>
-                    <TableHeader><TableRow>
-                      <TableHead className="table-header">Expediente</TableHead>
-                      <TableHead className="table-header">Paciente</TableHead>
-                      <TableHead className="table-header">Teléfono</TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
-                      {sinNog.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="font-mono text-xs">{p.record_number || '—'}</TableCell>
-                          <TableCell className="text-sm">{p.full_name}</TableCell>
                           <TableCell className="text-xs">{p.phone || '—'}</TableCell>
                         </TableRow>
                       ))}

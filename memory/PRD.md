@@ -20,7 +20,7 @@ superadmin, admin, usuario, medico, administrador_igss, optica, anestesia — ca
 - **Evaluación Oftalmológica**: expediente por consulta con autoguardado, antecedentes/medicamentos/diagnósticos que persisten entre visitas, recetas, sellado a las 24h.
 - **Agenda**: citas, integración Google Calendar.
 - **Sala de Operaciones / Anestesia**: registro de cirugías, cierre mensual de anestesia con pago individual por procedimiento.
-- **IGSS**: unidades, NOG, producción, órdenes. Libro de órdenes IGSS (`igss_ordenes_libro`, en construcción por fases): 1 orden por No. SPS y unidad, fuente única de conteo (consumidos/reservados), exclusivo de superadmin/admin/administrador_igss; catálogo admite Baja Cuantía sin número y entradas sin tope.
+- **IGSS**: unidades, NOG, producción, órdenes. Libro de órdenes IGSS (`igss_ordenes_libro`, Fases 1-3 completas, Fase 4 migración pendiente): 1 orden por No. SPS y unidad, fuente única de conteo (consumidos = órdenes atendidas, reservados = órdenes pendientes; nunca dosis), exclusivo de superadmin/admin/administrador_igss; catálogo admite Baja Cuantía sin número y entradas sin tope; listado oficial Excel 1 fila por orden atendida.
 - **Óptica / POS / Caja / Inventario FEFO**: ventas, inventario, conciliación.
 - **FEL Digifact**: facturación electrónica (pausado, pendiente activación SAT/certificación — ver ROADMAP).
 

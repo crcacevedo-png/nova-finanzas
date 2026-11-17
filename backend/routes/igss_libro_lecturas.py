@@ -166,30 +166,24 @@ async def _filas(ordenes: list, nogs: dict) -> list:
 
 @router.get("/{unit_id}/nogs")
 async def listar_nogs_unidad(unit_id: str, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
-    """NOG de la unidad con sus contadores del libro, más los pacientes de la unidad con
-    NOG escrito fuera del catálogo o sin NOG (solo activos)."""
+    """NOG de la unidad con sus contadores del libro, más los pacientes activos de la unidad
+    con un NOG escrito (dato anterior al libro) que no existe en el catálogo."""
     unit = await _unidad_or_404(unit_id)
     nogs = sorted(await _nogs_libro({"unidad_id": unit_id}), key=lambda n: (n["numero"] == "", n["etiqueta"]))
     numeros = {(n["numero"] or "").strip() for n in nogs}
     pacientes = await db.patients.find(
-        {"is_active": True, "igss_unit_id": unit_id},
+        {"is_active": True, "igss_unit_id": unit_id, "igss_nog": {"$nin": [None, ""]}},
         {"_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1,
          "dpi": 1, "phone": 1, "birth_date": 1, "igss_nog": 1, "igss_afiliacion": 1}).to_list(None)
-    sin_nog, fuera = [], []
-    for p in pacientes:
-        numero = (p.get("igss_nog") or "").strip()
-        fila = {"id": p["id"], "record_number": p.get("record_number", ""),
-                "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-                "dpi": p.get("dpi", ""), "phone": p.get("phone", ""), "edad": _calcular_edad(p.get("birth_date", "")),
-                "igss_nog": numero, "igss_afiliacion": p.get("igss_afiliacion", "")}
-        if not numero:
-            sin_nog.append(fila)
-        elif numero not in numeros:
-            fuera.append(fila)
+    fuera = [{"id": p["id"], "record_number": p.get("record_number", ""),
+              "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+              "dpi": p.get("dpi", ""), "phone": p.get("phone", ""), "edad": _calcular_edad(p.get("birth_date", "")),
+              "igss_nog": (p.get("igss_nog") or "").strip(), "igss_afiliacion": p.get("igss_afiliacion", "")}
+             for p in pacientes if (p.get("igss_nog") or "").strip() not in numeros]
     con_tope = [n for n in nogs if n["disponibles"] is not None]
     return {
         "unidad": {"id": unit["id"], "name": unit.get("name", ""), "code": unit.get("code", "")},
-        "nogs": nogs, "pacientes_nog_no_catalogado": fuera, "pacientes_sin_nog": sin_nog,
+        "nogs": nogs, "pacientes_nog_no_catalogado": fuera,
         "totales": {
             "nogs": len(nogs),
             "servicios_contratados": sum(n["cantidad"] for n in con_tope),
