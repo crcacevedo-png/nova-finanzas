@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
+import { FechaDMA } from './FechaDMA';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { FileSpreadsheet, Loader2 } from 'lucide-react';
@@ -20,6 +20,7 @@ export const ListadoOficialDialog = ({ open, onOpenChange, unidades, unidadInici
 
   const descargar = async () => {
     if (!unidad) { toast.error('Elija la unidad IGSS'); return; }
+    if (desde === null || hasta === null) { toast.error('Corrija la fecha: use dd/mm/aaaa'); return; }
     if (desde && hasta && desde > hasta) { toast.error('La fecha "desde" no puede ser posterior a "hasta"'); return; }
     const rango = { desde: desde || undefined, hasta: hasta || undefined };
     setDescargando(true);
@@ -58,18 +59,18 @@ export const ListadoOficialDialog = ({ open, onOpenChange, unidades, unidadInici
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Desde (fecha en que se completó)</Label>
-              <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="mt-1" data-testid="listado-oficial-desde" />
+              <div className="mt-1"><FechaDMA value={desde} onChange={setDesde} testId="listado-oficial-desde" /></div>
             </div>
             <div>
               <Label className="text-xs">Hasta</Label>
-              <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="mt-1" data-testid="listado-oficial-hasta" />
+              <div className="mt-1"><FechaDMA value={hasta} onChange={setHasta} testId="listado-oficial-hasta" /></div>
             </div>
           </div>
-          <p className="text-xs text-slate-400">Sin fechas se exporta todo el historial: el total de filas coincide con las órdenes consumidas.</p>
+          <p className="text-xs text-slate-400">Sin fechas se exporta todo el historial: el total de filas coincide con las órdenes completas.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={descargando}>Cancelar</Button>
-          <Button onClick={descargar} disabled={descargando} className="bg-teal-600 hover:bg-teal-700" data-testid="listado-oficial-descargar">
+          <Button onClick={descargar} disabled={descargando || desde === null || hasta === null} className="bg-teal-600 hover:bg-teal-700" data-testid="listado-oficial-descargar">
             {descargando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
             Descargar
           </Button>

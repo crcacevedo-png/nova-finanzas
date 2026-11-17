@@ -63,7 +63,9 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasi
               {o.estado === 'en_curso' && (
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-600" type="button" onClick={onCerrar} title="Cerrar sin completar" data-testid={`orden-cerrar-${o.id}`}><CircleSlash className="w-3.5 h-3.5" /></Button>
               )}
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" type="button" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
+              {o.estado !== 'cerrada' && (
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" type="button" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
+              )}
             </>
           )}
         </div>

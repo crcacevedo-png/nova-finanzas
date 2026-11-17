@@ -110,16 +110,15 @@ def _expr_cirugias():
 def etapas_estado() -> list:
     """Recalcula estado y fecha_completa (anulada, cerrada e histórica no cambian).
     Consulta: reservada → completa con la evaluación (los seguimientos no cambian nada).
-    Varias dosis: en curso desde la 1.ª dosis, completa con la N de N.
-    1 servicio: en curso con cirugía programada o consulta previa, completa al realizarse."""
+    Procedimiento: en curso con la 1.ª dosis o con una consulta previa (si es de 1 servicio,
+    también con la cirugía programada); completa con la dosis N de N / cirugía realizada."""
     fechas = lambda tipo: {"$map": {"input": _de_tipo(tipo), "in": "$$this.fecha"}}  # noqa: E731
     consulta = {"$eq": ["$tipo", "consulta"]}
     dosis = {"$ifNull": ["$dosis_autorizadas", 1]}
     evals = {"$size": _de_tipo("evaluacion")}
     completa = {"$cond": [consulta, {"$gte": [evals, 1]}, {"$gte": [_expr_cirugias(), dosis]}]}
-    en_curso = {"$and": [{"$not": [consulta]}, {"$cond": [
-        {"$gt": [dosis, 1]}, {"$gte": [_expr_cirugias(), 1]},
-        {"$or": [{"$gte": [evals, 1]}, {"$gt": [{"$size": {"$ifNull": ["$cirugias_programadas", []]}}, 0]}]}]}]}
+    programada = {"$and": [{"$lte": [dosis, 1]}, {"$gt": [{"$size": {"$ifNull": ["$cirugias_programadas", []]}}, 0]}]}
+    en_curso = {"$and": [{"$not": [consulta]}, {"$or": [{"$gte": [_expr_cirugias(), 1]}, {"$gte": [evals, 1]}, programada]}]}
     fijo = {"$in": ["$estado", list(ESTADOS_FIJOS)]}
     return [{"$set": {
         "estado": {"$cond": [fijo, "$estado", {"$cond": [completa, "completa", {"$cond": [en_curso, "en_curso", "reservada"]}]}]},
@@ -426,16 +425,21 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
 
 @router.post("/ordenes/{orden_id}/anular")
 async def anular_orden(orden_id: str, body: OrdenAnular, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
-    """Anula una orden (nunca se elimina) y libera su cupo."""
+    """Anula una orden (nunca se elimina) y libera su cupo. Una orden cerrada sin completar
+    no se anula: ya liberó su cupo y queda como constancia del tratamiento suspendido."""
     now = datetime.now(timezone.utc).isoformat()
     antes = await db.igss_ordenes_libro.find_one_and_update(
-        {"id": orden_id, "estado": {"$ne": "anulada"}},
+        {"id": orden_id, "estado": {"$nin": ["anulada", "cerrada"]}},
         {"$set": {"estado": "anulada", "vigente": False,
                   "anulada_por": current_user.get("id", ""), "anulada_por_nombre": _nombre_usuario(current_user),
                   "fecha_anulacion": now, "motivo_anulacion": body.motivo.strip(), "updated_at": now}},
         projection={"_id": 0}, return_document=ReturnDocument.BEFORE)
     if not antes:
-        await _orden_or_404(orden_id)
+        cur = await _orden_or_404(orden_id)
+        if cur.get("estado") == "cerrada":
+            raise HTTPException(status_code=400, detail=(
+                "Una orden cerrada sin completar no se puede anular: ya liberó su cupo, no se cobra "
+                "y queda como constancia del tratamiento suspendido."))
         raise HTTPException(status_code=400, detail="La orden ya está anulada")
     if antes.get("estado") in ESTADOS_CUPO:
         await _liberar_cupo(antes["nog_id"])

@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { igssNogApi } from '../services/api';
 import { descargarBlob, etiquetaCatalogo, nombreListado } from '../lib/igssLibro';
 import { desgloseCupo, estadoOrden } from './igss/estadosLibro';
+import { FechaDMA } from './igss/FechaDMA';
 
 const TIPO_COMPRA_OPTIONS = [
   { value: 'compra_directa', label: 'Compra Directa' },
@@ -245,6 +246,11 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const rango = { desde: desde || undefined, hasta: hasta || undefined };
+  const fechaMala = () => {
+    if (desde === null || hasta === null) { toast.error('Corrija la fecha: use dd/mm/aaaa'); return true; }
+    if (desde && hasta && desde > hasta) { toast.error('La fecha "desde" no puede ser posterior a "hasta"'); return true; }
+    return false;
+  };
 
   const fetch = useCallback(async () => {
     if (!unit) return;
@@ -267,6 +273,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
   useEffect(() => { if (open) { fetch(); setExpanded(initialNogId || null); } }, [open, fetch, initialNogId]);
 
   const exportNog = async (nog) => {
+    if (fechaMala()) return;
     try {
       const res = await igssNogApi.exportExcel(nog.id, rango);
       descargarBlob(res.data, nombreListado(etiquetaCatalogo(nog), rango));
@@ -276,6 +283,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
   };
 
   const exportUnidad = async () => {
+    if (fechaMala()) return;
     try {
       const res = await igssNogApi.exportUnidadExcel(unit.id, rango);
       descargarBlob(res.data, nombreListado(unit.name, rango));
@@ -329,11 +337,11 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
               <>
                 <div>
                   <Label className="text-[11px] text-gray-500">Desde (fecha en que se completó)</Label>
-                  <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-teal h-8 w-36 text-xs" data-testid="nog-export-desde" />
+                  <div className="w-36"><FechaDMA value={desde} onChange={setDesde} inputClassName="input-teal h-8 text-xs" testId="nog-export-desde" /></div>
                 </div>
                 <div>
                   <Label className="text-[11px] text-gray-500">Hasta</Label>
-                  <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-teal h-8 w-36 text-xs" data-testid="nog-export-hasta" />
+                  <div className="w-36"><FechaDMA value={hasta} onChange={setHasta} inputClassName="input-teal h-8 text-xs" testId="nog-export-hasta" /></div>
                 </div>
                 <Button variant="outline" size="sm" className="btn-outline" onClick={exportUnidad} data-testid="nog-export-unidad">
                   <FileSpreadsheet className="w-4 h-4 mr-2" />Listado oficial

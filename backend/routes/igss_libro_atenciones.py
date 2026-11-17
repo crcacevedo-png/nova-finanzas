@@ -731,7 +731,7 @@ async def en_curso_sin_movimiento(dias: int = Query(90, ge=1, le=3650),
 async def preparar_estados_libro():
     """Una sola vez por entorno: anota en su orden las cirugías IGSS programadas y
     recalcula el estado de las órdenes (pendiente/atendida → reservada/en curso/completa)."""
-    flag = "libro_estados_bloque1_v1"
+    flag = "libro_estados_bloque1_v2"
     if await db.system_flags.find_one({"key": flag, "done": True}):
         return
     programadas = 0

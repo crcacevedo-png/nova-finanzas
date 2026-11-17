@@ -1218,9 +1218,11 @@ def test_b1_14_cerrar_sin_completar(H):
     e = sin_orden_de(sa, cx["id"])
     assert e and "cerrada sin completar" in e["motivo"]
     assert get_orden(sa, o["id"])["dosis_aplicadas"] == 1
-    # Anularla después no libera el cupo dos veces
+    # Una orden cerrada sin completar no se puede anular (ni se toca el cupo)
     ocupados_nog = _db_call(lambda db: db.igss_nogs.find_one({"id": n["id"]}))["libro_ocupados"]
-    assert requests.post(f"{LIBRO}/ordenes/{o['id']}/anular", json={"motivo": "depuración"}, headers=sa).status_code == 200
+    r = requests.post(f"{LIBRO}/ordenes/{o['id']}/anular", json={"motivo": "depuración"}, headers=sa)
+    assert r.status_code == 400 and "cerrada sin completar no se puede anular" in r.json()["detail"]
+    assert get_orden(sa, o["id"])["estado"] == "cerrada"
     assert _db_call(lambda db: db.igss_nogs.find_one({"id": n["id"]}))["libro_ocupados"] == ocupados_nog
     log = _db_call(lambda db: db.audit_logs.find_one({"action": "LIBRO_ORDEN_CERRADA_SIN_COMPLETAR", "details.orden_id": o["id"]}))
     assert log and log["details"]["motivo"] == "Paciente mejoró, no regresa" and log["details"]["dosis_aplicadas"] == 1
@@ -1279,3 +1281,18 @@ def test_b1_16_historicas_hoja_aparte_y_cifra_propia(H):
     assert estados.count("historica") == 5 and estados.count("completa") == 3
     crear_eval(sa, orden_id=hist[1], fecha="2026-10-20")
     assert get_orden(sa, hist[1])["estado"] == "historica" and get_orden(sa, hist[1])["total_atenciones"] == 0
+
+
+def test_b1_17_varias_dosis_con_consulta_previa_en_curso(H):
+    """Ajuste aprobado: en varias dosis, una consulta previa contra la orden la deja en curso
+    (igual que en cirugía); una dosis solo programada no."""
+    sa = H["superadmin"]
+    n, o = orden_dosis(sa, 0)
+    crear_cx(sa, no_sps=o["no_sps"], date="2026-10-20")
+    assert get_orden(sa, o["id"])["estado"] == "reservada"
+    ev = crear_eval(sa, orden_id=o["id"], fecha="2026-10-05")
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and od["dosis_aplicadas"] == 0
+    assert filas_listado_nog(sa, n) == []
+    assert requests.delete(f"{EVAL_API}/{ev['id']}", headers=sa).status_code == 200
+    assert get_orden(sa, o["id"])["estado"] == "reservada"
