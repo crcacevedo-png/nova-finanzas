@@ -9,6 +9,8 @@ import {
 } from '../components/ui/dialog';
 import { toast, Toaster } from 'sonner';
 import { igssNogApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { ConciliacionNOG } from '../components/ConciliacionNOG';
 import {
   ClipboardList, Plus, Search, Pencil, Power, PowerOff, Loader2, AlertTriangle, XCircle, CheckCircle2,
 } from 'lucide-react';
@@ -59,6 +61,8 @@ const emptyForm = {
 };
 
 const GestionNOG = () => {
+  const { user } = useAuth();
+  const puedeConciliar = ['superadmin', 'administrador_igss'].includes(user?.role);
   const [loading, setLoading] = useState(true);
   const [nogs, setNogs] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -204,9 +208,12 @@ const GestionNOG = () => {
               <p className="text-sm text-slate-500">Ingreso y gestión central de todos los NOG del IGSS</p>
             </div>
           </div>
-          <Button onClick={abrirNuevo} className="bg-teal-600 hover:bg-teal-700" data-testid="nuevo-nog-button">
-            <Plus className="w-4 h-4 mr-2" /> Nuevo NOG
-          </Button>
+          <div className="flex items-center gap-2">
+            {puedeConciliar && <ConciliacionNOG unidades={unidades} />}
+            <Button onClick={abrirNuevo} className="bg-teal-600 hover:bg-teal-700" data-testid="nuevo-nog-button">
+              <Plus className="w-4 h-4 mr-2" /> Nuevo NOG
+            </Button>
+          </div>
         </div>
 
         {/* Totales */}

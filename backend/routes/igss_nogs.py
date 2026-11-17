@@ -1508,3 +1508,706 @@ async def exportar_produccion_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="produccion_igss_{periodo}.xlsx"'}
     )
+
+
+
+# ==================== CONCILIACIÓN IGSS / NOG (SOLO LECTURA) ====================
+# Compara todas las fuentes que cuentan servicios IGSS (contador del NOG,
+# acreditaciones, órdenes del paciente, evaluaciones reales, cirugías IGSS y
+# el reporte de Producción) y reporta las discrepancias. NO corrige nada.
+
+CONCILIACION_ROLES = ["superadmin", "administrador_igss"]
+
+_CONC_PAC_PROJ = {
+    "_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1, "dpi": 1,
+    "igss_afiliacion": 1, "igss_unit_id": 1, "igss_ordenes": 1, "igss_nog": 1,
+    "igss_no_sps": 1, "is_active": 1, "referral_institution": 1,
+}
+_CONC_EVAL_PROJ = {**_BORRADOR_PROJ, "igss_no_sps": 1, "igss_codigo": 1, "fecha_creacion": 1}
+_CONC_SURG_PROJ = {"_id": 0, "id": 1, "patient_id": 1, "patient_name": 1, "date": 1,
+                   "procedure": 1, "igss_data": 1}
+
+ORIGENES_CONOCIDOS = ["evaluacion", "asignacion", "reasignacion", "retroactivo",
+                      "recalculo", "backfill", "manual"]
+
+DISCREPANCIA_LEYENDA = {
+    "D01": "El contador guardado del NOG no coincide con el número real de acreditaciones vigentes.",
+    "D02": "Hay una acreditación vigente (cupo consumido) pero no existe ninguna evaluación real de esa autorización.",
+    "D03": "Hay una evaluación real de un paciente IGSS pero su autorización no tiene acreditación vigente (atención no contada).",
+    "D04": "Acreditación vigente sin No. SPS: no se puede identificar la autorización.",
+    "D05": "Más de una acreditación vigente para la misma autorización (paciente + NOG + No. SPS).",
+    "D06": "El mismo No. SPS aparece en más de un paciente o en más de un NOG.",
+    "D07": "Acreditación vigente de un paciente inactivo o que ya no existe.",
+    "D08": "La acreditación apunta a una evaluación que ya no existe.",
+    "D09": "Cirugía IGSS sin acreditación vigente para su autorización.",
+    "D10": "Paciente IGSS con NOG o No. SPS pero sin unidad IGSS asignada.",
+    "D11": "Número de NOG usado en pacientes, evaluaciones o cirugías que no existe en el catálogo de su unidad.",
+    "D12": "Posibles pacientes duplicados: mismo DPI o misma afiliación IGSS en más de un expediente.",
+    "D13": "Registro de producción cuya evaluación ya no existe.",
+    "D14": "Evaluación IGSS real sin No. SPS resoluble (ni en la evaluación ni en las órdenes del paciente).",
+    "D15": "Orden del paciente sin No. SPS.",
+}
+
+
+def _cnorm(v):
+    return str(v or "").strip()
+
+
+def _ckey(v):
+    return _cnorm(v).upper()
+
+
+def _origen_bucket(origen):
+    o = _cnorm(origen).lower()
+    if o.startswith("recalculo"):
+        return "recalculo"
+    if o.startswith("reasign"):
+        return "reasignacion"
+    if o in ORIGENES_CONOCIDOS:
+        return o
+    return "otros"
+
+
+def _pac_nombre(p):
+    return f"{(p or {}).get('first_name', '')} {(p or {}).get('last_name', '')}".strip()
+
+
+def _ordenes_paciente(p):
+    """Órdenes IGSS del paciente; respaldo en los campos antiguos igss_nog/igss_no_sps."""
+    res = []
+    for o in (p.get("igss_ordenes") or []):
+        numero = _cnorm(o.get("nog"))
+        if not numero:
+            continue
+        res.append({"nog": numero, "no_sps": _cnorm(o.get("no_sps")),
+                    "codigo": _cnorm(o.get("codigo")), "procedimiento": _cnorm(o.get("procedimiento"))})
+    if not res:
+        leg = _cnorm(p.get("igss_nog"))
+        if leg:
+            res = [{"nog": leg, "no_sps": _cnorm(p.get("igss_no_sps")), "codigo": "", "procedimiento": ""}]
+    return res
+
+
+def _disc(tipo, descripcion, nog="", unidad="", paciente="", expediente="",
+          afiliacion="", no_sps="", ids=None, fecha=""):
+    return {
+        "tipo": tipo, "nog": _cnorm(nog), "unidad": _cnorm(unidad), "paciente": _cnorm(paciente),
+        "expediente": _cnorm(expediente), "igss_afiliacion": _cnorm(afiliacion),
+        "no_sps": _cnorm(no_sps), "ids": ids or {}, "fecha": _cnorm(fecha),
+        "descripcion": descripcion,
+    }
+
+
+async def _build_conciliacion(unidad_id: Optional[str] = None, nog: Optional[str] = None):
+    """Construye el reporte de conciliación. Solo lectura: no escribe en ninguna colección."""
+    nog_filtro = _cnorm(nog)
+
+    # ---------- Carga única de cada colección (sin consultas dentro de bucles) ----------
+    nogs = await db.igss_nogs.find({}, {"_id": 0}).to_list(None)
+    units = await db.igss_units.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(None)
+    unit_map = {u["id"]: u.get("name", "") for u in units}
+    pacientes = await db.patients.find({"referral_institution": "igss"}, _CONC_PAC_PROJ).to_list(None)
+    pac_map = {p["id"]: p for p in pacientes}
+    acreds = await db.igss_nog_acreditaciones.find({}, {"_id": 0}).to_list(None)
+    faltantes = list({a.get("paciente_id") for a in acreds
+                      if a.get("paciente_id") and a["paciente_id"] not in pac_map})
+    if faltantes:
+        extra = await db.patients.find({"id": {"$in": faltantes}}, _CONC_PAC_PROJ).to_list(None)
+        for p in extra:
+            pac_map[p["id"]] = p
+    evals = await db.evaluaciones_oftalmologicas.find(
+        {"paciente_id": {"$in": list(pac_map.keys())}}, _CONC_EVAL_PROJ).to_list(None)
+    surgeries = await db.surgeries.find({"institution": "IGSS"}, _CONC_SURG_PROJ).to_list(None)
+    prod_docs = await db.igss_produccion.find({}, {"_id": 0}).to_list(None)
+    prod_rows = await _build_produccion_rows(None, "1900-01-01", "2999-12-31",
+                                             unidad_id or None, nog_filtro or None)
+
+    # Existencia de evaluaciones referenciadas fuera del universo IGSS cargado
+    eval_ids = {e["id"] for e in evals}
+    referidas = {_cnorm(a.get("evaluacion_id")) for a in acreds if _cnorm(a.get("evaluacion_id"))}
+    referidas |= {_cnorm(p.get("evaluacion_id")) for p in prod_docs if _cnorm(p.get("evaluacion_id"))}
+    desconocidas = list(referidas - eval_ids)
+    if desconocidas:
+        hits = await db.evaluaciones_oftalmologicas.find(
+            {"id": {"$in": desconocidas}}, {"_id": 0, "id": 1}).to_list(None)
+        eval_ids |= {h["id"] for h in hits}
+
+    # ---------- Índices en memoria ----------
+    nog_by_id = {n["id"]: n for n in nogs}
+    nog_by_unit = {(n.get("unidad_id", ""), _ckey(n.get("numero"))): n for n in nogs}
+    prod_idx = {}
+    for r in prod_rows:
+        prod_idx[(r.get("paciente_id"), _ckey(r.get("nog")), _ckey(r.get("no_sps")))] = r
+    prod_por_nog = {}
+    for r in prod_rows:
+        k = (r.get("unidad_id", ""), _ckey(r.get("nog")))
+        prod_por_nog[k] = prod_por_nog.get(k, 0) + 1
+
+    # ---------- Universo de autorizaciones: (paciente, NOG, No. SPS) ----------
+    auth = {}
+
+    def _auth(pac_id, numero, sps, unidad=""):
+        k = (pac_id or "", _ckey(numero), _ckey(sps))
+        a = auth.get(k)
+        if a is None:
+            pac = pac_map.get(pac_id) or {}
+            uid = unidad or _cnorm(pac.get("igss_unit_id"))
+            nog_doc = nog_by_unit.get((uid, _ckey(numero)))
+            a = {
+                "key": k, "paciente_id": pac_id or "", "nog": _cnorm(numero), "no_sps": _cnorm(sps),
+                "unidad_id": uid, "nog_id": (nog_doc or {}).get("id", ""),
+                "codigo": "", "procedimiento": "", "paciente_nombre": _pac_nombre(pac),
+                "expediente": _cnorm(pac.get("record_number")),
+                "afiliacion": _cnorm(pac.get("igss_afiliacion")),
+                "paciente_activo": bool(pac.get("is_active", True)) if pac else False,
+                "paciente_existe": bool(pac),
+                "en_ordenes": False, "acreditaciones": [], "evaluaciones": [], "cirugias": [],
+            }
+            auth[k] = a
+        return a
+
+    # 1) Órdenes del paciente
+    ordenes_sin_sps = []
+    for p in pacientes:
+        ords = _ordenes_paciente(p)
+        for o in ords:
+            a = _auth(p["id"], o["nog"], o["no_sps"])
+            a["en_ordenes"] = True
+            a["codigo"] = a["codigo"] or o["codigo"]
+            a["procedimiento"] = a["procedimiento"] or o["procedimiento"]
+            if not o["no_sps"]:
+                ordenes_sin_sps.append((p, o))
+
+    # 2) Evaluaciones reales
+    evals_reales = []
+    for ev in evals:
+        if eval_es_borrador_vacio(ev):
+            continue
+        pac = pac_map.get(ev.get("paciente_id"))
+        if not pac:
+            continue
+        numero, sps, codigo, proc = _resolver_orden(ev, pac)
+        evals_reales.append((ev, pac, numero, sps))
+        a = _auth(pac["id"], numero, sps)
+        a["codigo"] = a["codigo"] or _cnorm(codigo)
+        a["procedimiento"] = a["procedimiento"] or _cnorm(proc)
+        a["evaluaciones"].append(ev)
+
+    # 3) Acreditaciones
+    acreds_vigentes = [a for a in acreds if a.get("anulada") is not True]
+    for ac in acreds_vigentes:
+        nog_doc = nog_by_id.get(ac.get("nog_id")) or {}
+        numero = _cnorm(ac.get("numero_nog")) or _cnorm(nog_doc.get("numero"))
+        a = _auth(ac.get("paciente_id"), numero, ac.get("no_sps"),
+                  unidad=_cnorm(ac.get("unidad_id")) or _cnorm(nog_doc.get("unidad_id")))
+        if not a["nog_id"]:
+            a["nog_id"] = _cnorm(ac.get("nog_id"))
+        a["acreditaciones"].append(ac)
+
+    # 4) Cirugías IGSS
+    for s in surgeries:
+        g = s.get("igss_data") or {}
+        numero = _cnorm(g.get("nog_number"))
+        if not numero and g.get("nog_id"):
+            numero = _cnorm((nog_by_id.get(g.get("nog_id")) or {}).get("numero"))
+        a = _auth(s.get("patient_id"), numero, g.get("sps"), unidad=_cnorm(g.get("unit_id")))
+        if not a["paciente_nombre"]:
+            a["paciente_nombre"] = _cnorm(s.get("patient_name"))
+        a["cirugias"].append(s)
+
+    def _in_scope(uid, numero):
+        if unidad_id and _cnorm(uid) != unidad_id:
+            return False
+        if nog_filtro and _ckey(numero) != _ckey(nog_filtro):
+            return False
+        return True
+
+    # ---------- SECCIÓN 1: RESUMEN POR NOG ----------
+    acred_por_nog = {}
+    for ac in acreds:
+        acred_por_nog.setdefault(ac.get("nog_id"), []).append(ac)
+    auth_por_nog = {}
+    for a in auth.values():
+        if a["nog_id"]:
+            auth_por_nog.setdefault(a["nog_id"], []).append(a)
+
+    resumen = []
+    nogs_scope = [n for n in nogs if _in_scope(n.get("unidad_id"), n.get("numero"))]
+    for n in nogs_scope:
+        todas = acred_por_nog.get(n["id"], [])
+        vigentes = [a for a in todas if a.get("anulada") is not True]
+        anuladas = [a for a in todas if a.get("anulada") is True]
+        por_origen = {k: 0 for k in ORIGENES_CONOCIDOS + ["otros"]}
+        for a in vigentes:
+            por_origen[_origen_bucket(a.get("origen"))] += 1
+        sin_sps = sum(1 for a in vigentes if not _cnorm(a.get("no_sps")))
+        sin_eval = sum(1 for a in vigentes
+                       if not _cnorm(a.get("evaluacion_id")) or _cnorm(a.get("evaluacion_id")) not in eval_ids)
+        pac_malo = 0
+        excel_filas = 0
+        for a in vigentes:
+            p = pac_map.get(a.get("paciente_id"))
+            if not p or not p.get("is_active", True):
+                pac_malo += 1
+            else:
+                excel_filas += 1
+        del_nog = auth_por_nog.get(n["id"], [])
+        con_eval = sum(1 for a in del_nog if a["evaluaciones"])
+        en_ordenes = sum(1 for a in del_nog if a["en_ordenes"] and a["paciente_activo"])
+        cirugias = [s for a in del_nog for s in a["cirugias"]]
+        monto_cirugias = round(sum(float((s.get("igss_data") or {}).get("procedure_cost") or 0)
+                                   for s in cirugias), 2)
+        d = _nog_con_derivados(n)
+        resumen.append({
+            "nog_id": n["id"],
+            "unidad_id": n.get("unidad_id", ""),
+            "unidad": unit_map.get(n.get("unidad_id", ""), ""),
+            "numero": d["numero"], "servicio": d["nombre_servicio"],
+            "cantidad": d["cantidad"], "precio": d["precio"], "is_active": d["is_active"],
+            "contador_guardado": d["acreditados"],
+            "acreditaciones_vigentes": len(vigentes),
+            "acreditaciones_anuladas": len(anuladas),
+            "vigentes_por_origen": por_origen,
+            "vigentes_sin_sps": sin_sps,
+            "vigentes_sin_evaluacion": sin_eval,
+            "vigentes_paciente_inactivo_o_inexistente": pac_malo,
+            "autorizaciones_con_evaluacion_real": con_eval,
+            "autorizaciones_en_ordenes": en_ordenes,
+            "cirugias_igss": len(cirugias),
+            "cirugias_igss_monto": monto_cirugias,
+            "filas_produccion": prod_por_nog.get((n.get("unidad_id", ""), _ckey(d["numero"])), 0),
+            "diferencia_contador": d["acreditados"] - len(vigentes),
+            "diferencia_atendidos": len(vigentes) - con_eval,
+            "filas_en_excel_actual": excel_filas,
+        })
+    resumen.sort(key=lambda r: (r["unidad"], r["numero"]))
+
+    # ---------- SECCIÓN 2: DISCREPANCIAS ----------
+    disc = []
+    tipos_por_auth = {}
+
+    def _add_auth_disc(a, tipo, descripcion, fecha="", ids=None):
+        tipos_por_auth.setdefault(a["key"], set()).add(tipo)
+        disc.append(_disc(tipo, descripcion, nog=a["nog"], unidad=unit_map.get(a["unidad_id"], ""),
+                          paciente=a["paciente_nombre"], expediente=a["expediente"],
+                          afiliacion=a["afiliacion"], no_sps=a["no_sps"], ids=ids or {}, fecha=fecha))
+
+    # D01
+    for r in resumen:
+        if r["diferencia_contador"] != 0:
+            disc.append(_disc(
+                "D01",
+                f"El contador guardado dice {r['contador_guardado']} y hay {r['acreditaciones_vigentes']} "
+                f"acreditaciones vigentes (diferencia {r['diferencia_contador']}).",
+                nog=r["numero"], unidad=r["unidad"], ids={"nog_id": r["nog_id"]}))
+
+    # Evaluaciones reales por paciente+NOG (contexto para acreditaciones sin SPS)
+    evals_por_pac_nog = {}
+    for ev, pac, numero, sps in evals_reales:
+        evals_por_pac_nog[(pac["id"], _ckey(numero))] = evals_por_pac_nog.get((pac["id"], _ckey(numero)), 0) + 1
+
+    for a in auth.values():
+        if not _in_scope(a["unidad_id"], a["nog"]):
+            continue
+        vig = a["acreditaciones"]
+        # D02
+        if vig and not a["evaluaciones"]:
+            otras = evals_por_pac_nog.get((a["paciente_id"], _ckey(a["nog"])), 0)
+            ctx = ""
+            if otras and not a["no_sps"]:
+                ctx = (f" El paciente sí tiene {otras} evaluación(es) real(es) de este NOG con otro "
+                       f"No. SPS: esta acreditación sin SPS probablemente las absorbió.")
+            elif otras:
+                ctx = f" El paciente tiene {otras} evaluación(es) real(es) de este NOG con otro No. SPS."
+            _add_auth_disc(a, "D02",
+                           "Cupo consumido sin evaluación real registrada para esta autorización." + ctx,
+                           fecha=_cnorm(vig[0].get("fecha_acreditacion"))[:10],
+                           ids={"acreditacion_ids": [x.get("id") for x in vig],
+                                "paciente_id": a["paciente_id"]})
+        # D04
+        for ac in vig:
+            if not _cnorm(ac.get("no_sps")):
+                _add_auth_disc(a, "D04", "Acreditación vigente sin No. SPS.",
+                               fecha=_cnorm(ac.get("fecha_acreditacion"))[:10],
+                               ids={"acreditacion_id": ac.get("id"), "paciente_id": a["paciente_id"]})
+        # D05
+        if len(vig) > 1:
+            _add_auth_disc(a, "D05",
+                           f"Hay {len(vig)} acreditaciones vigentes para la misma autorización.",
+                           ids={"acreditacion_ids": [x.get("id") for x in vig],
+                                "paciente_id": a["paciente_id"]})
+        # D07 / D08
+        for ac in vig:
+            if not a["paciente_existe"]:
+                _add_auth_disc(a, "D07", "La acreditación pertenece a un paciente que ya no existe.",
+                               ids={"acreditacion_id": ac.get("id"), "paciente_id": a["paciente_id"]})
+            elif not a["paciente_activo"]:
+                _add_auth_disc(a, "D07", "La acreditación pertenece a un paciente inactivo.",
+                               ids={"acreditacion_id": ac.get("id"), "paciente_id": a["paciente_id"]})
+            ev_id = _cnorm(ac.get("evaluacion_id"))
+            if ev_id and ev_id not in eval_ids:
+                _add_auth_disc(a, "D08", "La acreditación apunta a una evaluación inexistente.",
+                               ids={"acreditacion_id": ac.get("id"), "evaluacion_id": ev_id})
+        # D09
+        if a["cirugias"] and not vig:
+            for s in a["cirugias"]:
+                _add_auth_disc(a, "D09", "Cirugía IGSS sin acreditación vigente para su autorización.",
+                               fecha=_cnorm(s.get("date"))[:10],
+                               ids={"surgery_id": s.get("id"), "paciente_id": a["paciente_id"]})
+
+    # D03 (evaluación real sin acreditación vigente) + causa probable
+    sin_sps_por_pac_nog = {}
+    for ac in acreds_vigentes:
+        if not _cnorm(ac.get("no_sps")):
+            sin_sps_por_pac_nog.setdefault(
+                (ac.get("paciente_id"), _ckey(ac.get("numero_nog"))), []).append(ac)
+    for ev, pac, numero, sps in evals_reales:
+        a = auth[(pac["id"], _ckey(numero), _ckey(sps))]
+        if a["acreditaciones"]:
+            continue
+        if not _in_scope(a["unidad_id"], a["nog"]):
+            continue
+        nog_doc = nog_by_unit.get((a["unidad_id"], _ckey(numero)))
+        if not numero:
+            causa = "La evaluación no tiene NOG"
+        elif not a["unidad_id"]:
+            causa = "El paciente no tiene unidad IGSS asignada"
+        elif not nog_doc:
+            causa = "El NOG no existe en el catálogo de la unidad"
+        elif not nog_doc.get("is_active", True):
+            causa = "El NOG está inactivo"
+        elif int(nog_doc.get("acreditados") or 0) >= int(nog_doc.get("cantidad") or 0):
+            causa = "El NOG está al 100% (sin cupo)"
+        elif sin_sps_por_pac_nog.get((pac["id"], _ckey(numero))):
+            causa = "Absorbida por una acreditación sin No. SPS del mismo paciente/NOG"
+        else:
+            causa = "Causa no determinada: revisar manualmente"
+        _add_auth_disc(a, "D03", f"Atención registrada que no descontó cupo. Causa probable: {causa}.",
+                       fecha=_cnorm(ev.get("fecha"))[:10],
+                       ids={"evaluacion_id": ev.get("id"), "paciente_id": pac["id"]})
+        # D14
+        if not _cnorm(sps):
+            _add_auth_disc(a, "D14", "Evaluación real sin No. SPS resoluble.",
+                           fecha=_cnorm(ev.get("fecha"))[:10],
+                           ids={"evaluacion_id": ev.get("id"), "paciente_id": pac["id"]})
+    for ev, pac, numero, sps in evals_reales:
+        a = auth[(pac["id"], _ckey(numero), _ckey(sps))]
+        if a["acreditaciones"] and not _cnorm(sps) and _in_scope(a["unidad_id"], a["nog"]):
+            _add_auth_disc(a, "D14", "Evaluación real sin No. SPS resoluble.",
+                           fecha=_cnorm(ev.get("fecha"))[:10],
+                           ids={"evaluacion_id": ev.get("id"), "paciente_id": pac["id"]})
+
+    # D06: mismo No. SPS en más de un paciente o más de un NOG
+    por_sps = {}
+    for a in auth.values():
+        if not a["no_sps"]:
+            continue
+        por_sps.setdefault(_ckey(a["no_sps"]), []).append(a)
+    for sps_k, lista in por_sps.items():
+        pacs = {x["paciente_id"] for x in lista}
+        nogs_k = {_ckey(x["nog"]) for x in lista}
+        if len(pacs) > 1 or len(nogs_k) > 1:
+            for a in lista:
+                if not _in_scope(a["unidad_id"], a["nog"]):
+                    continue
+                _add_auth_disc(
+                    a, "D06",
+                    f"El No. SPS {a['no_sps']} aparece en {len(pacs)} paciente(s) y {len(nogs_k)} NOG distinto(s).",
+                    ids={"paciente_id": a["paciente_id"],
+                         "pacientes": sorted(p for p in pacs if p),
+                         "nogs": sorted(n for n in nogs_k if n)})
+
+    # D10 / D11 / D15 (pacientes)
+    numeros_catalogo = {(_cnorm(n.get("unidad_id")), _ckey(n.get("numero"))) for n in nogs}
+    numeros_global = {_ckey(n.get("numero")) for n in nogs}
+    for p in pacientes:
+        ords = _ordenes_paciente(p)
+        tiene_datos = any(o["nog"] or o["no_sps"] for o in ords)
+        if tiene_datos and not _cnorm(p.get("igss_unit_id")):
+            if not unidad_id:
+                disc.append(_disc("D10", "Paciente IGSS con NOG/SPS pero sin unidad IGSS asignada.",
+                                  nog=ords[0]["nog"] if ords else "", paciente=_pac_nombre(p),
+                                  expediente=_cnorm(p.get("record_number")),
+                                  afiliacion=_cnorm(p.get("igss_afiliacion")),
+                                  no_sps=ords[0]["no_sps"] if ords else "",
+                                  ids={"paciente_id": p["id"]}))
+        for o in ords:
+            if not o["no_sps"] and _in_scope(p.get("igss_unit_id"), o["nog"]):
+                disc.append(_disc("D15", "Orden del paciente sin No. SPS.", nog=o["nog"],
+                                  unidad=unit_map.get(_cnorm(p.get("igss_unit_id")), ""),
+                                  paciente=_pac_nombre(p), expediente=_cnorm(p.get("record_number")),
+                                  afiliacion=_cnorm(p.get("igss_afiliacion")),
+                                  ids={"paciente_id": p["id"]}))
+
+    # D11: números de NOG usados que no existen en el catálogo de su unidad
+    for a in auth.values():
+        if not a["nog"]:
+            continue
+        if not _in_scope(a["unidad_id"], a["nog"]):
+            continue
+        if (a["unidad_id"], _ckey(a["nog"])) in numeros_catalogo:
+            continue
+        origen = []
+        if a["en_ordenes"]:
+            origen.append("órdenes del paciente")
+        if a["evaluaciones"]:
+            origen.append("evaluaciones")
+        if a["cirugias"]:
+            origen.append("cirugías")
+        if a["acreditaciones"]:
+            origen.append("acreditaciones")
+        extra = (" El número sí existe en otra unidad." if _ckey(a["nog"]) in numeros_global else "")
+        _add_auth_disc(a, "D11",
+                       f"El NOG {a['nog']} usado en {', '.join(origen) or 'registros IGSS'} "
+                       f"no está en el catálogo de su unidad.{extra}",
+                       ids={"paciente_id": a["paciente_id"]})
+
+    # D12: posibles duplicados de paciente
+    for campo, etiqueta in (("dpi", "DPI"), ("igss_afiliacion", "afiliación IGSS")):
+        grupos = {}
+        for p in pacientes:
+            v = _ckey(p.get(campo))
+            if v:
+                grupos.setdefault(v, []).append(p)
+        for v, lista in grupos.items():
+            if len(lista) < 2:
+                continue
+            if unidad_id and all(_cnorm(x.get("igss_unit_id")) != unidad_id for x in lista):
+                continue
+            for p in lista:
+                disc.append(_disc("D12", f"Mismo {etiqueta} ({v}) en {len(lista)} expedientes IGSS.",
+                                  unidad=unit_map.get(_cnorm(p.get("igss_unit_id")), ""),
+                                  paciente=_pac_nombre(p), expediente=_cnorm(p.get("record_number")),
+                                  afiliacion=_cnorm(p.get("igss_afiliacion")),
+                                  ids={"paciente_id": p["id"],
+                                       "pacientes": [x["id"] for x in lista]}))
+
+    # D13: producción con evaluación inexistente
+    if not unidad_id and not nog_filtro:
+        for pd in prod_docs:
+            ev_id = _cnorm(pd.get("evaluacion_id"))
+            if ev_id and ev_id not in eval_ids:
+                disc.append(_disc("D13", "Registro de producción cuya evaluación ya no existe.",
+                                  ids={"evaluacion_id": ev_id}))
+
+    conteo_por_tipo = {f"D{str(i).zfill(2)}": 0 for i in range(1, 16)}
+    for d in disc:
+        conteo_por_tipo[d["tipo"]] = conteo_por_tipo.get(d["tipo"], 0) + 1
+    disc.sort(key=lambda d: (d["tipo"], d["unidad"], d["nog"], d["paciente"]))
+
+    # ---------- SECCIÓN 3: LISTADO PARA COTEJO ----------
+    cotejo = []
+    for a in auth.values():
+        if not _in_scope(a["unidad_id"], a["nog"]):
+            continue
+        vig = a["acreditaciones"]
+        evs = sorted(a["evaluaciones"], key=lambda e: (_cnorm(e.get("fecha")), _cnorm(e.get("fecha_creacion"))))
+        cirs = sorted(a["cirugias"], key=lambda s: _cnorm(s.get("date")))
+        prow = prod_idx.get((a["paciente_id"], _ckey(a["nog"]), _ckey(a["no_sps"])))
+        tipos = tipos_por_auth.get(a["key"], set())
+        acreditada = bool(vig)
+        atendida = bool(evs)
+        if tipos & {"D04", "D05", "D06", "D07", "D08"}:
+            estado = "REVISAR"
+        elif acreditada and atendida:
+            estado = "OK"
+        elif acreditada and not atendida:
+            estado = "RESERVADO_SIN_ATENCION"
+        elif atendida and not acreditada:
+            estado = "ATENDIDO_SIN_CONTAR"
+        else:
+            estado = "REVISAR"
+        nog_doc = nog_by_id.get(a["nog_id"]) or {}
+        cotejo.append({
+            "unidad": unit_map.get(a["unidad_id"], ""),
+            "unidad_id": a["unidad_id"],
+            "nog": a["nog"], "no_sps": a["no_sps"],
+            "codigo": a["codigo"],
+            "procedimiento": a["procedimiento"] or _cnorm(nog_doc.get("nombre_servicio")),
+            "expediente": a["expediente"], "paciente": a["paciente_nombre"],
+            "paciente_id": a["paciente_id"],
+            "igss_afiliacion": a["afiliacion"],
+            "paciente_activo": bool(a["paciente_activo"]),
+            "en_ordenes": a["en_ordenes"],
+            "acreditada": acreditada,
+            "acreditacion_origen": _cnorm(vig[0].get("origen")) if vig else "",
+            "acreditacion_fecha": _cnorm(vig[0].get("fecha_acreditacion"))[:10] if vig else "",
+            "evaluacion_real": atendida,
+            "evaluacion_fecha": _cnorm(evs[0].get("fecha")) if evs else "",
+            "evaluacion_medico": _cnorm(evs[0].get("medico_nombre")) if evs else "",
+            "evaluaciones_cantidad": len(evs),
+            "cirugia": bool(cirs),
+            "cirugia_fecha": _cnorm(cirs[0].get("date")) if cirs else "",
+            "en_produccion": bool(prow),
+            "impreso": bool((prow or {}).get("impreso")),
+            "enviado": bool((prow or {}).get("enviado")),
+            "facturado": bool((prow or {}).get("facturado")),
+            "pagado": bool((prow or {}).get("pagado")),
+            "discrepancias": sorted(tipos),
+            "estado_sugerido": estado,
+            "verificado_hoja_sps": "",
+            "observaciones": "",
+        })
+    cotejo.sort(key=lambda c: (c["unidad"], c["nog"], c["paciente"]))
+
+    totales = {
+        "nogs": len(resumen),
+        "cupos_contratados": sum(r["cantidad"] for r in resumen),
+        "contador_guardado": sum(r["contador_guardado"] for r in resumen),
+        "acreditaciones_vigentes": sum(r["acreditaciones_vigentes"] for r in resumen),
+        "acreditaciones_anuladas": sum(r["acreditaciones_anuladas"] for r in resumen),
+        "autorizaciones_con_evaluacion_real": sum(r["autorizaciones_con_evaluacion_real"] for r in resumen),
+        "autorizaciones_en_ordenes": sum(r["autorizaciones_en_ordenes"] for r in resumen),
+        "cirugias_igss": sum(r["cirugias_igss"] for r in resumen),
+        "cirugias_igss_monto": round(sum(r["cirugias_igss_monto"] for r in resumen), 2),
+        "filas_produccion": sum(r["filas_produccion"] for r in resumen),
+        "filas_en_excel_actual": sum(r["filas_en_excel_actual"] for r in resumen),
+        "diferencia_contador": sum(r["diferencia_contador"] for r in resumen),
+        "diferencia_atendidos": sum(r["diferencia_atendidos"] for r in resumen),
+        "autorizaciones_cotejo": len(cotejo),
+        "discrepancias": len(disc),
+        "pacientes_igss": len(pacientes),
+    }
+
+    return {
+        "generado_en": datetime.now(timezone.utc).isoformat(),
+        "filtro": {"unidad_id": unidad_id or None, "nog": nog_filtro or None},
+        "totales_globales": totales,
+        "resumen_por_nog": resumen,
+        "discrepancias": disc,
+        "conteo_por_tipo": conteo_por_tipo,
+        "cotejo": cotejo,
+    }
+
+
+async def _auditar_conciliacion(current_user: dict, modo: str, data: dict):
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "CONCILIACION_IGSS_GENERADA",
+        "user_id": (current_user or {}).get("id", ""),
+        "user_name": (current_user or {}).get("username", (current_user or {}).get("name", "")),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "details": {"modo": modo, "filtro": data.get("filtro", {}),
+                    "totales": data.get("totales_globales", {}),
+                    "conteo_por_tipo": data.get("conteo_por_tipo", {})},
+    })
+
+
+@router.get("/conciliacion")
+async def conciliacion_igss(
+    unidad_id: Optional[str] = Query(None),
+    nog: Optional[str] = Query(None),
+    current_user: dict = Depends(require_role(CONCILIACION_ROLES))
+):
+    """Reporte de conciliación IGSS (solo lectura): compara contador del NOG,
+    acreditaciones, órdenes, evaluaciones reales, cirugías y producción."""
+    data = await _build_conciliacion(unidad_id, nog)
+    await _auditar_conciliacion(current_user, "json", data)
+    return data
+
+
+@router.get("/conciliacion/export/excel")
+async def conciliacion_igss_excel(
+    unidad_id: Optional[str] = Query(None),
+    nog: Optional[str] = Query(None),
+    current_user: dict = Depends(require_role(CONCILIACION_ROLES))
+):
+    """Exporta la conciliación IGSS a Excel (Resumen, Discrepancias, Cotejo y Leyenda)."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    data = await _build_conciliacion(unidad_id, nog)
+    hf = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
+    hfont = Font(color="FFFFFF", bold=True)
+
+    def _hoja(wb, titulo, headers, filas, first=False):
+        ws = wb.active if first else wb.create_sheet()
+        ws.title = titulo
+        for col, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=col, value=h)
+            c.fill = hf
+            c.font = hfont
+            c.alignment = Alignment(horizontal="center", wrap_text=True)
+        for i, fila in enumerate(filas, 2):
+            for col, v in enumerate(fila, 1):
+                ws.cell(row=i, column=col, value=v)
+        for col in range(1, len(headers) + 1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+        return ws
+
+    si = lambda b: "Sí" if b else "No"
+    wb = openpyxl.Workbook()
+
+    orig = ORIGENES_CONOCIDOS + ["otros"]
+    _hoja(wb, "Resumen",
+          ["Unidad", "NOG", "Servicio", "Cantidad contratada", "Precio (Q)", "Activo",
+           "Contador guardado", "Acreditaciones vigentes", "Acreditaciones anuladas"]
+          + [f"Vigentes: {o}" for o in orig]
+          + ["Vigentes sin SPS", "Vigentes sin evaluación",
+             "Vigentes paciente inactivo/inexistente", "Autorizaciones con evaluación real",
+             "Autorizaciones en órdenes", "Cirugías IGSS", "Monto cirugías (Q)",
+             "Filas de producción", "Diferencia contador", "Diferencia atendidos",
+             "Filas en Excel actual"],
+          [[r["unidad"], r["numero"], r["servicio"], r["cantidad"], r["precio"], si(r["is_active"]),
+            r["contador_guardado"], r["acreditaciones_vigentes"], r["acreditaciones_anuladas"]]
+           + [r["vigentes_por_origen"].get(o, 0) for o in orig]
+           + [r["vigentes_sin_sps"], r["vigentes_sin_evaluacion"],
+              r["vigentes_paciente_inactivo_o_inexistente"], r["autorizaciones_con_evaluacion_real"],
+              r["autorizaciones_en_ordenes"], r["cirugias_igss"], r["cirugias_igss_monto"],
+              r["filas_produccion"], r["diferencia_contador"], r["diferencia_atendidos"],
+              r["filas_en_excel_actual"]]
+           for r in data["resumen_por_nog"]], first=True)
+
+    _hoja(wb, "Discrepancias",
+          ["Tipo", "Unidad", "NOG", "Paciente", "Expediente", "Afiliación IGSS", "No. SPS",
+           "Fecha", "Descripción", "IDs involucrados"],
+          [[d["tipo"], d["unidad"], d["nog"], d["paciente"], d["expediente"], d["igss_afiliacion"],
+            d["no_sps"], d["fecha"], d["descripcion"],
+            "; ".join(f"{k}={v}" for k, v in (d["ids"] or {}).items())]
+           for d in data["discrepancias"]])
+
+    _hoja(wb, "Cotejo",
+          ["Unidad", "NOG", "No. SPS", "Código", "Procedimiento", "Expediente", "Paciente",
+           "Afiliación IGSS", "Paciente activo", "En órdenes", "Acreditada", "Origen acreditación",
+           "Fecha acreditación", "Evaluación real", "Fecha 1a evaluación", "Médico",
+           "Cantidad evaluaciones", "Cirugía", "Fecha cirugía", "En producción", "Impreso",
+           "Enviado", "Facturado", "Pagado", "Discrepancias", "Estado sugerido",
+           "Verificado contra hoja SPS", "Observaciones"],
+          [[c["unidad"], c["nog"], c["no_sps"], c["codigo"], c["procedimiento"], c["expediente"],
+            c["paciente"], c["igss_afiliacion"], si(c["paciente_activo"]), si(c["en_ordenes"]),
+            si(c["acreditada"]), c["acreditacion_origen"], c["acreditacion_fecha"],
+            si(c["evaluacion_real"]), c["evaluacion_fecha"], c["evaluacion_medico"],
+            c["evaluaciones_cantidad"], si(c["cirugia"]), c["cirugia_fecha"], si(c["en_produccion"]),
+            si(c["impreso"]), si(c["enviado"]), si(c["facturado"]), si(c["pagado"]),
+            ", ".join(c["discrepancias"]), c["estado_sugerido"], "", ""]
+           for c in data["cotejo"]])
+
+    leyenda = [
+        ["Hoja Resumen", "Una fila por NOG del catálogo con todas las formas de contar sus servicios."],
+        ["Contador guardado", "Número que el sistema tiene almacenado en el NOG (campo acreditados)."],
+        ["Acreditaciones vigentes", "Cupos realmente descontados y no anulados."],
+        ["Autorizaciones con evaluación real", "Autorizaciones (paciente + NOG + No. SPS) con al menos una consulta con datos clínicos."],
+        ["Autorizaciones en órdenes", "Autorizaciones registradas en las órdenes de pacientes activos."],
+        ["Filas de producción", "Líneas que hoy muestra el reporte de Producción para ese NOG."],
+        ["Diferencia contador", "Contador guardado menos acreditaciones vigentes (debería ser 0)."],
+        ["Diferencia atendidos", "Acreditaciones vigentes menos autorizaciones con atención real."],
+        ["Filas en Excel actual", "Filas que hoy salen en el Excel del NOG (solo pacientes activos)."],
+        ["Hoja Cotejo", "Una fila por autorización, uniendo órdenes, acreditaciones, evaluaciones, cirugías y producción."],
+        ["Estado OK", "La autorización descontó cupo y tiene atención registrada."],
+        ["Estado RESERVADO_SIN_ATENCION", "Descontó cupo pero no hay atención registrada."],
+        ["Estado ATENDIDO_SIN_CONTAR", "Hay atención registrada pero no descontó cupo."],
+        ["Estado REVISAR", "Cualquier otra combinación o con discrepancias D04 a D08."],
+        ["Verificado contra hoja SPS", "Columna vacía para marcar a mano al cotejar con la hoja física."],
+        ["Observaciones", "Columna vacía para anotaciones manuales."],
+        ["", ""],
+    ] + [[k, v] for k, v in sorted(DISCREPANCIA_LEYENDA.items())]
+    _hoja(wb, "Leyenda", ["Concepto", "Qué significa"], leyenda)
+
+    await _auditar_conciliacion(current_user, "excel", data)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="conciliacion_igss_{today_str_gt()}.xlsx"'}
+    )

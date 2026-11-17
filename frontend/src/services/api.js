@@ -219,6 +219,10 @@ export const igssNogApi = {
     axios.get(`${API_URL}/igss-units/nogs/${nogId}/export/excel`, { responseType: 'blob' }),
   exportUnidadExcel: (unitId) =>
     axios.get(`${API_URL}/igss-units/${unitId}/nogs/export/excel`, { responseType: 'blob' }),
+  // Conciliación IGSS (solo lectura)
+  getConciliacion: (params) => axios.get(`${API_URL}/igss-units/conciliacion`, { params }),
+  conciliacionExcel: (params) =>
+    axios.get(`${API_URL}/igss-units/conciliacion/export/excel`, { params, responseType: 'blob' }),
 };
 
 // Google Calendar API (sincronización de Agenda por médico)
