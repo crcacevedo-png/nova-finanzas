@@ -298,3 +298,7 @@ cd /app/backend && python -m pytest
 ---
 
 ## Última Actualización: 7 Agosto 2026
+
+## Libro de órdenes IGSS (Fase 1, 2026-11)
+- `tests/test_igss_libro.py` (18 pruebas, ~90 s por esperas del rate limit de login 5/min). Ejecutar archivos de prueba IGSS por separado con ~65 s de pausa para evitar 429 en login.
+- Varios tests antiguos necesitan `export REACT_APP_BACKEND_URL=...` (no cargan dotenv).

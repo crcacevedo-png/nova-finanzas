@@ -7,10 +7,14 @@ from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 import uuid
 import io
+import re
+import unicodedata
 
 from config.database import db
+from config.permissions import LIBRO_IGSS_ROLES
 from routes.auth import get_current_user, require_permission, require_role
 from utils.timezone import today_str_gt
 
@@ -29,27 +33,92 @@ UMBRAL_AVISO = 0.9  # 90%
 # ==================== MODELOS ====================
 
 class NogCreate(BaseModel):
-    numero: str = Field(..., min_length=1, max_length=100)
+    numero: Optional[str] = Field("", max_length=100)
     nombre_servicio: Optional[str] = ""
     tipo_compra: Optional[str] = ""
-    cantidad: int = Field(..., ge=1)
+    cantidad: Optional[int] = Field(None, ge=0)
     precio: float = Field(0, ge=0)
     monto_total: Optional[float] = Field(None, ge=0)
     fecha_asignacion: Optional[str] = ""
+    sin_tope: Optional[bool] = None
 
 
 class NogUpdate(BaseModel):
-    numero: Optional[str] = None
+    numero: Optional[str] = Field(None, max_length=100)
     nombre_servicio: Optional[str] = None
     tipo_compra: Optional[str] = None
-    cantidad: Optional[int] = Field(None, ge=1)
+    cantidad: Optional[int] = Field(None, ge=0)
     precio: Optional[float] = Field(None, ge=0)
     monto_total: Optional[float] = Field(None, ge=0)
     fecha_asignacion: Optional[str] = None
     is_active: Optional[bool] = None
+    sin_tope: Optional[bool] = None
+
+
+MSG_BAJA_CUANTIA_TEXTO = "Deje el número vacío y elija tipo de compra Baja Cuantía"
 
 
 # ==================== HELPERS ====================
+
+def norm_txt(v) -> str:
+    """Minúsculas, sin tildes y con espacios colapsados (comparaciones de texto)."""
+    t = unicodedata.normalize("NFKD", str(v or "")).encode("ascii", "ignore").decode().lower()
+    return " ".join(t.split())
+
+
+def es_texto_baja_cuantia(numero) -> bool:
+    return "bajacuantia" in re.sub(r"[^a-z0-9]", "", norm_txt(numero))
+
+
+def etiqueta_catalogo(nog: dict) -> str:
+    numero = (nog.get("numero") or "").strip()
+    return numero or f"Baja cuantía — {(nog.get('nombre_servicio') or '').strip()}"
+
+
+def _validar_entrada_catalogo(e: dict) -> dict:
+    """Reglas del catálogo: número obligatorio salvo Baja Cuantía; sin textos tipo
+    'BAJA CUANTIA' en el número; servicio obligatorio si no hay número; cupo >= 1
+    salvo entradas sin tope. Devuelve los campos normalizados."""
+    numero = (e.get("numero") or "").strip()
+    servicio = (e.get("nombre_servicio") or "").strip()
+    tipo = e.get("tipo_compra") or ""
+    if numero and es_texto_baja_cuantia(numero):
+        raise HTTPException(status_code=422, detail=MSG_BAJA_CUANTIA_TEXTO)
+    if not numero and tipo != "baja_cuantia":
+        raise HTTPException(status_code=422, detail="El número de NOG es obligatorio. Solo las compras de Baja Cuantía pueden quedar sin número.")
+    if not numero and not servicio:
+        raise HTTPException(status_code=422, detail="En Baja Cuantía sin número el nombre del servicio es obligatorio")
+    sin_tope = bool(e.get("sin_tope"))
+    cantidad = int(e.get("cantidad") or 0)
+    if not sin_tope and cantidad < 1:
+        raise HTTPException(status_code=422, detail="La cantidad de cupos debe ser al menos 1 (o marque la entrada como sin tope)")
+    return {"numero": numero, "nombre_servicio": servicio, "nombre_servicio_norm": norm_txt(servicio),
+            "sin_tope": sin_tope, "cantidad": cantidad}
+
+
+async def _duplicado_catalogo(unidad_id: str, v: dict, excluir_id: str = None):
+    q = {"unidad_id": unidad_id}
+    if v["numero"]:
+        q["numero"] = v["numero"]
+        msg = "Ya existe un NOG con este número en la unidad"
+    else:
+        q.update({"numero": "", "nombre_servicio_norm": v["nombre_servicio_norm"]})
+        msg = "Ya existe una entrada de Baja Cuantía sin número para este servicio en la unidad"
+    if excluir_id:
+        q["id"] = {"$ne": excluir_id}
+    return msg if await db.igss_nogs.find_one(q, {"_id": 1}) else None
+
+
+async def _audit_catalogo(action: str, user: dict, details: dict):
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": action,
+        "user_id": (user or {}).get("id", ""),
+        "user_name": (user or {}).get("name") or (user or {}).get("username", ""),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "details": details,
+    })
+
 
 def _calcular_edad(birth_date: str) -> int:
     try:
@@ -91,6 +160,9 @@ def _nog_con_derivados(nog: dict) -> dict:
         "nombre_servicio": nog.get("nombre_servicio", ""),
         "tipo_compra": nog.get("tipo_compra", ""),
         "tipo_compra_label": TIPO_COMPRA_LABELS.get(nog.get("tipo_compra", ""), nog.get("tipo_compra", "")),
+        "modalidad": TIPO_COMPRA_LABELS.get(nog.get("tipo_compra", ""), nog.get("tipo_compra", "")),
+        "etiqueta": etiqueta_catalogo(nog),
+        "sin_tope": bool(nog.get("sin_tope")),
         "fecha_asignacion": nog.get("fecha_asignacion", ""),
         "cantidad": cantidad,
         "precio": precio,
@@ -441,37 +513,48 @@ async def listar_nogs_activos(
 async def crear_nog(
     unit_id: str,
     data: NogCreate,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
-    """Crea un NOG (contrato) en la unidad y acredita retroactivamente lo existente."""
+    """Crea una entrada del catálogo (NOG o Baja Cuantía sin número) en la unidad y
+    acredita retroactivamente lo existente (sistema anterior, solo si tiene número)."""
     await _unidad_or_404(unit_id)
-    numero = data.numero.strip()
-
-    existing = await db.igss_nogs.find_one({"unidad_id": unit_id, "numero": numero})
-    if existing:
-        raise HTTPException(status_code=400, detail="Ya existe un NOG con este número en la unidad")
+    tipo = data.tipo_compra or ""
+    sin_tope = data.sin_tope if data.sin_tope is not None else (tipo == "baja_cuantia")
+    v = _validar_entrada_catalogo({**data.model_dump(), "sin_tope": sin_tope})
+    dup = await _duplicado_catalogo(unit_id, v)
+    if dup:
+        raise HTTPException(status_code=400, detail=dup)
 
     now = datetime.now(timezone.utc).isoformat()
+    cantidad = v["cantidad"]
     nog_doc = {
         "id": str(uuid.uuid4()),
         "unidad_id": unit_id,
-        "numero": numero,
-        "nombre_servicio": (data.nombre_servicio or "").strip(),
-        "tipo_compra": data.tipo_compra or "",
-        "cantidad": int(data.cantidad),
+        "numero": v["numero"],
+        "nombre_servicio": v["nombre_servicio"],
+        "nombre_servicio_norm": v["nombre_servicio_norm"],
+        "tipo_compra": tipo,
+        "sin_tope": v["sin_tope"],
+        "cantidad": cantidad,
         "precio": float(data.precio or 0),
         "monto_total": (round(float(data.monto_total), 2) if data.monto_total is not None
-                        else round(float(data.precio or 0) * int(data.cantidad), 2)),
+                        else round(float(data.precio or 0) * cantidad, 2)),
         "fecha_asignacion": (data.fecha_asignacion or "").strip(),
         "acreditados": 0,
+        "libro_ocupados": 0,
         "is_active": True,
         "created_by": current_user["id"],
         "created_at": now,
         "updated_at": now,
     }
-    await db.igss_nogs.insert_one(nog_doc)
-    if "_id" in nog_doc:
-        del nog_doc["_id"]
+    try:
+        await db.igss_nogs.insert_one(nog_doc)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=400, detail=await _duplicado_catalogo(unit_id, v) or "Entrada duplicada en la unidad")
+    nog_doc.pop("_id", None)
+    await _audit_catalogo("LIBRO_CATALOGO_CREADO", current_user, {
+        "nog_id": nog_doc["id"], "unidad_id": unit_id, "numero": v["numero"],
+        "nombre_servicio": v["nombre_servicio"], "tipo_compra": tipo, "sin_tope": v["sin_tope"], "cantidad": cantidad})
 
     # Conteo retroactivo de lo ya existente
     creadas = await _sincronizar_acreditaciones(nog_doc, current_user, origen="retroactivo")
@@ -486,26 +569,36 @@ async def crear_nog(
 async def actualizar_nog(
     nog_id: str,
     data: NogUpdate,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
-    """Actualiza un NOG. No modifica el contador de acreditaciones."""
+    """Actualiza una entrada del catálogo. No modifica contadores ni órdenes."""
     nog = await _get_nog_or_404(nog_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if not update_data:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
 
-    if "numero" in update_data:
-        nuevo = update_data["numero"].strip()
-        update_data["numero"] = nuevo
-        if nuevo.lower() != (nog.get("numero") or "").lower():
-            dup = await db.igss_nogs.find_one(
-                {"unidad_id": nog["unidad_id"], "numero": nuevo, "id": {"$ne": nog_id}}
-            )
+    tipo_cambia = "tipo_compra" in update_data and update_data["tipo_compra"] != (nog.get("tipo_compra") or "")
+    if tipo_cambia and "sin_tope" not in update_data:
+        update_data["sin_tope"] = update_data["tipo_compra"] == "baja_cuantia"
+    # Solo se validan las reglas del catálogo si cambia un dato que las afecta
+    # (activar/desactivar o cambiar precio de entradas antiguas sigue permitido).
+    if set(update_data) & {"numero", "nombre_servicio", "tipo_compra", "cantidad", "sin_tope"}:
+        v = _validar_entrada_catalogo({**nog, **update_data})
+        if set(update_data) & {"numero", "nombre_servicio", "tipo_compra"}:
+            dup = await _duplicado_catalogo(nog["unidad_id"], v, excluir_id=nog_id)
             if dup:
-                raise HTTPException(status_code=400, detail="Ya existe un NOG con este número en la unidad")
+                raise HTTPException(status_code=400, detail=dup)
+        update_data.update({k: v[k] for k in ("numero", "nombre_servicio", "nombre_servicio_norm", "sin_tope", "cantidad")
+                            if k in update_data or k == "nombre_servicio_norm"})
 
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.igss_nogs.update_one({"id": nog_id}, {"$set": update_data})
+    try:
+        await db.igss_nogs.update_one({"id": nog_id}, {"$set": update_data})
+    except DuplicateKeyError:
+        raise HTTPException(status_code=400, detail="Entrada duplicada en la unidad")
+    await _audit_catalogo("LIBRO_CATALOGO_EDITADO", current_user, {
+        "nog_id": nog_id, "antes": {k: nog.get(k) for k in update_data if k != "updated_at"},
+        "despues": {k: val for k, val in update_data.items() if k != "updated_at"}})
     fresh = await db.igss_nogs.find_one({"id": nog_id}, {"_id": 0})
     return _nog_con_derivados(fresh)
 
@@ -513,12 +606,18 @@ async def actualizar_nog(
 @router.delete("/nogs/{nog_id}")
 async def eliminar_nog(
     nog_id: str,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
-    """Elimina un NOG y todas sus acreditaciones."""
-    await _get_nog_or_404(nog_id)
+    """Elimina una entrada del catálogo y sus acreditaciones (sistema anterior).
+    Si tiene órdenes en el libro se rechaza: solo puede desactivarse."""
+    nog = await _get_nog_or_404(nog_id)
+    if await db.igss_ordenes_libro.find_one({"nog_id": nog_id}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="Esta entrada del catálogo tiene órdenes en el libro y no se puede eliminar. Desactívela en su lugar.")
     await db.igss_nog_acreditaciones.delete_many({"nog_id": nog_id})
     await db.igss_nogs.delete_one({"id": nog_id})
+    await _audit_catalogo("LIBRO_CATALOGO_ELIMINADO", current_user, {
+        "nog_id": nog_id, "unidad_id": nog.get("unidad_id", ""), "numero": nog.get("numero", ""),
+        "nombre_servicio": nog.get("nombre_servicio", "")})
     return {"message": "NOG eliminado correctamente"}
 
 

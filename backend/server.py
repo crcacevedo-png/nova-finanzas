@@ -1646,6 +1646,7 @@ async def seed_igss_nogs_from_list():
     (unidad, servicio) para baja cuantía sin número. Si ya existen, se omiten."""
     import json as _json
     import re as _re
+    from routes.igss_nogs import norm_txt
     path = os.path.join(os.path.dirname(__file__), "data", "igss_nogs_seed.json")
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -1723,12 +1724,15 @@ async def seed_igss_nogs_from_list():
             "unidad_id": unidad_id,
             "numero": numero,
             "nombre_servicio": nombre_servicio,
+            "nombre_servicio_norm": norm_txt(nombre_servicio),
             "tipo_compra": tipo,
+            "sin_tope": tipo == "baja_cuantia",
             "cantidad": cantidad,
             "precio": precio,
             "monto_total": monto_total,
             "fecha_asignacion": "",
             "acreditados": max(acreditados, 0),
+            "libro_ocupados": 0,
             "is_active": True,
             "created_by": created_by,
             "created_at": now,
@@ -3172,6 +3176,8 @@ api_router.include_router(patients_router, tags=["Pacientes"])
 api_router.include_router(pacientes_router, tags=["Pacientes - Búsqueda rápida"])
 
 # ==================== MÓDULO NOG POR UNIDAD IGSS ====================
+from routes.igss_libro import router as igss_libro_router, ensure_libro_indexes
+api_router.include_router(igss_libro_router, tags=["IGSS - Libro de órdenes"])
 from routes.igss_nogs import router as igss_nogs_router
 api_router.include_router(igss_nogs_router, tags=["Unidades IGSS - NOG"])
 
@@ -4707,7 +4713,6 @@ async def startup_event():
     await db.igss_units.create_index([("is_active", 1)])
     # Índices de NOG por unidad IGSS
     try:
-        await db.igss_nogs.create_index([("unidad_id", 1), ("numero", 1)], unique=True, name="nog_unidad_numero")
         await db.igss_nogs.create_index([("id", 1)], name="nog_id_lookup")
         await db.igss_nog_acreditaciones.create_index([("nog_id", 1), ("anulada", 1)], name="acred_nog_anulada")
         await db.igss_nog_acreditaciones.create_index([("nog_id", 1), ("evaluacion_id", 1)], name="acred_nog_eval")
@@ -4715,6 +4720,8 @@ async def startup_event():
         await db.igss_nog_acreditaciones.create_index([("id", 1)], name="acred_id_lookup")
     except Exception:
         pass
+    # Libro de órdenes IGSS + índices parciales del catálogo (baja cuantía sin número)
+    await ensure_libro_indexes()
     # Índices de Óptica
     await db.doctors.create_index([("name", 1)])
     await db.doctors.create_index([("is_active", 1)])

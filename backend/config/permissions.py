@@ -5,6 +5,9 @@ import time
 
 from config.database import db
 
+# Roles con acceso exclusivo al Libro de órdenes IGSS (catálogo, órdenes, contadores, listados, migración)
+LIBRO_IGSS_ROLES = ["superadmin", "admin", "administrador_igss"]
+
 PERMISSIONS = {
     "superadmin": {
         "view_dashboard": True,

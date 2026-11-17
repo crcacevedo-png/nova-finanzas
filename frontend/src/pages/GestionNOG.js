@@ -11,6 +11,7 @@ import { toast, Toaster } from 'sonner';
 import { igssNogApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ConciliacionNOG } from '../components/ConciliacionNOG';
+import { puedeVerLibroIgss, esTextoBajaCuantia, etiquetaCatalogo } from '../lib/igssLibro';
 import {
   ClipboardList, Plus, Search, Pencil, Power, PowerOff, Loader2, AlertTriangle, XCircle, CheckCircle2,
 } from 'lucide-react';
@@ -58,11 +59,13 @@ const EstadoBadge = ({ estado }) => {
 const emptyForm = {
   id: null, numero: '', nombre_servicio: '', tipo_compra: '', cantidad: '',
   precio: '', monto_total: '', montoTotalManual: false, unidad_id: '', fecha_asignacion: '', is_active: true,
+  sin_tope: false, sinTopeManual: false,
 };
 
 const GestionNOG = () => {
   const { user } = useAuth();
   const puedeConciliar = ['superadmin', 'administrador_igss'].includes(user?.role);
+  const puedeEditar = puedeVerLibroIgss(user);
   const [loading, setLoading] = useState(true);
   const [nogs, setNogs] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -95,7 +98,7 @@ const GestionNOG = () => {
       if (filtroUnidad !== 'all' && n.unidad_id !== filtroUnidad) return false;
       if (filtroEstado !== 'all' && n.estado !== filtroEstado) return false;
       if (q) {
-        const hay = `${n.numero} ${n.nombre_servicio}`.toLowerCase();
+        const hay = `${etiquetaCatalogo(n)} ${n.nombre_servicio}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -114,6 +117,7 @@ const GestionNOG = () => {
       precio: String(n.precio ?? ''), monto_total: String(n.monto_total ?? ''), montoTotalManual: true,
       unidad_id: n.unidad_id || '',
       fecha_asignacion: (n.fecha_asignacion || '').slice(0, 10), is_active: n.is_active,
+      sin_tope: !!n.sin_tope, sinTopeManual: true,
     });
     setDialogOpen(true);
   };
@@ -137,18 +141,27 @@ const GestionNOG = () => {
   });
   const onMontoTotal = (v) => setForm((f) => ({ ...f, monto_total: v, montoTotalManual: true }));
 
+  const onTipoCompra = (v) => setForm((f) => ({
+    ...f, tipo_compra: v, sin_tope: f.sinTopeManual ? f.sin_tope : v === 'baja_cuantia',
+  }));
+  const esBaja = form.tipo_compra === 'baja_cuantia';
+
   const guardar = async () => {
-    if (!form.numero.trim()) { toast.error('El número de NOG es obligatorio'); return; }
+    const numero = form.numero.trim();
+    if (numero && esTextoBajaCuantia(numero)) { toast.error('Deje el número vacío y elija tipo de compra Baja Cuantía'); return; }
+    if (!numero && !esBaja) { toast.error('El número de NOG es obligatorio (solo Baja Cuantía puede quedar sin número)'); return; }
+    if (!numero && !form.nombre_servicio.trim()) { toast.error('En Baja Cuantía sin número el servicio es obligatorio'); return; }
     if (!form.unidad_id) { toast.error('La unidad es obligatoria'); return; }
-    const cant = parseInt(form.cantidad, 10);
-    if (!cant || cant < 1) { toast.error('La cantidad de cupos debe ser al menos 1'); return; }
+    const cant = parseInt(form.cantidad, 10) || 0;
+    if (!form.sin_tope && cant < 1) { toast.error('La cantidad de cupos debe ser al menos 1 (o marque "Sin tope")'); return; }
     const montoTotalNum = form.monto_total !== ''
       ? (parseFloat(form.monto_total) || 0)
       : (parseFloat(form.precio) || 0) * cant;
     const payload = {
-      numero: form.numero.trim(),
+      numero,
       nombre_servicio: form.nombre_servicio.trim(),
       tipo_compra: form.tipo_compra || '',
+      sin_tope: !!form.sin_tope,
       cantidad: cant,
       precio: parseFloat(form.precio) || 0,
       monto_total: +(montoTotalNum || 0).toFixed(2),
@@ -210,9 +223,11 @@ const GestionNOG = () => {
           </div>
           <div className="flex items-center gap-2">
             {puedeConciliar && <ConciliacionNOG unidades={unidades} />}
-            <Button onClick={abrirNuevo} className="bg-teal-600 hover:bg-teal-700" data-testid="nuevo-nog-button">
-              <Plus className="w-4 h-4 mr-2" /> Nuevo NOG
-            </Button>
+            {puedeEditar && (
+              <Button onClick={abrirNuevo} className="bg-teal-600 hover:bg-teal-700" data-testid="nuevo-nog-button">
+                <Plus className="w-4 h-4 mr-2" /> Nuevo NOG
+              </Button>
+            )}
           </div>
         </div>
 
@@ -272,7 +287,7 @@ const GestionNOG = () => {
                   <th className="px-4 py-3 font-semibold">NOG</th>
                   <th className="px-4 py-3 font-semibold">Servicio</th>
                   <th className="px-4 py-3 font-semibold">Unidad</th>
-                  <th className="px-4 py-3 font-semibold">Tipo compra</th>
+                  <th className="px-4 py-3 font-semibold">Modalidad</th>
                   <th className="px-4 py-3 font-semibold">Fecha asignación</th>
                   <th className="px-4 py-3 font-semibold text-center">Cupos</th>
                   <th className="px-4 py-3 font-semibold text-center">Disp.</th>
@@ -294,18 +309,22 @@ const GestionNOG = () => {
                 ) : (
                   filtered.map((n) => (
                     <tr key={n.id} className="border-t hover:bg-slate-50" data-testid={`nog-row-${n.id}`}>
-                      <td className="px-4 py-3 font-semibold text-slate-800">{n.numero}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800" data-testid={`nog-etiqueta-${n.id}`}>
+                        {n.numero || <span className="text-amber-700">Baja cuantía — {n.nombre_servicio}</span>}
+                      </td>
                       <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">{n.nombre_servicio || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{n.unidad_nombre || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{n.tipo_compra_label || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{fmtFecha(n.fecha_asignacion)}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{n.acreditados} / {n.cantidad}</td>
-                      <td className="px-4 py-3 text-center font-medium text-slate-700">{n.disponibles}</td>
+                      <td className="px-4 py-3 text-center text-slate-600" data-testid={`nog-cupos-${n.id}`}>
+                        {n.sin_tope ? <span className="text-xs font-medium text-slate-500">Sin tope · {n.acreditados}</span> : `${n.acreditados} / ${n.cantidad}`}
+                      </td>
+                      <td className="px-4 py-3 text-center font-medium text-slate-700">{n.sin_tope ? '—' : n.disponibles}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{fmtQ(n.precio)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-slate-800" data-testid={`nog-monto-total-${n.id}`}>{fmtQ(n.monto_total)}</td>
                       <td className="px-4 py-3"><EstadoBadge estado={n.estado} /></td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
+                        {puedeEditar && <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" onClick={() => abrirEditar(n)} data-testid={`nog-editar-${n.id}`}>
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -318,7 +337,7 @@ const GestionNOG = () => {
                           >
                             {togglingId === n.id ? <Loader2 className="w-4 h-4 animate-spin" /> : (n.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />)}
                           </Button>
-                        </div>
+                        </div>}
                       </td>
                     </tr>
                   ))
@@ -355,18 +374,20 @@ const GestionNOG = () => {
               </div>
 
               <div>
-                <Label>Número de NOG *</Label>
+                <Label>Número de NOG {esBaja ? '' : '*'}</Label>
                 <Input
                   value={form.numero}
                   onChange={(e) => setForm((f) => ({ ...f, numero: e.target.value }))}
+                  placeholder={esBaja ? 'Vacío en Baja Cuantía' : ''}
                   className="mt-1" data-testid="nog-form-numero"
                 />
+                {esBaja && <p className="text-xs text-slate-400 mt-1">Las compras de Baja Cuantía no tienen número de NOG: déjelo vacío.</p>}
               </div>
               <div>
                 <Label>Tipo de compra</Label>
                 <select
                   value={form.tipo_compra}
-                  onChange={(e) => setForm((f) => ({ ...f, tipo_compra: e.target.value }))}
+                  onChange={(e) => onTipoCompra(e.target.value)}
                   className="mt-1 w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
                   data-testid="nog-form-tipo-compra"
                 >
@@ -376,7 +397,7 @@ const GestionNOG = () => {
               </div>
 
               <div className="col-span-2">
-                <Label>Servicio</Label>
+                <Label>Servicio {esBaja && !form.numero.trim() ? '*' : ''}</Label>
                 <Input
                   value={form.nombre_servicio}
                   onChange={(e) => setForm((f) => ({ ...f, nombre_servicio: e.target.value }))}
@@ -386,13 +407,22 @@ const GestionNOG = () => {
               </div>
 
               <div>
-                <Label>Cantidad de cupos *</Label>
+                <Label>Cantidad de cupos {form.sin_tope ? '' : '*'}</Label>
                 <Input
-                  type="number" min="1"
+                  type="number" min="0"
                   value={form.cantidad}
                   onChange={(e) => onCantidad(e.target.value)}
+                  placeholder={form.sin_tope ? 'No aplica' : ''}
                   className="mt-1" data-testid="nog-form-cantidad"
                 />
+                <label className="mt-2 flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox" checked={!!form.sin_tope}
+                    onChange={(e) => setForm((f) => ({ ...f, sin_tope: e.target.checked, sinTopeManual: true }))}
+                    className="h-4 w-4 accent-teal-600" data-testid="nog-form-sin-tope"
+                  />
+                  Sin tope (sin cantidad contratada; no aplica aviso 90 % ni bloqueo)
+                </label>
               </div>
               <div>
                 <Label>Monto individual por servicio (Q)</Label>
