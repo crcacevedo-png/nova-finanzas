@@ -48,6 +48,11 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 - Gatear el link "Cuentas por Cobrar" del menú de Finanzas para el rol óptica con `view_cuentas_cobrar` (hoy usa `manage_sales`, funciona pero por una permiso distinto al que exige la ruta) — hallazgo menor de la auditoría del rol administrador_igss (2026-11-16).
 - Habilitar el menú `finanzas_cxc` para el rol "usuario" si debe poder navegar a Cuentas por Cobrar desde el sidebar (hoy solo es alcanzable por URL directa, aunque ya tiene el permiso `view_cuentas_cobrar` de solo lectura) — hallazgo de la auditoría del rol administrador_igss (2026-11-16).
 
+## P1 — Correlación venta ↔ cuenta por cobrar (fases pendientes)
+- **Fase 2**: conciliación desde la pantalla de Ventas (ver desde la venta a qué cuenta por cobrar dio origen y cuánto se ha abonado) y reporte exportable de ventas al crédito contra saldos pendientes.
+- **Fase 3**: emparejamiento asistido de los registros históricos — el sistema propone coincidencias por paciente, monto y fecha, y una persona confirma o descarta en lote.
+- Las cuentas creadas antes de la Fase 1 siguen apareciendo como "Sin venta" hasta que alguien las vincule a mano (decisión del plan: no se emparejan automáticamente).
+
 ## P2 — Pausado / depende de terceros
 - FEL/Digifact: activación de producción pendiente de certificado SAT/Digifact, aprovisionamiento y credenciales seguras del usuario.
 

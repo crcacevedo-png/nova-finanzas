@@ -15,12 +15,14 @@ import { Label } from '../ui/label';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatDate } from '../../services/api';
 import { getTipoResponsableInfo, getEstadoIcon, getEstadoConfig } from './constants';
+import CXCVentaOrigen from './CXCVentaOrigen';
 
 const CXCDetalleDialog = ({
   open,
   onOpenChange,
   cuenta,
-  onRegistrarAbono
+  onRegistrarAbono,
+  onVentaActualizada
 }) => {
   const { hasPermission } = useAuth();
   const getEstadoBadge = (estado) => {
@@ -127,6 +129,13 @@ const CXCDetalleDialog = ({
                 </p>
               )}
             </div>
+            
+            {/* Venta de origen */}
+            <CXCVentaOrigen
+              cuenta={cuenta}
+              puedeEditar={hasPermission('manage_cuentas_cobrar')}
+              onChanged={onVentaActualizada}
+            />
             
             {/* Montos */}
             <div className="grid grid-cols-3 gap-4">

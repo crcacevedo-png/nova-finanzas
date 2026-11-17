@@ -62,6 +62,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { toast } from 'sonner';
+import { CXCVentaOrigen } from '../components/cxc';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -357,7 +358,7 @@ const CuentasCobrarOptica = () => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar por paciente, número de cuenta..."
+                  placeholder="Buscar por paciente, número de cuenta u orden de venta..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -403,6 +404,7 @@ const CuentasCobrarOptica = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>No. Cuenta</TableHead>
+                      <TableHead>Orden de venta</TableHead>
                       <TableHead>Paciente</TableHead>
                       <TableHead>Concepto</TableHead>
                       <TableHead className="text-right">Total</TableHead>
@@ -422,6 +424,13 @@ const CuentasCobrarOptica = () => {
                       >
                         <TableCell className="font-mono font-medium">
                           {cuenta.numero_cuenta}
+                        </TableCell>
+                        <TableCell data-testid={`cxc-orden-${cuenta.id}`}>
+                          {cuenta.venta_numero ? (
+                            <span className="font-mono text-xs text-slate-600">{cuenta.venta_numero}</span>
+                          ) : (
+                            <span className="text-xs text-slate-400">Sin venta</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -564,6 +573,16 @@ const CuentasCobrarOptica = () => {
                   </p>
                 )}
               </div>
+              
+              {/* Venta de origen */}
+              <CXCVentaOrigen
+                cuenta={cuentaSeleccionada}
+                puedeEditar={cuentaSeleccionada.estado !== 'Anulado'}
+                onChanged={() => {
+                  fetchCuentaDetalle(cuentaSeleccionada.id);
+                  fetchCuentas();
+                }}
+              />
               
               {/* Montos */}
               <div className="grid grid-cols-3 gap-4">

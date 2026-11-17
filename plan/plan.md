@@ -1,51 +1,49 @@
-# Cierre de Producción Diario — Dra. Mariamercedes Palma
+# Correlación entre la venta y la cuenta por cobrar
 
-Cada día a las 5:00 PM (hora Guatemala), el sistema envía automáticamente a dra.mpalma@gmail.com un PDF con el detalle de su producción personal del día. Funciona igual que el informe diario de anestesia que ya se envía por correo, pero con el contenido y horario propios de la Dra. Palma.
+Cada cuenta por cobrar mostrará de qué venta proviene: número de orden, fecha, productos y servicios cobrados y el monto que quedó al crédito.
+Cuando una cuenta no tenga venta asociada, se podrá buscarla y vincularla a mano desde la misma pantalla.
 
 ## Para quién es
-- La Dra. Mariamercedes Palma, quien recibe el correo diario en su bandeja.
-- La administración de la clínica, que deja de tener que armar este cierre manualmente.
 
-## Funcionalidad principal
-- Un nuevo cron diario a las **5:00 PM hora Guatemala**, independiente de los dos que ya existen a las 6:00 PM (informe de anestesia y cierre diario general).
-- El reporte reúne **toda su producción del día como médico que refiere**, sin importar la categoría:
-  - Ventas de la clínica general donde ella aparece como médico que refiere.
-  - Ventas de Óptica (armazones, lentes, lentes de contacto, accesorios) donde ella aparece como médico que refiere.
-- Contenido del PDF: un renglón por cada producto/servicio vendido ese día (fecha, número de venta, paciente, producto/servicio, cantidad, monto), con el total general al final — mismo nivel de detalle que el desglose de producción por médico que ya existe en el Dashboard.
-- Se envía como **PDF adjunto**, con el mismo estilo del informe de anestesia (membrete, tabla clara, total destacado).
-- Si ese día no tuvo producción, igual llega el correo mostrando el cierre en cero, para que el envío sea predecible todos los días.
-- Es un reporte de solo lectura: no modifica ninguna venta, cron o pantalla existente.
+- Personal de caja y administración que cobra las cuentas pendientes y necesita saber exactamente qué se le vendió al paciente y bajo qué orden.
+- Dirección/finanzas, que al revisar un saldo pendiente necesita ver el respaldo de la venta sin ir a buscarla en otro listado.
 
-## Flujo de uso
-No requiere ninguna acción manual:
-1. A las 5:00 PM hora Guatemala, el sistema reúne las ventas de clínica general del día donde la Dra. Palma es el médico que refiere.
-2. Reúne también las ventas de Óptica del día donde ella es el médico que refiere, en cualquier categoría.
-3. Arma un solo PDF combinado con el detalle línea por línea y el total.
-4. Envía el PDF por correo a dra.mpalma@gmail.com.
+## Funcionalidad y experiencia
 
-Para confirmar que llegó, basta con revisar su correo después de las 5:00 PM; esta fase no agrega una pantalla dentro del sistema para verlo.
+- **Origen visible en el listado de cuentas por cobrar**: una columna nueva con el número de orden (ej. VTA-20261116-0007). Las cuentas sin venta asociada muestran un indicador "Sin venta" para que se noten de inmediato.
+- **Detalle de la cuenta con el respaldo de la venta**: al abrir una cuenta se muestra un bloque con los datos de su venta: número de orden, fecha, vendedor, médico, el detalle de productos/servicios con cantidades y precios, el total de la venta y cuánto de ese total quedó al crédito (cuando parte se pagó en caja, se ve la diferencia).
+- **Búsqueda por número de orden**: el buscador de cuentas por cobrar también encuentra cuentas escribiendo el número de la venta.
+- **Vinculación manual**: en una cuenta sin venta (o con la venta equivocada) se puede buscar la venta por número de orden, paciente o fecha, elegirla y asociarla. También se puede quitar el vínculo. Queda registrado quién hizo el cambio y cuándo.
+- **Protecciones al vincular**: solo se ofrecen ventas no anuladas; se avisa si la venta elegida ya está asociada a otra cuenta o si el monto no coincide con el de la cuenta, permitiendo continuar a conciencia (el aviso no bloquea, porque en la práctica pueden existir ajustes).
+- **Nada se recalcula**: vincular o desvincular no altera montos, saldos, abonos ni el estado de la cuenta; solo cambia la referencia.
 
-## Estilo del PDF
-Se mantiene la misma línea visual que el informe de anestesia ya existente: encabezado con el nombre de la clínica y la fecha, tabla ordenada con las columnas del detalle, y el total resaltado al final.
+Fuera de alcance en esta entrega: no se agregan columnas ni cambios en la pantalla de Ventas, no se emparejan automáticamente los registros históricos, y una cuenta se asocia a una sola venta.
 
-## Fases de implementación
-**Fase 1 (MVP — se construye ahora)**
-- Cron diario a las 5:00 PM hora Guatemala.
-- Combinación de ventas de clínica general + Óptica, en cualquier categoría, filtradas por Dra. Mariamercedes Palma como médico que refiere.
-- PDF con detalle línea por línea y total.
-- Envío automático a dra.mpalma@gmail.com.
-- Envío también en los días sin producción (reporte en cero).
+## Flujo del usuario
 
-**Fase 2**
-- Pantalla de administración para cambiar el correo destino o el horario sin pedírselo al equipo de desarrollo.
-- Historial de los reportes enviados, con opción de reenviar uno puntual.
+1. La persona entra a Cuentas por Cobrar y ve la lista habitual, ahora con la columna de orden de venta.
+2. Abre una cuenta pendiente y, junto al concepto y el saldo, ve el detalle de la venta que la originó.
+3. Si la cuenta no tiene venta asociada, pulsa "Vincular venta", busca por número de orden o por paciente, revisa los resultados (fecha, paciente, total) y selecciona la correcta.
+4. La cuenta queda mostrando su orden; si se detecta un error, se cambia o se quita el vínculo desde el mismo lugar.
+5. Para encontrar una cuenta a partir de un número de orden, lo escribe en el buscador de la lista.
 
-**Fase 3**
-- Extender este mismo "cierre de producción personal" a otros médicos que quieran su propio reporte diario, eligiéndolos de una lista en vez de dejarlo fijo a un solo médico.
+## Sensación de la interfaz
+
+Se mantiene el estilo actual del módulo: tablas limpias, tipografía sobria y badges de estado. El número de orden aparece como una etiqueta discreta en tipografía monoespaciada, igual que los números de cuenta, para que se lean como identificadores y no compitan con los montos. El bloque de la venta dentro del detalle se presenta como una tarjeta separada con un encabezado claro ("Venta de origen") y la lista de renglones en texto pequeño; la ausencia de venta se muestra en gris, no en rojo, porque no es un error sino un dato por completar. La búsqueda de ventas al vincular ocurre en una ventana modal con resultados en lista, sin sacar a la persona de la cuenta que está revisando.
+
+## Fases
+
+**Fase 1 (lo que se construye ahora)**: columna de orden en el listado de cuentas por cobrar, bloque "Venta de origen" en el detalle con el desglose de la venta y el monto al crédito, búsqueda de cuentas por número de orden, y vinculación/desvinculación manual con registro de quién la hizo.
+
+**Fase 2**: conciliación en la pantalla de Ventas (ver desde la venta a qué cuenta dio origen y cuánto se ha abonado) y un reporte de ventas al crédito contra saldos pendientes, exportable.
+
+**Fase 3**: emparejamiento asistido de los registros históricos — el sistema propone coincidencias por paciente, monto y fecha, y una persona confirma o descarta en lote.
 
 ## Supuestos
-- Hoy la clínica general y Óptica llevan catálogos de médicos separados; la coincidencia con "Dra. Mariamercedes Palma" se hará por nombre en ambos catálogos. Si el nombre está escrito de forma distinta en alguno de los dos, se ajustará durante la construcción.
-- "Producción" significa ventas donde ella está registrada como médico que refiere (igual que el resto del sistema lo define hoy), no procedimientos que ella haya realizado personalmente.
-- El reporte cubre únicamente las ventas del día del envío (hora Guatemala); no es un reporte de rango de fechas.
-- En esta fase el correo destino y el horario quedan fijos en la configuración del sistema, igual que el informe de anestesia; cambiarlos más adelante se maneja como un ajuste de configuración, no desde una pantalla.
-- Si el envío falla, se registra igual que los demás reportes automáticos existentes, sin agregar alertas adicionales en esta fase.
+
+- Las ventas nuevas pagadas con "Cuenta por Cobrar" ya quedan asociadas a su cuenta al momento de confirmarse; esta entrega aprovecha esa relación existente y agrega la vinculación manual para los casos en que falte. Si se detecta que alguna venta nueva no está quedando asociada, se corrige como parte de esta fase.
+- Las cuentas creadas antes de este cambio se mostrarán como "Sin venta" hasta que alguien las vincule manualmente; no se tocan sus montos ni su historial.
+- El vínculo aplica tanto a las cuentas por cobrar de clínica como a las de óptica, con la misma presentación.
+- Quien puede registrar abonos en una cuenta es quien puede vincular o desvincular su venta; quien solo tiene vista puede ver la venta de origen pero no modificarla.
+- Se permite vincular una venta ya asociada a otra cuenta solo tras un aviso explícito, para no bloquear correcciones legítimas; el caso normal es uno a uno.
+- Los montos y el detalle de la venta se muestran tal como quedaron registrados en la venta, aunque después se hayan editado precios en otros módulos.

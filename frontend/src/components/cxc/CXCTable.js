@@ -82,6 +82,7 @@ const CXCTable = ({
           <TableHeader>
             <TableRow>
               <TableHead>No. Cuenta</TableHead>
+              <TableHead>Orden de venta</TableHead>
               <TableHead>Responsable</TableHead>
               <TableHead>Paciente</TableHead>
               <TableHead>Concepto</TableHead>
@@ -104,6 +105,13 @@ const CXCTable = ({
                 >
                   <TableCell className="font-mono font-medium">
                     {cuenta.numero_cuenta}
+                  </TableCell>
+                  <TableCell data-testid={`cxc-orden-${cuenta.id}`}>
+                    {cuenta.venta_numero ? (
+                      <span className="font-mono text-xs text-slate-600">{cuenta.venta_numero}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">Sin venta</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

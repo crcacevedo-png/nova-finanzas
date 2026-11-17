@@ -6,3 +6,4 @@ export { default as CXCDetalleDialog } from './CXCDetalleDialog';
 export { default as CXCAbonoDialog } from './CXCAbonoDialog';
 export { default as CXCResponsableDialog } from './CXCResponsableDialog';
 export { default as CXCResponsablesGrid } from './CXCResponsablesGrid';
+export { default as CXCVentaOrigen } from './CXCVentaOrigen';

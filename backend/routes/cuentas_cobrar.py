@@ -49,6 +49,7 @@ class ResponsableCxCResponse(ResponsableCxCBase):
 class CxCOpticaCreate(BaseModel):
     """Crear CxC para Óptica - asociada a una orden/venta"""
     venta_id: Optional[str] = None  # Opcional para soportar CxC sin venta previa
+    venta_origen_id: Optional[str] = None  # Alias usado por el POS de Óptica (orden de óptica)
     paciente_id: str
     paciente_nombre: str
     monto_total: float = Field(..., ge=0)
@@ -132,6 +133,131 @@ async def generar_numero_cuenta(origen: str) -> str:
         nuevo_num = 1
     
     return f"{prefijo}-{fecha}-{nuevo_num:04d}"
+
+
+VENTA_SOURCES = {
+    "clinica": {"coll": "ventas", "numero": "numero_venta", "anulados": ["anulada"]},
+    "optica": {"coll": "optica_sales", "numero": "order_number", "anulados": ["cancelado"]},
+}
+
+
+def _fuente(origen: str) -> dict:
+    return VENTA_SOURCES.get(origen or "clinica", VENTA_SOURCES["clinica"])
+
+
+def _resumen_venta(venta: dict, origen: str = "clinica") -> dict:
+    """Resumen de la venta de origen (tal como quedó registrada en la venta)."""
+    if (origen or "clinica") == "optica":
+        return _resumen_venta_optica(venta)
+    items = []
+    for it in (venta.get("items") or []):
+        items.append({
+            "codigo": it.get("codigo") or "",
+            "nombre": it.get("nombre") or "",
+            "cantidad": it.get("cantidad") or 0,
+            "precio_unitario": float(it.get("precio_unitario") or 0),
+            "descuento": float(it.get("descuento") or 0),
+            "subtotal": float(it.get("subtotal") or 0),
+        })
+    formas = venta.get("formas_pago") or []
+    monto_credito = round(sum(float(f.get("monto") or 0) for f in formas
+                              if f.get("metodo") == "Cuenta por Cobrar"), 2)
+    total = round(float(venta.get("total") or 0), 2)
+    return {
+        "id": venta.get("id"),
+        "origen": "clinica",
+        "numero_venta": venta.get("numero_venta") or "",
+        "fecha": venta.get("fecha") or venta.get("created_at") or "",
+        "estado": venta.get("estado") or "",
+        "paciente_nombre": venta.get("paciente_nombre") or "",
+        "vendedor_nombre": venta.get("vendedor_nombre") or "",
+        "medico_nombre": venta.get("medico_nombre") or "",
+        "bodega_nombre": venta.get("bodega_nombre") or "",
+        "items": items,
+        "cantidad_items": venta.get("cantidad_items") or len(items),
+        "subtotal": round(float(venta.get("subtotal") or 0), 2),
+        "descuento_total": round(float(venta.get("descuento_total") or 0), 2),
+        "iva": round(float(venta.get("iva") or 0), 2),
+        "total": total,
+        "monto_credito": monto_credito,
+        "monto_en_caja": round(total - monto_credito, 2),
+        "formas_pago": [{"metodo": f.get("metodo"), "monto": float(f.get("monto") or 0)} for f in formas],
+    }
+
+
+def _resumen_venta_optica(venta: dict) -> dict:
+    """Resumen de una orden de Óptica (colección optica_sales)."""
+    items = []
+    for it in (venta.get("items_v2") or []):
+        items.append({
+            "codigo": it.get("type") or "",
+            "nombre": it.get("name") or it.get("product_name") or "",
+            "cantidad": it.get("quantity") or 0,
+            "precio_unitario": float(it.get("unit_price") or 0),
+            "descuento": 0.0,
+            "subtotal": float(it.get("subtotal") or 0),
+        })
+    if not items:
+        if float(venta.get("frame_price") or 0) > 0:
+            items.append({"codigo": "frame", "nombre": "Armazón", "cantidad": 1,
+                          "precio_unitario": float(venta["frame_price"]), "descuento": 0.0,
+                          "subtotal": float(venta["frame_price"])})
+        for li in (venta.get("lens_items") or []):
+            items.append({"codigo": "lens", "nombre": li.get("lens_type_name") or "Lente",
+                          "cantidad": li.get("quantity") or 1,
+                          "precio_unitario": float(li.get("unit_price") or 0), "descuento": 0.0,
+                          "subtotal": float(li.get("subtotal") or 0)})
+    total = round(float(venta.get("total") or 0), 2)
+    monto_credito = round(float(venta.get("monto_cxc") or venta.get("balance_due") or 0), 2)
+    return {
+        "id": venta.get("id"),
+        "origen": "optica",
+        "numero_venta": venta.get("order_number") or "",
+        "fecha": venta.get("created_at") or "",
+        "estado": venta.get("status") or "",
+        "paciente_nombre": venta.get("patient_name") or "",
+        "vendedor_nombre": venta.get("created_by_name") or "",
+        "medico_nombre": venta.get("doctor_name") or "",
+        "bodega_nombre": "Óptica",
+        "items": items,
+        "cantidad_items": sum(int(i["cantidad"] or 0) for i in items),
+        "subtotal": round(float(venta.get("subtotal") or 0), 2),
+        "descuento_total": round(float(venta.get("discount_amount") or 0), 2),
+        "iva": round(float(venta.get("iva") or 0), 2),
+        "total": total,
+        "monto_credito": monto_credito,
+        "monto_en_caja": round(float(venta.get("total_paid") or 0), 2),
+        "formas_pago": [{"metodo": venta.get("payment_method") or "", "monto": float(venta.get("total_paid") or 0)}],
+    }
+
+
+async def _agregar_numero_venta(cuentas: List[dict]) -> List[dict]:
+    """Agrega `venta_numero` a cada cuenta con una consulta por fuente de venta."""
+    numeros = {}
+    for origen, conf in VENTA_SOURCES.items():
+        ids = list({c.get("venta_id") for c in cuentas
+                    if c.get("venta_id") and (c.get("origen") or "clinica") == origen})
+        if not ids:
+            continue
+        docs = await db[conf["coll"]].find(
+            {"id": {"$in": ids}}, {"_id": 0, "id": 1, conf["numero"]: 1}
+        ).to_list(None)
+        for d in docs:
+            numeros[d["id"]] = d.get(conf["numero"], "")
+    for c in cuentas:
+        c["venta_numero"] = numeros.get(c.get("venta_id"), "")
+    return cuentas
+
+
+async def _ids_ventas_por_numero(search: str) -> List[str]:
+    """IDs de ventas (clínica y óptica) cuyo número de orden coincide con la búsqueda."""
+    ids = []
+    for conf in VENTA_SOURCES.values():
+        docs = await db[conf["coll"]].find(
+            {conf["numero"]: {"$regex": search, "$options": "i"}}, {"_id": 0, "id": 1}
+        ).to_list(200)
+        ids.extend(d["id"] for d in docs)
+    return ids
 
 
 def calcular_estado(monto_total: float, monto_pagado: float, fecha_vencimiento: str = None) -> str:
@@ -263,13 +389,16 @@ async def listar_cxc_optica(
             {"concepto": {"$regex": search, "$options": "i"}},
             {"descripcion": {"$regex": search, "$options": "i"}}
         ]
+        venta_ids = await _ids_ventas_por_numero(search)
+        if venta_ids:
+            query["$or"].append({"venta_id": {"$in": venta_ids}})
     
     total = await db.cuentas_por_cobrar.count_documents(query)
     cuentas = await db.cuentas_por_cobrar.find(
         query, {"_id": 0}
     ).sort("fecha_emision", -1).skip(offset).limit(limit).to_list(limit)
     
-    return {"data": cuentas, "total": total}
+    return {"data": await _agregar_numero_venta(cuentas), "total": total}
 
 
 @router.get("/optica/resumen")
@@ -321,7 +450,7 @@ async def crear_cxc_optica(
         "numero_cuenta": numero,
         "paciente_id": cuenta.paciente_id,
         "paciente_nombre": cuenta.paciente_nombre,
-        "venta_id": cuenta.venta_id,
+        "venta_id": cuenta.venta_id or cuenta.venta_origen_id,
         "monto_total": cuenta.monto_total,
         "monto_pagado": cuenta.monto_pagado,
         "saldo_pendiente": saldo,
@@ -374,13 +503,16 @@ async def listar_cxc_clinica(
             {"concepto": {"$regex": search, "$options": "i"}},
             {"descripcion": {"$regex": search, "$options": "i"}}
         ]
+        venta_ids = await _ids_ventas_por_numero(search)
+        if venta_ids:
+            query["$or"].append({"venta_id": {"$in": venta_ids}})
     
     total = await db.cuentas_por_cobrar.count_documents(query)
     cuentas = await db.cuentas_por_cobrar.find(
         query, {"_id": 0}
     ).sort("fecha_emision", -1).skip(offset).limit(limit).to_list(limit)
     
-    return {"data": cuentas, "total": total}
+    return {"data": await _agregar_numero_venta(cuentas), "total": total}
 
 
 @router.get("/clinica/resumen")
@@ -483,12 +615,66 @@ async def crear_cxc_clinica(
 
 # ==================== OPERACIONES COMUNES ====================
 
+class VincularVentaBody(BaseModel):
+    venta_id: str = Field(..., min_length=1)
+    confirmar: bool = Field(default=False, description="Confirma vincular una venta ya asociada a otra cuenta")
+
+
+@router.get("/ventas/buscar")
+async def buscar_ventas_vinculables(
+    search: Optional[str] = Query(None, description="Número de orden o paciente"),
+    fecha: Optional[str] = Query(None, description="Fecha de la venta (YYYY-MM-DD)"),
+    origen: str = Query("clinica", description="clinica (Punto de Venta) u optica"),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: dict = Depends(require_any_permission(["manage_cuentas_cobrar", "view_optica"]))
+):
+    """Busca ventas no anuladas para vincular a una cuenta por cobrar."""
+    conf = _fuente(origen)
+    es_optica = origen == "optica"
+    campo_numero = conf["numero"]
+    campo_paciente = "patient_name" if es_optica else "paciente_nombre"
+    campo_fecha = "created_at" if es_optica else "fecha"
+    campo_estado = "status" if es_optica else "estado"
+    
+    query = {campo_estado: {"$nin": conf["anulados"]}}
+    
+    if search:
+        query["$or"] = [
+            {campo_numero: {"$regex": search, "$options": "i"}},
+            {campo_paciente: {"$regex": search, "$options": "i"}},
+        ]
+    
+    if fecha:
+        query[campo_fecha] = {"$regex": f"^{fecha[:10]}"}
+    
+    ventas = await db[conf["coll"]].find(query, {"_id": 0}).sort(campo_fecha, -1).to_list(limit)
+    
+    # Cuentas ya vinculadas a esas ventas (una sola consulta)
+    ids = [v["id"] for v in ventas]
+    vinculadas = {}
+    if ids:
+        cuentas = await db.cuentas_por_cobrar.find(
+            {"venta_id": {"$in": ids}}, {"_id": 0, "id": 1, "venta_id": 1, "numero_cuenta": 1}
+        ).to_list(None)
+        for c in cuentas:
+            vinculadas.setdefault(c["venta_id"], []).append(c)
+    
+    data = []
+    for v in ventas:
+        resumen = _resumen_venta(v, origen)
+        otras = vinculadas.get(v["id"], [])
+        resumen["cuentas_vinculadas"] = [{"id": c["id"], "numero_cuenta": c.get("numero_cuenta", "")} for c in otras]
+        data.append(resumen)
+    
+    return {"data": data, "total": len(data)}
+
+
 @router.get("/{cuenta_id}")
 async def obtener_cuenta(
     cuenta_id: str,
     current_user: dict = Depends(require_any_permission(["view_cuentas_cobrar", "view_optica"]))
 ):
-    """Obtener detalle de una cuenta por cobrar"""
+    """Obtener detalle de una cuenta por cobrar (incluye la venta de origen si está vinculada)"""
     cuenta = await db.cuentas_por_cobrar.find_one(
         {"id": cuenta_id},
         {"_id": 0}
@@ -497,7 +683,121 @@ async def obtener_cuenta(
     if not cuenta:
         raise HTTPException(status_code=404, detail="Cuenta no encontrada")
     
+    cuenta["venta"] = None
+    cuenta["venta_numero"] = ""
+    if cuenta.get("venta_id"):
+        origen = cuenta.get("origen") or "clinica"
+        conf = _fuente(origen)
+        venta = await db[conf["coll"]].find_one({"id": cuenta["venta_id"]}, {"_id": 0})
+        if venta:
+            cuenta["venta"] = _resumen_venta(venta, origen)
+            cuenta["venta_numero"] = cuenta["venta"]["numero_venta"]
+    
     return cuenta
+
+
+@router.put("/{cuenta_id}/venta")
+async def vincular_venta(
+    cuenta_id: str,
+    body: VincularVentaBody,
+    current_user: dict = Depends(require_any_permission(["manage_cuentas_cobrar", "view_optica"]))
+):
+    """Vincula manualmente una venta a la cuenta. No recalcula montos, saldos ni estado:
+    solo cambia la referencia."""
+    cuenta = await db.cuentas_por_cobrar.find_one({"id": cuenta_id}, {"_id": 0})
+    if not cuenta:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+    
+    origen = cuenta.get("origen") or "clinica"
+    conf = _fuente(origen)
+    venta = await db[conf["coll"]].find_one({"id": body.venta_id}, {"_id": 0})
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    estado_venta = venta.get("status" if origen == "optica" else "estado")
+    if estado_venta in conf["anulados"]:
+        raise HTTPException(status_code=400, detail="No se puede vincular una venta anulada")
+    
+    otra = await db.cuentas_por_cobrar.find_one(
+        {"venta_id": body.venta_id, "id": {"$ne": cuenta_id}},
+        {"_id": 0, "numero_cuenta": 1}
+    )
+    if otra and not body.confirmar:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Esta venta ya está vinculada a la cuenta {otra.get('numero_cuenta')}. "
+                   f"Confirma para vincularla también a esta cuenta."
+        )
+    
+    advertencias = []
+    if otra:
+        advertencias.append(f"La venta también está vinculada a la cuenta {otra.get('numero_cuenta')}.")
+    resumen = _resumen_venta(venta, origen)
+    if round(resumen["monto_credito"], 2) != round(float(cuenta.get("monto_total") or 0), 2):
+        advertencias.append(
+            f"El monto al crédito de la venta (Q{resumen['monto_credito']:.2f}) no coincide con "
+            f"el total de la cuenta (Q{float(cuenta.get('monto_total') or 0):.2f})."
+        )
+    
+    now = datetime.now(timezone.utc).isoformat()
+    await db.cuentas_por_cobrar.update_one(
+        {"id": cuenta_id},
+        {"$set": {
+            "venta_id": body.venta_id,
+            "venta_vinculada_por": current_user.get("id"),
+            "venta_vinculada_por_nombre": current_user.get("name", current_user.get("username")),
+            "venta_vinculada_en": now,
+            "updated_at": now,
+        }}
+    )
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "CXC_VENTA_VINCULADA",
+        "user_id": current_user.get("id", ""),
+        "user_name": current_user.get("name", current_user.get("username", "")),
+        "timestamp": now,
+        "details": {"cuenta_id": cuenta_id, "numero_cuenta": cuenta.get("numero_cuenta"),
+                    "venta_id": body.venta_id, "numero_venta": resumen["numero_venta"],
+                    "venta_anterior": cuenta.get("venta_id"), "advertencias": advertencias},
+    })
+    
+    return {"success": True, "message": f"Venta {resumen['numero_venta']} vinculada",
+            "venta": resumen, "advertencias": advertencias}
+
+
+@router.delete("/{cuenta_id}/venta")
+async def desvincular_venta(
+    cuenta_id: str,
+    current_user: dict = Depends(require_any_permission(["manage_cuentas_cobrar", "view_optica"]))
+):
+    """Quita el vínculo con la venta. No altera montos, saldos, abonos ni estado."""
+    cuenta = await db.cuentas_por_cobrar.find_one({"id": cuenta_id}, {"_id": 0})
+    if not cuenta:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+    if not cuenta.get("venta_id"):
+        raise HTTPException(status_code=400, detail="La cuenta no tiene una venta vinculada")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    await db.cuentas_por_cobrar.update_one(
+        {"id": cuenta_id},
+        {"$set": {
+            "venta_id": None,
+            "venta_desvinculada_por": current_user.get("id"),
+            "venta_desvinculada_por_nombre": current_user.get("name", current_user.get("username")),
+            "venta_desvinculada_en": now,
+            "updated_at": now,
+        }}
+    )
+    await db.audit_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": "CXC_VENTA_DESVINCULADA",
+        "user_id": current_user.get("id", ""),
+        "user_name": current_user.get("name", current_user.get("username", "")),
+        "timestamp": now,
+        "details": {"cuenta_id": cuenta_id, "numero_cuenta": cuenta.get("numero_cuenta"),
+                    "venta_id": cuenta.get("venta_id")},
+    })
+    
+    return {"success": True, "message": "Venta desvinculada"}
 
 
 @router.post("/{cuenta_id}/abono")
