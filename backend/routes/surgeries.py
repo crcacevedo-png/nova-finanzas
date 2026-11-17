@@ -533,11 +533,12 @@ async def create_surgery(
         "updated_at": now
     }
     # Libro IGSS: con el interruptor encendido exige paciente + No. SPS de una orden vigente
-    from routes.igss_libro_atenciones import validar_cirugia_nueva
+    from routes.igss_libro_atenciones import validar_cirugia_nueva, programar_cirugia
     orden_libro = await validar_cirugia_nueva(surgery_doc)
     surgery_doc["igss_orden_id"] = orden_libro["id"] if orden_libro else None
     
     await db.surgeries.insert_one(surgery_doc)
+    await programar_cirugia(surgery_doc, orden_libro)
     
     # Crear evento/nota de cirugía en el historial clínico si hay paciente registrado
     if surgery.patient_id:
@@ -587,7 +588,7 @@ async def update_surgery(
     # Libro IGSS: si cambia la institución o el No. SPS se vuelve a resolver la orden.
     # Una cirugía existente puede editarse aunque no tenga orden (queda "sin orden").
     from routes.igss_libro_atenciones import (orden_de_cirugia, validar_dosis_para_realizar,
-                                              sincronizar_cirugia, respuesta_registro)
+                                              sincronizar_cirugia, respuesta_registro, programar_cirugia)
     merged = {**existing, **update_data}
     sps_antes = ((existing.get("igss_data") or {}).get("sps") or "").strip().upper()
     sps_despues = ((merged.get("igss_data") or {}).get("sps") or "").strip().upper()
@@ -604,6 +605,8 @@ async def update_surgery(
     registro = {}
     if existing.get("status") == "realizado" or existing.get("igss_orden_id") != updated.get("igss_orden_id"):
         registro = respuesta_registro(await sincronizar_cirugia(updated, current_user), current_user)
+    else:
+        await programar_cirugia(updated)
     # Sincronizar registro de anestesia (tipo/anestesiólogo/fecha)
     try:
         from routes.quirofano import upsert_anesthesia_from_surgery
@@ -799,6 +802,11 @@ async def cancel_surgery(
     except Exception:
         pass
 
+    # Libro IGSS: la cancelada deja de estar programada; la reagendada queda programada
+    from routes.igss_libro_atenciones import programar_cirugia
+    await programar_cirugia({**surgery, **update_data})
+    if new_surgery_id:
+        await programar_cirugia(new_doc)
     
     updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
     enriched = await enrich_surgery(updated)

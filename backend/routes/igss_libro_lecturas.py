@@ -1,7 +1,9 @@
 # /app/backend/routes/igss_libro_lecturas.py
 # Libro de órdenes IGSS — Fase 3: las lecturas salen del libro y cuentan ÓRDENES (No. SPS),
-# nunca dosis ni atenciones: consumidos = atendidas, reservados = pendientes. Contadores y
-# alertas del catálogo, Producción y listado oficial en Excel (1 fila por orden atendida).
+# nunca dosis ni atenciones: reservadas, en curso, completas e históricas por separado (ocupan
+# cupo las cuatro; las cerradas sin completar no). Cobrable = solo completas: Producción y
+# listado oficial en Excel (1 fila por orden completa, en el periodo en que se completó); las
+# históricas van en una hoja aparte, solo de consulta.
 # Exclusivo de LIBRO_IGSS_ROLES (incluido el selector `nogs-activos`).
 
 import io
@@ -15,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from config.database import db
 from config.permissions import LIBRO_IGSS_ROLES
 from routes.auth import require_role
+from routes.igss_libro import ESTADOS_CUPO
 from routes.igss_nogs import (TIPO_COMPRA_LABELS, UMBRAL_AVISO, _calcular_edad, _get_nog_or_404,
                               _produccion_totales, _unidad_or_404, etiqueta_catalogo, norm_txt)
 from utils.timezone import now_gt, today_str_gt
@@ -39,18 +42,26 @@ def costo_orden(o: dict) -> float:
     return round(float(v if v is not None else (o.get("precio") or 0)), 2)
 
 
+CONTADOR = {"reservada": "reservadas", "en_curso": "en_curso", "completa": "completas", "historica": "historicas"}
+ORDEN_LISTA = ("completa", "en_curso", "reservada", "historica", "cerrada")
+NOTA_HISTORICAS = "Servicios anteriores al cambio de sistema. Ya gestionados fuera del sistema. No enviar al IGSS."
+
+
 async def contadores_libro(match: Optional[dict] = None) -> dict:
-    """{nog_id: {consumidos, reservados, monto_consumido}} contando órdenes vigentes."""
+    """{nog_id: {reservadas, en_curso, completas, historicas, cerradas, monto_cobrable}}; las
+    cuatro primeras ocupan cupo."""
     out = {}
-    pipeline = [{"$match": {"estado": {"$in": ["pendiente", "atendida"]}, **(match or {})}},
+    pipeline = [{"$match": {"estado": {"$in": [*ESTADOS_CUPO, "cerrada"]}, **(match or {})}},
                 {"$group": {"_id": {"nog": "$nog_id", "estado": "$estado"}, "n": {"$sum": 1}, "monto": {"$sum": COSTO}}}]
     async for g in db.igss_ordenes_libro.aggregate(pipeline):
-        c = out.setdefault(g["_id"]["nog"], {"consumidos": 0, "reservados": 0, "monto_consumido": 0.0})
-        if g["_id"]["estado"] == "atendida":
-            c["consumidos"], c["monto_consumido"] = g["n"], round(float(g["monto"]), 2)
-        else:
-            c["reservados"] = g["n"]
+        c = out.setdefault(g["_id"]["nog"], {**{k: 0 for k in CONTADOR.values()}, "cerradas": 0, "monto_cobrable": 0.0})
+        c[CONTADOR.get(g["_id"]["estado"], "cerradas")] = g["n"]
+        if g["_id"]["estado"] == "completa":
+            c["monto_cobrable"] = round(float(g["monto"]), 2)
     return out
+
+
+CIFRAS = (*CONTADOR.values(), "ocupados", "cerradas")
 
 
 def nog_libro(nog: dict, c: Optional[dict] = None) -> dict:
@@ -60,8 +71,9 @@ def nog_libro(nog: dict, c: Optional[dict] = None) -> dict:
     precio = float(nog.get("precio") or 0)
     sin_tope = bool(nog.get("sin_tope"))
     tope = not sin_tope and cantidad > 0
-    consumidos, reservados = int(c.get("consumidos", 0)), int(c.get("reservados", 0))
-    usados = consumidos + reservados
+    cifras = {k: int(c.get(k, 0)) for k in CONTADOR.values()}
+    usados = sum(cifras.values())
+    cifras["cerradas"] = int(c.get("cerradas", 0))
     activo = nog.get("is_active", True) is not False
     aviso, bloqueado = tope and usados >= cantidad * UMBRAL_AVISO, tope and usados >= cantidad
     estado = "inactivo" if not activo else "completado" if bloqueado else "por_completarse" if aviso else "activo"
@@ -73,11 +85,11 @@ def nog_libro(nog: dict, c: Optional[dict] = None) -> dict:
         "tipo_compra_label": _modalidad(nog), "modalidad": _modalidad(nog), "etiqueta": etiqueta_catalogo(nog),
         "sin_tope": sin_tope, "fecha_asignacion": nog.get("fecha_asignacion", ""),
         "cantidad": cantidad, "precio": precio, "monto_total": monto_total, "valor_total": monto_total,
-        "consumidos": consumidos, "reservados": reservados, "usados": usados,
+        **cifras, "ocupados": usados,
         "disponibles": max(cantidad - usados, 0) if tope else None,
         "porcentaje": round(usados / cantidad * 100, 1) if tope else None,
         "aviso_90": aviso, "bloqueado": bloqueado,
-        "monto_consumido": float(c.get("monto_consumido", 0.0)),
+        "monto_cobrable": float(c.get("monto_cobrable", 0.0)),
         "estado": estado, "is_active": activo,
         "created_at": nog.get("created_at", ""), "updated_at": nog.get("updated_at", ""),
     }
@@ -125,6 +137,7 @@ def fila_orden(o: dict, nog: Optional[dict], pac: Optional[dict]) -> dict:
         "codigo": o.get("codigo", ""), "procedimiento": o.get("procedimiento") or (nog or {}).get("nombre_servicio", ""),
         "tipo": o.get("tipo", ""), "fecha_ingreso": o.get("fecha_ingreso", ""),
         "fecha_primera_atencion": o.get("fecha_primera_atencion") or "",
+        "fecha_completa": o.get("fecha_completa") or "",
         "medico_nombre": next((a.get("medico") for a in ats if a.get("medico")), ""),
         "dosis_aplicadas": aplicadas, "dosis_autorizadas": autorizadas, "fechas_dosis": [f for f in fechas if f],
         "evaluacion_id": ev.get("ref_id") if ev else None,
@@ -138,13 +151,13 @@ def _orden_fecha_sps(o: dict):
     return (o.get("fecha_primera_atencion") or "", o.get("no_sps") or "")
 
 
-async def ordenes_atendidas(filtro: dict, desde=None, hasta=None) -> list:
-    """Órdenes ATENDIDAS (pendientes y anuladas fuera) cuya PRIMERA atención cae en el
-    rango; incluye pacientes inactivos. Orden: fecha de primera atención y No. SPS."""
-    q = {"estado": "atendida", **filtro}
+async def ordenes_completas(filtro: dict, desde=None, hasta=None) -> list:
+    """Órdenes COMPLETAS (las únicas cobrables) que se completaron en el rango; incluye
+    pacientes inactivos. Orden: fecha de primera atención y No. SPS."""
+    q = {"estado": "completa", **filtro}
     rango = {k: v[:10] for k, v in (("$gte", desde), ("$lte", hasta)) if v}
     if rango:
-        q["fecha_primera_atencion"] = rango
+        q["fecha_completa"] = rango
     docs = await db.igss_ordenes_libro.find(q, {"_id": 0}).to_list(None)
     return sorted(docs, key=_orden_fecha_sps)
 
@@ -187,8 +200,7 @@ async def listar_nogs_unidad(unit_id: str, current_user: dict = Depends(require_
         "totales": {
             "nogs": len(nogs),
             "servicios_contratados": sum(n["cantidad"] for n in con_tope),
-            "consumidos": sum(n["consumidos"] for n in nogs),
-            "reservados": sum(n["reservados"] for n in nogs),
+            **{k: sum(n[k] for n in nogs) for k in (*CIFRAS,)},
             "servicios_disponibles": sum(n["disponibles"] for n in con_tope if n["is_active"]),
             "valor_total": round(sum(n["monto_total"] for n in nogs), 2),
         },
@@ -231,8 +243,7 @@ async def resumen_nogs(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLE
         "nogs_disponibles": sum(1 for n in activos if n["estado"] != "completado"),
         "nogs_completados": sum(1 for n in activos if n["estado"] == "completado"),
         "servicios_contratados": sum(n["cantidad"] for n in con_tope),
-        "servicios_consumidos": sum(n["consumidos"] for n in nogs),
-        "servicios_reservados": sum(n["reservados"] for n in nogs),
+        **{k: sum(n[k] for n in nogs) for k in CIFRAS},
         "servicios_disponibles": sum(n["disponibles"] for n in con_tope if n["is_active"]),
         "valor_total": round(sum(n["monto_total"] for n in nogs), 2),
     }
@@ -250,7 +261,7 @@ async def alertas_nogs(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLE
         alertas.append({
             "unidad_id": n["unidad_id"], "unidad_nombre": u.get("name", ""), "unidad_codigo": u.get("code", ""),
             "nog_id": n["id"], "numero": n["numero"], "etiqueta": n["etiqueta"], "nombre_servicio": n["nombre_servicio"],
-            "consumidos": n["consumidos"], "reservados": n["reservados"], "usados": n["usados"],
+            **{k: n[k] for k in CIFRAS},
             "cantidad": n["cantidad"], "disponibles": n["disponibles"], "porcentaje": n["porcentaje"], "estado": n["estado"]})
     alertas.sort(key=lambda a: (0 if a["estado"] == "completado" else 1, -a["porcentaje"]))
     return {
@@ -263,11 +274,12 @@ async def alertas_nogs(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLE
 
 @router.get("/nogs/{nog_id}/pacientes")
 async def ordenes_de_nog(nog_id: str, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
-    """Órdenes vigentes del NOG (atendidas y pendientes), una fila por orden."""
+    """Órdenes del NOG salvo las anuladas (completas, en curso, reservadas, históricas y
+    cerradas sin completar), una fila por orden."""
     nog = await _get_nog_or_404(nog_id)
     docs = await db.igss_ordenes_libro.find(
-        {"nog_id": nog_id, "estado": {"$in": ["pendiente", "atendida"]}}, {"_id": 0}).to_list(None)
-    docs.sort(key=lambda o: (o.get("estado") != "atendida", *_orden_fecha_sps(o)))
+        {"nog_id": nog_id, "estado": {"$in": list(ORDEN_LISTA)}}, {"_id": 0}).to_list(None)
+    docs.sort(key=lambda o: (ORDEN_LISTA.index(o.get("estado")), *_orden_fecha_sps(o)))
     cont = await contadores_libro({"nog_id": nog_id})
     filas = await _filas(docs, {nog_id: nog})
     return {"nog": nog_libro(nog, cont.get(nog_id)), "ordenes": filas, "total": len(filas)}
@@ -278,9 +290,9 @@ async def ordenes_de_nog(nog_id: str, current_user: dict = Depends(require_role(
 COLUMNAS = ["No. SPS", "Modalidad", "NOG", "Expediente", "Paciente", "Afiliación", "Código", "Procedimiento",
             "Fecha 1ª atención", "Médico", "Dosis aplicadas / autorizadas", "Fechas de cada dosis", "Precio (Q)",
             "Impreso", "Enviado", "Facturado", "Pagado"]
-COLUMNAS_RESUMEN = ["NOG / Entrada", "Servicio", "Modalidad", "Precio unitario (Q)", "Órdenes atendidas en el periodo",
-                    "Monto del periodo (Q)", "Órdenes atendidas acumuladas", "Cupos contratados", "Avance acumulado",
-                    "Monto acumulado (Q)", "Monto contratado (Q)", "Estado"]
+COLUMNAS_RESUMEN = ["NOG / Entrada", "Servicio", "Modalidad", "Precio unitario (Q)", "Órdenes completas en el periodo",
+                    "Monto del periodo (Q)", "Órdenes completas acumuladas", "Cupos contratados", "Avance acumulado",
+                    "Monto acumulado (Q)", "Monto contratado (Q)", "Estado", "Históricas (no se cobran)"]
 
 
 def _si(v) -> str:
@@ -300,12 +312,12 @@ def _estilos():
             Font(color="FFFFFF", bold=True), Font(bold=True), Alignment(horizontal="center", vertical="center", wrap_text=True))
 
 
-def _encabezado(ws, lineas: list) -> int:
+def _encabezado(ws, lineas: list, inicio: int = 1) -> int:
     _, _, bold, _ = _estilos()
-    for r, (k, v) in enumerate(lineas, 1):
+    for r, (k, v) in enumerate(lineas, inicio):
         ws.cell(row=r, column=1, value=k).font = bold
         ws.cell(row=r, column=2, value=v)
-    return len(lineas) + 2
+    return inicio + len(lineas) + 1
 
 
 def _fila_titulos(ws, r: int, titulos: list):
@@ -321,9 +333,12 @@ def _anchos(ws, n: int, ancho: int = 18):
         ws.column_dimensions[get_column_letter(c)].width = ancho
 
 
-def _hoja_ordenes(ws, lineas: list, filas: list):
+def _hoja_ordenes(ws, lineas: list, filas: list, nota: Optional[str] = None):
     _, _, bold, _ = _estilos()
-    r = _encabezado(ws, lineas)
+    if nota:
+        from openpyxl.styles import Font
+        ws.cell(row=1, column=1, value=nota).font = Font(bold=True, color="B42318")
+    r = _encabezado(ws, lineas, inicio=3 if nota else 1)
     _fila_titulos(ws, r, COLUMNAS)
     for f in filas:
         r += 1
@@ -352,28 +367,31 @@ def _titulo_hoja(wb, texto: str) -> str:
 def _periodo_texto(desde, hasta) -> str:
     if not (desde or hasta):
         return "Todo el historial"
-    return f"{fmt_fecha(desde) if desde else 'inicio'} al {fmt_fecha(hasta) if hasta else 'hoy'} (fecha de primera atención)"
+    return f"{fmt_fecha(desde) if desde else 'inicio'} al {fmt_fecha(hasta) if hasta else 'hoy'} (fecha en que se completó la orden)"
 
 
 def _fila_resumen(n: dict, filas: list) -> list:
     tope = n["disponibles"] is not None
-    avance = f"{round(n['consumidos'] / n['cantidad'] * 100, 1)} %" if tope else "Sin tope" if n["sin_tope"] else "—"
+    avance = f"{round(n['completas'] / n['cantidad'] * 100, 1)} %" if tope else "Sin tope" if n["sin_tope"] else "—"
     return [n["etiqueta"], n["nombre_servicio"], n["modalidad"], n["precio"], len(filas),
-            round(sum(f["costo"] for f in filas), 2), n["consumidos"],
-            n["cantidad"] if tope else "Sin tope", avance, n["monto_consumido"],
-            "Sin tope" if n["sin_tope"] else n["monto_total"], "Activo" if n["is_active"] else "Inactivo"]
+            round(sum(f["costo"] for f in filas), 2), n["completas"],
+            n["cantidad"] if tope else "Sin tope", avance, n["monto_cobrable"],
+            "Sin tope" if n["sin_tope"] else n["monto_total"], "Activo" if n["is_active"] else "Inactivo",
+            n["historicas"]]
 
 
 async def libro_oficial_excel(unit: dict, nogs_docs: list, desde=None, hasta=None) -> io.BytesIO:
     """Hoja "Resumen" (1 fila por NOG y por entrada de baja cuantía), una hoja por NOG y una
-    hoja aparte de Baja Cuantía. Cada fila es una orden atendida; al pie, total y monto."""
+    hoja aparte de Baja Cuantía. Cada fila es una orden COMPLETA; al pie, total y monto. Si hay
+    órdenes históricas, van en la hoja "Históricas" (mismas columnas, todas, sin filtro de
+    fechas): solo de consulta y para cuadrar cupos, nunca para cobro."""
     from openpyxl import Workbook
     ids = [n["id"] for n in nogs_docs]
     cont = await contadores_libro({"nog_id": {"$in": ids}})
     nogs = [nog_libro(n, cont.get(n["id"])) for n in nogs_docs]
     docs = {n["id"]: n for n in nogs_docs}
     por_nog = {}
-    for f in await _filas(await ordenes_atendidas({"nog_id": {"$in": ids}}, desde, hasta), docs):
+    for f in await _filas(await ordenes_completas({"nog_id": {"$in": ids}}, desde, hasta), docs):
         por_nog.setdefault(f["nog_id"], []).append(f)
     con_numero = sorted((n for n in nogs if n["numero"].strip()), key=lambda n: n["numero"])
     sin_numero = sorted((n for n in nogs if not n["numero"].strip()), key=lambda n: n["etiqueta"])
@@ -393,7 +411,7 @@ async def libro_oficial_excel(unit: dict, nogs_docs: list, desde=None, hasta=Non
     r += 1
     _, _, bold, _ = _estilos()
     for c, v in ((1, "TOTAL"), (5, len(todas)), (6, round(sum(f["costo"] for f in todas), 2)),
-                 (7, sum(n["consumidos"] for n in nogs)), (10, round(sum(n["monto_consumido"] for n in nogs), 2))):
+                 (7, sum(n["completas"] for n in nogs)), (10, round(sum(n["monto_cobrable"] for n in nogs), 2))):
         ws.cell(row=r, column=c, value=v).font = bold
     _anchos(ws, len(COLUMNAS_RESUMEN), 20)
 
@@ -406,6 +424,12 @@ async def libro_oficial_excel(unit: dict, nogs_docs: list, desde=None, hasta=Non
                        key=lambda f: (f["fecha_primera_atencion"], f["no_sps"]))
         _hoja_ordenes(wb.create_sheet(_titulo_hoja(wb, "Baja Cuantía")),
                       base + [("Modalidad", "Baja Cuantía (sin número de NOG)")], filas)
+    historicas = await db.igss_ordenes_libro.find({"estado": "historica", "nog_id": {"$in": ids}}, {"_id": 0}).to_list(None)
+    if historicas:
+        filas = sorted(await _filas(historicas, docs), key=lambda f: (f["nog"], f["fecha_primera_atencion"], f["no_sps"]))
+        _hoja_ordenes(wb.create_sheet(_titulo_hoja(wb, "Históricas")),
+                      [("Unidad IGSS", unit.get("name", "")), ("Periodo", "Todas las históricas (no depende del periodo)")],
+                      filas, nota=NOTA_HISTORICAS)
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -449,12 +473,12 @@ async def export_unidad_excel(
     hasta: Optional[str] = Query(None, pattern=FECHA),
     current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES)),
 ):
-    """Listado oficial de la unidad: 1 fila por orden atendida; filtro sobre la fecha de
-    la PRIMERA atención. Entradas activas o con órdenes atendidas."""
+    """Listado oficial de la unidad: 1 fila por orden completa; filtro sobre la fecha en
+    que se completó. Entradas activas o con órdenes completas."""
     _validar_rango(desde, hasta)
     unit = await _unidad_or_404(unit_id)
     docs = await db.igss_nogs.find({"unidad_id": unit_id}, {"_id": 0}).to_list(None)
-    con_ordenes = set(await db.igss_ordenes_libro.distinct("nog_id", {"unidad_id": unit_id, "estado": "atendida"}))
+    con_ordenes = set(await db.igss_ordenes_libro.distinct("nog_id", {"unidad_id": unit_id, "estado": "completa"}))
     docs = [n for n in docs if n.get("is_active", True) is not False or n["id"] in con_ordenes]
     buf = await libro_oficial_excel(unit, docs, desde, hasta)
     return _descarga(buf, _nombre_archivo("Listado_oficial", unit.get("name") or "IGSS", desde, hasta))
@@ -463,10 +487,10 @@ async def export_unidad_excel(
 # ==================== PRODUCCIÓN ====================
 
 async def produccion_rows(fecha=None, desde=None, hasta=None, unidad_id=None, nog=None) -> list:
-    """Producción leída del libro: 1 fila por orden atendida en la fecha de su primera atención."""
+    """Producción leída del libro: 1 fila por orden completa, en la fecha en que se completó."""
     if fecha:
         desde = hasta = fecha
-    ordenes = await ordenes_atendidas({"unidad_id": unidad_id} if unidad_id else {}, desde, hasta)
+    ordenes = await ordenes_completas({"unidad_id": unidad_id} if unidad_id else {}, desde, hasta)
     nogs = {n["id"]: n for n in await db.igss_nogs.find(
         {"id": {"$in": list({o.get("nog_id") for o in ordenes})}}, {"_id": 0}).to_list(None)}
     units = await _unidades()
@@ -474,7 +498,7 @@ async def produccion_rows(fecha=None, desde=None, hasta=None, unidad_id=None, no
     for f in await _filas(ordenes, nogs):
         if nog and norm_txt(nog) not in norm_txt(f["nog"]):
             continue
-        rows.append({**f, "fecha": f["fecha_primera_atencion"],
+        rows.append({**f, "fecha": f["fecha_completa"],
                      "unidad_nombre": units.get(f["unidad_id"], {}).get("name", "")})
     rows.sort(key=lambda r: (r["unidad_nombre"], r["nog"], r["fecha"], r["no_sps"]))
     return rows
@@ -489,7 +513,7 @@ async def listar_produccion(
     nog: Optional[str] = None,
     current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES)),
 ):
-    """Producción IGSS: una línea por ORDEN atendida, con costo y estados (se editan en la orden)."""
+    """Producción IGSS: una línea por ORDEN completa, con costo y estados (se editan en la orden)."""
     if not (fecha or desde or hasta):
         fecha = today_str_gt()
     rows = await produccion_rows(fecha, desde, hasta, unidad_id, nog)
@@ -514,7 +538,7 @@ async def exportar_produccion_excel(
     wb = Workbook()
     ws = wb.active
     ws.title = "Produccion"
-    titulos = ["Fecha 1ª atención", "Unidad", "NOG", "Modalidad", "No. SPS", "Paciente", "Expediente", "Procedimiento",
+    titulos = ["Fecha en que se completó", "Unidad", "NOG", "Modalidad", "No. SPS", "Paciente", "Expediente", "Procedimiento",
                "Médico", "Dosis", "Costo (Q)", "Impreso", "Enviado", "Facturado", "Pagado"]
     _fila_titulos(ws, 1, titulos)
     for r in rows:

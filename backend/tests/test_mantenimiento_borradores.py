@@ -96,7 +96,7 @@ class TestRecalculo:
         assert r2.status_code == 200
         assert r2.json()["acreditaciones_vigentes"] == d1["acreditaciones_vigentes"]
         res = sa.get(f"{IGSS}/nogs/resumen").json()
-        assert res["servicios_consumidos"] >= 0
+        assert res["completas"] >= 0
         assert res["servicios_disponibles"] >= 0
 
     def test_igss_admin_recalculo_200(self, igss_admin):

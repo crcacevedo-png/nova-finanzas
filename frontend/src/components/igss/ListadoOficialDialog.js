@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 import { igssNogApi } from '../../services/api';
 import { descargarBlob, nombreListado } from '../../lib/igssLibro';
 
-// Listado oficial IGSS por unidad: 1 fila por orden atendida, filtrable por la fecha de
-// la primera atención. Resumen + una hoja por NOG + hoja de Baja Cuantía.
+// Listado oficial IGSS por unidad: 1 fila por orden COMPLETA, filtrable por la fecha en que
+// se completó. Resumen + una hoja por NOG + Baja Cuantía (+ "Históricas", solo de consulta).
 export const ListadoOficialDialog = ({ open, onOpenChange, unidades, unidadInicial }) => {
   const [unidad, setUnidad] = useState('');
   const [desde, setDesde] = useState('');
@@ -40,7 +40,7 @@ export const ListadoOficialDialog = ({ open, onOpenChange, unidades, unidadInici
         <DialogHeader>
           <DialogTitle>Listado oficial IGSS (Excel)</DialogTitle>
           <DialogDescription>
-            Una fila por orden atendida (No. SPS). Excluye órdenes pendientes y anuladas; incluye pacientes inactivos.
+            Una fila por orden COMPLETA (No. SPS): solo esas se cobran. Excluye reservadas, en curso, cerradas sin completar y anuladas; incluye pacientes inactivos. Las históricas van en una hoja aparte, solo de consulta.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -57,7 +57,7 @@ export const ListadoOficialDialog = ({ open, onOpenChange, unidades, unidadInici
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Desde (1ª atención)</Label>
+              <Label className="text-xs">Desde (fecha en que se completó)</Label>
               <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="mt-1" data-testid="listado-oficial-desde" />
             </div>
             <div>

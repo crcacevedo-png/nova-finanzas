@@ -508,10 +508,10 @@ const UnidadesIGSS = () => {
           {verLibro && (
             <MetricCard
               icon={ClipboardList}
-              label="Órdenes consumidas"
-              value={resumen?.servicios_consumidos ?? 0}
+              label="Órdenes completas (se cobran)"
+              value={resumen?.completas ?? 0}
               color="bg-teal-100 text-teal-600"
-              subtitle={`${resumen?.servicios_reservados ?? 0} reservadas · de ${resumen?.servicios_contratados ?? 0} cupos`}
+              subtitle={`${resumen?.en_curso ?? 0} en curso · ${resumen?.reservadas ?? 0} reservadas · ${resumen?.historicas ?? 0} históricas · de ${resumen?.servicios_contratados ?? 0} cupos`}
             />
           )}
         </div>

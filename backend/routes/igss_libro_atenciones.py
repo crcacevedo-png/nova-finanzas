@@ -8,7 +8,7 @@
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,9 +19,10 @@ from pymongo.errors import DuplicateKeyError
 from config.database import db
 from config.permissions import LIBRO_IGSS_ROLES
 from routes.auth import require_any_permission, require_role
-from routes.igss_libro import (_audit, _expr_cirugias, _nombre_usuario, _orden_out, crear_orden_libro,
-                               normalizar_sps)
+from routes.igss_libro import (ESTADO_TEXTO, ESTADOS_VIGENTES, _audit, _expr_cirugias, _lit, _nombre_usuario,
+                               _orden_out, crear_orden_libro, etapas_estado, normalizar_sps)
 from routes.igss_nogs import TIPO_COMPRA_LABELS, etiqueta_catalogo, eval_es_borrador_vacio
+from utils.timezone import today_str_gt
 
 router = APIRouter(prefix="/igss-units/libro", tags=["IGSS - Libro de órdenes"])
 pacientes_router = APIRouter(prefix="/patients", tags=["Pacientes"])
@@ -55,16 +56,13 @@ async def _pendientes_sin_orden() -> int:
 
 # ==================== OPERACIONES ATÓMICAS SOBRE LA ORDEN ====================
 
-def _lit(v):
-    return {"$literal": v}
-
-
 async def agregar_atencion(orden_id: str, atencion: dict, exigir_dosis: bool):
     """Agrega una atención a la orden en UNA operación atómica. En cirugías calcula
     numero_dosis (consecutivo) y marca excede_dosis; con exigir_dosis=True la condición
-    impide superar dosis_autorizadas. Devuelve la orden actualizada o None."""
+    impide superar dosis_autorizadas. El estado se recalcula (en curso / completa según el
+    tipo de la orden). Devuelve la orden actualizada o None."""
     es_cx = atencion["tipo"] == "cirugia"
-    filtro = {"id": orden_id, "estado": {"$ne": "anulada"},
+    filtro = {"id": orden_id, "estado": {"$in": list(ESTADOS_VIGENTES)},
               "atenciones": {"$not": {"$elemMatch": {"tipo": atencion["tipo"], "ref_id": atencion["ref_id"]}}}}
     if es_cx and exigir_dosis:
         filtro["$expr"] = {"$lt": [_expr_cirugias(), "$dosis_autorizadas"]}
@@ -74,19 +72,18 @@ async def agregar_atencion(orden_id: str, atencion: dict, exigir_dosis: bool):
     fecha = _lit(atencion.get("fecha") or "")
     pipeline = [{"$set": {
         "atenciones": {"$concatArrays": [{"$ifNull": ["$atenciones", []]}, [nueva]]},
-        "estado": "atendida",
         "fecha_primera_atencion": {"$cond": [
             {"$or": [{"$not": ["$fecha_primera_atencion"]}, {"$lt": [fecha, "$fecha_primera_atencion"]}]},
             fecha, "$fecha_primera_atencion"]},
         "updated_at": _lit(datetime.now(timezone.utc).isoformat()),
-    }}]
+    }}, *etapas_estado()]
     return await db.igss_ordenes_libro.find_one_and_update(
         filtro, pipeline, projection={"_id": 0}, return_document=ReturnDocument.AFTER)
 
 
 async def quitar_atencion(tipo: str, ref_id: str):
     """Quita la atención (tipo, ref_id) de la orden que la tenga, renumera las dosis y
-    devuelve la orden a "pendiente" si queda sin atenciones. Devuelve la orden ANTES."""
+    recalcula el estado (reservada si queda sin atenciones). Devuelve la orden ANTES."""
     sin_ella = {"$filter": {"input": {"$ifNull": ["$atenciones", []]},
                             "cond": {"$not": [{"$and": [{"$eq": ["$$this.tipo", _lit(tipo)]},
                                                         {"$eq": ["$$this.ref_id", _lit(ref_id)]}]}]}}}
@@ -102,16 +99,45 @@ async def quitar_atencion(tipo: str, ref_id: str):
         {"$set": {"atenciones": "$_tmp.arr"}},
         {"$unset": "_tmp"},
         {"$set": {
-            "estado": {"$cond": [{"$eq": ["$estado", "anulada"]}, "anulada",
-                                 {"$cond": [{"$gt": [{"$size": "$atenciones"}, 0]}, "atendida", "pendiente"]}]},
             "fecha_primera_atencion": {"$cond": [{"$gt": [{"$size": "$atenciones"}, 0]},
                                                  {"$min": "$atenciones.fecha"}, None]},
             "updated_at": _lit(datetime.now(timezone.utc).isoformat()),
         }},
+        *etapas_estado(),
     ]
     return await db.igss_ordenes_libro.find_one_and_update(
         {"atenciones": {"$elemMatch": {"tipo": tipo, "ref_id": ref_id}}}, pipeline,
         projection={"_id": 0}, return_document=ReturnDocument.BEFORE)
+
+
+def _sin_programada(ref_id: str):
+    return {"$filter": {"input": {"$ifNull": ["$cirugias_programadas", []]},
+                        "cond": {"$ne": ["$$this.ref_id", _lit(ref_id)]}}}
+
+
+async def programar_cirugia(cx: dict, destino: Optional[dict] = None):
+    """Deja la cirugía IGSS PROGRAMADA (activa) anotada en `cirugias_programadas` de su
+    orden (una orden de 1 servicio pasa a "en curso"); realizada, cancelada, eliminada o
+    sin orden, la quita de donde esté. Recalcula el estado en la misma operación."""
+    ref = cx["id"]
+    if cx.get("institution") == "IGSS" and cx.get("status") == "activo":
+        destino = destino or await orden_de_cirugia(cx)
+    else:
+        destino = None
+    otras = {"cirugias_programadas.ref_id": ref}
+    if destino:
+        otras["id"] = {"$ne": destino["id"]}
+    await db.igss_ordenes_libro.update_many(otras, [{"$set": {"cirugias_programadas": _sin_programada(ref)}}, *etapas_estado()])
+    if destino:
+        nueva = _lit({"ref_id": ref, "fecha": (cx.get("date") or "")[:10]})
+        await db.igss_ordenes_libro.update_one(
+            {"id": destino["id"], "estado": {"$in": list(ESTADOS_VIGENTES)}},
+            [{"$set": {"cirugias_programadas": {"$concatArrays": [_sin_programada(ref), [nueva]]}}}, *etapas_estado()])
+
+
+async def _motivo_no_admite(orden_id: str) -> str:
+    o = await db.igss_ordenes_libro.find_one({"id": orden_id}, {"_id": 0, "no_sps": 1, "estado": 1}) or {}
+    return f"La orden {o.get('no_sps', '')} está {ESTADO_TEXTO.get(o.get('estado'), o.get('estado', ''))} y no admite atenciones nuevas"
 
 
 async def _orden_con_atencion(tipo: str, ref_id: str):
@@ -228,7 +254,7 @@ async def sincronizar_evaluacion(evaluacion: dict, user: dict) -> dict:
             await _audit("LIBRO_ATENCION_REGISTRADA", user, {"tipo": "evaluacion", "ref_id": ev_id,
                                                               "orden_id": destino["id"], "no_sps": destino.get("no_sps")})
             return {"resultado": "registrada", "orden_id": destino["id"]}
-        motivo, falla = "La orden fue anulada antes de registrar la atención", True
+        motivo, falla = await _motivo_no_admite(destino["id"]), True
     await registrar_sin_orden("evaluacion", ev_id, motivo, {
         **_datos_paciente(paciente), "fecha": atencion["fecha"], "medico": atencion["medico"],
         "procedimiento": evaluacion.get("igss_procedimiento") or evaluacion.get("motivo_consulta", "")[:120]}, user)
@@ -255,12 +281,14 @@ async def registrar_evaluacion_seguro(evaluacion: dict, user: dict) -> Optional[
 
 
 async def sincronizar_evaluacion_si_cambia(existing: dict, update_data: dict, user: dict) -> Optional[str]:
-    """Tras editar/autoguardar: resincroniza si cambió la orden elegida, o si cambió
-    fecha/médico/paciente de una evaluación que ya está en el libro o en "sin orden"."""
+    """Tras editar/autoguardar: resincroniza si cambió la orden elegida, si la evaluación
+    pasó a ser (o dejó de ser) borrador vacío, o si cambió fecha/médico/paciente de una
+    evaluación que ya está en el libro o en "sin orden"."""
     def cambio(k):
         return k in update_data and (update_data.get(k) or "") != (existing.get(k) or "")
     ev_id = existing["id"]
-    if not (cambio("igss_orden_id") or cambio("igss_no_sps")):
+    cambia_vacio = eval_es_borrador_vacio(existing) != eval_es_borrador_vacio({**existing, **update_data})
+    if not (cambio("igss_orden_id") or cambio("igss_no_sps") or cambia_vacio):
         if not any(cambio(k) for k in ("fecha", "medico_nombre", "paciente_id")):
             return None
         en_libro = await db.igss_ordenes_libro.find_one({"atenciones": {"$elemMatch": {"tipo": "evaluacion", "ref_id": ev_id}}}, {"_id": 1})
@@ -321,6 +349,7 @@ async def sincronizar_cirugia(cx: dict, user: dict) -> dict:
     """Registra la cirugía REALIZADA en su orden (numero_dosis consecutivo) o en
     "atenciones sin orden"; si ya no está realizada / no es IGSS, quita la atención."""
     ref = cx["id"]
+    await programar_cirugia(cx)
     if cx.get("institution") != "IGSS" or cx.get("status") != "realizado":
         await quitar_atencion("cirugia", ref)
         await cerrar_sin_orden("cirugia", ref, "descartada", user, motivo="Cirugía no realizada o no IGSS")
@@ -350,8 +379,8 @@ async def sincronizar_cirugia(cx: dict, user: dict) -> dict:
         # Dosis completas: nunca se anota una dosis de más. Con el interruptor encendido se
         # rechaza; apagado, la cirugía queda en "atenciones sin orden" hasta elegir otra orden.
         fresca = await db.igss_ordenes_libro.find_one({"id": destino["id"]}, {"_id": 0}) or destino
-        if fresca.get("estado") == "anulada":
-            motivo = "La orden fue anulada antes de registrar la atención"
+        if fresca.get("estado") not in ESTADOS_VIGENTES:
+            motivo = await _motivo_no_admite(destino["id"])
         else:
             n = int(fresca.get("dosis_autorizadas") or 1)
             if exigir:
@@ -373,6 +402,7 @@ async def sincronizar_cirugia(cx: dict, user: dict) -> dict:
 
 
 async def quitar_cirugia(ref_id: str, user: dict):
+    await programar_cirugia({"id": ref_id})
     await quitar_atencion("cirugia", ref_id)
     await cerrar_sin_orden("cirugia", ref_id, "descartada", user, motivo="Cirugía eliminada")
 
@@ -383,6 +413,7 @@ def respuesta_registro(r: dict, user: dict) -> dict:
     if (user or {}).get("role") in LIBRO_IGSS_ROLES:
         o = r.get("orden") or {}
         return {"libro": {"resultado": r.get("resultado"), "motivo": r.get("motivo"), "no_sps": o.get("no_sps"),
+                          "estado": o.get("estado"),
                           "dosis_aplicadas": _cirugias(o) if o else None,
                           "dosis_autorizadas": o.get("dosis_autorizadas")}}
     return {"aviso_igss": AVISO_GENERICO} if r.get("falla") else {}
@@ -523,6 +554,8 @@ async def _asignar(tipo: str, ref_id: str, orden_id: str, user: dict) -> dict:
         raise HTTPException(status_code=404, detail="Orden de destino no encontrada o anulada")
     if not fuente["paciente_id"] or destino.get("paciente_id") != fuente["paciente_id"]:
         raise HTTPException(status_code=422, detail="La orden de destino pertenece a otro paciente")
+    if destino.get("estado") not in ESTADOS_VIGENTES:
+        raise HTTPException(status_code=422, detail=await _motivo_no_admite(orden_id))
     if tipo == "cirugia" and not _atencion_de(destino, tipo, ref_id) \
             and _cirugias(destino) >= int(destino.get("dosis_autorizadas") or 1):
         raise HTTPException(status_code=422, detail=msg_dosis_completas(int(destino.get("dosis_autorizadas") or 1)))
@@ -621,7 +654,7 @@ async def ordenes_abiertas_paciente(
     elegir en evaluación/cita. SOLO procedimiento y fecha de ingreso: nunca No. SPS,
     NOG, dosis ni precio."""
     ordenes = await db.igss_ordenes_libro.find(
-        {"paciente_id": patient_id, "vigente": True,
+        {"paciente_id": patient_id, "vigente": True, "estado": {"$in": list(ESTADOS_VIGENTES)},
          "$expr": {"$lt": [_expr_cirugias(), "$dosis_autorizadas"]}},
         {"_id": 0, "id": 1, "procedimiento": 1, "codigo": 1, "tipo": 1, "fecha_ingreso": 1, "nog_id": 1},
     ).sort("fecha_ingreso", 1).to_list(200)
@@ -632,3 +665,85 @@ async def ordenes_abiertas_paciente(
                               ("Consulta" if o.get("tipo") == "consulta" else "Procedimiento"),
              "fecha_ingreso": o.get("fecha_ingreso", ""),
              "motivo_sugerido": servicios.get(o.get("nog_id"), "")} for o in ordenes]
+
+
+# ==================== REVISIÓN: CIRUGÍAS SIN MARCAR Y ÓRDENES DETENIDAS ====================
+
+def _dias_desde(fecha: str, hoy: date) -> Optional[int]:
+    try:
+        return (hoy - date.fromisoformat(str(fecha)[:10])).days
+    except ValueError:
+        return None
+
+
+@router.get("/cirugias-por-marcar")
+async def cirugias_por_marcar(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    """Cirugías IGSS cuya fecha ya pasó y siguen sin marcarse como realizadas: mientras no
+    se marquen, su orden no se completa y no se cobra."""
+    hoy = today_str_gt()
+    cxs = await db.surgeries.find(
+        {"institution": "IGSS", "status": "activo", "date": {"$lt": hoy}},
+        {"_id": 0, "id": 1, "date": 1, "time": 1, "patient_id": 1, "patient_name": 1, "procedure": 1,
+         "surgeon": 1, "eye": 1, "igss_data": 1}).sort([("date", 1), ("time", 1)]).to_list(None)
+    ordenes = {}
+    async for o in db.igss_ordenes_libro.find(
+            {"cirugias_programadas.ref_id": {"$in": [c["id"] for c in cxs]}},
+            {"_id": 0, "id": 1, "no_sps": 1, "estado": 1, "cirugias_programadas": 1}):
+        for p in o.get("cirugias_programadas") or []:
+            ordenes[p["ref_id"]] = {"id": o["id"], "no_sps": o.get("no_sps"), "estado": o.get("estado")}
+    d = date.fromisoformat(hoy)
+    data = [{"id": c["id"], "fecha": c.get("date", ""), "hora": c.get("time", ""), "paciente_id": c.get("patient_id"),
+             "paciente_nombre": c.get("patient_name", ""), "procedimiento": c.get("procedure", ""),
+             "cirujano": c.get("surgeon", ""), "ojo": c.get("eye", ""), "unidad": (c.get("igss_data") or {}).get("unit", ""),
+             "no_sps_indicado": normalizar_sps((c.get("igss_data") or {}).get("sps")),
+             "orden": ordenes.get(c["id"]), "dias_atraso": _dias_desde(c.get("date"), d)} for c in cxs]
+    return {"data": data, "total": len(data)}
+
+
+@router.get("/en-curso-sin-movimiento")
+async def en_curso_sin_movimiento(dias: int = Query(90, ge=1, le=3650),
+                                  current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    """Órdenes "en curso" sin dosis ni atención nueva (ni cirugía programada) en más de
+    `dias` días: candidatas a revisar o a cerrar sin completar."""
+    d = date.fromisoformat(today_str_gt())
+    limite = (d - timedelta(days=dias)).isoformat()
+    docs = await db.igss_ordenes_libro.aggregate([
+        {"$match": {"estado": "en_curso"}},
+        {"$set": {"_ultima": {"$max": {"$concatArrays": [
+            {"$map": {"input": {"$ifNull": ["$atenciones", []]}, "in": "$$this.fecha"}},
+            {"$map": {"input": {"$ifNull": ["$cirugias_programadas", []]}, "in": "$$this.fecha"}}]}}}},
+        {"$match": {"$expr": {"$lt": [{"$ifNull": ["$_ultima", "$fecha_ingreso"]}, limite]}}},
+        {"$project": {"_id": 0}},
+    ]).to_list(None)
+    nogs = {n["id"]: n for n in await db.igss_nogs.find(
+        {"id": {"$in": list({o.get("nog_id") for o in docs})}}, {"_id": 0}).to_list(None)}
+    data = []
+    for o in docs:
+        ultima = o.pop("_ultima", None) or o.get("fecha_ingreso", "")
+        data.append({**_orden_out(o, nogs.get(o.get("nog_id"))), "ultima_actividad": ultima,
+                     "dias_sin_movimiento": _dias_desde(ultima, d)})
+    data.sort(key=lambda x: x["ultima_actividad"] or "")
+    return {"data": data, "total": len(data), "dias": dias}
+
+
+# ==================== ARRANQUE: ESTADOS DEL LIBRO (BLOQUE 1) ====================
+
+async def preparar_estados_libro():
+    """Una sola vez por entorno: anota en su orden las cirugías IGSS programadas y
+    recalcula el estado de las órdenes (pendiente/atendida → reservada/en curso/completa)."""
+    flag = "libro_estados_bloque1_v1"
+    if await db.system_flags.find_one({"key": flag, "done": True}):
+        return
+    programadas = 0
+    async for cx in db.surgeries.find({"institution": "IGSS", "status": "activo", "patient_id": {"$nin": [None, ""]}},
+                                      {"_id": 0, "id": 1, "institution": 1, "status": 1, "patient_id": 1,
+                                       "igss_orden_id": 1, "igss_data": 1, "date": 1}):
+        orden = await orden_de_cirugia(cx)
+        if orden:
+            await programar_cirugia(cx, orden)
+            programadas += 1
+    r = await db.igss_ordenes_libro.update_many({"estado": {"$nin": ["anulada", "cerrada", "historica"]}}, etapas_estado())
+    await db.system_flags.update_one({"key": flag}, {"$set": {
+        "done": True, "cirugias_programadas": programadas, "ordenes_recalculadas": r.modified_count,
+        "at": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+    logger.info("Libro IGSS: %s cirugías programadas anotadas, %s órdenes recalculadas", programadas, r.modified_count)

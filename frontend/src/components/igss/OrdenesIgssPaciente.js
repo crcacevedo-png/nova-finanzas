@@ -1,17 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Plus, Pencil, Ban, ChevronDown, ChevronRight, Shuffle, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Ban, ChevronDown, ChevronRight, Shuffle, Loader2, AlertTriangle, CircleSlash } from 'lucide-react';
 import { toast } from 'sonner';
 import { igssLibroApi } from '../../services/api';
 import { OrdenLibroDialog } from './OrdenLibroDialog';
 import { MotivoDialog, ElegirOrdenDialog } from './OrdenDialogs';
-
-const ESTADO = {
-  pendiente: ['bg-amber-50 text-amber-700 border-amber-200', 'Pendiente'],
-  atendida: ['bg-emerald-50 text-emerald-700 border-emerald-200', 'Atendida'],
-  anulada: ['bg-slate-100 text-slate-500 border-slate-200', 'Anulada'],
-};
+import { ESTADOS_ACTIVOS, estadoOrden } from './estadosLibro';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
 
@@ -24,18 +19,23 @@ const Atenciones = ({ orden, onReasignar }) => (
           {a.tipo === 'cirugia' ? `Cirugía · dosis ${a.numero_dosis}` : 'Evaluación'} · {fmt(a.fecha)}{a.medico ? ` · ${a.medico}` : ''}
           {a.excede_dosis && <span className="ml-1 text-red-600 font-medium">(excede dosis)</span>}
         </span>
-        {orden.estado !== 'anulada' && (
+        {ESTADOS_ACTIVOS.includes(orden.estado) && (
           <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onReasignar(orden, a)} data-testid={`reasignar-${a.ref_id}`}>
             <Shuffle className="w-3 h-3 mr-1" /> Reasignar
           </Button>
         )}
       </div>
     ))}
+    {(orden.cirugias_programadas || []).map((p) => (
+      <div key={`prog-${p.ref_id}`} className="text-xs text-sky-700" data-testid={`orden-programada-${p.ref_id}`}>
+        Cirugía programada · {fmt(p.fecha)} (aún no realizada)
+      </div>
+    ))}
   </div>
 );
 
-const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onReasignar }) => {
-  const [cls, label] = ESTADO[o.estado] || ESTADO.pendiente;
+const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasignar }) => {
+  const [cls, label] = estadoOrden(o.estado);
   return (
     <div className="border border-slate-200 rounded-lg p-3 bg-white" data-testid={`orden-libro-${o.id}`}>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
@@ -60,12 +60,16 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onReasignar }) =>
           {o.estado !== 'anulada' && (
             <>
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onEditar} title="Editar" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
+              {o.estado === 'en_curso' && (
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-600" onClick={onCerrar} title="Cerrar sin completar" data-testid={`orden-cerrar-${o.id}`}><CircleSlash className="w-3.5 h-3.5" /></Button>
+              )}
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
             </>
           )}
         </div>
       </div>
       {o.estado === 'anulada' && <p className="text-xs text-slate-500 mt-1">Anulada: {o.motivo_anulacion}</p>}
+      {o.estado === 'cerrada' && <p className="text-xs text-orange-700 mt-1" data-testid={`orden-cerrada-motivo-${o.id}`}>Cerrada sin completar (no se cobra): {o.motivo_cierre}</p>}
       {abierta && <Atenciones orden={o} onReasignar={onReasignar} />}
     </div>
   );
@@ -78,6 +82,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
   const [abiertas, setAbiertas] = useState({});
   const [editar, setEditar] = useState({ open: false, orden: null });
   const [anular, setAnular] = useState(null);
+  const [cerrar, setCerrar] = useState(null);
   const [reasignar, setReasignar] = useState(null);
 
   const cargar = useCallback(async () => {
@@ -119,6 +124,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
           onToggle={() => setAbiertas((a) => ({ ...a, [o.id]: !a[o.id] }))}
           onEditar={() => setEditar({ open: true, orden: o })}
           onAnular={() => setAnular(o)}
+          onCerrar={() => setCerrar(o)}
           onReasignar={(orden, atencion) => setReasignar({ orden, atencion })}
         />
       ))}
@@ -130,6 +136,12 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
         open={!!anular} onOpenChange={(v) => !v && setAnular(null)} testId="anular-orden-dialog"
         titulo={`Anular orden ${anular?.no_sps || ''}`} descripcion="La orden no se borra: queda anulada con su motivo y libera el cupo."
         accion="Anular" onConfirm={async (motivo) => { await igssLibroApi.anular(anular.id, motivo); toast.success('Orden anulada'); cargar(); }}
+      />
+      <MotivoDialog
+        open={!!cerrar} onOpenChange={(v) => !v && setCerrar(null)} testId="cerrar-orden-dialog"
+        titulo={`Cerrar sin completar ${cerrar?.no_sps || ''}`}
+        descripcion="Para tratamientos suspendidos (el paciente mejora, no regresa o fallece). La orden deja de admitir dosis, libera su cupo y NO se cobra. Queda en auditoría."
+        accion="Cerrar sin completar" onConfirm={async (motivo) => { await igssLibroApi.cerrar(cerrar.id, motivo); toast.success('Orden cerrada sin completar'); cargar(); }}
       />
       <ElegirOrdenDialog
         open={!!reasignar} onOpenChange={(v) => !v && setReasignar(null)} pacienteId={pacienteId}

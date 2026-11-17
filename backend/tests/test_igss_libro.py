@@ -157,7 +157,7 @@ def test_01_sps_repetido_en_la_misma_unidad_falla(H):
     sa = H["superadmin"]
     n1 = entrada(sa)
     o = orden(sa, n1["id"], no_sps=f"  abc-{TAG} ")
-    assert o["no_sps"] == f"ABC-{TAG}".upper() and o["estado"] == "pendiente"
+    assert o["no_sps"] == f"ABC-{TAG}".upper() and o["estado"] == "reservada"
     r = nueva_orden(sa, n1["id"], no_sps=f"Abc-{TAG}", pac=PAC2)
     assert r.status_code == 409 and "No. SPS" in r.json()["detail"]
     # Otra entrada del catálogo de la MISMA unidad tampoco admite el SPS repetido
@@ -179,18 +179,18 @@ def test_02_orden_sin_sps_rechazada(H):
         assert r.status_code == 422 and "No. SPS es obligatorio" in r.json()["detail"]
     r = requests.post(f"{LIBRO}/ordenes", json={"nog_id": n["id"], "paciente_id": PAC1}, headers=sa)
     assert r.status_code == 422
-    assert contador(sa, n["id"])["reservados"] == 0
+    assert contador(sa, n["id"])["reservadas"] == 0
 
 
-# ---------- 7: pendiente = reservado ----------
+# ---------- 7: reservada ocupa cupo ----------
 
 def test_07_orden_pendiente_cuenta_como_reservada(H):
     sa = H["superadmin"]
     n = entrada(sa, cantidad=3)
     orden(sa, n["id"])
     c = contador(sa, n["id"])
-    assert c["reservados"] == 1 and c["consumidos"] == 0 and c["disponibles"] == 2
-    assert c["monto_acumulado"] == 0
+    assert (c["reservadas"], c["en_curso"], c["completas"], c["disponibles"]) == (1, 0, 0, 2)
+    assert c["monto_cobrable"] == 0
 
 
 # ---------- 9: concurrencia ----------
@@ -205,7 +205,7 @@ def test_09_veinte_creaciones_simultaneas_con_cupo_para_cinco(H):
     vig = _db_call(lambda db: db.igss_ordenes_libro.count_documents({"nog_id": n["id"], "vigente": True}))
     assert vig == 5
     c = contador(sa, n["id"])
-    assert c["reservados"] == 5 and c["bloqueado"] is True and c["disponibles"] == 0
+    assert c["reservadas"] == 5 and c["bloqueado"] is True and c["disponibles"] == 0
     r = nueva_orden(sa, n["id"])
     assert r.status_code == 409 and "100 %" in r.json()["detail"]
 
@@ -224,7 +224,7 @@ def test_anular_libera_cupo_y_exige_motivo(H):
     assert requests.post(f"{LIBRO}/ordenes/{o['id']}/anular", json={"motivo": "otra vez"}, headers=sa).status_code == 400
     assert requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"codigo": "X"}, headers=sa).status_code == 400
     c = contador(sa, n["id"])
-    assert c["reservados"] == 0 and c["anuladas"] == 1
+    assert c["reservadas"] == 0 and c["anuladas"] == 1
     assert nueva_orden(sa, n["id"]).status_code == 200
     # La orden anulada sigue existiendo (nunca se elimina)
     assert requests.get(f"{LIBRO}/ordenes/{o['id']}", headers=sa).status_code == 200
@@ -242,7 +242,7 @@ def test_dosis_y_edicion_atomica(H):
     # Simula 2 dosis aplicadas (el registro automático de atenciones llega en la Fase 2)
     _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": o["id"]}, {"$set": {"atenciones": [
         {"tipo": "cirugia", "ref_id": "TEST_c1", "numero_dosis": 1},
-        {"tipo": "cirugia", "ref_id": "TEST_c2", "numero_dosis": 2}], "estado": "atendida"}}))
+        {"tipo": "cirugia", "ref_id": "TEST_c2", "numero_dosis": 2}], "estado": "en_curso"}}))
     r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"dosis_autorizadas": 1}, headers=sa)
     assert r.status_code == 422 and "2 dosis aplicadas" in r.json()["detail"]
     r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"paciente_id": PAC2}, headers=sa)
@@ -323,7 +323,7 @@ def test_13_roles_no_autorizados_403(H, rol):
         requests.delete(f"{API}/igss-units/nogs/{n['id']}", headers=h),
     ]
     assert [r.status_code for r in llamadas] == [403] * len(llamadas)
-    assert requests.get(f"{LIBRO}/ordenes/{o['id']}", headers=sa).json()["estado"] == "pendiente"
+    assert requests.get(f"{LIBRO}/ordenes/{o['id']}", headers=sa).json()["estado"] == "reservada"
 
 
 # ---------- 16-20: Baja Cuantía y sin tope ----------
@@ -370,7 +370,7 @@ def test_19_orden_baja_cuantia_con_sps(H):
     assert o["modalidad"] == "Baja Cuantía" and o["numero_nog"] == ""
     assert o["etiqueta_nog"] == f"Baja cuantía — Glaucoma {TAG}" and o["precio"] == 80
     c = contador(sa, bc["id"])
-    assert c["reservados"] == 1 and c["sin_tope"] is True
+    assert c["reservadas"] == 1 and c["sin_tope"] is True
     lst = requests.get(f"{LIBRO}/ordenes", params={"nog_id": bc["id"]}, headers=sa).json()
     assert lst["total"] == 1 and lst["data"][0]["modalidad"] == "Baja Cuantía"
 
@@ -382,7 +382,7 @@ def test_20_entrada_sin_tope_nunca_bloquea(H):
     for _ in range(8):
         orden(sa, st["id"])
     c = contador(sa, st["id"])
-    assert c["reservados"] == 8 and c["bloqueado"] is False and c["aviso_90"] is False
+    assert c["reservadas"] == 8 and c["bloqueado"] is False and c["aviso_90"] is False
     assert c["disponibles"] is None and c["cantidad"] is None
     # Valores por defecto de sin_tope según el tipo de compra
     assert entrada(sa, numero="", tipo_compra="baja_cuantia", nombre_servicio=f"Default {TAG}", cantidad=None)["sin_tope"] is True
@@ -481,10 +481,10 @@ def test_03_tres_dosis_un_cupo_y_cuarta_rechazada(H):
     finally:
         switch(sa, False)
     od = get_orden(sa, o["id"])
-    assert od["estado"] == "atendida" and od["dosis_aplicadas"] == 3
+    assert od["estado"] == "completa" and od["dosis_aplicadas"] == 3
     assert [a["numero_dosis"] for a in od["atenciones"]] == [1, 2, 3]
     c = contador(sa, n["id"])
-    assert c["consumidos"] == 1 and c["reservados"] == 0
+    assert (c["completas"], c["en_curso"], c["reservadas"]) == (1, 0, 0)
 
 
 def test_04_una_dosis_segunda_cirugia(H):
@@ -520,14 +520,14 @@ def test_05_cirugia_programada_no_registra(H):
     o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
     cx = crear_cx(sa, no_sps=o["no_sps"])
     od = get_orden(sa, o["id"])
-    assert od["estado"] == "pendiente" and od["total_atenciones"] == 0
+    assert od["estado"] == "reservada" and od["total_atenciones"] == 0
     assert sin_orden_de(sa, cx["id"]) is None
     # Al desmarcar "realizada" la dosis se quita
     assert realizar(sa, cx["id"]).status_code == 200
     assert get_orden(sa, o["id"])["dosis_aplicadas"] == 1
     assert realizar(sa, cx["id"], False).status_code == 200
     od = get_orden(sa, o["id"])
-    assert od["estado"] == "pendiente" and od["dosis_aplicadas"] == 0
+    assert od["estado"] == "reservada" and od["dosis_aplicadas"] == 0
 
 
 def test_06_consulta_seguimiento_no_consume_otro_cupo(H):
@@ -537,21 +537,22 @@ def test_06_consulta_seguimiento_no_consume_otro_cupo(H):
     crear_eval(sa, orden_id=o["id"])
     crear_eval(sa, orden_id=o["id"], fecha="2026-11-20")
     od = get_orden(sa, o["id"])
-    assert od["estado"] == "atendida" and od["total_atenciones"] == 2
-    assert od["fecha_primera_atencion"] == "2026-11-10"
+    assert od["estado"] == "completa" and od["total_atenciones"] == 2
+    assert od["fecha_primera_atencion"] == "2026-11-10" and od["fecha_completa"] == "2026-11-10"
     c = contador(sa, n["id"])
-    assert c["consumidos"] == 1 and c["reservados"] == 0 and c["disponibles"] == 4
+    assert (c["completas"], c["reservadas"], c["disponibles"]) == (1, 0, 4)
 
 
-def test_10_eliminar_evaluacion_devuelve_a_pendiente(H):
+def test_10_eliminar_evaluacion_devuelve_a_reservada(H):
     sa = H["superadmin"]
     n = entrada(sa)
     o = orden(sa, n["id"])
     ev = crear_eval(sa, orden_id=o["id"])
-    assert get_orden(sa, o["id"])["estado"] == "atendida"
+    assert get_orden(sa, o["id"])["estado"] == "completa"
     assert requests.delete(f"{EVAL_API}/{ev['id']}", headers=sa).status_code == 200
     od = get_orden(sa, o["id"])
-    assert od["estado"] == "pendiente" and od["total_atenciones"] == 0 and od["fecha_primera_atencion"] is None
+    assert od["estado"] == "reservada" and od["total_atenciones"] == 0 and od["fecha_primera_atencion"] is None
+    assert od["fecha_completa"] is None
     # Lo mismo al eliminar una cirugía realizada; las dosis restantes se renumeran
     p = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
     c1, c2 = crear_cx(sa, no_sps=p["no_sps"]), crear_cx(sa, no_sps=p["no_sps"])
@@ -577,7 +578,7 @@ def test_14_medico_registra_atencion_sin_ver_libro(H):
     texto = str(ev)
     assert o["no_sps"] not in texto and n["numero"] not in texto
     od = get_orden(sa, o["id"])
-    assert od["estado"] == "atendida" and od["atenciones"][0]["ref_id"] == ev["id"]
+    assert od["estado"] == "completa" and od["atenciones"][0]["ref_id"] == ev["id"]
     # El paciente que ve el médico no trae órdenes, No. SPS ni NOG
     pac = requests.get(f"{API}/patients/{PAC1}", headers=med).json()
     assert pac["igss_ordenes"] == [] and pac["igss_no_sps"] == "" and pac["igss_nog"] == ""
@@ -610,14 +611,14 @@ def test_15_roles_no_autorizados_no_modifican_ordenes_del_paciente(H):
         assert nueva_orden(H[rol], n["id"], pac=PAC2).status_code == 403
 
 
-def test_19_baja_cuantia_atendida_se_consume(H):
+def test_19_baja_cuantia_completa_se_cuenta(H):
     sa = H["superadmin"]
     bc = entrada(sa, numero="", tipo_compra="baja_cuantia", nombre_servicio=f"Campimetría {TAG}", cantidad=None)
     o = orden(sa, bc["id"])
     crear_eval(sa, orden_id=o["id"])
     c = contador(sa, bc["id"])
-    assert c["consumidos"] == 1 and c["reservados"] == 0
-    lst = requests.get(f"{LIBRO}/ordenes", params={"nog_id": bc["id"], "estado": "atendida"}, headers=sa).json()
+    assert (c["completas"], c["reservadas"]) == (1, 0)
+    lst = requests.get(f"{LIBRO}/ordenes", params={"nog_id": bc["id"], "estado": "completa"}, headers=sa).json()
     assert lst["total"] == 1 and lst["data"][0]["modalidad"] == "Baja Cuantía"
 
 
@@ -629,12 +630,12 @@ def test_ninguna_y_asignacion_desde_sin_orden(H):
     ev = crear_eval(sa, pac=PAC2, orden_id="ninguna", igss_no_sps=o["no_sps"])
     e = sin_orden_de(sa, ev["id"])
     assert e and e["tipo"] == "evaluacion" and "Ninguna" in e["motivo"]
-    assert get_orden(sa, o["id"])["estado"] == "pendiente"
+    assert get_orden(sa, o["id"])["estado"] == "reservada"
     assert requests.get(SIN_ORDEN, headers=us).status_code == 403
     assert requests.post(f"{SIN_ORDEN}/{e['id']}/asignar", json={"orden_id": o["id"]}, headers=us).status_code == 403
     r = requests.post(f"{SIN_ORDEN}/{e['id']}/asignar", json={"orden_id": o["id"]}, headers=sa)
     assert r.status_code == 200, r.text
-    assert get_orden(sa, o["id"])["estado"] == "atendida"
+    assert get_orden(sa, o["id"])["estado"] == "completa"
     assert sin_orden_de(sa, ev["id"]) is None and sin_orden_de(sa, ev["id"], "resuelta")
     ev_db = _db_call(lambda db: db.evaluaciones_oftalmologicas.find_one({"id": ev["id"]}, {"_id": 0}))
     assert ev_db["igss_orden_id"] == o["id"]
@@ -706,13 +707,13 @@ def test_reasignar_atencion_entre_ordenes(H):
     assert requests.post(f"{LIBRO}/atenciones/reasignar", json=body, headers=H["medico"]).status_code == 403
     r = requests.post(f"{LIBRO}/atenciones/reasignar", json=body, headers=sa)
     assert r.status_code == 200, r.text
-    assert get_orden(sa, a["id"])["estado"] == "pendiente" and get_orden(sa, b["id"])["estado"] == "atendida"
+    assert get_orden(sa, a["id"])["estado"] == "reservada" and get_orden(sa, b["id"])["estado"] == "completa"
     log = _db_call(lambda db: db.audit_logs.find_one({"action": "LIBRO_ATENCION_REASIGNADA", "details.ref_id": ev["id"]}))
     assert log and log["details"]["orden_anterior"] == a["id"]
     # Reasignar a "sin orden"
     body["orden_destino_id"] = None
     assert requests.post(f"{LIBRO}/atenciones/reasignar", json=body, headers=sa).status_code == 200
-    assert get_orden(sa, b["id"])["estado"] == "pendiente" and sin_orden_de(sa, ev["id"]) is not None
+    assert get_orden(sa, b["id"])["estado"] == "reservada" and sin_orden_de(sa, ev["id"]) is not None
 
 
 def test_opciones_solo_ordenes_abiertas(H):
@@ -769,20 +770,20 @@ def test_fase3_contadores_cuentan_ordenes_no_dosis(H):
     b = orden(sa, n["id"], pac=PAC2)
     crear_eval(sa, pac=PAC2, orden_id=b["id"])
     crear_eval(sa, pac=PAC2, orden_id=b["id"], fecha="2026-11-21")
-    orden(sa, n["id"])  # pendiente
+    orden(sa, n["id"])  # reservada
     anulada = orden(sa, n["id"])
     requests.post(f"{LIBRO}/ordenes/{anulada['id']}/anular", json={"motivo": "prueba"}, headers=sa)
     d, _ = nog_de(sa, n["id"])
-    assert (d["consumidos"], d["reservados"], d["usados"], d["disponibles"]) == (2, 1, 3, 7)
+    assert (d["completas"], d["en_curso"], d["reservadas"], d["ocupados"], d["disponibles"]) == (2, 0, 1, 3, 7)
     todos = requests.get(f"{UNITS_API}/nogs/all", headers=sa).json()["data"]
-    assert next(x for x in todos if x["id"] == n["id"])["consumidos"] == 2
+    assert next(x for x in todos if x["id"] == n["id"])["completas"] == 2
     r = requests.get(f"{UNITS_API}/nogs/{n['id']}/pacientes", headers=sa)
     assert r.status_code == 200
     filas = r.json()["ordenes"]
-    assert len(filas) == 3 and sorted(f["estado"] for f in filas) == ["atendida", "atendida", "pendiente"]
+    assert len(filas) == 3 and sorted(f["estado"] for f in filas) == ["completa", "completa", "reservada"]
     fa = next(f for f in filas if f["orden_id"] == a["id"])
     assert (fa["dosis_aplicadas"], fa["dosis_autorizadas"], len(fa["fechas_dosis"])) == (3, 3, 3)
-    assert contador(sa, n["id"])["consumidos"] == 2
+    assert contador(sa, n["id"])["completas"] == 2
 
 
 def test_fase3_aviso_90_y_bloqueo_100(H):
@@ -822,7 +823,7 @@ def test_fase3_permisos_de_lecturas(H):
     for rol in DENEGADOS:
         assert requests.get(f"{UNITS_API}/{UNIT}/nogs-activos", headers=H[rol]).status_code == 403, rol
     full = requests.get(f"{UNITS_API}/{UNIT}/nogs-activos", headers=sa).json()
-    assert "consumidos" in next(x for x in full if x["id"] == n["id"])
+    assert {"reservadas", "en_curso", "completas"} <= set(next(x for x in full if x["id"] == n["id"]))
 
 
 def _escenario_unidad2(sa):
@@ -837,7 +838,7 @@ def _escenario_unidad2(sa):
     p = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3, procedimiento="Avastin U2")
     for fecha in ("2026-08-12", "2026-09-15"):
         realizar(sa, crear_cx(sa, no_sps=p["no_sps"], date=fecha)["id"])
-    orden(sa, n["id"])  # pendiente: no aparece
+    orden(sa, n["id"])  # reservada: no aparece
     an = orden(sa, n["id"])
     requests.post(f"{LIBRO}/ordenes/{an['id']}/anular", json={"motivo": "prueba"}, headers=sa)
     b = orden(sa, bc["id"], pac=PAC2)
@@ -868,13 +869,11 @@ def test_fase3_listado_oficial_unidad(H):
     assert list(cab) == ["No. SPS", "Modalidad", "NOG", "Expediente", "Paciente", "Afiliación", "Código",
                          "Procedimiento", "Fecha 1ª atención", "Médico", "Dosis aplicadas / autorizadas",
                          "Fechas de cada dosis", "Precio (Q)", "Impreso", "Enviado", "Facturado", "Pagado"]
-    # 1 fila por orden atendida == consumidos; orden: fecha de 1ª atención y luego No. SPS
+    # 1 fila por orden COMPLETA == completas; la de 3 dosis con 2 aplicadas (en curso) no sale
     d, _ = nog_de(sa, n["id"], UNIT3)
-    assert len(filas) == d["consumidos"] == 3 and pie["Total de órdenes"] == 3
-    assert [f[0] for f in filas] == [c2["no_sps"], c1["no_sps"], p["no_sps"]]
-    assert pie["Monto total (Q)"] == 450
-    fp = filas[2]
-    assert fp[10] == "2 / 3" and fp[11] == "12/08/2026, 15/09/2026" and fp[8] == "12/08/2026"
+    assert len(filas) == d["completas"] == 2 and pie["Total de órdenes"] == 2 and d["en_curso"] == 1
+    assert [f[0] for f in filas] == [c2["no_sps"], c1["no_sps"]]
+    assert pie["Monto total (Q)"] == 300
     f1 = filas[1]
     assert f1[10] == "1 / 1" and f1[11] == "05/08/2026" and f1[9] == "Dr. TEST Libro"
     assert filas[0][4] == "TEST_LIBRO Paciente 2"  # paciente inactivo incluido
@@ -882,7 +881,7 @@ def test_fase3_listado_oficial_unidad(H):
     assert len(fb) == 1 and fb[0][1] == "Baja Cuantía" and fb[0][2].startswith("Baja cuantía —") and pb["Monto total (Q)"] == 80
     res = list(wb["Resumen"].iter_rows(values_only=True))
     fila_n = next(r for r in res if r[0] == n["numero"])
-    assert fila_n[4] == 3 and fila_n[6] == 3 and fila_n[7] == 5 and fila_n[8] == "60.0 %"
+    assert fila_n[4] == 2 and fila_n[6] == 2 and fila_n[7] == 5 and fila_n[8] == "40.0 %"
     fila_b = next(r for r in res if str(r[0]).startswith("Baja cuantía"))
     assert fila_b[4] == 1 and fila_b[7] == "Sin tope"
 
@@ -890,19 +889,21 @@ def test_fase3_listado_oficial_unidad(H):
 def test_fase3_listado_oficial_filtro_fechas_y_un_nog(H):
     sa = H["superadmin"]
     n, bc, c1, c2, p, b = escenario(sa)
-    # El filtro aplica sobre la fecha de la PRIMERA atención (seguimientos posteriores no cuentan)
+    # El filtro aplica sobre la fecha en que se COMPLETÓ: ni el seguimiento del 20/08 ni las
+    # dosis de una orden en curso cuentan en el periodo
     wb = excel(sa, f"{UNITS_API}/{UNIT3}/nogs/export/excel", desde="2026-08-10", hasta="2026-08-31")
-    _, filas, _ = filas_hoja(wb[f"NOG {n['numero']}"])
-    assert [f[0] for f in filas] == [p["no_sps"]]
+    assert filas_hoja(wb[f"NOG {n['numero']}"])[1] == []
+    wb = excel(sa, f"{UNITS_API}/{UNIT3}/nogs/export/excel", desde="2026-09-01", hasta="2026-09-30")
+    assert filas_hoja(wb[f"NOG {n['numero']}"])[1] == []
     _, fb, _ = filas_hoja(wb["Baja Cuantía"])
-    assert fb == []
+    assert [f[0] for f in fb] == [b["no_sps"]]
     res = list(wb["Resumen"].iter_rows(values_only=True))
     fila_n = next(r for r in res if r[0] == n["numero"])
-    assert fila_n[4] == 1 and fila_n[6] == 3  # periodo vs acumulado
+    assert fila_n[4] == 0 and fila_n[6] == 2  # periodo vs acumulado
     # Exportación de un solo NOG: mismo formato
     wb1 = excel(sa, f"{UNITS_API}/nogs/{n['id']}/export/excel")
     assert wb1.sheetnames == ["Resumen", f"NOG {n['numero']}"]
-    assert len(filas_hoja(wb1[f"NOG {n['numero']}"])[1]) == 3
+    assert len(filas_hoja(wb1[f"NOG {n['numero']}"])[1]) == 2
     assert requests.get(f"{UNITS_API}/{UNIT3}/nogs/export/excel", params={"desde": "2026-09-01", "hasta": "2026-08-01"},
                         headers=sa).status_code == 400
 
@@ -914,13 +915,15 @@ def test_fase3_produccion_y_dashboard_desde_libro(H):
     r = requests.get(f"{UNITS_API}/produccion", params=q, headers=sa)
     assert r.status_code == 200
     rows = r.json()["data"]
-    assert sorted(x["orden_id"] for x in rows) == sorted([c1["id"], c2["id"], p["id"], b["id"]])
-    assert r.json()["totales"]["servicios"] == 4
-    # Los estados de facturación se guardan en la orden del libro
-    assert requests.put(f"{LIBRO}/ordenes/{p['id']}", json={"pagado": True, "costo_override": 175}, headers=sa).status_code == 200
+    # Solo órdenes completas: la de 3 dosis con 2 aplicadas no es producción cobrable
+    assert sorted(x["orden_id"] for x in rows) == sorted([c1["id"], c2["id"], b["id"]])
+    assert r.json()["totales"]["servicios"] == 3
+    # Los estados de facturación se guardan en la orden del libro (solo en órdenes completas)
+    assert requests.put(f"{LIBRO}/ordenes/{p['id']}", json={"pagado": True}, headers=sa).status_code == 422
+    assert requests.put(f"{LIBRO}/ordenes/{c1['id']}", json={"pagado": True, "costo_override": 175}, headers=sa).status_code == 200
     tot = requests.get(f"{UNITS_API}/produccion", params=q, headers=sa).json()["totales"]
     assert tot["por_estado"]["pagado"] == {"cantidad": 1, "monto": 175.0}
-    assert tot["total_costo"] == 150 + 150 + 175 + 80
+    assert tot["total_costo"] == 175 + 150 + 80
     solo = requests.get(f"{UNITS_API}/produccion", params={**q, "nog": "campimetría u2"}, headers=sa).json()["data"]
     assert [x["orden_id"] for x in solo] == [b["id"]]
     dia = requests.get(f"{UNITS_API}/produccion", params={"fecha": "2026-08-05", "unidad_id": UNIT3}, headers=sa).json()
@@ -931,3 +934,348 @@ def test_fase3_produccion_y_dashboard_desde_libro(H):
     prod = requests.get(f"{UNITS_API}/produccion", params=dq, headers=sa).json()["totales"]
     assert dash["igss"]["servicios"] == dash["produccion_igss"]["servicios"] == prod["servicios"]
     assert dash["produccion_igss"]["total"] == prod["total_costo"]
+
+
+# ==================== BLOQUE 1: REGLA DE COBRO ====================
+# Estados reservada / en curso / completa / anulada. Lo que completa la orden es la atención
+# que la hoja autoriza; cupo ocupado = reservadas + en curso + completas; cobrable = completas.
+
+def orden_dosis(sa, aplicadas, dosis=3, **kw):
+    """Entrada nueva + orden de `dosis` dosis con `aplicadas` cirugías realizadas."""
+    n = entrada(sa, **kw)
+    o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=dosis, procedimiento="Avastin B1")
+    for i in range(aplicadas):
+        r = realizar(sa, crear_cx(sa, no_sps=o["no_sps"], date=f"2026-10-0{i + 1}")["id"])
+        assert r.status_code == 200, r.text
+    return n, get_orden(sa, o["id"])
+
+
+def filas_listado_nog(sa, n):
+    return filas_hoja(excel(sa, f"{UNITS_API}/nogs/{n['id']}/export/excel")[f"NOG {n['numero']}"])[1]
+
+
+def test_b1_1a_tres_dosis_sin_aplicaciones_reservada(H):
+    _, o = orden_dosis(H["superadmin"], 0)
+    assert o["estado"] == "reservada" and o["dosis_aplicadas"] == 0 and o["fecha_completa"] is None
+
+
+def test_b1_1b_tres_dosis_primera_dosis_en_curso(H):
+    _, o = orden_dosis(H["superadmin"], 1)
+    assert o["estado"] == "en_curso" and o["dosis_aplicadas"] == 1 and o["fecha_completa"] is None
+
+
+def test_b1_1c_tres_dosis_segunda_dosis_en_curso(H):
+    _, o = orden_dosis(H["superadmin"], 2)
+    assert o["estado"] == "en_curso" and o["dosis_aplicadas"] == 2
+
+
+def test_b1_1d_tres_dosis_tercera_dosis_completa(H):
+    sa = H["superadmin"]
+    _, o = orden_dosis(sa, 3)
+    assert o["estado"] == "completa" and o["dosis_aplicadas"] == 3 and o["fecha_completa"] == "2026-10-03"
+    # Desmarcar la última dosis la devuelve a "en curso"
+    ultima = next(a for a in o["atenciones"] if a["numero_dosis"] == 3)
+    assert realizar(sa, ultima["ref_id"], False).status_code == 200
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and od["fecha_completa"] is None
+
+
+def test_b1_2_listado_oficial_solo_con_la_tercera_dosis(H):
+    sa = H["superadmin"]
+    n, o = orden_dosis(sa, 2)
+    assert filas_listado_nog(sa, n) == []
+    assert realizar(sa, crear_cx(sa, no_sps=o["no_sps"], date="2026-10-20")["id"]).status_code == 200
+    filas = filas_listado_nog(sa, n)
+    assert [f[0] for f in filas] == [o["no_sps"]] and filas[0][10] == "3 / 3"
+
+
+def test_b1_3_consulta_la_completa_la_evaluacion(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    o = orden(sa, n["id"], procedimiento="Consulta B1")
+    crear_eval(sa, orden_id=o["id"], fecha="2026-10-05")
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "completa" and od["fecha_completa"] == "2026-10-05"
+    assert [f[0] for f in filas_listado_nog(sa, n)] == [o["no_sps"]]
+
+
+def test_b1_4_catarata_consulta_previa_en_curso_y_cirugia_completa(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=1, procedimiento="Catarata OD")
+    q = {"desde": "2026-01-01", "hasta": "2026-12-31", "unidad_id": UNIT}
+
+    def en_produccion():
+        rows = requests.get(f"{UNITS_API}/produccion", params=q, headers=sa).json()["data"]
+        return o["id"] in {x["orden_id"] for x in rows}
+    crear_eval(sa, orden_id=o["id"], fecha="2026-10-01")
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and od["total_atenciones"] == 1 and od["dosis_aplicadas"] == 0
+    assert filas_listado_nog(sa, n) == [] and not en_produccion()
+    assert realizar(sa, crear_cx(sa, no_sps=o["no_sps"], date="2026-10-15")["id"]).status_code == 200
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "completa" and od["fecha_completa"] == "2026-10-15"
+    assert [f[0] for f in filas_listado_nog(sa, n)] == [o["no_sps"]] and en_produccion()
+
+
+def test_b1_5_cupo_ocupado_desde_reservada(H):
+    sa = H["superadmin"]
+    n = entrada(sa, cantidad=2)
+    orden(sa, n["id"])
+    c = contador(sa, n["id"])
+    assert (c["reservadas"], c["ocupados"], c["disponibles"]) == (1, 1, 1)
+    orden(sa, n["id"])
+    c = contador(sa, n["id"])
+    assert c["ocupados"] == 2 and c["bloqueado"] is True
+    r = nueva_orden(sa, n["id"])
+    assert r.status_code == 409 and "100 %" in r.json()["detail"]
+
+
+def test_b1_6_solo_completa_se_factura_o_paga(H):
+    sa = H["superadmin"]
+    _, en_curso = orden_dosis(sa, 1)
+    _, reservada = orden_dosis(sa, 0)
+    for o in (en_curso, reservada):
+        for campo in ("facturado", "pagado"):
+            r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={campo: True}, headers=sa)
+            assert r.status_code == 422 and "Solo una orden completa" in r.json()["detail"], r.text
+        assert get_orden(sa, o["id"])["facturado"] is False and get_orden(sa, o["id"])["pagado"] is False
+    assert "en curso" in requests.put(f"{LIBRO}/ordenes/{en_curso['id']}", json={"pagado": True}, headers=sa).json()["detail"]
+    _, completa = orden_dosis(sa, 3)
+    r = requests.put(f"{LIBRO}/ordenes/{completa['id']}", json={"facturado": True, "pagado": True}, headers=sa)
+    assert r.status_code == 200 and r.json()["facturado"] is True and r.json()["pagado"] is True
+    # Desmarcar sí se permite en cualquier estado; cambiar las dosis de una pagada, no
+    assert requests.put(f"{LIBRO}/ordenes/{en_curso['id']}", json={"pagado": False}, headers=sa).status_code == 200
+    assert requests.put(f"{LIBRO}/ordenes/{completa['id']}", json={"dosis_autorizadas": 5}, headers=sa).status_code == 422
+
+
+def test_b1_7_excel_oficial_tantas_filas_como_completas(H):
+    sa = H["superadmin"]
+    n = entrada(sa, cantidad=10)
+    for _ in range(2):
+        crear_eval(sa, orden_id=orden(sa, n["id"])["id"], fecha="2026-10-07")
+    p = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
+    realizar(sa, crear_cx(sa, no_sps=p["no_sps"], date="2026-10-08")["id"])
+    orden(sa, n["id"])
+    c = contador(sa, n["id"])
+    assert (c["reservadas"], c["en_curso"], c["completas"], c["ocupados"]) == (1, 1, 2, 4)
+    assert "consumidos" not in c and "reservados" not in c
+    filas = filas_listado_nog(sa, n)
+    assert len(filas) == c["completas"] == 2
+
+
+# ==================== BLOQUE 1 (precisiones): consulta, cirugía, dosis, históricas ====================
+
+def evento_cx(sa, oid):
+    return get_orden(sa, oid).get("cirugias_programadas") or []
+
+
+def test_b1_8_consulta_borrador_vacio_no_completa(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    o = orden(sa, n["id"], procedimiento="Consulta borrador")
+    ev = crear_eval(sa, orden_id=o["id"], fecha="2026-10-09")
+    assert get_orden(sa, o["id"])["estado"] == "completa"
+    # Si la evaluación queda vacía (sin médico ni contenido) deja de completar la orden
+    r = requests.put(f"{EVAL_API}/{ev['id']}", json={"medico_nombre": "", "medico_id": "", "motivo_consulta": ""}, headers=sa)
+    assert r.status_code == 200, r.text
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "reservada" and od["total_atenciones"] == 0 and od["fecha_completa"] is None
+    assert filas_listado_nog(sa, n) == []
+    # Vuelve a tener contenido: completa otra vez
+    r = requests.put(f"{EVAL_API}/{ev['id']}", json={"motivo_consulta": "Control real"}, headers=sa)
+    assert r.status_code == 200, r.text
+    assert get_orden(sa, o["id"])["estado"] == "completa"
+
+
+def test_b1_9_consulta_nunca_en_curso_y_seguimiento_no_cobra(H):
+    sa = H["superadmin"]
+    n = entrada(sa, cantidad=5)
+    o = orden(sa, n["id"])
+    crear_cx(sa, no_sps=o["no_sps"])  # una cirugía programada no mueve una orden de consulta
+    assert get_orden(sa, o["id"])["estado"] == "reservada"
+    crear_eval(sa, orden_id=o["id"], fecha="2026-10-10")
+    crear_eval(sa, orden_id=o["id"], fecha="2026-10-25")
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "completa" and od["total_atenciones"] == 2 and od["fecha_completa"] == "2026-10-10"
+    assert len(filas_listado_nog(sa, n)) == 1
+    c = contador(sa, n["id"])
+    assert (c["completas"], c["ocupados"], c["monto_cobrable"]) == (1, 1, 100)
+
+
+def test_b1_10_cirugia_programada_en_curso_cancelada_reservada(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=1, procedimiento="Catarata OI")
+    cx = crear_cx(sa, no_sps=o["no_sps"], date="2026-10-20")
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and od["total_atenciones"] == 0
+    assert [p["ref_id"] for p in od["cirugias_programadas"]] == [cx["id"]]
+    assert filas_listado_nog(sa, n) == []
+    # Reprogramar la fecha actualiza la cirugía programada; sigue en curso
+    assert requests.put(f"{CX_API}/{cx['id']}", json={"date": "2026-10-22"}, headers=sa).status_code == 200
+    assert evento_cx(sa, o["id"]) == [{"ref_id": cx["id"], "fecha": "2026-10-22"}]
+    # Cancelada (sin reagendar): la orden vuelve a reservada
+    r = requests.post(f"{CX_API}/{cx['id']}/cancel", json={"reason": "Paciente no se presentó"}, headers=sa)
+    assert r.status_code == 200, r.text
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "reservada" and od["cirugias_programadas"] == []
+    # Cancelada con reagendamiento: la nueva cirugía queda programada y la orden en curso
+    cx2 = crear_cx(sa, no_sps=o["no_sps"], date="2026-10-23")
+    r = requests.post(f"{CX_API}/{cx2['id']}/cancel", json={"reason": "Reagendar", "reschedule_date": "2026-10-30"}, headers=sa)
+    nueva = r.json()["new_surgery_id"]
+    assert get_orden(sa, o["id"])["estado"] == "en_curso"
+    assert evento_cx(sa, o["id"]) == [{"ref_id": nueva, "fecha": "2026-10-30"}]
+    # Eliminar la cirugía programada también la quita
+    assert requests.delete(f"{CX_API}/{nueva}", headers=sa).status_code == 200
+    assert get_orden(sa, o["id"])["estado"] == "reservada"
+
+
+def test_b1_11_cirugia_con_consulta_previa_en_curso_hasta_realizada(H):
+    """Prueba pedida: orden de cirugía con consulta previa sigue en curso y no sale en el
+    listado de cobro; al marcar la cirugía como realizada pasa a completa y sí sale."""
+    sa = H["superadmin"]
+    n = entrada(sa)
+    o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=1, procedimiento="Vitrectomía OD")
+    crear_eval(sa, orden_id=o["id"], fecha="2026-10-02")
+    cx = crear_cx(sa, no_sps=o["no_sps"], date="2026-10-16")
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and od["fecha_completa"] is None
+    assert filas_listado_nog(sa, n) == []
+    assert requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"facturado": True}, headers=sa).status_code == 422
+    assert realizar(sa, cx["id"]).status_code == 200
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "completa" and od["fecha_completa"] == "2026-10-16" and od["cirugias_programadas"] == []
+    assert [f[0] for f in filas_listado_nog(sa, n)] == [o["no_sps"]]
+    # Desmarcar "realizada": vuelve a en curso (consulta previa + cirugía programada otra vez)
+    assert realizar(sa, cx["id"], False).status_code == 200
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and [p["ref_id"] for p in od["cirugias_programadas"]] == [cx["id"]]
+    assert filas_listado_nog(sa, n) == []
+
+
+def test_b1_12_varias_dosis_programada_no_mueve_y_borrar_dosis_vuelve_en_curso(H):
+    sa = H["superadmin"]
+    n, o = orden_dosis(sa, 0)
+    crear_cx(sa, no_sps=o["no_sps"])
+    assert get_orden(sa, o["id"])["estado"] == "reservada"
+    cxs = [crear_cx(sa, no_sps=o["no_sps"], date=f"2026-10-1{i}") for i in range(3)]
+    for c in cxs:
+        assert realizar(sa, c["id"]).status_code == 200
+    assert get_orden(sa, o["id"])["estado"] == "completa"  # 3 de 3: sola, nadie la cierra
+    assert requests.delete(f"{CX_API}/{cxs[1]['id']}", headers=sa).status_code == 200
+    od = get_orden(sa, o["id"])
+    assert od["estado"] == "en_curso" and od["dosis_aplicadas"] == 2 and od["fecha_completa"] is None
+    assert [a["numero_dosis"] for a in od["atenciones"]] == [1, 2]
+    assert filas_listado_nog(sa, n) == []
+
+
+def test_b1_13_cirugias_pendientes_de_marcar(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=1, procedimiento="Catarata pendiente")
+    vieja = crear_cx(sa, no_sps=o["no_sps"], date="2026-01-15")
+    futura = crear_cx(sa, no_sps=o["no_sps"], date="2099-01-15")
+    url = f"{LIBRO}/cirugias-por-marcar"
+    for rol in DENEGADOS:
+        assert requests.get(url, headers=H[rol]).status_code == 403
+    for rol in AUTORIZADOS:
+        assert requests.get(url, headers=H[rol]).status_code == 200
+    r = requests.get(url, headers=sa).json()
+    ids = {c["id"]: c for c in r["data"]}
+    assert vieja["id"] in ids and futura["id"] not in ids and r["total"] == len(r["data"])
+    fila = ids[vieja["id"]]
+    assert fila["orden"]["no_sps"] == o["no_sps"] and fila["orden"]["estado"] == "en_curso" and fila["dias_atraso"] > 0
+    assert realizar(sa, vieja["id"]).status_code == 200
+    assert vieja["id"] not in {c["id"] for c in requests.get(url, headers=sa).json()["data"]}
+
+
+def test_b1_14_cerrar_sin_completar(H):
+    sa, us = H["superadmin"], H["usuario"]
+    n, o = orden_dosis(sa, 1, cantidad=2)
+    otra = orden(sa, n["id"])
+    url = f"{LIBRO}/ordenes/{o['id']}/cerrar"
+    assert contador(sa, n["id"])["bloqueado"] is True
+    for rol in DENEGADOS:
+        assert requests.post(url, json={"motivo": "Paciente mejoró"}, headers=H[rol]).status_code == 403
+    assert requests.post(url, json={"motivo": ""}, headers=sa).status_code == 422
+    r = requests.post(f"{LIBRO}/ordenes/{otra['id']}/cerrar", json={"motivo": "no aplica"}, headers=sa)
+    assert r.status_code == 400 and "está reservada" in r.json()["detail"]
+    r = requests.post(url, json={"motivo": "Paciente mejoró, no regresa"}, headers=H["administrador_igss"])
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "cerrada" and r.json()["motivo_cierre"] == "Paciente mejoró, no regresa"
+    assert requests.post(url, json={"motivo": "otra vez"}, headers=sa).status_code == 400
+    # Libera el cupo: el NOG lleno vuelve a admitir una orden
+    c = contador(sa, n["id"])
+    assert (c["cerradas"], c["en_curso"], c["ocupados"], c["bloqueado"]) == (1, 0, 1, False)
+    assert nueva_orden(sa, n["id"]).status_code == 200
+    # No es cobrable y no admite dosis nuevas
+    assert requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"facturado": True}, headers=sa).status_code == 422
+    assert filas_listado_nog(sa, n) == []
+    cx = crear_cx(sa, no_sps=o["no_sps"])
+    r = realizar(us, cx["id"])
+    assert r.status_code == 200 and r.json().get("aviso_igss")
+    e = sin_orden_de(sa, cx["id"])
+    assert e and "cerrada sin completar" in e["motivo"]
+    assert get_orden(sa, o["id"])["dosis_aplicadas"] == 1
+    # Anularla después no libera el cupo dos veces
+    ocupados_nog = _db_call(lambda db: db.igss_nogs.find_one({"id": n["id"]}))["libro_ocupados"]
+    assert requests.post(f"{LIBRO}/ordenes/{o['id']}/anular", json={"motivo": "depuración"}, headers=sa).status_code == 200
+    assert _db_call(lambda db: db.igss_nogs.find_one({"id": n["id"]}))["libro_ocupados"] == ocupados_nog
+    log = _db_call(lambda db: db.audit_logs.find_one({"action": "LIBRO_ORDEN_CERRADA_SIN_COMPLETAR", "details.orden_id": o["id"]}))
+    assert log and log["details"]["motivo"] == "Paciente mejoró, no regresa" and log["details"]["dosis_aplicadas"] == 1
+
+
+def test_b1_15_en_curso_sin_movimiento_90_dias(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    vieja = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
+    realizar(sa, crear_cx(sa, no_sps=vieja["no_sps"], date="2025-01-10")["id"])
+    reciente = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
+    realizar(sa, crear_cx(sa, no_sps=reciente["no_sps"], date="2099-01-10")["id"])
+    url = f"{LIBRO}/en-curso-sin-movimiento"
+    assert requests.get(url, headers=H["medico"]).status_code == 403
+    data = requests.get(url, headers=sa).json()["data"]
+    fila = next((x for x in data if x["id"] == vieja["id"]), None)
+    assert fila and fila["ultima_actividad"] == "2025-01-10" and fila["dias_sin_movimiento"] > 90
+    assert all(x["id"] != reciente["id"] for x in data)
+
+
+def test_b1_16_historicas_hoja_aparte_y_cifra_propia(H):
+    """Prueba pedida: NOG con 3 completas y 5 históricas → listado oficial con 3 filas y
+    hoja "Históricas" con 5."""
+    sa = H["superadmin"]
+    n = entrada(sa, cantidad=20)
+    completas = []
+    for i in range(3):
+        o = orden(sa, n["id"])
+        crear_eval(sa, orden_id=o["id"], fecha=f"2026-10-1{i}")
+        completas.append(o["no_sps"])
+    hist = [orden(sa, n["id"])["id"] for _ in range(5)]
+    _db_call(lambda db: db.igss_ordenes_libro.update_many(
+        {"id": {"$in": hist}}, {"$set": {"estado": "historica", "fecha_primera_atencion": "2025-06-01"}}))
+    c = contador(sa, n["id"])
+    assert (c["completas"], c["historicas"], c["ocupados"], c["monto_cobrable"]) == (3, 5, 8, 300)
+    d, tot = nog_de(sa, n["id"])
+    assert (d["completas"], d["historicas"]) == (3, 5) and tot["totales"]["historicas"] >= 5
+    wb = excel(sa, f"{UNITS_API}/nogs/{n['id']}/export/excel")
+    assert wb.sheetnames == ["Resumen", f"NOG {n['numero']}", "Históricas"]
+    assert sorted(f[0] for f in filas_listado_nog(sa, n)) == sorted(completas)
+    ws = wb["Históricas"]
+    assert ws.cell(row=1, column=1).value == ("Servicios anteriores al cambio de sistema. Ya gestionados fuera del sistema. "
+                                              "No enviar al IGSS.")
+    cab, filas, pie = filas_hoja(ws)
+    assert list(cab) == list(filas_hoja(wb[f"NOG {n['numero']}"])[0]) and len(filas) == 5 and pie["Total de órdenes"] == 5
+    res = list(wb["Resumen"].iter_rows(values_only=True))
+    fila = next(r for r in res if r[0] == n["numero"])
+    assert fila[4] == 3 and fila[6] == 3 and fila[-1] == 5
+    # Nunca cobrables: ni Producción ni facturado
+    rows = requests.get(f"{UNITS_API}/produccion", params={"desde": "2025-01-01", "hasta": "2026-12-31", "unidad_id": UNIT},
+                        headers=sa).json()["data"]
+    assert not set(hist) & {x["orden_id"] for x in rows}
+    assert requests.put(f"{LIBRO}/ordenes/{hist[0]}", json={"facturado": True}, headers=sa).status_code == 422
+    # El detalle del NOG las lista con su estado; una histórica no admite atenciones
+    estados = [f["estado"] for f in requests.get(f"{UNITS_API}/nogs/{n['id']}/pacientes", headers=sa).json()["ordenes"]]
+    assert estados.count("historica") == 5 and estados.count("completa") == 3
+    crear_eval(sa, orden_id=hist[1], fecha="2026-10-20")
+    assert get_orden(sa, hist[1])["estado"] == "historica" and get_orden(sa, hist[1])["total_atenciones"] == 0

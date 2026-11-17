@@ -14,6 +14,7 @@ import { igssLibroApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { MotivoDialog, ElegirOrdenDialog } from '../components/igss/OrdenDialogs';
 import { MigracionSimulacion } from '../components/igss/MigracionSimulacion';
+import { ResumenLibro, TarjetasRevision, TablaCirugiasPorMarcar, TablaDetenidas } from '../components/igss/RevisionLibro';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
 const fmtHora = (f) => (f ? new Date(f).toLocaleString('es-GT') : '—');
@@ -112,6 +113,30 @@ export default function LibroIGSS() {
   const [cargando, setCargando] = useState(true);
   const [asignar, setAsignar] = useState(null);
   const [descartar, setDescartar] = useState(null);
+  const [vista, setVista] = useState('sin_orden');
+  const [revision, setRevision] = useState({ resumen: null, cirugias: [], detenidas: [] });
+  const [cerrar, setCerrar] = useState(null);
+
+  const cargarRevision = useCallback(async () => {
+    try {
+      const [r, cx, det] = await Promise.all([igssLibroApi.resumen(), igssLibroApi.cirugiasPorMarcar(), igssLibroApi.detenidas(90)]);
+      setRevision({ resumen: r.data, cirugias: cx.data?.data || [], detenidas: det.data?.data || [] });
+    } catch (e) {
+      toast.error('No se pudieron cargar las listas de revisión del libro');
+    }
+  }, []);
+
+  useEffect(() => { cargarRevision(); }, [cargarRevision]);
+
+  const marcarRealizada = async (c) => {
+    try {
+      await igssLibroApi.marcarRealizada(c.id);
+      toast.success(`Cirugía de ${c.paciente_nombre} marcada como realizada`);
+      cargarRevision();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'No se pudo marcar como realizada');
+    }
+  };
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -145,14 +170,24 @@ export default function LibroIGSS() {
           <BookOpen className="w-7 h-7 text-teal-700" />
           <div>
             <h1 className="text-2xl font-semibold text-slate-800">Libro de órdenes IGSS</h1>
-            <p className="text-sm text-slate-500">Atenciones que no pudieron vincularse a una orden (No. SPS).</p>
+            <p className="text-sm text-slate-500">Cifras del libro y listas para revisar: atenciones sin orden, cirugías sin marcar y órdenes detenidas.</p>
           </div>
         </div>
         {['exigir_orden', 'usar_solo_libro'].map((campo) => (
           <Interruptor key={campo} campo={campo} config={config} esSuperadmin={user?.role === 'superadmin'} onCambiar={cambiarInterruptor} />
         ))}
         {user?.role === 'superadmin' && <MigracionSimulacion />}
-        <div className="rounded-xl border border-slate-200 bg-white">
+        <ResumenLibro resumen={revision.resumen} />
+        <TarjetasRevision vista={vista} onVista={setVista}
+          conteos={{ sin_orden: config?.atenciones_sin_orden_pendientes, cirugias: revision.cirugias.length, detenidas: revision.detenidas.length }} />
+        {vista !== 'sin_orden' && (
+          <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto" data-testid={`libro-vista-${vista}`}>
+            {vista === 'cirugias'
+              ? <TablaCirugiasPorMarcar filas={revision.cirugias} onMarcar={marcarRealizada} />
+              : <TablaDetenidas filas={revision.detenidas} onCerrar={setCerrar} />}
+          </div>
+        )}
+        {vista === 'sin_orden' && <div className="rounded-xl border border-slate-200 bg-white" data-testid="libro-vista-sin_orden">
           <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
             <div className="flex gap-1">
               {ESTADOS.map(([v, l]) => (
@@ -186,8 +221,14 @@ export default function LibroIGSS() {
               </tbody>
             </table>
           </div>
-        </div>
+        </div>}
       </div>
+      <MotivoDialog
+        open={!!cerrar} onOpenChange={(v) => !v && setCerrar(null)} testId="cerrar-orden-dialog"
+        titulo={`Cerrar sin completar ${cerrar?.no_sps || ''}`}
+        descripcion="Para tratamientos suspendidos. La orden deja de admitir dosis, libera su cupo y NO se cobra (el IGSS no paga una hoja incompleta). Queda en auditoría."
+        accion="Cerrar sin completar" onConfirm={async (motivo) => { await igssLibroApi.cerrar(cerrar.id, motivo); toast.success('Orden cerrada sin completar'); cargarRevision(); }}
+      />
       <ElegirOrdenDialog
         open={!!asignar} onOpenChange={(v) => !v && setAsignar(null)} pacienteId={asignar?.paciente_id}
         titulo={`Asignar ${asignar?.tipo === 'cirugia' ? 'cirugía' : 'evaluación'} a una orden`}

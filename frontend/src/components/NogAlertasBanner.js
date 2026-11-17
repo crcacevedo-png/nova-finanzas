@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { igssNogApi } from '../services/api';
+import { desgloseCupo } from './igss/estadosLibro';
 
 // Banner reutilizable de alertas de contratos NOG (90%+ y completados).
 // Se autoabastece del endpoint /igss-units/nogs/alertas. Si no hay alertas
@@ -64,7 +65,7 @@ export const NogAlertasBanner = ({ onVer, reloadSignal = 0 }) => {
                     {a.numero && a.nombre_servicio ? <span className="font-normal text-gray-500"> — {a.nombre_servicio}</span> : null}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {a.unidad_nombre} · {a.usados}/{a.cantidad} cupos ({a.porcentaje}%) · {a.consumidos} atendidas · {a.reservados} reservadas · {a.disponibles} disponibles
+                    {a.unidad_nombre} · {a.ocupados}/{a.cantidad} cupos ({a.porcentaje}%) · {desgloseCupo(a)} · {a.disponibles} disponibles
                   </p>
                 </div>
               </div>

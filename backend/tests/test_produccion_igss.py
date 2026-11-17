@@ -1,4 +1,4 @@
-# Producción IGSS (Fase 3 del Libro IGSS): una fila por ORDEN atendida, estados y costo en la
+# Producción IGSS (Fase 3 del Libro IGSS): una fila por ORDEN completa, estados y costo en la
 # orden del libro, Excel y acceso por rol. El detalle con datos sembrados está en test_igss_libro.py.
 import os
 import io
@@ -33,7 +33,7 @@ class TestListado:
         assert r["totales"]["servicios"] == len(rows)
         assert abs(r["totales"]["total_costo"] - sum(x["costo"] for x in rows)) < 0.01
         for x in rows:
-            assert x["estado"] == "atendida" and x["orden_id"]
+            assert x["estado"] == "completa" and x["orden_id"]
             assert len({y["orden_id"] for y in rows}) == len(rows)
 
     def test_default_today(self, sa):
@@ -58,7 +58,7 @@ class TestExcel:
         assert "spreadsheetml" in r.headers.get("content-type", "")
         from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(r.content))
-        assert wb.active["A1"].value == "Fecha 1ª atención"
+        assert wb.active["A1"].value == "Fecha en que se completó"
 
 
 class TestAccess:

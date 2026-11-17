@@ -85,7 +85,7 @@ def seed():
         await db.igss_nog_acreditaciones.insert_many([_acr(A1, N, U, P1, S1), _acr(A3, N3, U)])
         await db.igss_ordenes_libro.insert_one({
             "id": O1, "unidad_id": U, "nog_id": N, "numero_nog": NUM, "no_sps": S1, "paciente_id": P1,
-            "paciente_nombre": "TEST_SOLO Paciente", "estado": "pendiente", "vigente": True, "tipo": "consulta",
+            "paciente_nombre": "TEST_SOLO Paciente", "estado": "reservada", "vigente": True, "tipo": "consulta",
             "dosis_autorizadas": 1, "fecha_ingreso": "2026-11-01", "atenciones": []})
         await db.evaluaciones_oftalmologicas.insert_one({"id": E0, "paciente_id": P1, "fecha": "2026-11-02"})
         await db.igss_produccion.insert_one({"evaluacion_id": E0, "pagado": True})
@@ -194,12 +194,12 @@ def test_04_evaluacion_guardar_editar_eliminar_actualiza_el_libro(sa):
                                                    "igss_orden_id": O1}, headers=sa)
     assert r.status_code == 200, r.text
     ev_id = r.json()["id"]
-    assert _orden(sa)["estado"] == "atendida"
+    assert _orden(sa)["estado"] == "completa"
     r = requests.put(f"{API}/evaluaciones/{ev_id}", json={"plan": "Plan TEST"}, headers=sa)
     assert r.status_code == 200, r.text
     assert requests.delete(f"{API}/evaluaciones/{ev_id}", headers=sa).status_code == 200
     o = _orden(sa)
-    assert o["estado"] == "pendiente" and o["total_atenciones"] == 0
+    assert o["estado"] == "reservada" and o["total_atenciones"] == 0
     _mismo_sistema_anterior(antes, _huella())
 
 

@@ -684,7 +684,7 @@ def _resumen_nog(s, nogs, cont, acreds, units) -> list:
     for o in s.migrables:
         a_migrar[(o["nog_id"], o["estado"])] += 1
     for o in s.ya_en_libro:
-        if o["estado_actual"] == "pendiente":
+        if o["estado_actual"] == "reservada":
             pasan[o["nog_id"]] += 1
     filas = []
     for n in nogs:
@@ -692,8 +692,9 @@ def _resumen_nog(s, nogs, cont, acreds, units) -> list:
         tope = not n.get("sin_tope") and int(n.get("cantidad") or 0) > 0
         cantidad = int(n.get("cantidad") or 0)
         atendidas, pendientes = a_migrar[(n["id"], "atendida")], a_migrar[(n["id"], "pendiente")]
-        consumidos = int(c.get("consumidos", 0)) + atendidas + pasan[n["id"]]
-        reservados = int(c.get("reservados", 0)) + pendientes - pasan[n["id"]]
+        libro_consumidos, libro_reservados = int(c.get("completas", 0)), int(c.get("reservadas", 0)) + int(c.get("en_curso", 0))
+        consumidos = libro_consumidos + atendidas + pasan[n["id"]]
+        reservados = libro_reservados + pendientes - pasan[n["id"]]
         filas.append({
             "nog_id": n["id"], "unidad_id": n.get("unidad_id", ""), "unidad": units.get(n.get("unidad_id", ""), {}).get("name", ""),
             "nog": etiqueta_catalogo(n), "modalidad": _modalidad(n), "is_active": n.get("is_active", True) is not False,
@@ -701,7 +702,7 @@ def _resumen_nog(s, nogs, cont, acreds, units) -> list:
             "a_migrar": atendidas + pendientes, "consumidas": atendidas, "pendientes": pendientes,
             "pendientes_sps": pend_sps[n["id"]], "contador_actual": int(n.get("acreditados") or 0),
             "acreditaciones_vigentes": vigentes[n["id"]],
-            "libro_consumidos": int(c.get("consumidos", 0)), "libro_reservados": int(c.get("reservados", 0)),
+            "libro_consumidos": libro_consumidos, "libro_reservados": libro_reservados,
             "sobrecupo": max(consumidos + reservados - cantidad, 0) if tope else 0,
         })
     filas.sort(key=lambda f: (f["unidad"], f["nog"].startswith("Baja"), f["nog"]))

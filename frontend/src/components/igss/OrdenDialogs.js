@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { igssLibroApi } from '../../services/api';
+import { ESTADOS_ACTIVOS, estadoOrden } from './estadosLibro';
 
 const errorDe = (e, fb) => (typeof e?.response?.data?.detail === 'string' ? e.response.data.detail : fb);
 const SIN_ORDEN = '__sin_orden__';
@@ -52,7 +53,7 @@ export const ElegirOrdenDialog = ({ open, onOpenChange, pacienteId, excluirId, p
     if (!open || !pacienteId) return;
     setSel('');
     igssLibroApi.listar({ paciente_id: pacienteId, limit: 200 })
-      .then(({ data }) => setOrdenes((data?.data || []).filter((o) => o.estado !== 'anulada' && o.id !== excluirId)))
+      .then(({ data }) => setOrdenes((data?.data || []).filter((o) => ESTADOS_ACTIVOS.includes(o.estado) && o.id !== excluirId)))
       .catch(() => setOrdenes([]));
   }, [open, pacienteId, excluirId]);
   const confirmar = async () => {
@@ -72,7 +73,7 @@ export const ElegirOrdenDialog = ({ open, onOpenChange, pacienteId, excluirId, p
           <SelectContent>
             {ordenes.map((o) => (
               <SelectItem key={o.id} value={o.id} data-testid={`elegir-orden-option-${o.id}`}>
-                {etiquetaOrden(o)} · {o.tipo === 'procedimiento' ? `${o.dosis_aplicadas}/${o.dosis_autorizadas} dosis` : o.estado}
+                {etiquetaOrden(o)} · {o.tipo === 'procedimiento' ? `${o.dosis_aplicadas}/${o.dosis_autorizadas} dosis` : estadoOrden(o.estado)[1]}
               </SelectItem>
             ))}
             {permitirSinOrden && <SelectItem value={SIN_ORDEN} data-testid="elegir-orden-sin-orden">Dejar sin orden</SelectItem>}

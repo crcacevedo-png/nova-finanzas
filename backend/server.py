@@ -3077,7 +3077,7 @@ api_router.include_router(roles_router, tags=["Roles"])
 # ==================== MÓDULO DE PACIENTES (Refactorizado) ====================
 from routes.igss_libro_atenciones import (router as igss_libro_atenciones_router,
                                          pacientes_router as igss_libro_pacientes_router,
-                                         ensure_atenciones_indexes)
+                                         ensure_atenciones_indexes, preparar_estados_libro)
 api_router.include_router(igss_libro_pacientes_router, tags=["Pacientes"])
 from routes.patients import router as patients_router, pacientes_router
 
@@ -4623,6 +4623,10 @@ async def startup_event():
     # Libro de órdenes IGSS + índices parciales del catálogo (baja cuantía sin número)
     await ensure_libro_indexes()
     await ensure_atenciones_indexes()
+    try:
+        await preparar_estados_libro()
+    except Exception as e:
+        print(f"Libro IGSS: no se pudieron preparar los estados: {e}")
     # Índices de Óptica
     await db.doctors.create_index([("name", 1)])
     await db.doctors.create_index([("is_active", 1)])

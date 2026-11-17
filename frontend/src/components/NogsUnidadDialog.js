@@ -21,6 +21,7 @@ import { Skeleton } from './ui/skeleton';
 import { toast } from 'sonner';
 import { igssNogApi } from '../services/api';
 import { descargarBlob, etiquetaCatalogo, nombreListado } from '../lib/igssLibro';
+import { desgloseCupo, estadoOrden } from './igss/estadosLibro';
 
 const TIPO_COMPRA_OPTIONS = [
   { value: 'compra_directa', label: 'Compra Directa' },
@@ -169,14 +170,9 @@ const NogForm = ({ open, onOpenChange, unitId, editing, onSaved }) => {
   );
 };
 
-// Órdenes vigentes (atendidas y pendientes) de un NOG, leídas del libro IGSS
-const ESTADO_ORDEN = {
-  atendida: { cls: 'bg-emerald-100 text-emerald-700', label: 'Atendida' },
-  pendiente: { cls: 'bg-amber-100 text-amber-700', label: 'Pendiente' },
-};
-
+// Órdenes de un NOG (salvo anuladas), leídas del libro IGSS
 const FilaOrden = ({ o }) => {
-  const est = ESTADO_ORDEN[o.estado] || ESTADO_ORDEN.pendiente;
+  const [cls, label] = estadoOrden(o.estado);
   return (
     <TableRow data-testid={`nog-orden-row-${o.orden_id}`}>
       <TableCell className="font-mono text-xs">{o.no_sps}</TableCell>
@@ -185,7 +181,7 @@ const FilaOrden = ({ o }) => {
         {!o.paciente_activo && <span className="ml-1 text-[10px] text-gray-400">(inactivo)</span>}
       </TableCell>
       <TableCell className="font-mono text-xs">{o.expediente || '—'}</TableCell>
-      <TableCell><Badge className={est.cls} data-testid={`nog-orden-estado-${o.orden_id}`}>{est.label}</Badge></TableCell>
+      <TableCell><Badge variant="outline" className={cls} data-testid={`nog-orden-estado-${o.orden_id}`}>{label}</Badge></TableCell>
       <TableCell className="text-xs">{fmtDia(o.fecha_primera_atencion)}</TableCell>
       <TableCell className="text-xs text-center">{o.dosis_aplicadas} / {o.dosis_autorizadas}</TableCell>
       <TableCell className="text-xs text-right">{fmtQ(o.costo)}</TableCell>
@@ -313,7 +309,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
         <DialogHeader>
           <DialogTitle>NOG — {unit?.name || data?.unidad?.name || ''}</DialogTitle>
           <DialogDescription>
-            Contratos de servicios del IGSS. Cada orden (No. SPS) ocupa 1 cupo: reservada mientras está pendiente y consumida al atenderse. El NOG se bloquea al completarse.
+            Contratos de servicios del IGSS. Cada orden (No. SPS) ocupa 1 cupo desde que se ingresa (reservada, en curso, completa o histórica). Solo las completas se cobran. El NOG se bloquea al llenarse el cupo.
           </DialogDescription>
         </DialogHeader>
 
@@ -321,8 +317,10 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-4 text-sm">
             <span style={{ color: 'var(--text-secondary)' }}>Contratados: <strong>{totales.servicios_contratados ?? 0}</strong></span>
-            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-consumidos">Consumidos: <strong>{totales.consumidos ?? 0}</strong></span>
-            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-reservados">Reservados: <strong>{totales.reservados ?? 0}</strong></span>
+            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-completas">Completas: <strong>{totales.completas ?? 0}</strong></span>
+            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-en-curso">En curso: <strong>{totales.en_curso ?? 0}</strong></span>
+            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-reservadas">Reservadas: <strong>{totales.reservadas ?? 0}</strong></span>
+            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-historicas">Históricas: <strong>{totales.historicas ?? 0}</strong></span>
             <span style={{ color: 'var(--text-secondary)' }}>Disponibles: <strong>{totales.servicios_disponibles ?? 0}</strong></span>
             <span style={{ color: 'var(--text-secondary)' }}>Valor: <strong>{fmtQ(totales.valor_total)}</strong></span>
           </div>
@@ -330,7 +328,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
             {nogs.length > 0 && (
               <>
                 <div>
-                  <Label className="text-[11px] text-gray-500">Desde (1ª atención)</Label>
+                  <Label className="text-[11px] text-gray-500">Desde (fecha en que se completó)</Label>
                   <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-teal h-8 w-36 text-xs" data-testid="nog-export-desde" />
                 </div>
                 <div>
@@ -387,11 +385,11 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
                       <TableCell className="text-xs">{n.tipo_compra_label || '—'}</TableCell>
                       <TableCell className="min-w-[160px]" data-testid={`nog-avance-${n.id}`}>
                         {n.disponibles == null ? (
-                          <div className="text-xs"><strong>{n.usados}</strong> órdenes · <span className="text-gray-400">sin tope</span></div>
+                          <div className="text-xs"><strong>{n.ocupados}</strong> órdenes · <span className="text-gray-400">sin tope</span></div>
                         ) : (
                           <>
                             <div className="flex items-center gap-1 text-xs mb-1">
-                              <strong>{n.usados}</strong> / {n.cantidad}
+                              <strong>{n.ocupados}</strong> / {n.cantidad}
                               {n.estado === 'por_completarse' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
                               {n.estado === 'completado' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
                             </div>
@@ -399,7 +397,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
                           </>
                         )}
                         <div className="text-[11px] text-gray-400 mt-0.5">
-                          {n.consumidos} atendidas · {n.reservados} reservadas{n.disponibles != null ? ` · ${n.disponibles} disp.` : ''}
+                          {desgloseCupo(n)}{n.disponibles != null ? ` · ${n.disponibles} disp.` : ''}
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-xs">

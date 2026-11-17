@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { ConciliacionNOG } from '../components/ConciliacionNOG';
 import { puedeVerLibroIgss, esTextoBajaCuantia, etiquetaCatalogo, descargarBlob, nombreListado } from '../lib/igssLibro';
 import { ListadoOficialDialog } from '../components/igss/ListadoOficialDialog';
+import { desgloseCupo } from '../components/igss/estadosLibro';
 import {
   ClipboardList, Plus, Search, Pencil, Power, PowerOff, Loader2, AlertTriangle, XCircle, CheckCircle2,
   Download, FileSpreadsheet,
@@ -213,8 +214,10 @@ const GestionNOG = () => {
   const totales = useMemo(() => ({
     total: filtered.length,
     cupos: filtered.reduce((a, n) => a + (n.sin_tope ? 0 : (n.cantidad || 0)), 0),
-    consumidos: filtered.reduce((a, n) => a + (n.consumidos || 0), 0),
-    reservados: filtered.reduce((a, n) => a + (n.reservados || 0), 0),
+    completas: filtered.reduce((a, n) => a + (n.completas || 0), 0),
+    en_curso: filtered.reduce((a, n) => a + (n.en_curso || 0), 0),
+    reservadas: filtered.reduce((a, n) => a + (n.reservadas || 0), 0),
+    historicas: filtered.reduce((a, n) => a + (n.historicas || 0), 0),
     disponibles: filtered.reduce((a, n) => a + (n.is_active ? (n.disponibles || 0) : 0), 0),
   }), [filtered]);
 
@@ -246,12 +249,14 @@ const GestionNOG = () => {
         </div>
 
         {/* Totales */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
           {[
             { key: 'nogs', label: 'NOG (filtrados)', value: totales.total },
             { key: 'cupos', label: 'Cupos totales', value: totales.cupos },
-            { key: 'consumidos', label: 'Consumidos (atendidas)', value: totales.consumidos },
-            { key: 'reservados', label: 'Reservados (pendientes)', value: totales.reservados },
+            { key: 'completas', label: 'Completas (se cobran)', value: totales.completas },
+            { key: 'en_curso', label: 'En curso', value: totales.en_curso },
+            { key: 'reservadas', label: 'Reservadas', value: totales.reservadas },
+            { key: 'historicas', label: 'Históricas (no se cobran)', value: totales.historicas },
             { key: 'disponibles', label: 'Disponibles', value: totales.disponibles },
           ].map((c) => (
             <div key={c.key} className="rounded-xl border bg-white p-4" data-testid={`nog-total-${c.key}`}>
@@ -332,8 +337,8 @@ const GestionNOG = () => {
                       <td className="px-4 py-3 text-slate-600">{n.tipo_compra_label || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{fmtFecha(n.fecha_asignacion)}</td>
                       <td className="px-4 py-3 text-center text-slate-600" data-testid={`nog-cupos-${n.id}`}>
-                        {n.sin_tope ? <span className="text-xs font-medium text-slate-500">Sin tope · {n.usados}</span> : `${n.usados} / ${n.cantidad}`}
-                        <div className="text-[11px] text-slate-400 whitespace-nowrap">{n.consumidos} atend. · {n.reservados} reserv.</div>
+                        {n.sin_tope ? <span className="text-xs font-medium text-slate-500">Sin tope · {n.ocupados}</span> : `${n.ocupados} / ${n.cantidad}`}
+                        <div className="text-[11px] text-slate-400 whitespace-nowrap">{desgloseCupo(n)}</div>
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-slate-700">{n.sin_tope ? '—' : n.disponibles}</td>
                       <td className="px-4 py-3 text-right text-slate-600 whitespace-nowrap">{fmtQ(n.precio)}</td>
