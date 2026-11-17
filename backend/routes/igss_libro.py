@@ -27,13 +27,14 @@ logger = logging.getLogger("igss_libro")
 
 MSG_SIN_SPS = "El No. SPS es obligatorio: sin No. SPS no se puede registrar la orden."
 CAMPOS_EDITABLES = ("codigo", "procedimiento", "precio", "costo_override", "fecha_ingreso",
-                    "impreso", "enviado", "facturado", "pagado")
+                    "impreso", "enviado", "facturado", "pagado", "inyectable")
 ESTADOS_VIGENTES = ("reservada", "en_curso", "completa")
 ESTADOS_CUPO = (*ESTADOS_VIGENTES, "historica")
 ESTADOS_FIJOS = ("anulada", "cerrada", "historica")
 ESTADO_TEXTO = {"reservada": "reservada", "en_curso": "en curso", "completa": "completa", "anulada": "anulada",
                 "historica": "histórica", "cerrada": "cerrada sin completar"}
 CAMPOS_COBRO = ("facturado", "pagado")
+MSG_INYECTABLE = "Solo una orden de procedimiento puede marcarse como inyectable"
 
 
 # ==================== MODELOS ====================
@@ -49,6 +50,7 @@ class OrdenCreate(BaseModel):
     precio: Optional[float] = Field(None, ge=0)
     costo_override: Optional[float] = Field(None, ge=0)
     fecha_ingreso: Optional[str] = None
+    inyectable: bool = False
 
 
 class OrdenUpdate(BaseModel):
@@ -65,6 +67,7 @@ class OrdenUpdate(BaseModel):
     enviado: Optional[bool] = None
     facturado: Optional[bool] = None
     pagado: Optional[bool] = None
+    inyectable: Optional[bool] = None
 
 
 class OrdenAnular(BaseModel):
@@ -188,6 +191,8 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
     dosis = int(data.get("dosis_autorizadas") or 1)
     if tipo == "consulta" and dosis != 1:
         raise HTTPException(status_code=422, detail="Una orden de consulta cubre una sola atención (dosis autorizadas = 1)")
+    if tipo == "consulta" and data.get("inyectable"):
+        raise HTTPException(status_code=422, detail=MSG_INYECTABLE)
     nog = await _get_nog_or_404(data.get("nog_id"))
     if nog.get("is_active") is False:
         raise HTTPException(status_code=400, detail="La entrada del catálogo está inactiva y no admite órdenes nuevas")
@@ -217,6 +222,7 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
         "procedimiento": (data.get("procedimiento") or "").strip(),
         "tipo": tipo,
         "dosis_autorizadas": dosis,
+        "inyectable": bool(data.get("inyectable")),
         **pac,
         "estado": "reservada",
         "vigente": True,
@@ -337,7 +343,9 @@ async def obtener_orden(orden_id: str, current_user: dict = Depends(require_role
 
 @router.post("/ordenes")
 async def crear_orden(data: OrdenCreate, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    from routes.igss_libro_atenciones import programar_existentes
     doc, nog = await crear_orden_libro(data.model_dump(), current_user, origen="manual")
+    doc = await programar_existentes(doc)
     out = _orden_out(doc, nog)
     cantidad, ocupados = int(nog.get("cantidad") or 0), int(nog.get("libro_ocupados") or 0)
     if not nog.get("sin_tope") and cantidad > 0 and ocupados >= cantidad * UMBRAL_AVISO:
@@ -369,8 +377,11 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
     if tipo == "consulta":
         if dosis not in (None, 1):
             raise HTTPException(status_code=422, detail="Una orden de consulta cubre una sola atención (dosis autorizadas = 1)")
+        if upd.get("inyectable"):
+            raise HTTPException(status_code=422, detail=MSG_INYECTABLE)
         dosis = 1
-    elif tipo is None and dosis not in (None, 1):
+        set_["inyectable"] = False
+    elif tipo is None and (dosis not in (None, 1) or upd.get("inyectable")):
         filtro["tipo"] = "procedimiento"
     if tipo:
         set_["tipo"] = tipo
@@ -409,12 +420,16 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
             raise HTTPException(status_code=422, detail="No se puede cambiar el tipo ni las dosis de una orden ya facturada o pagada")
         aplicadas = sum(1 for a in cur.get("atenciones") or [] if a.get("tipo") == "cirugia")
         if "tipo" in filtro:
-            raise HTTPException(status_code=422, detail="Solo las órdenes de procedimiento admiten más de 1 dosis")
+            raise HTTPException(status_code=422, detail=MSG_INYECTABLE if upd.get("inyectable")
+                                else "Solo las órdenes de procedimiento admiten más de 1 dosis")
         if dosis is not None and aplicadas > int(dosis):
             raise HTTPException(status_code=422, detail=f"La orden ya tiene {aplicadas} dosis aplicadas; las dosis autorizadas no pueden ser menos")
         raise HTTPException(status_code=422, detail="No se puede cambiar el paciente de una orden con atenciones registradas")
 
     despues = await _orden_or_404(orden_id)
+    if "no_sps" in set_ or "paciente_id" in upd:
+        from routes.igss_libro_atenciones import programar_existentes
+        despues = await programar_existentes(despues)
     await _audit("LIBRO_ORDEN_EDITADA", current_user, {
         "orden_id": orden_id, "no_sps": despues.get("no_sps"),
         "antes": {k: antes.get(k) for k in set_ if k not in ("updated_at", "updated_by")},

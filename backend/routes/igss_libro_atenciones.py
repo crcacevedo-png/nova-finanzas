@@ -135,6 +135,19 @@ async def programar_cirugia(cx: dict, destino: Optional[dict] = None):
             [{"$set": {"cirugias_programadas": {"$concatArrays": [_sin_programada(ref), [nueva]]}}}, *etapas_estado()])
 
 
+async def programar_existentes(orden: dict) -> dict:
+    """Orden ingresada (o con No. SPS / paciente cambiado) DESPUÉS de programar su cirugía:
+    anota las cirugías IGSS activas del paciente con ese No. SPS y quita las que ya no le
+    corresponden. Devuelve la orden actualizada."""
+    for p in orden.get("cirugias_programadas") or []:
+        await programar_cirugia(await db.surgeries.find_one({"id": p["ref_id"]}, {"_id": 0}) or {"id": p["ref_id"]})
+    async for cx in db.surgeries.find({"institution": "IGSS", "status": "activo", "patient_id": orden.get("paciente_id")},
+                                      {"_id": 0}):
+        if cx.get("igss_orden_id") == orden["id"] or normalizar_sps((cx.get("igss_data") or {}).get("sps")) == orden.get("no_sps"):
+            await programar_cirugia(cx)
+    return await db.igss_ordenes_libro.find_one({"id": orden["id"]}, {"_id": 0}) or orden
+
+
 async def _motivo_no_admite(orden_id: str) -> str:
     o = await db.igss_ordenes_libro.find_one({"id": orden_id}, {"_id": 0, "no_sps": 1, "estado": 1}) or {}
     return f"La orden {o.get('no_sps', '')} está {ESTADO_TEXTO.get(o.get('estado'), o.get('estado', ''))} y no admite atenciones nuevas"
@@ -676,27 +689,41 @@ def _dias_desde(fecha: str, hoy: date) -> Optional[int]:
         return None
 
 
+ORDENES_VIVAS = ("reservada", "en_curso")
+
+
 @router.get("/cirugias-por-marcar")
 async def cirugias_por_marcar(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
-    """Cirugías IGSS cuya fecha ya pasó y siguen sin marcarse como realizadas: mientras no
-    se marquen, su orden no se completa y no se cobra."""
+    """Cirugías IGSS cuya fecha ya pasó y siguen sin marcarse como realizadas, SOLO de
+    órdenes vivas (reservada o en curso), que son las que se pueden cobrar. No salen las
+    de órdenes históricas, cerradas o completas ni las cirugías sin orden."""
     hoy = today_str_gt()
     cxs = await db.surgeries.find(
-        {"institution": "IGSS", "status": "activo", "date": {"$lt": hoy}},
+        {"institution": "IGSS", "status": "activo", "date": {"$lt": hoy}, "patient_id": {"$nin": [None, ""]}},
         {"_id": 0, "id": 1, "date": 1, "time": 1, "patient_id": 1, "patient_name": 1, "procedure": 1,
-         "surgeon": 1, "eye": 1, "igss_data": 1}).sort([("date", 1), ("time", 1)]).to_list(None)
-    ordenes = {}
+         "surgeon": 1, "eye": 1, "igss_data": 1, "igss_orden_id": 1}).sort([("date", 1), ("time", 1)]).to_list(None)
+    por_id, por_sps = {}, {}
     async for o in db.igss_ordenes_libro.find(
-            {"cirugias_programadas.ref_id": {"$in": [c["id"] for c in cxs]}},
-            {"_id": 0, "id": 1, "no_sps": 1, "estado": 1, "cirugias_programadas": 1}):
-        for p in o.get("cirugias_programadas") or []:
-            ordenes[p["ref_id"]] = {"id": o["id"], "no_sps": o.get("no_sps"), "estado": o.get("estado")}
+            {"paciente_id": {"$in": list({c["patient_id"] for c in cxs})}, "vigente": True},
+            {"_id": 0, "id": 1, "no_sps": 1, "estado": 1, "paciente_id": 1, "inyectable": 1}):
+        por_id[o["id"]] = o
+        por_sps[(o["paciente_id"], o.get("no_sps"))] = o
+
+    def orden_de(c):  # misma prioridad que orden_de_cirugia: igss_orden_id y luego paciente + No. SPS
+        o = por_id.get(c.get("igss_orden_id"))
+        if o and o["paciente_id"] == c["patient_id"]:
+            return o
+        sps = normalizar_sps((c.get("igss_data") or {}).get("sps"))
+        return por_sps.get((c["patient_id"], sps)) if sps else None
+
+    cxs = [(c, o) for c in cxs if (o := orden_de(c)) and o.get("estado") in ORDENES_VIVAS]
     d = date.fromisoformat(hoy)
     data = [{"id": c["id"], "fecha": c.get("date", ""), "hora": c.get("time", ""), "paciente_id": c.get("patient_id"),
              "paciente_nombre": c.get("patient_name", ""), "procedimiento": c.get("procedure", ""),
              "cirujano": c.get("surgeon", ""), "ojo": c.get("eye", ""), "unidad": (c.get("igss_data") or {}).get("unit", ""),
              "no_sps_indicado": normalizar_sps((c.get("igss_data") or {}).get("sps")),
-             "orden": ordenes.get(c["id"]), "dias_atraso": _dias_desde(c.get("date"), d)} for c in cxs]
+             "orden": {k: o.get(k) for k in ("id", "no_sps", "estado", "inyectable")},
+             "dias_atraso": _dias_desde(c.get("date"), d)} for c, o in cxs]
     return {"data": data, "total": len(data)}
 
 

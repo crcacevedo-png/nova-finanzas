@@ -1171,11 +1171,19 @@ def test_b1_12_varias_dosis_programada_no_mueve_y_borrar_dosis_vuelve_en_curso(H
 
 
 def test_b1_13_cirugias_pendientes_de_marcar(H):
+    """Solo cirugías de órdenes vivas (reservada o en curso): no salen las de órdenes
+    históricas, completas ni las cirugías sin orden."""
     sa = H["superadmin"]
-    n = entrada(sa)
+    n = entrada(sa, cantidad=10)
     o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=1, procedimiento="Catarata pendiente")
     vieja = crear_cx(sa, no_sps=o["no_sps"], date="2026-01-15")
     futura = crear_cx(sa, no_sps=o["no_sps"], date="2099-01-15")
+    sin_orden = crear_cx(sa, no_sps=sps(), date="2026-01-15")
+    h = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=1)
+    cx_h = crear_cx(sa, no_sps=h["no_sps"], date="2026-01-16")
+    _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": h["id"]}, {"$set": {"estado": "historica"}}))
+    c3 = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
+    cx_c3 = crear_cx(sa, no_sps=c3["no_sps"], date="2026-01-17")  # 3 dosis, ninguna aplicada: reservada y viva
     url = f"{LIBRO}/cirugias-por-marcar"
     for rol in DENEGADOS:
         assert requests.get(url, headers=H[rol]).status_code == 403
@@ -1183,11 +1191,49 @@ def test_b1_13_cirugias_pendientes_de_marcar(H):
         assert requests.get(url, headers=H[rol]).status_code == 200
     r = requests.get(url, headers=sa).json()
     ids = {c["id"]: c for c in r["data"]}
-    assert vieja["id"] in ids and futura["id"] not in ids and r["total"] == len(r["data"])
+    assert vieja["id"] in ids and cx_c3["id"] in ids and r["total"] == len(r["data"])
+    assert not {futura["id"], sin_orden["id"], cx_h["id"]} & set(ids)
     fila = ids[vieja["id"]]
     assert fila["orden"]["no_sps"] == o["no_sps"] and fila["orden"]["estado"] == "en_curso" and fila["dias_atraso"] > 0
+    assert ids[cx_c3["id"]]["orden"]["estado"] == "reservada"
     assert realizar(sa, vieja["id"]).status_code == 200
-    assert vieja["id"] not in {c["id"] for c in requests.get(url, headers=sa).json()["data"]}
+    ids = {c["id"] for c in requests.get(url, headers=sa).json()["data"]}
+    assert vieja["id"] not in ids  # realizada: la orden queda completa
+    # Una cirugía de orden histórica marcada realizada va a "atenciones sin orden" (no queda atascada)
+    assert realizar(sa, cx_h["id"]).status_code == 200
+    e = sin_orden_de(sa, cx_h["id"])
+    assert e and "histórica" in e["motivo"]
+
+
+def test_b2_1_orden_ingresada_despues_de_programar_la_cirugia(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    numero = sps()
+    cx = crear_cx(sa, no_sps=numero.lower() + " ", date="2026-01-20")
+    o = orden(sa, n["id"], no_sps=numero, tipo="procedimiento", dosis_autorizadas=1, inyectable=True)
+    assert o["estado"] == "en_curso" and [p["ref_id"] for p in o["cirugias_programadas"]] == [cx["id"]]
+    assert o["inyectable"] is True
+    assert cx["id"] in {c["id"] for c in requests.get(f"{LIBRO}/cirugias-por-marcar", headers=sa).json()["data"]}
+    # Cambiar el No. SPS de la orden la desvincula de esa cirugía
+    r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"no_sps": sps()}, headers=sa)
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "reservada" and r.json()["cirugias_programadas"] == []
+
+
+def test_b2_2_marca_inyectable(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    r = nueva_orden(sa, n["id"], tipo="consulta", inyectable=True)
+    assert r.status_code == 422 and "inyectable" in r.json()["detail"]
+    o = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
+    assert o["inyectable"] is False
+    r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"inyectable": True}, headers=sa)
+    assert r.status_code == 200 and r.json()["inyectable"] is True
+    c = orden(sa, n["id"])
+    r = requests.put(f"{LIBRO}/ordenes/{c['id']}", json={"inyectable": True}, headers=sa)
+    assert r.status_code == 422 and "inyectable" in r.json()["detail"]
+    r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"tipo": "consulta", "dosis_autorizadas": 1}, headers=sa)
+    assert r.status_code == 200 and r.json()["inyectable"] is False
 
 
 def test_b1_14_cerrar_sin_completar(H):

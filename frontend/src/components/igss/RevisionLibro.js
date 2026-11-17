@@ -29,7 +29,7 @@ export const ResumenLibro = ({ resumen }) => (
 
 const TARJETAS = [
   ['sin_orden', Inbox, 'Atenciones sin orden', 'Pendientes de asignar a una orden'],
-  ['cirugias', Scissors, 'Cirugías sin marcar como realizadas', 'Ya pasó su fecha: su orden no se completa ni se cobra'],
+  ['cirugias', Scissors, 'Cirugías sin marcar como realizadas', 'De órdenes reservadas o en curso: ya pasó su fecha y no se cobran hasta marcarlas'],
   ['detenidas', Clock, 'En curso sin movimiento', 'Sin dosis ni atención nueva en más de 90 días'],
 ];
 
@@ -61,14 +61,15 @@ export const TablaCirugiasPorMarcar = ({ filas, onMarcar }) => (
       <tr><Th>Fecha</Th><Th>Paciente</Th><Th>Procedimiento</Th><Th>Orden (No. SPS)</Th><Th>Atraso</Th><Th /></tr>
     </thead>
     <tbody>
-      {filas.length === 0 && <Vacio cols={6} texto="No hay cirugías IGSS pendientes de marcar." testId="cirugias-por-marcar-vacio" />}
+      {filas.length === 0 && <Vacio cols={6} texto="No hay cirugías de órdenes reservadas o en curso pendientes de marcar." testId="cirugias-por-marcar-vacio" />}
       {filas.map((c) => (
         <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`cirugia-por-marcar-${c.id}`}>
           <td className="px-3 py-2 text-sm whitespace-nowrap">{fmt(c.fecha)} <span className="text-xs text-slate-400">{c.hora}</span></td>
           <td className="px-3 py-2 text-sm font-medium text-slate-800">{c.paciente_nombre || '—'}<div className="text-xs text-slate-400 font-normal">{c.unidad}</div></td>
           <td className="px-3 py-2 text-sm text-slate-600">{c.procedimiento} {c.ojo}<div className="text-xs text-slate-400">{c.cirujano}</div></td>
           <td className="px-3 py-2 text-xs">
-            {c.orden ? <span className="font-mono">{c.orden.no_sps}</span> : <span className="text-amber-700">Sin orden ({c.no_sps_indicado || 'sin SPS'})</span>}
+            <span className="font-mono">{c.orden?.no_sps}</span>
+            <div className="text-slate-400">{estadoOrden(c.orden?.estado)[1]}{c.orden?.inyectable ? ' · Inyectable' : ''}</div>
           </td>
           <td className="px-3 py-2 text-xs text-red-600 whitespace-nowrap">{c.dias_atraso} días</td>
           <td className="px-3 py-2 text-right">

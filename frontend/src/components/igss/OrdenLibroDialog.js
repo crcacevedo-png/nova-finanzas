@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Loader2 } from 'lucide-react';
@@ -13,7 +14,7 @@ const errorDe = (e, fb) => {
   return typeof d === 'string' ? d : fb;
 };
 
-const VACIO = { unidad_id: '', nog_id: '', no_sps: '', tipo: 'consulta', dosis_autorizadas: 1, codigo: '', procedimiento: '' };
+const VACIO = { unidad_id: '', nog_id: '', no_sps: '', tipo: 'consulta', dosis_autorizadas: 1, codigo: '', procedimiento: '', inyectable: false };
 
 const cupoTexto = (c) => {
   if (c.sin_tope) return 'sin tope';
@@ -41,7 +42,7 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
   }, [open, editando, form.unidad_id]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const onTipo = (v) => setForm((f) => ({ ...f, tipo: v, dosis_autorizadas: v === 'consulta' ? 1 : f.dosis_autorizadas }));
+  const onTipo = (v) => setForm((f) => ({ ...f, tipo: v, dosis_autorizadas: v === 'consulta' ? 1 : f.dosis_autorizadas, inyectable: v === 'consulta' ? false : f.inyectable }));
 
   const guardar = async () => {
     if (!form.no_sps.trim()) { toast.error('El No. SPS es obligatorio'); return; }
@@ -49,6 +50,7 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
     const payload = {
       no_sps: form.no_sps, tipo: form.tipo, dosis_autorizadas: Number(form.dosis_autorizadas) || 1,
       codigo: form.codigo || '', procedimiento: form.procedimiento || '',
+      inyectable: form.tipo === 'procedimiento' && !!form.inyectable,
     };
     setGuardando(true);
     try {
@@ -131,6 +133,12 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
             <Label className="text-xs">Código</Label>
             <Input value={form.codigo} onChange={(e) => set('codigo', e.target.value)} className="mt-1" data-testid="orden-form-codigo" />
           </div>
+          {form.tipo === 'procedimiento' && (
+            <label className="sm:col-span-2 flex items-center gap-2 text-sm text-slate-700 cursor-pointer" data-testid="orden-form-inyectable-label">
+              <Checkbox checked={!!form.inyectable} onCheckedChange={(v) => set('inyectable', v === true)} data-testid="orden-form-inyectable" />
+              Inyectable <span className="text-xs text-slate-400">(tratamiento por dosis, p. ej. anti-VEGF)</span>
+            </label>
+          )}
           <div className="sm:col-span-2">
             <Label className="text-xs">Procedimiento / Estudio</Label>
             <Input value={form.procedimiento} onChange={(e) => set('procedimiento', e.target.value)} placeholder="Ej: Avastin OD" className="mt-1" data-testid="orden-form-procedimiento" />

@@ -48,6 +48,7 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasi
             </div>
             <div className="text-xs text-slate-500">
               {o.modalidad || 'Sin modalidad'} · {o.tipo === 'procedimiento' ? 'Procedimiento' : 'Consulta'}
+              {o.inyectable && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px] bg-sky-50 text-sky-700 border-sky-200" data-testid={`orden-inyectable-${o.id}`}>Inyectable</Badge>}
               {o.procedimiento ? ` · ${o.procedimiento}` : ''} · Ingreso {fmt(o.fecha_ingreso)}
             </div>
           </div>
