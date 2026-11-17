@@ -240,6 +240,9 @@ export const igssLibroApi = {
   reasignar: (data) => axios.post(`${LIBRO}/atenciones/reasignar`, data),
   // Para médicos/recepción: solo procedimiento y fecha de ingreso de las órdenes abiertas
   abiertas: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes-abiertas`),
+  // Fase 4 (a): simulación de la migración, solo lectura y solo superadmin
+  simularMigracion: (params) => axios.get(`${API_URL}/igss-units/migracion/simular`, { params: { ...params, detalle: false } }),
+  simularMigracionExcel: (params) => axios.get(`${API_URL}/igss-units/migracion/simular/excel`, { params, responseType: 'blob' }),
 };
 
 // Google Calendar API (sincronización de Agenda por médico)

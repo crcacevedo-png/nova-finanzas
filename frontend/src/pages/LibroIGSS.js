@@ -13,6 +13,7 @@ import { BookOpen, ShieldCheck, ShieldOff, Search, Link2, XCircle, Loader2, Lock
 import { igssLibroApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { MotivoDialog, ElegirOrdenDialog } from '../components/igss/OrdenDialogs';
+import { MigracionSimulacion } from '../components/igss/MigracionSimulacion';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
 const fmtHora = (f) => (f ? new Date(f).toLocaleString('es-GT') : '—');
@@ -28,7 +29,7 @@ const INTERRUPTORES = {
   usar_solo_libro: {
     testId: 'libro-solo-libro', titulo: 'Usar solo el libro', iconos: [Lock, Unlock],
     quien: 'solo_libro_actualizado_por_nombre', cuando: 'solo_libro_actualizado_en', confirmarTitulo: '¿Usar solo el libro?',
-    texto: 'Encendido: guardar, desactivar o eliminar pacientes y evaluaciones, eliminar un NOG y limpiar borradores dejan de escribir en el sistema anterior (acreditaciones, contador "acreditados" y producción antigua), y sus recálculos quedan deshabilitados. El libro se sigue actualizando igual. Apagado por defecto.',
+    texto: 'Encendido: guardar, desactivar o eliminar pacientes y evaluaciones, crear un NOG y limpiar borradores dejan de escribir en el sistema anterior (acreditaciones, contador "acreditados" y producción antigua), y sus recálculos quedan deshabilitados. El libro se sigue actualizando igual. Un NOG con acreditaciones u órdenes nunca se elimina: solo se desactiva. Apagado por defecto.',
     confirmar: () => 'Los botones y funciones antiguas de recalcular, reconciliar, aplicar y anular acreditación quedarán deshabilitados. Los datos antiguos no se borran.',
   },
 };
@@ -150,6 +151,7 @@ export default function LibroIGSS() {
         {['exigir_orden', 'usar_solo_libro'].map((campo) => (
           <Interruptor key={campo} campo={campo} config={config} esSuperadmin={user?.role === 'superadmin'} onCambiar={cambiarInterruptor} />
         ))}
+        {user?.role === 'superadmin' && <MigracionSimulacion />}
         <div className="rounded-xl border border-slate-200 bg-white">
           <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
             <div className="flex gap-1">

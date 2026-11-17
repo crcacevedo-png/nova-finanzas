@@ -203,7 +203,7 @@ def test_04_evaluacion_guardar_editar_eliminar_actualiza_el_libro(sa):
     _mismo_sistema_anterior(antes, _huella())
 
 
-def test_05_limpiar_borradores_y_crear_eliminar_nog(sa):
+def test_05_limpiar_borradores_y_crear_desactivar_nog(sa):
     antes = _huella()
     r = requests.post(f"{API}/igss-units/mantenimiento/borradores-vacios/limpiar", json={"confirmar": True}, headers=sa)
     assert r.status_code == 200 and r.json()["eliminados"] >= 1
@@ -214,8 +214,19 @@ def test_05_limpiar_borradores_y_crear_eliminar_nog(sa):
     r = requests.post(f"{API}/igss-units/{U}/nogs", json={"numero": f"TSOLO4{TAG}", "nombre_servicio": "Consulta",
                                                           "tipo_compra": "contrato", "cantidad": 5, "precio": 10}, headers=sa)
     assert r.status_code == 200 and r.json()["acreditaciones_retroactivas"] == 0, r.text
-    assert requests.delete(f"{API}/igss-units/nogs/{N3}", headers=sa).status_code == 200
-    _mismo_sistema_anterior(antes, _huella())  # la acreditación A3 del NOG eliminado sigue intacta
+    n4 = r.json()["id"]
+
+    async def doc(db):
+        return await db.igss_nogs.find_one({"id": n4}, {"_id": 0})
+    assert "acreditados" not in _db_call(doc)  # encendido: crear_nog no escribe el contador antiguo
+    # Con acreditaciones (A3) no se puede eliminar: solo desactivar
+    r = requests.delete(f"{API}/igss-units/nogs/{N3}", headers=sa)
+    assert r.status_code == 400 and "1 acreditación(es)" in r.json()["detail"] and "Desactívela" in r.json()["detail"]
+    r = requests.put(f"{API}/igss-units/nogs/{N3}", json={"is_active": False}, headers=sa)
+    assert r.status_code == 200 and r.json()["is_active"] is False
+    # Sin acreditaciones ni órdenes sí se puede eliminar
+    assert requests.delete(f"{API}/igss-units/nogs/{n4}", headers=sa).status_code == 200
+    _mismo_sistema_anterior(antes, _huella())  # la acreditación A3 sigue intacta
 
 
 def _norm(s):
@@ -256,3 +267,22 @@ def test_07_apagar_restaura_el_sistema_anterior(sa):
     assert requests.put(f"{LIBRO}/config", json={"usar_solo_libro": False}, headers=sa).json()["usar_solo_libro"] is False
     r = requests.post(f"{API}/igss-units/nogs/{N}/recalcular", headers=sa)
     assert r.status_code == 200, r.text
+    # Apagado: crear_nog vuelve a guardar el contador antiguo en 0
+    r = requests.post(f"{API}/igss-units/{U}/nogs", json={"numero": f"TSOLO5{TAG}", "nombre_servicio": "Consulta",
+                                                          "tipo_compra": "contrato", "cantidad": 5, "precio": 10}, headers=sa)
+    assert r.status_code == 200, r.text
+
+    async def doc(db):
+        return await db.igss_nogs.find_one({"id": r.json()["id"]}, {"_id": 0})
+    assert _db_call(doc)["acreditados"] == 0
+    # Apagado tampoco se elimina una entrada con acreditaciones (A1 en N, A3 en N3)
+    for nog_id in (N, N3):
+        r2 = requests.delete(f"{API}/igss-units/nogs/{nog_id}", headers=sa)
+        assert r2.status_code == 400 and "Desactívela" in r2.json()["detail"], r2.text
+
+
+def test_08_limpieza_de_duplicados_no_corre_al_iniciar():
+    import inspect
+    import server
+    assert "cleanup_igss_nog_seed_duplicates(" not in inspect.getsource(server.startup_event)
+    assert not hasattr(server, "seed_igss_nogs_from_list")

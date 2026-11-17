@@ -272,6 +272,23 @@ def test_11_entrada_con_ordenes_no_se_puede_eliminar(H):
     assert requests.delete(f"{API}/igss-units/nogs/{vacia['id']}", headers=sa).status_code == 200
 
 
+# ---------- 11b / 11c: validaciones al editar una orden ----------
+
+def test_11b_editar_orden_costo_negativo_422(H):
+    sa = H["superadmin"]
+    o = orden(sa, entrada(sa)["id"])
+    r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"costo_override": -1}, headers=sa)
+    assert r.status_code == 422, r.text
+    assert requests.get(f"{LIBRO}/ordenes/{o['id']}", headers=sa).json()["costo_override"] is None
+
+
+def test_11c_editar_orden_sin_datos_400(H):
+    sa = H["superadmin"]
+    o = orden(sa, entrada(sa)["id"])
+    r = requests.put(f"{LIBRO}/ordenes/{o['id']}", json={}, headers=sa)
+    assert r.status_code == 400 and r.json()["detail"] == "No hay datos para actualizar"
+
+
 # ---------- 13: permisos ----------
 
 @pytest.mark.parametrize("rol", AUTORIZADOS)

@@ -478,13 +478,14 @@ async def crear_nog(
         "monto_total": (round(float(data.monto_total), 2) if data.monto_total is not None
                         else round(float(data.precio or 0) * cantidad, 2)),
         "fecha_asignacion": (data.fecha_asignacion or "").strip(),
-        "acreditados": 0,
         "libro_ocupados": 0,
         "is_active": True,
         "created_by": current_user["id"],
         "created_at": now,
         "updated_at": now,
     }
+    if not await solo_libro_activo():  # encendido: el contador antiguo no se escribe
+        nog_doc["acreditados"] = 0
     try:
         await db.igss_nogs.insert_one(nog_doc)
     except DuplicateKeyError:
@@ -546,13 +547,17 @@ async def eliminar_nog(
     nog_id: str,
     current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
-    """Elimina una entrada del catálogo y sus acreditaciones (sistema anterior).
-    Si tiene órdenes en el libro se rechaza: solo puede desactivarse."""
+    """Elimina una entrada del catálogo SIN órdenes en el libro ni acreditaciones (de
+    cualquier estado); si tiene alguna se rechaza: solo puede desactivarse."""
     nog = await _get_nog_or_404(nog_id)
-    if await db.igss_ordenes_libro.find_one({"nog_id": nog_id}, {"_id": 1}):
-        raise HTTPException(status_code=400, detail="Esta entrada del catálogo tiene órdenes en el libro y no se puede eliminar. Desactívela en su lugar.")
-    if not await solo_libro_activo():
-        await db.igss_nog_acreditaciones.delete_many({"nog_id": nog_id})
+    ordenes = await db.igss_ordenes_libro.count_documents({"nog_id": nog_id})
+    acreditaciones = await db.igss_nog_acreditaciones.count_documents({"nog_id": nog_id})
+    if ordenes or acreditaciones:
+        partes = [f"{ordenes} orden(es) en el libro" if ordenes else "",
+                  f"{acreditaciones} acreditación(es) del sistema anterior" if acreditaciones else ""]
+        raise HTTPException(status_code=400, detail=(
+            f"Esta entrada del catálogo tiene {' y '.join(p for p in partes if p)} y no se puede eliminar. "
+            "Desactívela en su lugar."))
     await db.igss_nogs.delete_one({"id": nog_id})
     await _audit_catalogo("LIBRO_CATALOGO_ELIMINADO", current_user, {
         "nog_id": nog_id, "unidad_id": nog.get("unidad_id", ""), "numero": nog.get("numero", ""),
