@@ -36,6 +36,7 @@ import {
   ArrowLeftRight,
   FileText,
   ClipboardList,
+  BookOpen,
   Store,
   Upload,
   FlaskConical,
@@ -52,6 +53,7 @@ import {
 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
+import { puedeVerLibroIgss } from '../lib/igssLibro';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_novavision-finanzas/artifacts/qvzbrum6_logo%20nova%20transparente.png";
 
@@ -214,12 +216,20 @@ const Layout = ({ children }) => {
       testId: 'nav-unidades-igss' 
     });
   }
-  if (hasPermission('manage_igss_units')) {
+  if (puedeVerLibroIgss(user)) {
     igssItems.push({
       path: '/igss/nog',
       icon: ClipboardList,
       label: 'NOG',
       testId: 'nav-gestion-nog'
+    });
+  }
+  if (puedeVerLibroIgss(user)) {
+    igssItems.push({
+      path: '/igss/libro',
+      icon: BookOpen,
+      label: 'Libro IGSS',
+      testId: 'nav-libro-igss'
     });
   }
 

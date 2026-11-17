@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Plus, Pencil, Trash2, RefreshCw, Download, Users, ChevronDown, ChevronRight,
-  AlertTriangle, XCircle, FileSpreadsheet, RotateCcw,
+  Plus, Pencil, Trash2, Download, Users, ChevronDown, ChevronRight,
+  AlertTriangle, XCircle, FileSpreadsheet,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -18,9 +18,9 @@ import {
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Skeleton } from './ui/skeleton';
-import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import { igssNogApi, patientApi } from '../services/api';
+import { igssNogApi } from '../services/api';
+import { descargarBlob, etiquetaCatalogo, nombreListado } from '../lib/igssLibro';
 
 const TIPO_COMPRA_OPTIONS = [
   { value: 'compra_directa', label: 'Compra Directa' },
@@ -30,25 +30,7 @@ const TIPO_COMPRA_OPTIONS = [
 ];
 
 const fmtQ = (n) => `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const fmtFecha = (iso) => {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('es-GT', { timeZone: 'America/Guatemala' });
-  } catch (e) {
-    return iso.slice(0, 10);
-  }
-};
-
-const descargarBlob = (blob, filename) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-};
+const fmtDia = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
 
 const EstadoBadge = ({ estado }) => {
   const map = {
@@ -187,176 +169,70 @@ const NogForm = ({ open, onOpenChange, unitId, editing, onSaved }) => {
   );
 };
 
-// Fila expandible de pacientes acreditados de un NOG
-const PacientesNog = ({ nogId, onAnulada }) => {
+// Órdenes vigentes (atendidas y pendientes) de un NOG, leídas del libro IGSS
+const ESTADO_ORDEN = {
+  atendida: { cls: 'bg-emerald-100 text-emerald-700', label: 'Atendida' },
+  pendiente: { cls: 'bg-amber-100 text-amber-700', label: 'Pendiente' },
+};
+
+const FilaOrden = ({ o }) => {
+  const est = ESTADO_ORDEN[o.estado] || ESTADO_ORDEN.pendiente;
+  return (
+    <TableRow data-testid={`nog-orden-row-${o.orden_id}`}>
+      <TableCell className="font-mono text-xs">{o.no_sps}</TableCell>
+      <TableCell className="font-medium">
+        {o.paciente_nombre}
+        {!o.paciente_activo && <span className="ml-1 text-[10px] text-gray-400">(inactivo)</span>}
+      </TableCell>
+      <TableCell className="font-mono text-xs">{o.expediente || '—'}</TableCell>
+      <TableCell><Badge className={est.cls} data-testid={`nog-orden-estado-${o.orden_id}`}>{est.label}</Badge></TableCell>
+      <TableCell className="text-xs">{fmtDia(o.fecha_primera_atencion)}</TableCell>
+      <TableCell className="text-xs text-center">{o.dosis_aplicadas} / {o.dosis_autorizadas}</TableCell>
+      <TableCell className="text-xs text-right">{fmtQ(o.costo)}</TableCell>
+    </TableRow>
+  );
+};
+
+const OrdenesNog = ({ nogId }) => {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
-  const [anularTarget, setAnularTarget] = useState(null);
-  const [motivo, setMotivo] = useState('');
-  const [anulando, setAnulando] = useState(false);
-  // Aplicar descuento manual a un paciente
-  const [search, setSearch] = useState('');
-  const [resultados, setResultados] = useState([]);
-  const [buscando, setBuscando] = useState(false);
-  const [aplicandoId, setAplicandoId] = useState(null);
 
-  const buscarPacientes = async (q) => {
-    setSearch(q);
-    if (!q || q.trim().length < 2) { setResultados([]); return; }
-    try {
-      setBuscando(true);
-      const res = await patientApi.search(q.trim(), 6);
-      setResultados(res.data || []);
-    } catch (e) {
-      setResultados([]);
-    } finally {
-      setBuscando(false);
-    }
-  };
-
-  const aplicarDescuento = async (pacienteId) => {
-    setAplicandoId(pacienteId);
-    try {
-      await igssNogApi.aplicarAcreditacion(nogId, pacienteId);
-      toast.success('Descuento aplicado al paciente.');
-      setSearch(''); setResultados([]);
-      fetch();
-      onAnulada && onAnulada();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'No se pudo aplicar el descuento');
-    } finally {
-      setAplicandoId(null);
-      setSearch(''); setResultados([]);
-    }
-  };
-
-  const fetch = useCallback(async () => {
+  useEffect(() => {
+    let vivo = true;
     setLoading(true);
-    try {
-      const res = await igssNogApi.getPacientes(nogId);
-      setRows(res.data?.acreditaciones || []);
-    } catch (e) {
-      toast.error('Error al cargar pacientes del NOG');
-    } finally {
-      setLoading(false);
-    }
+    igssNogApi.getPacientes(nogId)
+      .then((res) => { if (vivo) setRows(res.data?.ordenes || []); })
+      .catch(() => { if (vivo) toast.error('Error al cargar las órdenes del NOG'); })
+      .finally(() => { if (vivo) setLoading(false); });
+    return () => { vivo = false; };
   }, [nogId]);
-
-  useEffect(() => { fetch(); }, [fetch]);
-
-  const confirmarAnular = async () => {
-    if (!anularTarget) return;
-    setAnulando(true);
-    try {
-      await igssNogApi.anularAcreditacion(nogId, anularTarget.acreditacion_id, motivo);
-      toast.success('Acreditación anulada. El servicio quedó disponible.');
-      setAnularTarget(null);
-      setMotivo('');
-      fetch();
-      onAnulada && onAnulada();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error al anular la acreditación');
-    } finally {
-      setAnulando(false);
-    }
-  };
 
   if (loading) return <div className="p-4"><Skeleton className="h-24 w-full" /></div>;
 
   return (
-    <div className="p-3 bg-gray-50 rounded-lg" data-testid={`nog-pacientes-${nogId}`}>
-      {/* Aplicar descuento manual a un paciente (corrección puntual) */}
-      <div className="mb-3 p-2 bg-white rounded-lg border border-emerald-100" data-testid={`nog-aplicar-box-${nogId}`}>
-        <Label className="text-xs font-semibold text-emerald-700">Aplicar descuento a un paciente</Label>
-        <div className="relative mt-1">
-          <Input
-            value={search}
-            onChange={(e) => buscarPacientes(e.target.value)}
-            placeholder="Buscar por nombre, expediente o DPI..."
-            className="input-teal h-8 text-sm"
-            data-testid={`nog-aplicar-search-${nogId}`}
-          />
-          {(resultados.length > 0 || buscando) && (
-            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-              {buscando && <div className="p-2 text-xs text-gray-400">Buscando...</div>}
-              {resultados.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => aplicarDescuento(p.id)}
-                  disabled={aplicandoId === p.id}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-emerald-50 flex items-center justify-between"
-                  data-testid={`nog-aplicar-option-${p.id}`}
-                >
-                  <span>{p.full_name} <span className="text-xs text-gray-400">· {p.record_number || p.dpi || ''}</span></span>
-                  <span className="text-xs text-emerald-700">{aplicandoId === p.id ? 'Aplicando...' : 'Aplicar'}</span>
-                </button>
-              ))}
-              {!buscando && resultados.length === 0 && search.trim().length >= 2 && (
-                <div className="p-2 text-xs text-gray-400">Sin resultados</div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
+    <div className="p-3 bg-gray-50 rounded-lg" data-testid={`nog-ordenes-${nogId}`}>
       {rows.length === 0 ? (
-        <div className="p-2 text-sm text-gray-500">No hay pacientes con descuento en este NOG.</div>
+        <div className="p-2 text-sm text-gray-500">No hay órdenes vigentes en este NOG.</div>
       ) : (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="table-header">Expediente</TableHead>
-              <TableHead className="table-header">Paciente</TableHead>
-              <TableHead className="table-header">DPI</TableHead>
-              <TableHead className="table-header">Afiliación</TableHead>
-              <TableHead className="table-header">Fecha acreditación</TableHead>
-              <TableHead className="table-header text-right">Acción</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.acreditacion_id} data-testid={`nog-acred-row-${r.acreditacion_id}`}>
-                <TableCell className="font-mono text-xs">{r.record_number || '—'}</TableCell>
-                <TableCell className="font-medium">{r.full_name}</TableCell>
-                <TableCell className="text-xs">{r.dpi || '—'}</TableCell>
-                <TableCell className="text-xs">{r.igss_afiliacion || '—'}</TableCell>
-                <TableCell className="text-xs">{fmtFecha(r.fecha_acreditacion)}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" className="h-8 text-red-600 hover:bg-red-100"
-                    onClick={() => setAnularTarget(r)} data-testid={`nog-anular-${r.acreditacion_id}`}>
-                    <RotateCcw className="w-3.5 h-3.5 mr-1" />Anular
-                  </Button>
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="table-header">No. SPS</TableHead>
+                <TableHead className="table-header">Paciente</TableHead>
+                <TableHead className="table-header">Expediente</TableHead>
+                <TableHead className="table-header">Estado</TableHead>
+                <TableHead className="table-header">1ª atención</TableHead>
+                <TableHead className="table-header text-center">Dosis</TableHead>
+                <TableHead className="table-header text-right">Precio</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {rows.map((o) => <FilaOrden key={o.orden_id} o={o} />)}
+            </TableBody>
+          </Table>
+        </div>
       )}
-
-      <Dialog open={!!anularTarget} onOpenChange={(o) => { if (!o) { setAnularTarget(null); setMotivo(''); } }}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>Anular acreditación</DialogTitle>
-            <DialogDescription>
-              Se liberará 1 servicio del NOG (volverá a quedar disponible). Esta acción corrige una acreditación hecha por error.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label className="text-xs">Motivo (opcional)</Label>
-            <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} className="input-teal"
-              placeholder="Ej: registrado por error" data-testid="nog-anular-motivo" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" className="btn-outline" onClick={() => { setAnularTarget(null); setMotivo(''); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmarAnular} disabled={anulando} data-testid="nog-anular-confirm">
-              {anulando ? 'Anulando...' : 'Anular'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
@@ -370,7 +246,9 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [busyNog, setBusyNog] = useState(null);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const rango = { desde: desde || undefined, hasta: hasta || undefined };
 
   const fetch = useCallback(async () => {
     if (!unit) return;
@@ -392,24 +270,10 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
 
   useEffect(() => { if (open) { fetch(); setExpanded(initialNogId || null); } }, [open, fetch, initialNogId]);
 
-  const recalcular = async (nog) => {
-    setBusyNog(nog.id);
-    try {
-      const res = await igssNogApi.recalcular(nog.id);
-      const nuevas = res.data?.acreditaciones_nuevas || 0;
-      toast.success(nuevas > 0 ? `Recalculado: ${nuevas} acreditación(es) nueva(s).` : 'Recalculado: sin cambios.');
-      refresh();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error al recalcular');
-    } finally {
-      setBusyNog(null);
-    }
-  };
-
   const exportNog = async (nog) => {
     try {
-      const res = await igssNogApi.exportExcel(nog.id);
-      descargarBlob(res.data, `NOG_${nog.numero}.xlsx`);
+      const res = await igssNogApi.exportExcel(nog.id, rango);
+      descargarBlob(res.data, nombreListado(etiquetaCatalogo(nog), rango));
     } catch (e) {
       toast.error('Error al exportar el NOG');
     }
@@ -417,8 +281,8 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
 
   const exportUnidad = async () => {
     try {
-      const res = await igssNogApi.exportUnidadExcel(unit.id);
-      descargarBlob(res.data, `Unidad_${unit.name}_NOGs.xlsx`);
+      const res = await igssNogApi.exportUnidadExcel(unit.id, rango);
+      descargarBlob(res.data, nombreListado(unit.name, rango));
     } catch (e) {
       toast.error('Error al exportar la unidad');
     }
@@ -450,7 +314,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
         <DialogHeader>
           <DialogTitle>NOG — {unit?.name || data?.unidad?.name || ''}</DialogTitle>
           <DialogDescription>
-            Contratos de servicios del IGSS. El sistema acredita 1 servicio por atención (evaluación) y bloquea el NOG al completarse.
+            Contratos de servicios del IGSS. Cada orden (No. SPS) ocupa 1 cupo: reservada mientras está pendiente y consumida al atenderse. El NOG se bloquea al completarse.
           </DialogDescription>
         </DialogHeader>
 
@@ -458,15 +322,26 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-4 text-sm">
             <span style={{ color: 'var(--text-secondary)' }}>Contratados: <strong>{totales.servicios_contratados ?? 0}</strong></span>
-            <span style={{ color: 'var(--text-secondary)' }}>Acreditados: <strong>{totales.servicios_acreditados ?? 0}</strong></span>
+            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-consumidos">Consumidos: <strong>{totales.consumidos ?? 0}</strong></span>
+            <span style={{ color: 'var(--text-secondary)' }} data-testid="nog-unidad-reservados">Reservados: <strong>{totales.reservados ?? 0}</strong></span>
             <span style={{ color: 'var(--text-secondary)' }}>Disponibles: <strong>{totales.servicios_disponibles ?? 0}</strong></span>
             <span style={{ color: 'var(--text-secondary)' }}>Valor: <strong>{fmtQ(totales.valor_total)}</strong></span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             {nogs.length > 0 && (
-              <Button variant="outline" size="sm" className="btn-outline" onClick={exportUnidad} data-testid="nog-export-unidad">
-                <FileSpreadsheet className="w-4 h-4 mr-2" />Exportar unidad
-              </Button>
+              <>
+                <div>
+                  <Label className="text-[11px] text-gray-500">Desde (1ª atención)</Label>
+                  <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-teal h-8 w-36 text-xs" data-testid="nog-export-desde" />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-gray-500">Hasta</Label>
+                  <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-teal h-8 w-36 text-xs" data-testid="nog-export-hasta" />
+                </div>
+                <Button variant="outline" size="sm" className="btn-outline" onClick={exportUnidad} data-testid="nog-export-unidad">
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />Listado oficial
+                </Button>
+              </>
             )}
             <Button size="sm" className="btn-primary" onClick={() => { setEditing(null); setFormOpen(true); }} data-testid="nog-add-button">
               <Plus className="w-4 h-4 mr-2" />Nuevo NOG
@@ -507,18 +382,26 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <div className="font-semibold">{n.numero}</div>
+                        <div className={`font-semibold ${n.numero ? '' : 'text-amber-700'}`}>{etiquetaCatalogo(n)}</div>
                         <div className="text-xs text-gray-500">{n.nombre_servicio || 'Sin nombre de servicio'}</div>
                       </TableCell>
                       <TableCell className="text-xs">{n.tipo_compra_label || '—'}</TableCell>
-                      <TableCell className="min-w-[140px]">
-                        <div className="flex items-center gap-1 text-xs mb-1">
-                          <strong>{n.acreditados}</strong> / {n.cantidad}
-                          {n.estado === 'por_completarse' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
-                          {n.estado === 'completado' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                      <TableCell className="min-w-[160px]" data-testid={`nog-avance-${n.id}`}>
+                        {n.disponibles == null ? (
+                          <div className="text-xs"><strong>{n.usados}</strong> órdenes · <span className="text-gray-400">sin tope</span></div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1 text-xs mb-1">
+                              <strong>{n.usados}</strong> / {n.cantidad}
+                              {n.estado === 'por_completarse' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                              {n.estado === 'completado' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                            </div>
+                            <Progress value={n.porcentaje || 0} className="h-2" data-testid={`nog-progress-${n.id}`} />
+                          </>
+                        )}
+                        <div className="text-[11px] text-gray-400 mt-0.5">
+                          {n.consumidos} atendidas · {n.reservados} reservadas{n.disponibles != null ? ` · ${n.disponibles} disp.` : ''}
                         </div>
-                        <Progress value={n.porcentaje} className="h-2" data-testid={`nog-progress-${n.id}`} />
-                        <div className="text-[11px] text-gray-400 mt-0.5">{n.disponibles} disp.</div>
                       </TableCell>
                       <TableCell className="text-right text-xs">
                         {fmtQ(n.precio)}
@@ -527,11 +410,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
                       <TableCell><EstadoBadge estado={n.estado} /></TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Recalcular"
-                            disabled={busyNog === n.id} onClick={() => recalcular(n)} data-testid={`nog-recalcular-${n.id}`}>
-                            <RefreshCw className={`w-4 h-4 ${busyNog === n.id ? 'animate-spin' : ''}`} />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Exportar"
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Listado oficial del NOG"
                             onClick={() => exportNog(n)} data-testid={`nog-export-${n.id}`}>
                             <Download className="w-4 h-4" />
                           </Button>
@@ -549,7 +428,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
                     {expanded === n.id && (
                       <TableRow>
                         <TableCell colSpan={7} className="p-0">
-                          <PacientesNog nogId={n.id} onAnulada={refresh} />
+                          <OrdenesNog nogId={n.id} />
                         </TableCell>
                       </TableRow>
                     )}
@@ -628,7 +507,7 @@ export const NogsUnidadDialog = ({ unit, open, onOpenChange, initialNogId = null
             <DialogHeader>
               <DialogTitle>Eliminar NOG</DialogTitle>
               <DialogDescription>
-                ¿Eliminar el NOG &quot;{deleteTarget?.numero}&quot;? Se borrarán también sus {deleteTarget?.acreditados || 0} acreditación(es). Esta acción no se puede deshacer.
+                ¿Eliminar &quot;{deleteTarget ? etiquetaCatalogo(deleteTarget) : ''}&quot;? Solo es posible si no tiene órdenes en el libro (si las tiene, desactívelo). Esta acción no se puede deshacer.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

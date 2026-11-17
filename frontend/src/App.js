@@ -13,6 +13,7 @@ import GastosFijos from './pages/GastosFijos';
 import Pacientes from './pages/Pacientes';
 import UnidadesIGSS from './pages/UnidadesIGSS';
 import GestionNOG from './pages/GestionNOG';
+import LibroIGSS from './pages/LibroIGSS';
 // Módulo Óptica
 import OpticaInventario from './pages/OpticaInventario';
 import OpticaVentas from './pages/OpticaVentas';
@@ -229,10 +230,18 @@ function AppRoutes() {
       <Route 
         path="/igss/nog" 
         element={
-          <ProtectedRoute requiredPermission="manage_igss_units">
+          <ProtectedRoute requiredRole={['superadmin', 'admin', 'administrador_igss']}>
             <GestionNOG />
           </ProtectedRoute>
         } 
+      />
+      <Route
+        path="/igss/libro"
+        element={
+          <ProtectedRoute requiredRole={['superadmin', 'admin', 'administrador_igss']}>
+            <LibroIGSS />
+          </ProtectedRoute>
+        }
       />
 
       {/* Módulo Óptica - Solo accesible para roles optica y superadmin */}

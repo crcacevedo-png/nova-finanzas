@@ -273,6 +273,26 @@ const SalaOperaciones = () => {
     } catch (e) { toast.error('No se pudo actualizar el estado de Pre-Ops'); }
   };
 
+  // Marcar / desmarcar REALIZADA. En IGSS registra la dosis en la orden del libro por detrás.
+  const toggleRealizada = async (surgery) => {
+    const realizada = surgery.status !== 'realizado';
+    try {
+      const { data } = await axios.post(`${API_URL}/surgeries/${surgery.id}/realizada`, { realizada });
+      setSurgeries((prev) => prev.map((s) => (s.id === surgery.id ? { ...s, ...data } : s)));
+      setSelectedSurgery((prev) => (prev && prev.id === surgery.id ? { ...prev, ...data } : prev));
+      toast.success(realizada ? 'Cirugía marcada como realizada' : 'Se quitó la marca de realizada');
+      if (data.aviso_igss) toast.warning(data.aviso_igss);
+      const libro = data.libro;
+      if (libro && realizada && libro.resultado === 'registrada') {
+        toast.info(`Libro IGSS: SPS ${libro.no_sps} · dosis ${libro.dosis_aplicadas} de ${libro.dosis_autorizadas}${libro.excede_dosis ? ' (excede lo autorizado)' : ''}`);
+      } else if (libro && realizada && libro.resultado === 'sin_orden') {
+        toast.warning(`Libro IGSS: quedó en "atenciones sin orden" — ${libro.motivo}`);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'No se pudo actualizar la cirugía');
+    }
+  };
+
   const [cancelForm, setCancelForm] = useState({ reason: '', reschedule_date: '', reschedule_time: '' });
 
   // Fetch data
@@ -1074,6 +1094,9 @@ const SalaOperaciones = () => {
                               {surgery.institution === 'IGSS' && (
                                 <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">IGSS</Badge>
                               )}
+                              {surgery.status === 'realizado' && (
+                                <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs" data-testid={`realizada-badge-${surgery.id}`}>Realizada</Badge>
+                              )}
                               {surgery.institution === 'Alquiler' && (() => {
                                 const st = surgery.supplies_status || 'pendiente';
                                 const map = {
@@ -1097,18 +1120,32 @@ const SalaOperaciones = () => {
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
+                              {canEdit && surgery.status !== 'cancelado' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleRealizada(surgery)}
+                                  className={`h-8 w-8 p-0 ${surgery.status === 'realizado' ? 'text-emerald-600 hover:text-emerald-700' : 'text-slate-400 hover:text-emerald-600'}`}
+                                  title={surgery.status === 'realizado' ? 'Quitar marca de realizada' : 'Marcar como realizada'}
+                                  data-testid={`realizada-surgery-${surgery.id}`}
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </Button>
+                              )}
                               {canCancelOrDelete && surgery.status !== 'cancelado' && (
                                 <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => { setSelectedSurgery(surgery); setCancelDialogOpen(true); }}
-                                    className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700"
-                                    title="Cancelar"
-                                    data-testid={`cancel-surgery-${surgery.id}`}
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
+                                  {surgery.status !== 'realizado' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => { setSelectedSurgery(surgery); setCancelDialogOpen(true); }}
+                                      className="h-8 w-8 p-0 text-amber-600 hover:text-amber-700"
+                                      title="Cancelar"
+                                      data-testid={`cancel-surgery-${surgery.id}`}
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"

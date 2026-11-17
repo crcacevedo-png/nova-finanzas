@@ -103,7 +103,7 @@ export const NogSelector = ({ unitId, value, onChange, idSuffix = '' }) => {
                 data-testid={`patient-nog-option-${n.id}`}
               >
                 {n.numero}{n.nombre_servicio ? ` — ${n.nombre_servicio}` : ''}
-                {completado ? ' (completado)' : ` (${n.disponibles} disp.)`}
+                {completado ? ' (completado)' : (n.disponibles != null ? ` (${n.disponibles} disp.)` : '')}
               </SelectItem>
             );
           })}

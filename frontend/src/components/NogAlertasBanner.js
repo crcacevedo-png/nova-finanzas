@@ -60,11 +60,11 @@ export const NogAlertasBanner = ({ onVer, reloadSignal = 0 }) => {
                   : <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />}
                 <div>
                   <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {a.numero}
-                    {a.nombre_servicio ? <span className="font-normal text-gray-500"> — {a.nombre_servicio}</span> : null}
+                    {a.etiqueta || a.numero}
+                    {a.numero && a.nombre_servicio ? <span className="font-normal text-gray-500"> — {a.nombre_servicio}</span> : null}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {a.unidad_nombre} · {a.acreditados}/{a.cantidad} servicios ({a.porcentaje}%) · {a.disponibles} disponibles
+                    {a.unidad_nombre} · {a.usados}/{a.cantidad} cupos ({a.porcentaje}%) · {a.consumidos} atendidas · {a.reservados} reservadas · {a.disponibles} disponibles
                   </p>
                 </div>
               </div>

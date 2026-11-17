@@ -8,3 +8,18 @@ export const esTextoBajaCuantia = (numero) => (numero || '')
   .includes('bajacuantia');
 
 export const etiquetaCatalogo = (n) => (n?.numero || '').trim() || `Baja cuantía — ${n?.nombre_servicio || ''}`;
+
+export const descargarBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const limpio = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '_');
+export const nombreListado = (nombre, { desde, hasta } = {}) =>
+  `Listado_oficial_${[nombre, desde, hasta].filter(Boolean).map(limpio).join('_')}.xlsx`;

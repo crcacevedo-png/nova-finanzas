@@ -42,7 +42,13 @@ import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import axios from 'axios';
 import { agendaApi } from '../services/agendaApi';
-import { getGuatemalaDate } from '../services/api';
+import { getGuatemalaDate, igssLibroApi } from '../services/api';
+import { OrdenIgssSelector, ordenPreseleccionada } from '../components/igss/OrdenIgssSelector';
+
+// Aviso genérico (sin datos del libro) cuando la atención IGSS no pudo vincularse a su orden
+const avisarIgss = (response) => {
+  if (response?.data?.aviso_igss) toast.warning(response.data.aviso_igss, { id: 'aviso-igss' });
+};
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -469,70 +475,66 @@ const EvaluacionOftalmologica = () => {
   // Nota clínica por paciente (persiste entre consultas)
   const [notaPaciente, setNotaPaciente] = useState('');
   const [guardandoNota, setGuardandoNota] = useState(false);
-  // Órdenes IGSS del paciente (para elegir la orden de esta consulta)
+  // Órdenes IGSS abiertas del paciente (solo procedimiento y fecha; nunca SPS/NOG/dosis)
   const [pacienteOrdenes, setPacienteOrdenes] = useState([]);
+  const [ordenesCargadas, setOrdenesCargadas] = useState(false);
   const [pacienteEsIgss, setPacienteEsIgss] = useState(false);
 
   const cargarNotaPaciente = useCallback(async (pid, autofillMotivo = false) => {
-    if (!pid) { setNotaPaciente(''); setPacienteOrdenes([]); setPacienteEsIgss(false); return; }
+    if (!pid) { setNotaPaciente(''); setPacienteOrdenes([]); setOrdenesCargadas(false); setPacienteEsIgss(false); return; }
     try {
       const token = localStorage.getItem('token');
       const { data } = await axios.get(`${API_URL}/patients/${pid}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotaPaciente(data.nota_clinica || '');
-      setPacienteEsIgss(data.referral_institution === 'igss');
-      setPacienteOrdenes(data.igss_ordenes || []);
-      // Motivo de consulta automático desde la descripción del NOG (solo pacientes IGSS, al abrir nueva evaluación)
-      if (autofillMotivo && data.referral_institution === 'igss' && data.igss_unit_id) {
-        const ordenes = data.igss_ordenes || [];
-        const pref = preferredOrdenIdRef.current;
-        const orden = ordenes.find(o => (o.id || '') === pref) || ordenes[0];
-        const numeroNog = (orden?.nog || '').trim();
-        if (numeroNog) {
-          try {
-            const { data: nogs } = await axios.get(
-              `${API_URL}/igss-units/${data.igss_unit_id}/nogs-activos`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const nog = (nogs || []).find(n => (n.numero || '').trim() === numeroNog);
-            const desc = (nog?.nombre_servicio || '').trim();
-            if (desc) {
-              setFormData(prev => ({ ...prev, motivo_consulta: desc }));
-            }
-          } catch (e) {
-            // silencioso: si no se puede resolver el NOG, se deja el motivo como está
-          }
+      const esIgss = data.referral_institution === 'igss';
+      setPacienteEsIgss(esIgss);
+      setOrdenesCargadas(false);
+      if (esIgss) {
+        let ordenes = [];
+        try {
+          ({ data: ordenes } = await igssLibroApi.abiertas(pid));
+        } catch (e) {
+          ordenes = [];
         }
+        setPacienteOrdenes(ordenes || []);
+        setOrdenesCargadas(true);
+        // Motivo de consulta automático desde el servicio de la orden (al abrir nueva evaluación)
+        const orden = ordenPreseleccionada(ordenes || [], preferredOrdenIdRef.current);
+        const desc = (orden?.motivo_sugerido || '').trim();
+        if (autofillMotivo && desc) {
+          setFormData(prev => ({ ...prev, motivo_consulta: desc }));
+        }
+      } else {
+        setPacienteOrdenes([]);
       }
     } catch (e) {
       // silencioso
     }
   }, []);
 
-  // Selección de orden IGSS para la consulta (fija el snapshot NOG/SPS en la evaluación)
+  // Selección de la orden IGSS de la consulta. El vínculo con el libro (No. SPS, NOG,
+  // dosis) lo resuelve el servidor por detrás; aquí solo se guarda el id de la orden.
   const seleccionarOrdenIgss = (ordenId) => {
     const orden = (pacienteOrdenes || []).find(o => (o.id || '') === ordenId);
     setFormData(prev => ({
       ...prev,
       igss_orden_id: ordenId,
-      igss_nog: orden?.nog || '',
-      igss_no_sps: orden?.no_sps || '',
-      igss_codigo: orden?.codigo || '',
+      igss_nog: '',
+      igss_no_sps: '',
+      igss_codigo: '',
       igss_procedimiento: orden?.procedimiento || '',
     }));
   };
 
-  // Autoseleccionar la orden si el paciente es IGSS y la evaluación aún no tiene orden.
-  // Prefiere la orden vinculada a la cita (preferredOrdenIdRef); si no, la primera.
+  // Preseleccionar (visible y cambiable) la orden de la cita o la única orden abierta.
   useEffect(() => {
-    if (!pacienteEsIgss || !pacienteOrdenes || pacienteOrdenes.length === 0) return;
-    if (formData.igss_orden_id) return;
-    const pref = preferredOrdenIdRef.current;
-    const chosen = pacienteOrdenes.find(o => (o.id || '') === pref) || pacienteOrdenes[0];
-    seleccionarOrdenIgss(chosen.id || '');
+    if (!pacienteEsIgss || !ordenesCargadas || formData.igss_orden_id) return;
+    const chosen = ordenPreseleccionada(pacienteOrdenes || [], preferredOrdenIdRef.current);
+    if (chosen) seleccionarOrdenIgss(chosen.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pacienteOrdenes, pacienteEsIgss]);
+  }, [pacienteOrdenes, ordenesCargadas, pacienteEsIgss]);
 
   const guardarNotaPaciente = async () => {
     const pid = pacienteIdRef.current || formData.paciente_id;
@@ -1204,11 +1206,12 @@ const EvaluacionOftalmologica = () => {
         await intentarConReintentos(async () => {
           if (evaluacionActual?.id && !String(evaluacionActual.id).startsWith('offline_')) {
             // Actualizar evaluación existente
-            await axios.patch(
+            const response = await axios.patch(
               `${API_URL}/evaluaciones/${evaluacionActual.id}/autoguardar`,
               formData,
               { headers: { Authorization: `Bearer ${token}` } }
             );
+            avisarIgss(response);
           } else {
             // Crear nueva evaluación automáticamente
             const response = await axios.post(
@@ -1216,6 +1219,7 @@ const EvaluacionOftalmologica = () => {
               formData,
               { headers: { Authorization: `Bearer ${token}` } }
             );
+            avisarIgss(response);
             setEvaluacionActual(response.data);
             fetchEvaluaciones(); // Actualizar lista
           }
@@ -1522,6 +1526,7 @@ const EvaluacionOftalmologica = () => {
           setEvaluacionActual(response.data);
           evaluacionId = response.data.id;
           toast.success('Evaluación guardada correctamente');
+          avisarIgss(response);
         } else {
           // Crear nueva
           const response = await axios.post(
@@ -1532,6 +1537,7 @@ const EvaluacionOftalmologica = () => {
           setEvaluacionActual(response.data);
           evaluacionId = response.data.id;
           toast.success('Evaluación creada correctamente');
+          avisarIgss(response);
         }
       }, (intento, total) => setAutoguardadoStatus(`Reintentando... (${intento}/${total})`));
       
@@ -2337,7 +2343,7 @@ const EvaluacionOftalmologica = () => {
           {/* COLUMNA IZQUIERDA: Antecedentes y Medicamentos */}
           <div className="space-y-4">
             {/* Orden IGSS de esta consulta */}
-            {pacienteEsIgss && pacienteOrdenes.length > 0 && (
+            {pacienteEsIgss && (
               <Card className="card-teal border-blue-200" data-testid="evaluacion-orden-igss">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -2346,27 +2352,14 @@ const EvaluacionOftalmologica = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Select
+                  <OrdenIgssSelector
+                    opciones={pacienteOrdenes}
+                    cargado={ordenesCargadas}
                     value={formData.igss_orden_id || ''}
-                    onValueChange={seleccionarOrdenIgss}
+                    onChange={seleccionarOrdenIgss}
                     disabled={isReadOnly}
-                  >
-                    <SelectTrigger className="input-teal" data-testid="evaluacion-orden-select">
-                      <SelectValue placeholder="Seleccionar orden" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pacienteOrdenes.map((o, i) => (
-                        <SelectItem key={o.id || i} value={o.id || `ord_${i}`} data-testid={`evaluacion-orden-option-${i}`}>
-                          {`NOG ${o.nog || '—'}`}{o.no_sps ? ` · SPS ${o.no_sps}` : ''}{o.procedimiento ? ` · ${o.procedimiento}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.igss_orden_id && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      El informe de esta consulta mostrará el NOG y No. SPS de la orden seleccionada.
-                    </p>
-                  )}
+                    testIdPrefix="evaluacion-orden"
+                  />
                 </CardContent>
               </Card>
             )}

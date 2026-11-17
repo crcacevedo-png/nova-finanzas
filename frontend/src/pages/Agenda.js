@@ -48,8 +48,10 @@ import { Textarea } from '../components/ui/textarea';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
 import { agendaApi } from '../services/agendaApi';
-import { patientApi, googleCalendarApi, getGuatemalaDate, igssUnitApi } from '../services/api';
-import { NogSelector } from '../components/NogSelector';
+import { patientApi, googleCalendarApi, getGuatemalaDate, igssUnitApi, igssLibroApi } from '../services/api';
+import { OrdenIgssSelector, ordenPreseleccionada } from '../components/igss/OrdenIgssSelector';
+import { OrdenesIgssPaciente } from '../components/igss/OrdenesIgssPaciente';
+import { puedeVerLibroIgss } from '../lib/igssLibro';
 import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
 import { BloqueosAgenda } from './AgendaBloqueos';
 
@@ -492,23 +494,30 @@ const Agenda = () => {
   const [creandoPaciente, setCreandoPaciente] = useState(false);
   // Órdenes IGSS del paciente seleccionado (para elegir la orden de la cita)
   const [citaOrdenes, setCitaOrdenes] = useState([]);
+  const [citaOrdenesCargadas, setCitaOrdenesCargadas] = useState(false);
+  const [citaEsIgss, setCitaEsIgss] = useState(false);
 
   useEffect(() => {
     const pid = citaForm.paciente_id;
-    if (!pid || citaForm.es_paciente_nuevo) { setCitaOrdenes([]); return; }
+    if (!pid || citaForm.es_paciente_nuevo) { setCitaOrdenes([]); setCitaEsIgss(false); return; }
     let cancel = false;
     (async () => {
       try {
         const { data: p } = await patientApi.getById(pid);
         if (cancel) return;
-        if (p.referral_institution === 'igss' && (p.igss_ordenes || []).length > 0) {
-          setCitaOrdenes(p.igss_ordenes);
-          setCitaForm(prev => {
-            if (prev.igss_orden_id) return prev;
-            const o = p.igss_ordenes[0];
-            return { ...prev, igss_orden_id: o.id || '', igss_nog: o.nog || '', igss_no_sps: o.no_sps || '', igss_procedimiento: o.procedimiento || '' };
-          });
+        if (p.referral_institution === 'igss') {
+          setCitaEsIgss(true);
+          setCitaOrdenesCargadas(false);
+          const { data: ops } = await igssLibroApi.abiertas(pid).catch(() => ({ data: [] }));
+          if (cancel) return;
+          setCitaOrdenes(ops || []);
+          setCitaOrdenesCargadas(true);
+          // Preselección visible (y cambiable): la única orden abierta
+          const o = ordenPreseleccionada(ops || [], null);
+          setCitaForm(prev => (prev.igss_orden_id || !o ? prev
+            : { ...prev, igss_orden_id: o.id, igss_nog: '', igss_no_sps: '', igss_procedimiento: o.procedimiento || '' }));
         } else {
+          setCitaEsIgss(false);
           setCitaOrdenes([]);
         }
       } catch (e) { if (!cancel) setCitaOrdenes([]); }
@@ -518,7 +527,7 @@ const Agenda = () => {
 
   const seleccionarOrdenCita = (ordenId) => {
     const o = (citaOrdenes || []).find(x => (x.id || '') === ordenId);
-    setCitaForm(prev => ({ ...prev, igss_orden_id: ordenId, igss_nog: o?.nog || '', igss_no_sps: o?.no_sps || '', igss_procedimiento: o?.procedimiento || '' }));
+    setCitaForm(prev => ({ ...prev, igss_orden_id: ordenId, igss_nog: '', igss_no_sps: '', igss_procedimiento: o?.procedimiento || '' }));
   };
   
   // Walk-in dialog
@@ -903,21 +912,6 @@ const Agenda = () => {
     igss_ordenes: [],
   });
 
-  // Gestión de órdenes IGSS en el modal de llegada (múltiples NOG/SPS por paciente)
-  const addOrdenCompletar = () => setCompletarForm(prev => ({
-    ...prev,
-    igss_ordenes: [...(prev.igss_ordenes || []), { id: `ord_${Date.now()}`, nog: '', no_sps: '', codigo: '', procedimiento: '' }]
-  }));
-  const removeOrdenCompletar = (idx) => setCompletarForm(prev => ({
-    ...prev,
-    igss_ordenes: (prev.igss_ordenes || []).filter((_, i) => i !== idx)
-  }));
-  const updateOrdenCompletar = (idx, field, value) => setCompletarForm(prev => {
-    const arr = [...(prev.igss_ordenes || [])];
-    arr[idx] = { ...arr[idx], [field]: value };
-    return { ...prev, igss_ordenes: arr };
-  });
-
   // Vincular una cita sin expediente a un paciente existente
   const seleccionarPacienteVincular = async (p) => {
     try {
@@ -1019,12 +1013,14 @@ const Agenda = () => {
     try {
       let pid = completarPidRef.current;
       let nombre;
+      // Las órdenes IGSS se manejan en el libro (no se envían con el expediente)
+      const { igss_ordenes, igss_nog, igss_no_sps, igss_codigo, ...datos } = f;
       if (completarEsNuevo) {
-        const { data: nuevo } = await patientApi.create(f);
+        const { data: nuevo } = await patientApi.create(datos);
         pid = nuevo.id;
         nombre = nuevo.full_name || `${nuevo.first_name} ${nuevo.last_name}`.trim();
       } else {
-        await patientApi.update(pid, f);
+        await patientApi.update(pid, datos);
         nombre = `${f.first_name.trim()} ${f.last_name.trim()}`.trim();
       }
       // Si la cita no tenía expediente vinculado, vincularlo ahora
@@ -2408,21 +2404,16 @@ const Agenda = () => {
                     Cambiar
                   </Button>
                 </div>
-                {citaOrdenes.length > 0 && (
+                {citaEsIgss && (
                   <div className="mt-2 space-y-1" data-testid="cita-orden-igss">
                     <Label className="text-xs text-blue-700">Orden IGSS de esta cita</Label>
-                    <Select value={citaForm.igss_orden_id || ''} onValueChange={seleccionarOrdenCita}>
-                      <SelectTrigger className="input-teal h-9" data-testid="cita-orden-select">
-                        <SelectValue placeholder="Seleccionar orden" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {citaOrdenes.map((o, i) => (
-                          <SelectItem key={o.id || i} value={o.id || `ord_${i}`} data-testid={`cita-orden-option-${i}`}>
-                            {`NOG ${o.nog || '—'}`}{o.no_sps ? ` · SPS ${o.no_sps}` : ''}{o.procedimiento ? ` · ${o.procedimiento}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <OrdenIgssSelector
+                      opciones={citaOrdenes}
+                      cargado={citaOrdenesCargadas}
+                      value={citaForm.igss_orden_id || ''}
+                      onChange={seleccionarOrdenCita}
+                      testIdPrefix="cita-orden"
+                    />
                   </div>
                 )}
                 </>
@@ -2779,56 +2770,15 @@ const Agenda = () => {
                     </Select>
                   </div>
                   <div><Label className="text-xs">Afiliación</Label><Input value={completarForm.igss_afiliacion} onChange={(e) => setCompletarForm(p => ({ ...p, igss_afiliacion: e.target.value }))} /></div>
-                  <div className="col-span-2 space-y-2 pt-1" data-testid="cf-igss-ordenes">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold text-blue-700">Órdenes IGSS</Label>
-                      <Button
-                        type="button" variant="outline" size="sm"
-                        onClick={addOrdenCompletar}
-                        disabled={!completarForm.igss_unit_id}
-                        className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                        data-testid="cf-add-orden"
-                      >
-                        <Plus className="w-3 h-3 mr-1" /> Agregar orden
-                      </Button>
+                  {puedeVerLibroIgss(user) && (
+                    <div className="col-span-2 pt-1" data-testid="cf-igss-ordenes">
+                      {!completarEsNuevo && completarPidRef.current ? (
+                        <OrdenesIgssPaciente pacienteId={completarPidRef.current} unidadId={completarForm.igss_unit_id} />
+                      ) : (
+                        <p className="text-xs text-slate-500">Guarde el expediente para registrar sus órdenes IGSS (No. SPS).</p>
+                      )}
                     </div>
-                    {!completarForm.igss_unit_id && (
-                      <p className="text-xs text-gray-500">Selecciona una unidad IGSS para agregar órdenes.</p>
-                    )}
-                    {(completarForm.igss_ordenes || []).length === 0 && completarForm.igss_unit_id && (
-                      <p className="text-xs text-gray-500">Opcional: agrega una orden con su NOG para descontar del servicio.</p>
-                    )}
-                    {(completarForm.igss_ordenes || []).map((orden, idx) => (
-                      <div key={orden.id || idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-2 bg-gray-50" data-testid={`cf-orden-row-${idx}`}>
-                        <div className="md:col-span-3 space-y-1">
-                          <Label className="text-xs">NOG {idx + 1}</Label>
-                          <NogSelector
-                            unitId={completarForm.igss_unit_id}
-                            value={orden.nog}
-                            onChange={(val) => updateOrdenCompletar(idx, 'nog', val)}
-                            idSuffix={`-cf-${idx}`}
-                          />
-                        </div>
-                        <div className="md:col-span-2 space-y-1">
-                          <Label className="text-xs">No. SPS</Label>
-                          <Input value={orden.no_sps || ''} onChange={(e) => updateOrdenCompletar(idx, 'no_sps', e.target.value)} placeholder="No. SPS" data-testid={`cf-orden-sps-${idx}`} />
-                        </div>
-                        <div className="md:col-span-2 space-y-1">
-                          <Label className="text-xs">Código</Label>
-                          <Input value={orden.codigo || ''} onChange={(e) => updateOrdenCompletar(idx, 'codigo', e.target.value)} placeholder="Código" data-testid={`cf-orden-codigo-${idx}`} />
-                        </div>
-                        <div className="md:col-span-4 space-y-1">
-                          <Label className="text-xs">Procedimiento / Estudio</Label>
-                          <Input value={orden.procedimiento || ''} onChange={(e) => updateOrdenCompletar(idx, 'procedimiento', e.target.value)} placeholder="Ej: Catarata OD" data-testid={`cf-orden-proc-${idx}`} />
-                        </div>
-                        <div className="md:col-span-1 flex justify-end">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeOrdenCompletar(idx)} className="h-8 w-8 p-0 text-red-500 hover:text-red-700" data-testid={`cf-orden-remove-${idx}`}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  )}
                 </div>
               )}
             </div>

@@ -110,9 +110,15 @@ class TestCancelRevertsStock:
 class TestOpticaNog:
     def test_optica_create_igss_patient_discounts_nog(self, opt, sa):
         def nog():
+            # Contador LEGADO (acreditaciones) en Mongo: el selector `nogs-activos` ya no
+            # devuelve contadores a roles fuera del Libro IGSS (Fase 3).
             lst = requests.get(f"{BASE_URL}/api/igss-units/{UNIT_ID}/nogs-activos", headers=opt)
             assert lst.status_code == 200
-            return next((n for n in lst.json() if n["numero"] == NOG_NUM), None)
+            if not any(n["numero"] == NOG_NUM for n in lst.json()):
+                return None
+            d = mdb.igss_nogs.find_one({"unidad_id": UNIT_ID, "numero": NOG_NUM}, {"_id": 0})
+            acr = int(d.get("acreditados") or 0)
+            return {"acreditados": acr, "disponibles": max(int(d.get("cantidad") or 0) - acr, 0)}
         n0 = nog()
         if not n0:
             pytest.skip("NOG not found")
@@ -124,15 +130,15 @@ class TestOpticaNog:
         assert r.status_code in (200, 201), r.text
         pid = r.json()["id"]
         try:
+            # Libro IGSS (Fase 2): un rol fuera del libro no registra órdenes IGSS => no descuenta
             n1 = nog()
-            assert n1["acreditados"] == n0["acreditados"] + 1
-            assert n1["disponibles"] == n0["disponibles"] - 1
-            # update by optica: add 2nd order with different SPS -> another discount
+            assert n1["acreditados"] == n0["acreditados"]
+            assert mdb.patients.find_one({"id": pid}, {"_id": 0})["igss_ordenes"] == []
             body2 = {"igss_ordenes": body["igss_ordenes"] + [{"id": str(uuid.uuid4()), "nog": NOG_NUM,
                      "no_sps": "TESTSPS2", "codigo": "C2", "procedimiento": "P2"}]}
             u = requests.put(f"{BASE_URL}/api/patients/{pid}", json=body2, headers=opt)
-            assert u.status_code == 200, u.text
-            assert nog()["acreditados"] == n0["acreditados"] + 2
+            assert u.status_code in (200, 400, 403), u.text  # 400: solo traía órdenes, que se ignoran
+            assert nog()["acreditados"] == n0["acreditados"]
         finally:
             requests.delete(f"{BASE_URL}/api/patients/{pid}", headers=sa)
             assert nog()["acreditados"] == n0["acreditados"]

@@ -422,6 +422,12 @@ async def get_evaluacion_pdf(
     
     # Obtener datos del paciente
     paciente = await db.patients.find_one({"id": evaluacion.get("paciente_id")}, {"_id": 0}) or {}
+    # Orden del libro IGSS vinculada (si la evaluación apunta a una orden del libro)
+    orden_libro = None
+    if evaluacion.get("igss_orden_id"):
+        orden_libro = await db.igss_ordenes_libro.find_one(
+            {"id": evaluacion["igss_orden_id"]},
+            {"_id": 0, "numero_nog": 1, "no_sps": 1, "codigo": 1, "procedimiento": 1})
     
     # Resolver nombre de unidad IGSS si aplica
     igss_unit_name = ""
@@ -534,7 +540,11 @@ async def get_evaluacion_pdf(
         # luego el snapshot guardado en la evaluación y por último los campos legacy del paciente.
         _orden_actual = {}
         _orden_id = evaluacion.get("igss_orden_id")
-        if _orden_id:
+        if orden_libro:
+            _orden_actual = {"nog": orden_libro.get("numero_nog") or "Baja Cuantía",
+                             "no_sps": orden_libro.get("no_sps", ""), "codigo": orden_libro.get("codigo", ""),
+                             "procedimiento": orden_libro.get("procedimiento", "")}
+        elif _orden_id:
             for _o in (paciente.get("igss_ordenes") or []):
                 if _o.get("id") == _orden_id:
                     _orden_actual = _o
@@ -970,6 +980,11 @@ async def create_evaluacion(
         logging.getLogger("igss").warning(
             "Acreditación de evaluación %s falló: %s", evaluacion_dict.get("id"), e)
     
+    # Libro de órdenes IGSS: registrar la atención por detrás (no depende del rol ni
+    # bloquea el guardado; a quien guarda solo se le devuelve un aviso genérico).
+    from routes.igss_libro_atenciones import registrar_evaluacion_seguro
+    aviso_igss = await registrar_evaluacion_seguro(evaluacion_dict, current_user)
+
     # Agendar próxima cita si corresponde (idempotente)
     await sincronizar_proxima_cita(
         evaluacion_dict["id"], evaluacion_dict.get("proxima_cita"),
@@ -994,7 +1009,7 @@ async def create_evaluacion(
     
     if "_id" in evaluacion_dict:
         del evaluacion_dict["_id"]
-    return evaluacion_dict
+    return {**evaluacion_dict, "aviso_igss": aviso_igss}
 
 
 async def sincronizar_proxima_cita(evaluacion_id: str, proxima_cita: dict, paciente_id: str,
@@ -1188,6 +1203,9 @@ async def purgar_evaluaciones_vacias(
     if ids:
         res = await db.evaluaciones_oftalmologicas.delete_many({"id": {"$in": ids}})
         eliminadas = res.deleted_count
+        from routes.igss_libro_atenciones import quitar_evaluacion
+        for ev_id in ids:
+            await quitar_evaluacion(ev_id, current_user)
     return {"eliminadas": eliminadas}
 
 
@@ -1605,8 +1623,10 @@ async def update_evaluacion(
         merged_data.get("paciente_id"), merged_data.get("fecha"), current_user
     )
     
+    from routes.igss_libro_atenciones import sincronizar_evaluacion_si_cambia
+    aviso_igss = await sincronizar_evaluacion_si_cambia(existing, update_data, current_user)
     updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
-    return updated
+    return {**updated, "aviso_igss": aviso_igss}
 
 
 @router.patch("/{evaluacion_id}/autoguardar", response_model=EvaluacionOftalmologicaResponse)
@@ -1647,7 +1667,7 @@ async def autoguardar_evaluacion(
         "antecedentes", "medicamentos_actuales", "medicamentos_previos", "examen",
         "diagnosticos", "plan", "recomendaciones", "procedimientos", "recetas", "igss_med_proc",
         "proxima_cita",
-        "igss_orden_id", "igss_nog", "igss_no_sps", "igss_codigo", "igss_procedimiento"
+        "igss_orden_id", "igss_nog_id", "igss_nog", "igss_no_sps", "igss_codigo", "igss_procedimiento"
     ]
     
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
@@ -1683,8 +1703,10 @@ async def autoguardar_evaluacion(
         merged_data.get("paciente_id"), merged_data.get("paciente_nombre", ""), current_user
     )
     
+    from routes.igss_libro_atenciones import sincronizar_evaluacion_si_cambia
+    aviso_igss = await sincronizar_evaluacion_si_cambia(existing, update_data, current_user)
     updated = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
-    return updated
+    return {**updated, "aviso_igss": aviso_igss}
 
 
 @router.delete("/{evaluacion_id}")
@@ -1703,6 +1725,8 @@ async def delete_evaluacion(
         raise HTTPException(status_code=423, detail=f"Expediente sellado. No se puede eliminar. {mensaje}")
     
     await db.evaluaciones_oftalmologicas.delete_one({"id": evaluacion_id})
+    from routes.igss_libro_atenciones import quitar_evaluacion
+    await quitar_evaluacion(evaluacion_id, current_user)
     
     await audit.log(
         action="EVALUACION_DELETED",

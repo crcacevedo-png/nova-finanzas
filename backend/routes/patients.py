@@ -245,6 +245,21 @@ async def get_next_record_number() -> str:
     return candidate
 
 
+CAMPOS_ORDENES_IGSS = ("igss_ordenes", "igss_nog", "igss_no_sps", "igss_codigo")
+
+
+def _puede_ordenes_igss(user: dict) -> bool:
+    from config.permissions import LIBRO_IGSS_ROLES
+    return (user or {}).get("role") in LIBRO_IGSS_ROLES
+
+
+def _ocultar_ordenes(patient: dict, user: dict) -> dict:
+    """Fuera de LIBRO_IGSS_ROLES no se devuelven No. SPS, NOG ni órdenes IGSS."""
+    if not _puede_ordenes_igss(user):
+        patient.update({"igss_ordenes": [], "igss_nog": "", "igss_no_sps": "", "igss_codigo": ""})
+    return patient
+
+
 def _normalizar_ordenes_igss(ordenes) -> list:
     """Normaliza la lista de órdenes IGSS: cada orden con id, nog, no_sps, codigo, procedimiento."""
     out = []
@@ -460,7 +475,7 @@ async def get_patients(
             continue
         if age_to is not None and enriched["age"] > age_to:
             continue
-        enriched_patients.append(enriched)
+        enriched_patients.append(_ocultar_ordenes(enriched, current_user))
     
     return PatientListResponse(
         data=enriched_patients,
@@ -558,7 +573,7 @@ async def get_patient(patient_id: str, current_user: dict = Depends(require_perm
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     
     enriched = await enrich_patient(patient)
-    return PatientResponse(**enriched)
+    return PatientResponse(**_ocultar_ordenes(enriched, current_user))
 
 
 class NotaClinicaRequest(BaseModel):
@@ -587,7 +602,7 @@ async def update_patient_nota_clinica(
     )
     updated = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     enriched = await enrich_patient(updated)
-    return PatientResponse(**enriched)
+    return PatientResponse(**_ocultar_ordenes(enriched, current_user))
 
 
 @router.post("", response_model=PatientResponse)
@@ -660,7 +675,10 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
     }
     
     # Órdenes IGSS (múltiples NOG/SPS por paciente). Migra el NOG/SPS actual a la 1ª orden.
-    if patient_data.referral_institution == "igss":
+    # Solo LIBRO_IGSS_ROLES pueden registrar órdenes: a los demás se les ignoran.
+    if not _puede_ordenes_igss(current_user):
+        patient_doc.update({"igss_nog": "", "igss_no_sps": "", "igss_codigo": "", "igss_ordenes": []})
+    elif patient_data.referral_institution == "igss":
         ordenes = _normalizar_ordenes_igss(patient_data.igss_ordenes)
         if not ordenes and (patient_data.igss_nog or patient_data.igss_no_sps or patient_data.igss_codigo):
             ordenes = _normalizar_ordenes_igss([{
@@ -686,7 +704,7 @@ async def create_patient(patient_data: PatientCreate, current_user: dict = Depen
     await _reconciliar_nog_paciente(patient_doc, current_user, origen="asignacion")
     
     enriched = await enrich_patient(patient_doc)
-    return PatientResponse(**enriched)
+    return PatientResponse(**_ocultar_ordenes(enriched, current_user))
 
 
 @router.post("/quick", response_model=PatientResponse)
@@ -753,7 +771,7 @@ async def create_patient_quick(
     )
 
     enriched = await enrich_patient(patient_doc)
-    return PatientResponse(**enriched)
+    return PatientResponse(**_ocultar_ordenes(enriched, current_user))
 
 
 @router.put("/{patient_id}", response_model=PatientResponse)
@@ -764,6 +782,11 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     
     update_data = {k: v for k, v in patient_data.model_dump().items() if v is not None}
+    # Solo LIBRO_IGSS_ROLES pueden crear o modificar órdenes IGSS: a los demás se les ignoran.
+    puede_ordenes = _puede_ordenes_igss(current_user)
+    if not puede_ordenes:
+        for _k in CAMPOS_ORDENES_IGSS:
+            update_data.pop(_k, None)
     if not update_data:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
     
@@ -814,7 +837,9 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
             update_data["other_institution_name"] = ""
     
     # Órdenes IGSS: normalizar y sincronizar los campos legacy con la primera orden
-    if referral == "igss":
+    if not puede_ordenes:
+        pass
+    elif referral == "igss":
         if "igss_ordenes" in update_data:
             # El cliente envió la lista explícita (puede ser vacía -> sin órdenes)
             ordenes = _normalizar_ordenes_igss(update_data["igss_ordenes"])
@@ -861,7 +886,7 @@ async def update_patient(patient_id: str, patient_data: PatientUpdate, current_u
     )
     
     enriched = await enrich_patient(updated)
-    return PatientResponse(**enriched)
+    return PatientResponse(**_ocultar_ordenes(enriched, current_user))
 
 
 @router.delete("/{patient_id}")
@@ -907,7 +932,7 @@ async def reactivate_patient(patient_id: str, current_user: dict = Depends(requi
     from routes.igss_nogs import _reconciliar_nog_paciente
     await _reconciliar_nog_paciente(updated, current_user, origen="reactivacion")
     enriched = await enrich_patient(updated)
-    return PatientResponse(**enriched)
+    return PatientResponse(**_ocultar_ordenes(enriched, current_user))
 
 
 @router.get("/mantenimiento/ordenes-legacy")

@@ -47,7 +47,7 @@ def test_list_all_superadmin(sa):
     assert d["total"] == len(d["data"]) and d["total"] > 0
     assert len(d["unidades"]) > 0
     n = d["data"][0]
-    for k in ["id", "numero", "unidad_nombre", "fecha_asignacion", "estado", "disponibles", "acreditados", "cantidad", "precio"]:
+    for k in ["id", "numero", "unidad_nombre", "fecha_asignacion", "estado", "disponibles", "consumidos", "reservados", "cantidad", "precio"]:
         assert k in n
     assert "_id" not in n
     assert len({x["unidad_id"] for x in d["data"]}) > 1

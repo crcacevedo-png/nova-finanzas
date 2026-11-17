@@ -11,9 +11,11 @@ import { toast, Toaster } from 'sonner';
 import { igssNogApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ConciliacionNOG } from '../components/ConciliacionNOG';
-import { puedeVerLibroIgss, esTextoBajaCuantia, etiquetaCatalogo } from '../lib/igssLibro';
+import { puedeVerLibroIgss, esTextoBajaCuantia, etiquetaCatalogo, descargarBlob, nombreListado } from '../lib/igssLibro';
+import { ListadoOficialDialog } from '../components/igss/ListadoOficialDialog';
 import {
   ClipboardList, Plus, Search, Pencil, Power, PowerOff, Loader2, AlertTriangle, XCircle, CheckCircle2,
+  Download, FileSpreadsheet,
 } from 'lucide-react';
 
 const TIPO_COMPRA_OPTIONS = [
@@ -76,6 +78,7 @@ const GestionNOG = () => {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+  const [listadoOpen, setListadoOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -198,12 +201,20 @@ const GestionNOG = () => {
     }
   };
 
-  const nombreUnidad = (id) => (unidades.find((u) => u.id === id) || {}).name || '';
+  const exportarNog = async (n) => {
+    try {
+      const res = await igssNogApi.exportExcel(n.id);
+      descargarBlob(res.data, nombreListado(etiquetaCatalogo(n)));
+    } catch (e) {
+      toast.error('No se pudo exportar el NOG');
+    }
+  };
 
   const totales = useMemo(() => ({
     total: filtered.length,
-    cupos: filtered.reduce((a, n) => a + (n.cantidad || 0), 0),
-    usados: filtered.reduce((a, n) => a + (n.acreditados || 0), 0),
+    cupos: filtered.reduce((a, n) => a + (n.sin_tope ? 0 : (n.cantidad || 0)), 0),
+    consumidos: filtered.reduce((a, n) => a + (n.consumidos || 0), 0),
+    reservados: filtered.reduce((a, n) => a + (n.reservados || 0), 0),
     disponibles: filtered.reduce((a, n) => a + (n.is_active ? (n.disponibles || 0) : 0), 0),
   }), [filtered]);
 
@@ -223,6 +234,9 @@ const GestionNOG = () => {
           </div>
           <div className="flex items-center gap-2">
             {puedeConciliar && <ConciliacionNOG unidades={unidades} />}
+            <Button variant="outline" onClick={() => setListadoOpen(true)} data-testid="listado-oficial-button">
+              <FileSpreadsheet className="w-4 h-4 mr-2" /> Listado oficial
+            </Button>
             {puedeEditar && (
               <Button onClick={abrirNuevo} className="bg-teal-600 hover:bg-teal-700" data-testid="nuevo-nog-button">
                 <Plus className="w-4 h-4 mr-2" /> Nuevo NOG
@@ -232,14 +246,15 @@ const GestionNOG = () => {
         </div>
 
         {/* Totales */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: 'NOG (filtrados)', value: totales.total },
-            { label: 'Cupos totales', value: totales.cupos },
-            { label: 'Cupos usados', value: totales.usados },
-            { label: 'Disponibles', value: totales.disponibles },
+            { key: 'nogs', label: 'NOG (filtrados)', value: totales.total },
+            { key: 'cupos', label: 'Cupos totales', value: totales.cupos },
+            { key: 'consumidos', label: 'Consumidos (atendidas)', value: totales.consumidos },
+            { key: 'reservados', label: 'Reservados (pendientes)', value: totales.reservados },
+            { key: 'disponibles', label: 'Disponibles', value: totales.disponibles },
           ].map((c) => (
-            <div key={c.label} className="rounded-xl border bg-white p-4">
+            <div key={c.key} className="rounded-xl border bg-white p-4" data-testid={`nog-total-${c.key}`}>
               <p className="text-xs text-slate-500">{c.label}</p>
               <p className="text-2xl font-bold text-slate-800">{c.value}</p>
             </div>
@@ -317,7 +332,8 @@ const GestionNOG = () => {
                       <td className="px-4 py-3 text-slate-600">{n.tipo_compra_label || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{fmtFecha(n.fecha_asignacion)}</td>
                       <td className="px-4 py-3 text-center text-slate-600" data-testid={`nog-cupos-${n.id}`}>
-                        {n.sin_tope ? <span className="text-xs font-medium text-slate-500">Sin tope · {n.acreditados}</span> : `${n.acreditados} / ${n.cantidad}`}
+                        {n.sin_tope ? <span className="text-xs font-medium text-slate-500">Sin tope · {n.usados}</span> : `${n.usados} / ${n.cantidad}`}
+                        <div className="text-[11px] text-slate-400 whitespace-nowrap">{n.consumidos} atend. · {n.reservados} reserv.</div>
                       </td>
                       <td className="px-4 py-3 text-center font-medium text-slate-700">{n.sin_tope ? '—' : n.disponibles}</td>
                       <td className="px-4 py-3 text-right text-slate-600">{fmtQ(n.precio)}</td>
@@ -325,6 +341,9 @@ const GestionNOG = () => {
                       <td className="px-4 py-3"><EstadoBadge estado={n.estado} /></td>
                       <td className="px-4 py-3">
                         {puedeEditar && <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" title="Listado oficial del NOG" onClick={() => exportarNog(n)} data-testid={`nog-exportar-${n.id}`}>
+                            <Download className="w-4 h-4" />
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={() => abrirEditar(n)} data-testid={`nog-editar-${n.id}`}>
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -467,6 +486,7 @@ const GestionNOG = () => {
           </DialogContent>
         </Dialog>
       </div>
+      <ListadoOficialDialog open={listadoOpen} onOpenChange={setListadoOpen} unidades={unidades} unidadInicial={filtroUnidad} />
       <Toaster position="top-right" richColors />
     </Layout>
   );

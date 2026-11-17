@@ -50,6 +50,7 @@ import { ProduccionIGSS } from '../components/ProduccionIGSS';
 import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
 import { NogAlertasBanner } from '../components/NogAlertasBanner';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { puedeVerLibroIgss } from '../lib/igssLibro';
 
 // Exporta el reporte por unidad a CSV
 const exportarReporteCSV = (data) => {
@@ -204,6 +205,8 @@ const UnidadesIGSS = () => {
 
   // Acceso por permiso (SuperAdmin y roles con manage_igss_units, p. ej. Administrador IGSS)
   const canManageIgss = user?.role === 'superadmin' || hasPermission('manage_igss_units');
+  // NOG, contadores y Producción leen del libro IGSS: solo superadmin/admin/administrador_igss
+  const verLibro = puedeVerLibroIgss(user);
 
   const fetchUnits = useCallback(async () => {
     try {
@@ -333,8 +336,8 @@ const UnidadesIGSS = () => {
   }, [fetchUnits]);
 
   useEffect(() => {
-    if (canManageIgss) fetchResumen();
-  }, [fetchResumen, alertReload, canManageIgss]);
+    if (verLibro) fetchResumen();
+  }, [fetchResumen, alertReload, verLibro]);
 
   // Auto-abrir el diálogo de NOG si se llega con ?nogUnidad=&nog= (desde el Dashboard)
   useEffect(() => {
@@ -455,7 +458,7 @@ const UnidadesIGSS = () => {
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Actualizar
               </Button>
-              <Button
+              {verLibro && <Button
                 variant="outline"
                 onClick={handleReconciliar}
                 disabled={reconciliando}
@@ -465,7 +468,7 @@ const UnidadesIGSS = () => {
               >
                 <RotateCcw className={`w-4 h-4 mr-2 ${reconciliando ? 'animate-spin' : ''}`} />
                 {reconciliando ? 'Recalculando...' : 'Recalcular consumo'}
-              </Button>
+              </Button>}
               <Button
                 variant="outline"
                 onClick={abrirMantenimiento}
@@ -489,7 +492,7 @@ const UnidadesIGSS = () => {
         </div>
 
         {/* Alertas de límite de NOG (90%+ y completados) */}
-        {canManageIgss && (
+        {verLibro && (
           <NogAlertasBanner
             reloadSignal={alertReload}
             onVer={(a) => abrirNogsUnidad({ id: a.unidad_id, name: a.unidad_nombre, code: a.unidad_codigo }, a.nog_id)}
@@ -501,9 +504,11 @@ const UnidadesIGSS = () => {
             <TabsTrigger value="catalogo" data-testid="tab-catalogo">
               <Building className="w-4 h-4 mr-2" />Catálogo
             </TabsTrigger>
-            <TabsTrigger value="produccion" data-testid="tab-produccion">
-              <FileText className="w-4 h-4 mr-2" />Producción
-            </TabsTrigger>
+            {verLibro && (
+              <TabsTrigger value="produccion" data-testid="tab-produccion">
+                <FileText className="w-4 h-4 mr-2" />Producción
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="catalogo" className="space-y-6 mt-4">
@@ -516,20 +521,24 @@ const UnidadesIGSS = () => {
             value={units.length}
             color="bg-green-100 text-green-600"
           />
-          <MetricCard
-            icon={FileStack}
-            label="NOG disponibles"
-            value={resumen?.nogs_disponibles ?? 0}
-            color="bg-blue-100 text-blue-600"
-            subtitle={`${resumen?.servicios_disponibles ?? 0} servicios disponibles`}
-          />
-          <MetricCard
-            icon={ClipboardList}
-            label="Servicios acreditados"
-            value={resumen?.servicios_acreditados ?? 0}
-            color="bg-teal-100 text-teal-600"
-            subtitle={`de ${resumen?.servicios_contratados ?? 0} contratados`}
-          />
+          {verLibro && (
+            <MetricCard
+              icon={FileStack}
+              label="NOG disponibles"
+              value={resumen?.nogs_disponibles ?? 0}
+              color="bg-blue-100 text-blue-600"
+              subtitle={`${resumen?.servicios_disponibles ?? 0} cupos disponibles`}
+            />
+          )}
+          {verLibro && (
+            <MetricCard
+              icon={ClipboardList}
+              label="Órdenes consumidas"
+              value={resumen?.servicios_consumidos ?? 0}
+              color="bg-teal-100 text-teal-600"
+              subtitle={`${resumen?.servicios_reservados ?? 0} reservadas · de ${resumen?.servicios_contratados ?? 0} cupos`}
+            />
+          )}
         </div>
 
         {/* Search */}
@@ -619,15 +628,17 @@ const UnidadesIGSS = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => abrirNogsUnidad(unit)}
-                              className="h-8 px-2 text-[#0F6E56] hover:bg-[#E1F5EE]"
-                              data-testid={`nogs-unit-${unit.id}`}
-                            >
-                              <FileStack className="w-4 h-4 mr-1" />NOG
-                            </Button>
+                            {verLibro && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => abrirNogsUnidad(unit)}
+                                className="h-8 px-2 text-[#0F6E56] hover:bg-[#E1F5EE]"
+                                data-testid={`nogs-unit-${unit.id}`}
+                              >
+                                <FileStack className="w-4 h-4 mr-1" />NOG
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -672,9 +683,11 @@ const UnidadesIGSS = () => {
         </Card>
           </TabsContent>
 
-          <TabsContent value="produccion" className="mt-4">
-            <ProduccionIGSS />
-          </TabsContent>
+          {verLibro && (
+            <TabsContent value="produccion" className="mt-4">
+              <ProduccionIGSS />
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Create/Edit Dialog */}

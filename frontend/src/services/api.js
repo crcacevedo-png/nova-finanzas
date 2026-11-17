@@ -210,19 +210,36 @@ export const igssNogApi = {
     axios.post(`${API_URL}/igss-units/nogs/${nogId}/acreditaciones/aplicar`, { paciente_id: pacienteId }),
   // Módulo de Producción IGSS
   getProduccion: (params) => axios.get(`${API_URL}/igss-units/produccion`, { params }),
-  updateProduccion: (evaluacionId, data) => axios.patch(`${API_URL}/igss-units/produccion/${evaluacionId}`, data),
   produccionExcelUrl: (params) => {
     const qs = new URLSearchParams(Object.entries(params || {}).filter(([, v]) => v)).toString();
     return `${API_URL}/igss-units/produccion/reporte/excel?${qs}`;
   },
-  exportExcel: (nogId) =>
-    axios.get(`${API_URL}/igss-units/nogs/${nogId}/export/excel`, { responseType: 'blob' }),
-  exportUnidadExcel: (unitId) =>
-    axios.get(`${API_URL}/igss-units/${unitId}/nogs/export/excel`, { responseType: 'blob' }),
+  exportExcel: (nogId, params) =>
+    axios.get(`${API_URL}/igss-units/nogs/${nogId}/export/excel`, { params, responseType: 'blob' }),
+  exportUnidadExcel: (unitId, params) =>
+    axios.get(`${API_URL}/igss-units/${unitId}/nogs/export/excel`, { params, responseType: 'blob' }),
   // Conciliación IGSS (solo lectura)
   getConciliacion: (params) => axios.get(`${API_URL}/igss-units/conciliacion`, { params }),
   conciliacionExcel: (params) =>
     axios.get(`${API_URL}/igss-units/conciliacion/export/excel`, { params, responseType: 'blob' }),
+};
+
+// Libro de órdenes IGSS (solo superadmin/admin/administrador_igss, salvo `abiertas`)
+const LIBRO = `${API_URL}/igss-units/libro`;
+export const igssLibroApi = {
+  listar: (params) => axios.get(`${LIBRO}/ordenes`, { params }),
+  crear: (data) => axios.post(`${LIBRO}/ordenes`, data),
+  editar: (id, data) => axios.put(`${LIBRO}/ordenes/${id}`, data),
+  anular: (id, motivo) => axios.post(`${LIBRO}/ordenes/${id}/anular`, { motivo }),
+  catalogo: (unidadId) => axios.get(`${LIBRO}/catalogo`, { params: { unidad_id: unidadId } }),
+  config: () => axios.get(`${LIBRO}/config`),
+  cambiarConfig: (exigir) => axios.put(`${LIBRO}/config`, { exigir_orden: exigir }),
+  sinOrden: (params) => axios.get(`${LIBRO}/atenciones-sin-orden`, { params }),
+  asignar: (id, ordenId) => axios.post(`${LIBRO}/atenciones-sin-orden/${id}/asignar`, { orden_id: ordenId }),
+  descartar: (id, motivo) => axios.post(`${LIBRO}/atenciones-sin-orden/${id}/descartar`, { motivo }),
+  reasignar: (data) => axios.post(`${LIBRO}/atenciones/reasignar`, data),
+  // Para médicos/recepción: solo procedimiento y fecha de ingreso de las órdenes abiertas
+  abiertas: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes-abiertas`),
 };
 
 // Google Calendar API (sincronización de Agenda por médico)

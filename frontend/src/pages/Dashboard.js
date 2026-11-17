@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { NogAlertasBanner } from '../components/NogAlertasBanner';
+import { useAuth } from '../context/AuthContext';
+import { puedeVerLibroIgss } from '../lib/igssLibro';
 import { dashboardApi, formatCurrency, formatDate, typeLabels, statusLabels } from '../services/api';
 import { 
   Wallet, 
@@ -148,6 +150,7 @@ const AlertCard = ({ title, alerts, type, icon: Icon }) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [resumenDia, setResumenDia] = useState(null);
   const [resumenMode, setResumenMode] = useState('dia');
@@ -275,9 +278,11 @@ const Dashboard = () => {
         </div>
 
         {/* Alertas de contratos NOG (IGSS) */}
-        <NogAlertasBanner
-          onVer={(a) => navigate(`/configuracion/unidades-igss?nogUnidad=${a.unidad_id}&nog=${a.nog_id}&nombre=${encodeURIComponent(a.unidad_nombre || '')}`)}
-        />
+        {puedeVerLibroIgss(user) && (
+          <NogAlertasBanner
+            onVer={(a) => navigate(`/configuracion/unidades-igss?nogUnidad=${a.unidad_id}&nog=${a.nog_id}&nombre=${encodeURIComponent(a.unidad_nombre || '')}`)}
+          />
+        )}
 
         {/* Resumen del Día */}
         <div data-testid="resumen-dia-section">

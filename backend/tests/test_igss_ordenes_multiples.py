@@ -155,8 +155,7 @@ class TestOrdenesIgss:
         assert r.json()["nog"]["acreditados"] == b0 + 1
         r2 = sa.post(f"{API}/igss-units/nogs/{nog_id}/acreditaciones/aplicar", json={"paciente_id": pid})
         assert r2.status_code == 400
-        lst = sa.get(f"{API}/igss-units/nogs/{nog_id}/pacientes").json()
-        assert any(f["paciente_id"] == pid for f in lst["acreditaciones"])
+        assert mongo.igss_nog_acreditaciones.find_one({"nog_id": nog_id, "paciente_id": pid, "anulada": {"$ne": True}})
 
     def test_aplicar_404_patient(self, igss_admin):
         nog_id = _nog(NOG_B)["id"]

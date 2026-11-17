@@ -123,6 +123,10 @@ class SurgeryResponse(BaseModel):
     created_by_name: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
+    realizada_por_nombre: Optional[str] = None
+    realizada_en: Optional[str] = None
+    aviso_igss: Optional[str] = None
+    libro: Optional[dict] = None
 
 class SurgeryListResponse(BaseModel):
     data: List[SurgeryResponse]
@@ -528,6 +532,10 @@ async def create_surgery(
         "created_at": now,
         "updated_at": now
     }
+    # Libro IGSS: con el interruptor encendido exige paciente + No. SPS de una orden vigente
+    from routes.igss_libro_atenciones import validar_cirugia_nueva
+    orden_libro = await validar_cirugia_nueva(surgery_doc)
+    surgery_doc["igss_orden_id"] = orden_libro["id"] if orden_libro else None
     
     await db.surgeries.insert_one(surgery_doc)
     
@@ -575,10 +583,27 @@ async def update_surgery(
                 raise HTTPException(status_code=400, detail="Todos los campos IGSS son obligatorios")
     
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    # Libro IGSS: si cambia la institución o el No. SPS se vuelve a resolver la orden.
+    # Una cirugía existente puede editarse aunque no tenga orden (queda "sin orden").
+    from routes.igss_libro_atenciones import (orden_de_cirugia, validar_dosis_para_realizar,
+                                              sincronizar_cirugia, respuesta_registro)
+    merged = {**existing, **update_data}
+    sps_antes = ((existing.get("igss_data") or {}).get("sps") or "").strip().upper()
+    sps_despues = ((merged.get("igss_data") or {}).get("sps") or "").strip().upper()
+    if merged.get("institution") != existing.get("institution") or sps_antes != sps_despues:
+        merged["igss_orden_id"] = None
+        orden_libro = await orden_de_cirugia(merged) if merged.get("institution") == "IGSS" else None
+        update_data["igss_orden_id"] = merged["igss_orden_id"] = orden_libro["id"] if orden_libro else None
+    if existing.get("status") == "realizado":
+        await validar_dosis_para_realizar(merged)
     
     await db.surgeries.update_one({"id": surgery_id}, {"$set": update_data})
     
     updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    registro = {}
+    if existing.get("status") == "realizado" or existing.get("igss_orden_id") != updated.get("igss_orden_id"):
+        registro = respuesta_registro(await sincronizar_cirugia(updated, current_user), current_user)
     # Sincronizar registro de anestesia (tipo/anestesiólogo/fecha)
     try:
         from routes.quirofano import upsert_anesthesia_from_surgery
@@ -586,7 +611,51 @@ async def update_surgery(
     except Exception:
         pass
     enriched = await enrich_surgery(updated)
-    return SurgeryResponse(**enriched)
+    return SurgeryResponse(**{**enriched, **registro})
+
+
+class RealizadaBody(BaseModel):
+    realizada: bool
+
+
+@router.post("/{surgery_id}/realizada", response_model=SurgeryResponse)
+async def marcar_realizada(
+    surgery_id: str,
+    body: RealizadaBody,
+    current_user: dict = Depends(require_permission("manage_sala_operaciones"))
+):
+    """Marca o desmarca una cirugía como REALIZADA. En cirugías IGSS registra (o quita)
+    la dosis en su orden del libro; sin orden queda en "atenciones sin orden"."""
+    from routes.igss_libro_atenciones import validar_dosis_para_realizar, sincronizar_cirugia, respuesta_registro
+    existing = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cirugía no encontrada")
+    if existing.get("status") == "cancelado":
+        raise HTTPException(status_code=400, detail="Una cirugía cancelada no puede marcarse como realizada")
+    nuevo = "realizado" if body.realizada else "activo"
+    if body.realizada:
+        await validar_dosis_para_realizar(existing)
+    now = datetime.now(timezone.utc).isoformat()
+    cambios = {"status": nuevo, "updated_at": now,
+               "realizada_por": current_user["id"] if body.realizada else None,
+               "realizada_por_nombre": current_user.get("name", current_user.get("username", "")) if body.realizada else None,
+               "realizada_en": now if body.realizada else None}
+    res = await db.surgeries.update_one({"id": surgery_id, "status": {"$ne": "cancelado"}}, {"$set": cambios})
+    if not res.matched_count:
+        raise HTTPException(status_code=400, detail="Una cirugía cancelada no puede marcarse como realizada")
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    try:
+        registro = respuesta_registro(await sincronizar_cirugia(updated, current_user), current_user)
+    except HTTPException:
+        await db.surgeries.update_one({"id": surgery_id}, {"$set": {k: existing.get(k) for k in cambios}})
+        raise
+    from routes.igss_libro import _audit
+    await _audit("CIRUGIA_REALIZADA" if body.realizada else "CIRUGIA_REALIZADA_REVERTIDA", current_user,
+                 {"surgery_id": surgery_id, "patient_name": existing.get("patient_name"),
+                  "institution": existing.get("institution")})
+    updated = await db.surgeries.find_one({"id": surgery_id}, {"_id": 0})
+    enriched = await enrich_surgery(updated)
+    return SurgeryResponse(**{**enriched, **registro})
 
 
 @router.patch("/{surgery_id}/supplies-status")
@@ -642,6 +711,8 @@ async def delete_surgery(
         raise HTTPException(status_code=404, detail="Cirugía no encontrada")
     
     await db.surgeries.delete_one({"id": surgery_id})
+    from routes.igss_libro_atenciones import quitar_cirugia
+    await quitar_cirugia(surgery_id, current_user)
     try:
         from routes.quirofano import delete_anesthesia_for_surgery
         await delete_anesthesia_for_surgery(surgery_id)
@@ -666,6 +737,8 @@ async def cancel_surgery(
         raise HTTPException(status_code=404, detail="Cirugía no encontrada")
     if surgery.get("status") == "cancelado":
         raise HTTPException(status_code=400, detail="La cirugía ya está cancelada")
+    if surgery.get("status") == "realizado":
+        raise HTTPException(status_code=400, detail="Una cirugía realizada no se puede cancelar. Primero desmárquela como realizada.")
 
     now = datetime.now(timezone.utc).isoformat()
     new_surgery_id = None

@@ -3,6 +3,8 @@ import os
 import io
 import pytest
 import requests
+
+pytestmark = pytest.mark.skip(reason="Producción legada por evaluación reemplazada por el libro. Fase 3 del Libro IGSS: las lecturas públicas salen del libro (ver tests/test_igss_libro.py)")
 from collections import Counter
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')

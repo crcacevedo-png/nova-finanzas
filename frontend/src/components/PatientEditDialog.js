@@ -18,9 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { NogSelector } from './NogSelector';
+import { OrdenesIgssPaciente } from './igss/OrdenesIgssPaciente';
+import { puedeVerLibroIgss } from '../lib/igssLibro';
+import { useAuth } from '../context/AuthContext';
 import {
   patientApi,
   igssUnitApi,
@@ -68,6 +69,7 @@ const extractErrorMessage = (error, fallback) => {
 // Diálogo de edición completa de un paciente, pensado para usarse desde
 // Sala de Operaciones / Editar cirugía (fuera del módulo general de Pacientes).
 export const PatientEditDialog = ({ open, onOpenChange, patientId, onSaved }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState(emptyForm);
   const [igssUnits, setIgssUnits] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -130,20 +132,6 @@ export const PatientEditDialog = ({ open, onOpenChange, patientId, onSaved }) =>
     }
   }, [open, patientId, loadPatient, loadIgssUnits]);
 
-  const addOrdenIgss = () => setFormData((prev) => ({
-    ...prev,
-    igss_ordenes: [...(prev.igss_ordenes || []), { id: `ord_${Date.now()}`, nog: '', no_sps: '', codigo: '', procedimiento: '' }],
-  }));
-  const removeOrdenIgss = (idx) => setFormData((prev) => ({
-    ...prev,
-    igss_ordenes: (prev.igss_ordenes || []).filter((_, i) => i !== idx),
-  }));
-  const updateOrdenIgss = (idx, field, value) => setFormData((prev) => {
-    const arr = [...(prev.igss_ordenes || [])];
-    arr[idx] = { ...arr[idx], [field]: value };
-    return { ...prev, igss_ordenes: arr };
-  });
-
   const validateForm = () => {
     if (!formData.first_name.trim()) { toast.error('El nombre es obligatorio'); return false; }
     if (!formData.last_name.trim()) { toast.error('El apellido es obligatorio'); return false; }
@@ -165,10 +153,10 @@ export const PatientEditDialog = ({ open, onOpenChange, patientId, onSaved }) =>
 
     setSubmitting(true);
     try {
-      const payload = { ...formData };
+      // Las órdenes IGSS (No. SPS / NOG) se manejan en el libro, no con el expediente
+      const { igss_ordenes, igss_nog, igss_no_sps, igss_codigo, ...payload } = formData;
       if (payload.referral_institution !== 'igss') {
         payload.igss_unit_id = '';
-        payload.igss_ordenes = [];
       }
       if (payload.referral_institution !== 'seguro_privado') payload.insurance_name = '';
       if (payload.referral_institution !== 'otra') payload.other_institution_name = '';
@@ -368,43 +356,11 @@ export const PatientEditDialog = ({ open, onOpenChange, patientId, onSaved }) =>
                       </div>
                     </div>
 
-                    <div className="md:col-span-2 space-y-2 pt-2" data-testid="patient-edit-igss-ordenes">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold text-blue-700">Órdenes IGSS</Label>
-                        <Button type="button" variant="outline" size="sm" onClick={addOrdenIgss} disabled={!formData.igss_unit_id} className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50">
-                          <Plus className="w-3 h-3 mr-1" /> Agregar orden
-                        </Button>
+                    {puedeVerLibroIgss(user) && (
+                      <div className="md:col-span-2 pt-2" data-testid="patient-edit-igss-ordenes">
+                        <OrdenesIgssPaciente pacienteId={patientId} unidadId={formData.igss_unit_id} />
                       </div>
-                      {!formData.igss_unit_id && <p className="text-xs text-gray-500">Selecciona una unidad IGSS para agregar órdenes.</p>}
-                      {(formData.igss_ordenes || []).length === 0 && formData.igss_unit_id && (
-                        <p className="text-xs text-gray-500">Sin órdenes. Agrega al menos una con su NOG y No. SPS.</p>
-                      )}
-                      {(formData.igss_ordenes || []).map((orden, idx) => (
-                        <div key={orden.id || idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-gray-100 rounded-lg p-2 bg-gray-50">
-                          <div className="md:col-span-3 space-y-1">
-                            <Label className="text-xs">NOG {idx + 1}</Label>
-                            <NogSelector unitId={formData.igss_unit_id} value={orden.nog} onChange={(val) => updateOrdenIgss(idx, 'nog', val)} idSuffix={`-edit-${idx}`} />
-                          </div>
-                          <div className="md:col-span-2 space-y-1">
-                            <Label className="text-xs">No. SPS</Label>
-                            <Input value={orden.no_sps || ''} onChange={(e) => updateOrdenIgss(idx, 'no_sps', e.target.value)} placeholder="No. SPS" />
-                          </div>
-                          <div className="md:col-span-2 space-y-1">
-                            <Label className="text-xs">Código</Label>
-                            <Input value={orden.codigo || ''} onChange={(e) => updateOrdenIgss(idx, 'codigo', e.target.value)} placeholder="Código" />
-                          </div>
-                          <div className="md:col-span-4 space-y-1">
-                            <Label className="text-xs">Procedimiento / Estudio</Label>
-                            <Input value={orden.procedimiento || ''} onChange={(e) => updateOrdenIgss(idx, 'procedimiento', e.target.value)} placeholder="Ej: Catarata OD" />
-                          </div>
-                          <div className="md:col-span-1 flex justify-end">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => removeOrdenIgss(idx)} className="h-8 w-8 p-0 text-red-500 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    )}
                   </>
                 )}
 

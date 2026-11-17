@@ -158,7 +158,8 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
     if await db.igss_ordenes_libro.find_one({"unidad_id": unidad_id, "no_sps": sps, "vigente": True}, {"_id": 1}):
         raise HTTPException(status_code=409, detail=_msg_sps_duplicado(sps))
 
-    if not await _reservar_cupo(nog["id"]):
+    reservado = await _reservar_cupo(nog["id"])
+    if not reservado:
         fresh = await _get_nog_or_404(nog["id"])
         if fresh.get("is_active") is False:
             raise HTTPException(status_code=400, detail="La entrada del catálogo está inactiva y no admite órdenes nuevas")
@@ -206,7 +207,7 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
     await _audit("LIBRO_ORDEN_CREADA", user, {
         "orden_id": doc["id"], "unidad_id": unidad_id, "nog_id": nog["id"], "no_sps": sps,
         "paciente_id": pac["paciente_id"], "tipo": tipo, "dosis_autorizadas": dosis, "origen": origen})
-    return doc, nog
+    return doc, reservado
 
 
 async def _orden_or_404(orden_id: str) -> dict:
@@ -224,6 +225,7 @@ async def ensure_libro_indexes():
                                               "partialFilterExpression": {"vigente": True}}),
         ([("nog_id", 1), ("estado", 1)], {"name": "libro_nog_estado"}),
         ([("paciente_id", 1)], {"name": "libro_paciente"}),
+        ([("estado", 1), ("unidad_id", 1), ("fecha_primera_atencion", 1)], {"name": "libro_estado_unidad_fecha"}),
         ([("id", 1)], {"unique": True, "name": "libro_id"}),
     ]
     for keys, opts in specs:
@@ -296,7 +298,12 @@ async def obtener_orden(orden_id: str, current_user: dict = Depends(require_role
 @router.post("/ordenes")
 async def crear_orden(data: OrdenCreate, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
     doc, nog = await crear_orden_libro(data.model_dump(), current_user, origen="manual")
-    return _orden_out(doc, nog)
+    out = _orden_out(doc, nog)
+    cantidad, ocupados = int(nog.get("cantidad") or 0), int(nog.get("libro_ocupados") or 0)
+    if not nog.get("sin_tope") and cantidad > 0 and ocupados >= cantidad * UMBRAL_AVISO:
+        out["aviso_cupo"] = (f"{etiqueta_catalogo(nog)} ya ocupa {ocupados} de {cantidad} cupos "
+                             f"({round(ocupados / cantidad * 100, 1)} %). Gestione la renovación a tiempo.")
+    return out
 
 
 @router.put("/ordenes/{orden_id}")
@@ -391,7 +398,7 @@ async def contador_nog(nog_id: str, current_user: dict = Depends(require_role(LI
     nog = await _get_nog_or_404(nog_id)
     grupos = await db.igss_ordenes_libro.aggregate([
         {"$match": {"nog_id": nog_id}},
-        {"$group": {"_id": "$estado", "n": {"$sum": 1}, "monto": {"$sum": {"$ifNull": ["$precio", 0]}}}},
+        {"$group": {"_id": "$estado", "n": {"$sum": 1}, "monto": {"$sum": {"$ifNull": ["$costo_override", {"$ifNull": ["$precio", 0]}]}}}},
     ]).to_list(None)
     por = {g["_id"]: g for g in grupos}
     consumidos = int((por.get("atendida") or {}).get("n", 0))

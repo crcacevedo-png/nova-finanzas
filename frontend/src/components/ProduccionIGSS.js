@@ -13,10 +13,11 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import { FileText, Printer, FolderOpen, Download, AlertTriangle } from 'lucide-react';
-import { igssNogApi, igssUnitApi } from '../services/api';
+import { Printer, FolderOpen, Download } from 'lucide-react';
+import { igssNogApi, igssUnitApi, igssLibroApi } from '../services/api';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const fmtDia = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
 const Q = (n) => `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const ESTADOS = [
   { key: 'impreso', label: 'Impreso' },
@@ -73,12 +74,12 @@ export const ProduccionIGSS = () => {
 
   const toggleEstado = async (row, key) => {
     const nuevo = !row[key];
-    setRows((prev) => prev.map((r) => r.evaluacion_id === row.evaluacion_id ? { ...r, [key]: nuevo } : r));
+    setRows((prev) => prev.map((r) => r.orden_id === row.orden_id ? { ...r, [key]: nuevo } : r));
     try {
-      await igssNogApi.updateProduccion(row.evaluacion_id, { [key]: nuevo });
+      await igssLibroApi.editar(row.orden_id, { [key]: nuevo });
       toast.success(`${ESTADOS.find((e) => e.key === key)?.label}: ${nuevo ? 'marcado' : 'desmarcado'}`);
     } catch (e) {
-      setRows((prev) => prev.map((r) => r.evaluacion_id === row.evaluacion_id ? { ...r, [key]: !nuevo } : r));
+      setRows((prev) => prev.map((r) => r.orden_id === row.orden_id ? { ...r, [key]: !nuevo } : r));
       toast.error('No se pudo actualizar el estado');
     }
     fetchData();
@@ -88,7 +89,7 @@ export const ProduccionIGSS = () => {
     const num = parseFloat(valor);
     if (isNaN(num) || num === row.costo) return;
     try {
-      await igssNogApi.updateProduccion(row.evaluacion_id, { costo_override: num });
+      await igssLibroApi.editar(row.orden_id, { costo_override: num });
       toast.success('Costo actualizado');
       fetchData();
     } catch (e) {
@@ -106,7 +107,7 @@ export const ProduccionIGSS = () => {
       });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       window.open(url, '_blank');
-      await igssNogApi.updateProduccion(row.evaluacion_id, { impreso: true });
+      await igssLibroApi.editar(row.orden_id, { impreso: true });
       fetchData();
     } catch (e) {
       toast.error('No se pudo generar el PDF');
@@ -195,7 +196,7 @@ export const ProduccionIGSS = () => {
       {/* Barra de totales */}
       {totales && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2" data-testid="prod-totales">
-          <TotCard label="Servicios" value={totales.servicios} />
+          <TotCard label="Órdenes" value={totales.servicios} />
           <TotCard label="Producción" value={Q(totales.total_costo)} />
           <TotCard label="Pagado" value={Q(totales.total_pagado)} accent="text-green-700" />
           <TotCard label="Pendiente" value={Q(totales.total_pendiente)} accent="text-amber-700" />
@@ -207,14 +208,14 @@ export const ProduccionIGSS = () => {
       {loading ? (
         <Skeleton className="h-64 w-full" />
       ) : rows.length === 0 ? (
-        <Card><CardContent className="py-10 text-center text-sm text-gray-500">No hay servicios IGSS en el periodo seleccionado.</CardContent></Card>
+        <Card><CardContent className="py-10 text-center text-sm text-gray-500" data-testid="prod-vacio">No hay órdenes IGSS atendidas en el periodo seleccionado.</CardContent></Card>
       ) : (
         Object.entries(grupos).map(([unidad, g]) => (
           <Card key={unidad} data-testid={`prod-unidad-${unidad}`}>
             <CardHeader className="py-3">
               <CardTitle className="text-sm font-semibold flex items-center justify-between">
                 <span>{unidad}</span>
-                <span className="text-xs font-normal text-gray-500">{g.total} servicio(s) · {Q(g.monto)}</span>
+                <span className="text-xs font-normal text-gray-500">{g.total} orden(es) · {Q(g.monto)}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 space-y-4">
@@ -222,12 +223,8 @@ export const ProduccionIGSS = () => {
                 <div key={nk}>
                   <div className="flex items-center justify-between text-xs font-semibold text-blue-700 bg-blue-50 rounded px-2 py-1 mb-1">
                     <span className="flex items-center gap-1.5">
-                      NOG {nk}
-                      {gn.rows.some((r) => r.nog_catalogado === false) && (
-                        <Badge className="bg-red-100 text-red-700 border border-red-300 text-[10px] font-semibold gap-1" data-testid={`nog-group-no-catalogado-${nk}`}>
-                          <AlertTriangle className="w-3 h-3" /> No catalogado
-                        </Badge>
-                      )}
+                      {gn.rows[0]?.numero_nog ? `NOG ${nk}` : nk}
+                      <Badge className="bg-white text-blue-700 border border-blue-200 text-[10px] font-medium">{gn.rows[0]?.modalidad || '—'}</Badge>
                     </span>
                     <span>{gn.rows.length} · {Q(gn.monto)}</span>
                   </div>
@@ -240,7 +237,8 @@ export const ProduccionIGSS = () => {
                           <TableHead className="table-header">No. SPS</TableHead>
                           <TableHead className="table-header">Procedimiento</TableHead>
                           <TableHead className="table-header">Médico</TableHead>
-                          <TableHead className="table-header">Fecha</TableHead>
+                          <TableHead className="table-header">1ª atención</TableHead>
+                          <TableHead className="table-header text-center">Dosis</TableHead>
                           <TableHead className="table-header">Costo (Q)</TableHead>
                           {ESTADOS.map((e) => <TableHead key={e.key} className="table-header text-center">{e.label}</TableHead>)}
                           <TableHead className="table-header text-right">Acciones</TableHead>
@@ -248,47 +246,40 @@ export const ProduccionIGSS = () => {
                       </TableHeader>
                       <TableBody>
                         {gn.rows.map((r) => (
-                          <TableRow key={r.evaluacion_id} data-testid={`prod-row-${r.evaluacion_id}`} className={r.nog_catalogado === false ? 'bg-red-50' : ''}>
+                          <TableRow key={r.orden_id} data-testid={`prod-row-${r.orden_id}`}>
                             <TableCell className="font-medium">
-                              <div className="flex items-center gap-1.5">
-                                {r.paciente_nombre}
-                                {r.nog_catalogado === false && (
-                                  <span
-                                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700 bg-red-100 border border-red-300 rounded px-1.5 py-0.5"
-                                    title="Este NOG no está registrado en el catálogo de la unidad: no tiene precio asignado ni descontó cupo."
-                                    data-testid={`prod-nog-no-catalogado-${r.evaluacion_id}`}
-                                  >
-                                    <AlertTriangle className="w-3 h-3" /> Pendiente de catalogar
-                                  </span>
-                                )}
-                              </div>
+                              {r.paciente_nombre}
+                              {!r.paciente_activo && <span className="ml-1 text-[10px] text-gray-400">(inactivo)</span>}
                             </TableCell>
                             <TableCell className="font-mono text-xs">{r.expediente || '—'}</TableCell>
                             <TableCell className="text-xs">{r.no_sps || '—'}</TableCell>
                             <TableCell className="text-xs">{r.procedimiento || '—'}</TableCell>
                             <TableCell className="text-xs">{r.medico_nombre || '—'}</TableCell>
-                            <TableCell className="text-xs">{r.fecha}</TableCell>
+                            <TableCell className="text-xs">{fmtDia(r.fecha)}</TableCell>
+                            <TableCell className="text-xs text-center" data-testid={`prod-dosis-${r.orden_id}`}>{r.dosis_aplicadas} / {r.dosis_autorizadas}</TableCell>
                             <TableCell>
                               <Input
-                                key={`${r.evaluacion_id}-${r.costo}`}
+                                key={`${r.orden_id}-${r.costo}`}
                                 type="number" step="0.01" min="0" defaultValue={r.costo}
                                 onBlur={(e) => guardarCosto(r, e.target.value)}
                                 className={`input-teal h-8 w-24 text-xs ${r.costo_editado ? 'border-amber-300' : ''}`}
-                                data-testid={`prod-costo-${r.evaluacion_id}`}
+                                data-testid={`prod-costo-${r.orden_id}`}
                               />
                             </TableCell>
                             {ESTADOS.map((e) => (
                               <TableCell key={e.key} className="text-center">
-                                <Checkbox checked={!!r[e.key]} onCheckedChange={() => toggleEstado(r, e.key)} data-testid={`prod-${e.key}-${r.evaluacion_id}`} />
+                                <Checkbox checked={!!r[e.key]} onCheckedChange={() => toggleEstado(r, e.key)} data-testid={`prod-${e.key}-${r.orden_id}`} />
                               </TableCell>
                             ))}
                             <TableCell className="text-right whitespace-nowrap">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Abrir expediente" onClick={() => abrirExpediente(r)} data-testid={`prod-abrir-${r.evaluacion_id}`}>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Abrir expediente" onClick={() => abrirExpediente(r)} data-testid={`prod-abrir-${r.orden_id}`}>
                                 <FolderOpen className="w-4 h-4 text-blue-600" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Imprimir expediente" onClick={() => imprimirExpediente(r)} data-testid={`prod-imprimir-${r.evaluacion_id}`}>
-                                <Printer className="w-4 h-4 text-emerald-600" />
-                              </Button>
+                              {r.evaluacion_id && (
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Imprimir expediente" onClick={() => imprimirExpediente(r)} data-testid={`prod-imprimir-${r.orden_id}`}>
+                                  <Printer className="w-4 h-4 text-emerald-600" />
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

@@ -65,9 +65,10 @@ def env(sa):
 
 
 def _nog(env, key, client):
-    r = client.get(f"{API}/igss-units/{env['uid']}/nogs")
-    assert r.status_code == 200, r.text
-    return next(n for n in r.json()["nogs"] if n["id"] == env["nogs"][key]["id"])
+    # Contador LEGADO (acreditaciones) leído de Mongo: desde la Fase 3 del Libro IGSS las
+    # pantallas leen del libro, pero la lógica legada sigue activa hasta la Fase 4.
+    from routes.igss_nogs import _nog_con_derivados
+    return _nog_con_derivados(mongo.igss_nogs.find_one({"id": env["nogs"][key]["id"]}, {"_id": 0}))
 
 
 def _patient(sa, env, ordenes):
@@ -108,7 +109,7 @@ class TestAutorizacion:
         env["pA"] = p["id"]
         after = _nog(env, "main", sa)["acreditados"]
         assert after - before == 2
-        acr = sa.get(f"{API}/igss-units/nogs/{env['nogs']['main']['id']}/pacientes").json()["acreditaciones"]
+        acr = list(mongo.igss_nog_acreditaciones.find({"nog_id": env['nogs']['main']['id'], "anulada": {"$ne": True}}, {"_id": 0}))
         mine = [a for a in acr if a["paciente_id"] == p["id"]]
         assert len(mine) == 2
         vig = list(mongo.igss_nog_acreditaciones.find({"paciente_id": p["id"], "anulada": {"$ne": True}}))
@@ -198,12 +199,10 @@ class TestCupo:
         _patient(sa, env, [{"nog": num, "no_sps": f"SPS-W{i}"} for i in range(9)])
         n = _nog(env, "aviso", sa)
         assert n["acreditados"] == 9 and n["estado"] == "por_completarse"
-        al = ia.get(f"{API}/igss-units/nogs/alertas").json()["alertas"]
-        ids = {a["nog_id"]: a["estado"] for a in al}
-        assert ids.get(env["nogs"]["aviso"]["id"]) == "por_completarse"
-        assert ids.get(env["nogs"]["cap"]["id"]) == "completado"
+        assert _nog(env, "cap", sa)["estado"] == "completado"
 
 
+@pytest.mark.skip(reason="Fase 3 del Libro IGSS: las lecturas públicas salen del libro (ver tests/test_igss_libro.py)")
 class TestProduccion:
     # Una fila por autorización; fecha = primera consulta
     def test_rows_by_authorization(self, sa, env):

@@ -15,7 +15,7 @@ import unicodedata
 
 from config.database import db
 from config.permissions import LIBRO_IGSS_ROLES
-from routes.auth import get_current_user, require_permission, require_role
+from routes.auth import require_role
 from utils.timezone import today_str_gt
 
 router = APIRouter(prefix="/igss-units", tags=["Unidades IGSS - NOG"])
@@ -426,89 +426,6 @@ async def _unidad_or_404(unit_id: str) -> dict:
 
 # ==================== ENDPOINTS - CATÁLOGO DE NOG ====================
 
-@router.get("/{unit_id}/nogs")
-async def listar_nogs_unidad(
-    unit_id: str,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Lista los NOG de una unidad con contadores derivados, más los pacientes
-    de la unidad con NOG fuera del catálogo y los que no tienen NOG (solo activos)."""
-    unit = await _unidad_or_404(unit_id)
-
-    nogs_docs = await db.igss_nogs.find({"unidad_id": unit_id}, {"_id": 0}).sort("numero", 1).to_list(1000)
-    nogs = [_nog_con_derivados(n) for n in nogs_docs]
-    numeros_catalogo = {(n.get("numero") or "").strip() for n in nogs_docs}
-
-    pacientes = await db.patients.find(
-        {"is_active": True, "igss_unit_id": unit_id},
-        {"_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1,
-         "dpi": 1, "phone": 1, "birth_date": 1, "igss_nog": 1, "igss_afiliacion": 1}
-    ).to_list(None)
-
-    sin_nog, fuera_catalogo = [], []
-    for p in pacientes:
-        numero = (p.get("igss_nog") or "").strip()
-        fila = {
-            "id": p["id"],
-            "record_number": p.get("record_number", ""),
-            "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-            "dpi": p.get("dpi", ""),
-            "phone": p.get("phone", ""),
-            "edad": _calcular_edad(p.get("birth_date", "")),
-            "igss_nog": numero,
-            "igss_afiliacion": p.get("igss_afiliacion", ""),
-        }
-        if not numero:
-            sin_nog.append(fila)
-        elif numero not in numeros_catalogo:
-            fuera_catalogo.append(fila)
-
-    return {
-        "unidad": {"id": unit["id"], "name": unit.get("name", ""), "code": unit.get("code", "")},
-        "nogs": nogs,
-        "pacientes_nog_no_catalogado": fuera_catalogo,
-        "pacientes_sin_nog": sin_nog,
-        "totales": {
-            "nogs": len(nogs),
-            "servicios_contratados": sum(n["cantidad"] for n in nogs),
-            "servicios_acreditados": sum(n["acreditados"] for n in nogs),
-            "servicios_disponibles": sum(n["disponibles"] for n in nogs),
-            "valor_total": round(sum(n["valor_total"] for n in nogs), 2),
-        },
-    }
-
-
-@router.get("/{unit_id}/nogs-activos")
-async def listar_nogs_activos(
-    unit_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Lista ligera para el selector de NOG en la ficha del paciente.
-    Devuelve los NOG activos con su estado y disponibilidad."""
-    nogs_docs = await db.igss_nogs.find(
-        {"unidad_id": unit_id, "is_active": True, "numero": {"$nin": [None, ""]}}, {"_id": 0}
-    ).sort("numero", 1).to_list(1000)
-    # Conteo de pacientes activos asignados a cada NOG de esta unidad (una sola agregación)
-    conteo_docs = await db.patients.aggregate([
-        {"$match": {"igss_unit_id": unit_id, "is_active": True, "igss_nog": {"$nin": [None, ""]}}},
-        {"$group": {"_id": "$igss_nog", "total": {"$sum": 1}}},
-    ]).to_list(2000)
-    conteo_por_nog = {c["_id"]: c["total"] for c in conteo_docs}
-    return [
-        {
-            "id": n["id"],
-            "numero": n.get("numero", ""),
-            "nombre_servicio": n.get("nombre_servicio", ""),
-            "disponibles": max(int(n.get("cantidad") or 0) - int(n.get("acreditados") or 0), 0),
-            "cantidad": int(n.get("cantidad") or 0),
-            "acreditados": int(n.get("acreditados") or 0),
-            "pacientes_asignados": conteo_por_nog.get(n.get("numero", ""), 0),
-            "estado": _estado_nog(int(n.get("acreditados") or 0), int(n.get("cantidad") or 0), True),
-        }
-        for n in nogs_docs
-    ]
-
-
 @router.post("/{unit_id}/nogs")
 async def crear_nog(
     unit_id: str,
@@ -623,7 +540,7 @@ async def eliminar_nog(
 
 @router.post("/nogs/reconciliar-todo")
 async def reconciliar_todo(
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
     """Backfill idempotente: recalcula el consumo de TODOS los NOG a partir de los
     pacientes activos asignados (1 servicio por paciente). Corrige NOG de pacientes
@@ -639,7 +556,7 @@ async def reconciliar_todo(
 @router.post("/nogs/{nog_id}/recalcular")
 async def recalcular_nog(
     nog_id: str,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
     """Re-sincroniza el contador con las evaluaciones existentes (idempotente).
     Útil tras importar evaluaciones o pacientes. Respeta las anulaciones."""
@@ -780,7 +697,7 @@ async def _recalcular_consumo_por_evaluaciones(user: dict):
 
 @router.post("/nogs/recalcular-por-evaluaciones")
 async def recalcular_por_evaluaciones(
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
     """Recalcula el consumo de TODOS los NOG contando solo a los pacientes con una
     evaluación real (con datos clínicos). Útil tras limpiar borradores vacíos."""
@@ -798,163 +715,12 @@ async def recalcular_por_evaluaciones(
 
 # ==================== ENDPOINTS - ACREDITACIONES / PACIENTES ====================
 
-@router.get("/nogs/all")
-async def listar_todos_nogs(
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Lista TODOS los NOG de TODAS las unidades (para el menú central de NOG),
-    con el nombre de la unidad y los contadores derivados. El filtrado por unidad,
-    estado y la búsqueda se hacen en el cliente."""
-    units = {u["id"]: u for u in await db.igss_units.find(
-        {}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(2000)}
-    nogs_docs = await db.igss_nogs.find({}, {"_id": 0}).to_list(None)
-    data = []
-    for n in nogs_docs:
-        d = _nog_con_derivados(n)
-        u = units.get(n.get("unidad_id"), {})
-        d["unidad_nombre"] = u.get("name", "")
-        d["unidad_codigo"] = u.get("code", "")
-        data.append(d)
-    data.sort(key=lambda x: (x.get("unidad_nombre", ""), x.get("numero", "")))
-    unidades = [{"id": u["id"], "name": u.get("name", ""), "code": u.get("code", "")}
-                for u in units.values()]
-    unidades.sort(key=lambda x: x["name"])
-    return {"data": data, "unidades": unidades, "total": len(data)}
-
-
-@router.get("/nogs/resumen")
-async def resumen_nogs(
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Resumen global de NOG para tarjetas del catálogo: cuántos NOG están
-    disponibles (activos y no completados) y el total de servicios disponibles."""
-    nogs = await db.igss_nogs.find({}, {"_id": 0}).to_list(None)
-    total_nogs = len(nogs)
-    nogs_disponibles = 0
-    nogs_completados = 0
-    servicios_contratados = 0
-    servicios_acreditados = 0
-    servicios_disponibles = 0
-    valor_total = 0.0
-    for n in nogs:
-        d = _nog_con_derivados(n)
-        servicios_contratados += d["cantidad"]
-        servicios_acreditados += d["acreditados"]
-        valor_total += d["valor_total"]
-        if d["is_active"]:
-            servicios_disponibles += d["disponibles"]
-            if d["estado"] == "completado":
-                nogs_completados += 1
-            else:
-                nogs_disponibles += 1
-    return {
-        "total_nogs": total_nogs,
-        "nogs_disponibles": nogs_disponibles,
-        "nogs_completados": nogs_completados,
-        "servicios_contratados": servicios_contratados,
-        "servicios_acreditados": servicios_acreditados,
-        "servicios_disponibles": servicios_disponibles,
-        "valor_total": round(valor_total, 2),
-    }
-
-
-@router.get("/nogs/alertas")
-async def alertas_nogs(
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Alertas de límite: NOG activos que alcanzaron el 90% (por completarse) o el
-    100% (completados/bloqueados). Sirve para renovar el contrato a tiempo."""
-    nogs = await db.igss_nogs.find({"is_active": True}, {"_id": 0}).to_list(None)
-    units = {u["id"]: u for u in await db.igss_units.find(
-        {}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(1000)}
-
-    alertas = []
-    for n in nogs:
-        d = _nog_con_derivados(n)
-        if d["estado"] in ("por_completarse", "completado"):
-            u = units.get(n.get("unidad_id"), {})
-            alertas.append({
-                "unidad_id": n.get("unidad_id", ""),
-                "unidad_nombre": u.get("name", ""),
-                "unidad_codigo": u.get("code", ""),
-                "nog_id": d["id"],
-                "numero": d["numero"],
-                "nombre_servicio": d["nombre_servicio"],
-                "acreditados": d["acreditados"],
-                "cantidad": d["cantidad"],
-                "disponibles": d["disponibles"],
-                "porcentaje": d["porcentaje"],
-                "estado": d["estado"],
-            })
-
-    # Completados primero, luego por porcentaje descendente
-    alertas.sort(key=lambda a: (0 if a["estado"] == "completado" else 1, -a["porcentaje"]))
-    return {
-        "alertas": alertas,
-        "total": len(alertas),
-        "completados": sum(1 for a in alertas if a["estado"] == "completado"),
-        "por_completarse": sum(1 for a in alertas if a["estado"] == "por_completarse"),
-        "umbral_aviso": int(UMBRAL_AVISO * 100),
-    }
-
-
-@router.get("/nogs/{nog_id}/pacientes")
-async def listar_pacientes_nog(
-    nog_id: str,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Lista las acreditaciones (pacientes atendidos) del NOG. Solo pacientes activos."""
-    nog = await _get_nog_or_404(nog_id)
-    acreds = await db.igss_nog_acreditaciones.find(
-        {"nog_id": nog_id, "anulada": {"$ne": True}}, {"_id": 0}
-    ).sort("fecha_acreditacion", 1).to_list(None)
-
-    pac_ids = list({a["paciente_id"] for a in acreds if a.get("paciente_id")})
-    pacientes = {}
-    if pac_ids:
-        cursor = db.patients.find(
-            {"id": {"$in": pac_ids}, "is_active": True}, {"_id": 0}
-        )
-        async for p in cursor:
-            pacientes[p["id"]] = p
-
-    filas = []
-    for a in acreds:
-        p = pacientes.get(a.get("paciente_id"))
-        if not p:
-            continue  # paciente inactivo o eliminado -> no se lista
-        # Mostrar el SPS/código de la orden que corresponde a ESTE NOG (no el legacy)
-        _ordenes = p.get("igss_ordenes") or []
-        _match = next((o for o in _ordenes if str(o.get("nog", "") or "").strip() == a.get("numero_nog", "")), None)
-        _sps = (_match or {}).get("no_sps") if _match else p.get("igss_no_sps", "")
-        _cod = (_match or {}).get("codigo") if _match else p.get("igss_codigo", "")
-        filas.append({
-            "acreditacion_id": a["id"],
-            "evaluacion_id": a.get("evaluacion_id", ""),
-            "fecha_acreditacion": a.get("fecha_acreditacion", ""),
-            "origen": a.get("origen", ""),
-            "paciente_id": p["id"],
-            "record_number": p.get("record_number", ""),
-            "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-            "dpi": p.get("dpi", ""),
-            "igss_afiliacion": p.get("igss_afiliacion", ""),
-            "igss_no_sps": _sps or "",
-            "igss_codigo": _cod or "",
-            "igss_tipo_compra": p.get("igss_tipo_compra", ""),
-            "phone": p.get("phone", ""),
-            "edad": _calcular_edad(p.get("birth_date", "")),
-            "numero_nog": a.get("numero_nog", ""),
-        })
-
-    return {"nog": _nog_con_derivados(nog), "acreditaciones": filas, "total": len(filas)}
-
-
 @router.post("/nogs/{nog_id}/acreditaciones/{acred_id}/anular")
 async def anular_acreditacion(
     nog_id: str,
     acred_id: str,
     motivo: str = Body("", embed=True),
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
     """Anula una acreditación hecha por error; libera el servicio (queda disponible)."""
     acred = await db.igss_nog_acreditaciones.find_one({"id": acred_id, "nog_id": nog_id}, {"_id": 0})
@@ -987,7 +753,7 @@ async def anular_acreditacion(
 async def aplicar_acreditacion_manual(
     nog_id: str,
     paciente_id: str = Body(..., embed=True),
-    current_user: dict = Depends(require_permission("manage_igss_units"))
+    current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
     """Aplica manualmente 1 descuento de este NOG a un paciente (corrección puntual).
     Respeta el cupo y evita duplicar el mismo NOG para el mismo paciente."""
@@ -1006,195 +772,7 @@ async def aplicar_acreditacion_manual(
     return {"message": "Descuento aplicado", "nog": _nog_con_derivados(fresh)}
 
 
-# ==================== EXPORTACIÓN A EXCEL ====================
-
-def _hoja_pacientes(ws, nog: dict, filas: list):
-    from openpyxl.styles import Font, PatternFill, Alignment
-    header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-    label_font = Font(bold=True)
-
-    # Encabezado del NOG
-    d = _nog_con_derivados(nog)
-    info = [
-        ("NOG", d["numero"]),
-        ("Servicio", d["nombre_servicio"]),
-        ("Tipo de compra", d["tipo_compra_label"]),
-        ("Cantidad contratada", d["cantidad"]),
-        ("Precio unitario (Q)", d["precio"]),
-        ("Acreditados", d["acreditados"]),
-        ("Disponibles", d["disponibles"]),
-        ("Valor total (Q)", d["valor_total"]),
-        ("Valor acreditado (Q)", d["valor_acreditado"]),
-        ("Valor disponible (Q)", d["valor_disponible"]),
-    ]
-    r = 1
-    for label, value in info:
-        ws.cell(row=r, column=1, value=label).font = label_font
-        ws.cell(row=r, column=2, value=value)
-        r += 1
-    r += 1
-
-    headers = ["Expediente", "Nombre y Apellido", "DPI", "Afiliación IGSS", "No. SPS",
-               "Código", "Tipo de Compra", "Teléfono", "Edad", "NOG", "Fecha de Acreditación"]
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=r, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", wrap_text=True)
-    header_row = r
-    r += 1
-
-    for f in filas:
-        fecha = f.get("fecha_acreditacion", "")
-        try:
-            fecha = datetime.fromisoformat(fecha.replace("Z", "+00:00")).strftime("%d/%m/%Y")
-        except Exception:
-            pass
-        valores = [
-            f.get("record_number", ""), f.get("full_name", ""), f.get("dpi", ""),
-            f.get("igss_afiliacion", ""), f.get("igss_no_sps", ""), f.get("igss_codigo", ""),
-            TIPO_COMPRA_LABELS.get(f.get("igss_tipo_compra", ""), f.get("igss_tipo_compra", "")),
-            f.get("phone", ""), f.get("edad", ""), f.get("numero_nog", ""), fecha,
-        ]
-        for col, v in enumerate(valores, 1):
-            ws.cell(row=r, column=col, value=v)
-        r += 1
-
-    import openpyxl
-    for col in range(1, len(headers) + 1):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
-    return header_row
-
-
-async def _filas_export_nog(nog_id: str) -> list:
-    acreds = await db.igss_nog_acreditaciones.find(
-        {"nog_id": nog_id, "anulada": {"$ne": True}}, {"_id": 0}
-    ).sort("fecha_acreditacion", 1).to_list(None)
-    pac_ids = list({a["paciente_id"] for a in acreds if a.get("paciente_id")})
-    pacientes = {}
-    if pac_ids:
-        cursor = db.patients.find({"id": {"$in": pac_ids}, "is_active": True}, {"_id": 0})
-        async for p in cursor:
-            pacientes[p["id"]] = p
-    filas = []
-    for a in acreds:
-        p = pacientes.get(a.get("paciente_id"))
-        if not p:
-            continue
-        filas.append({
-            "record_number": p.get("record_number", ""),
-            "full_name": f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-            "dpi": p.get("dpi", ""),
-            "igss_afiliacion": p.get("igss_afiliacion", ""),
-            "igss_no_sps": p.get("igss_no_sps", ""),
-            "igss_codigo": p.get("igss_codigo", ""),
-            "igss_tipo_compra": p.get("igss_tipo_compra", ""),
-            "phone": p.get("phone", ""),
-            "edad": _calcular_edad(p.get("birth_date", "")),
-            "numero_nog": a.get("numero_nog", ""),
-            "fecha_acreditacion": a.get("fecha_acreditacion", ""),
-        })
-    return filas
-
-
-def _safe_sheet_title(text: str) -> str:
-    invalid = set('[]:*?/\\')
-    clean = "".join(c for c in str(text) if c not in invalid).strip()
-    return (clean or "NOG")[:31]
-
-
-@router.get("/nogs/{nog_id}/export/excel")
-async def export_nog_excel(
-    nog_id: str,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Exporta a Excel el listado de pacientes acreditados de un NOG."""
-    nog = await _get_nog_or_404(nog_id)
-    import openpyxl
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = _safe_sheet_title(f"NOG {nog.get('numero', '')}")
-    filas = await _filas_export_nog(nog_id)
-    _hoja_pacientes(ws, nog, filas)
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    filename = f"NOG_{(nog.get('numero') or 'export')}.xlsx".replace("/", "-").replace(" ", "_")
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
-
-
-@router.get("/{unit_id}/nogs/export/excel")
-async def export_unidad_excel(
-    unit_id: str,
-    current_user: dict = Depends(require_permission("manage_igss_units"))
-):
-    """Exporta a Excel todos los NOG de la unidad (una hoja por NOG)."""
-    unit = await _unidad_or_404(unit_id)
-    nogs = await db.igss_nogs.find({"unidad_id": unit_id}, {"_id": 0}).sort("numero", 1).to_list(1000)
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment
-    wb = openpyxl.Workbook()
-
-    # Hoja resumen
-    ws = wb.active
-    ws.title = "Resumen"
-    header_fill = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-    ws.cell(row=1, column=1, value=f"Unidad IGSS: {unit.get('name', '')}").font = Font(bold=True, size=12)
-    headers = ["NOG", "Servicio", "Tipo de compra", "Cantidad", "Precio (Q)",
-               "Acreditados", "Disponibles", "Valor total (Q)", "Estado"]
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=3, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", wrap_text=True)
-    r = 4
-    for n in nogs:
-        d = _nog_con_derivados(n)
-        for col, v in enumerate([
-            d["numero"], d["nombre_servicio"], d["tipo_compra_label"], d["cantidad"],
-            d["precio"], d["acreditados"], d["disponibles"], d["valor_total"], d["estado"],
-        ], 1):
-            ws.cell(row=r, column=col, value=v)
-        r += 1
-    for col in range(1, len(headers) + 1):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 18
-
-    # Una hoja por NOG
-    for n in nogs:
-        hoja = wb.create_sheet(title=_safe_sheet_title(f"NOG {n.get('numero', '')}"))
-        filas = await _filas_export_nog(n["id"])
-        _hoja_pacientes(hoja, n, filas)
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    filename = f"Unidad_{(unit.get('name') or 'IGSS')}_NOGs.xlsx".replace("/", "-").replace(" ", "_")
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
-
-
 # ==================== MÓDULO DE PRODUCCIÓN IGSS ====================
-
-PRODUCCION_ROLES = ["superadmin", "admin", "administrador_igss"]
-
-
-class ProduccionUpdate(BaseModel):
-    impreso: Optional[bool] = None
-    enviado: Optional[bool] = None
-    facturado: Optional[bool] = None
-    pagado: Optional[bool] = None
-    costo_override: Optional[float] = Field(None, ge=0)
-
 
 def _txt(v):
     return bool(v.strip()) if isinstance(v, str) else bool(v)
@@ -1477,136 +1055,6 @@ def _produccion_totales(rows):
         "total_pendiente": round(tot_costo - pagado, 2),
     }
 
-
-@router.get("/produccion")
-async def listar_produccion(
-    fecha: Optional[str] = None,
-    desde: Optional[str] = None,
-    hasta: Optional[str] = None,
-    unidad_id: Optional[str] = None,
-    nog: Optional[str] = None,
-    current_user: dict = Depends(require_role(PRODUCCION_ROLES))
-):
-    """Listado de producción IGSS: una línea por evaluación (orden) con costo y estados."""
-    if not (fecha or desde or hasta):
-        fecha = today_str_gt()
-    rows = await _build_produccion_rows(fecha, desde, hasta, unidad_id, nog)
-    return {
-        "data": rows,
-        "totales": _produccion_totales(rows),
-        "filtro": {"fecha": fecha, "desde": desde, "hasta": hasta, "unidad_id": unidad_id, "nog": nog},
-    }
-
-
-@router.patch("/produccion/{evaluacion_id}")
-async def actualizar_produccion(
-    evaluacion_id: str,
-    data: ProduccionUpdate,
-    current_user: dict = Depends(require_role(PRODUCCION_ROLES))
-):
-    """Marca estados (impreso/enviado/facturado/pagado) y/o ajusta el costo de un registro.
-    Los estados se aplican a TODAS las evaluaciones de la misma orden (fila consolidada),
-    para que marcar/desmarcar sea consistente. El costo se ajusta solo en el representante.
-    Enviar costo_override=null restablece el costo al precio del NOG."""
-    ev = await db.evaluaciones_oftalmologicas.find_one({"id": evaluacion_id}, {"_id": 0})
-    if not ev:
-        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
-    pac = await db.patients.find_one({"id": ev.get("paciente_id")}, {"_id": 0})
-    if not pac or pac.get("referral_institution") != "igss":
-        raise HTTPException(status_code=400, detail="La evaluación no pertenece a un paciente IGSS")
-    provided = data.model_dump(exclude_unset=True)
-    if not provided:
-        raise HTTPException(status_code=400, detail="No hay datos para actualizar")
-    now = datetime.now(timezone.utc).isoformat()
-    uid = current_user["id"]
-
-    # Estados booleanos: se aplican a toda la orden (todas las evaluaciones del grupo)
-    bool_fields = {k: v for k, v in provided.items()
-                   if k in ("impreso", "enviado", "facturado", "pagado") and v is not None}
-    if bool_fields:
-        numero, no_sps, _, _ = _resolver_orden(ev, pac)
-        okey = _order_key(no_sps, numero, ev.get("fecha"))
-        sibs = await db.evaluaciones_oftalmologicas.find(
-            {"paciente_id": ev.get("paciente_id")}, {"_id": 0}).to_list(None)
-        target_ids = {evaluacion_id}
-        for s in sibs:
-            sn, sp, _, _ = _resolver_orden(s, pac)
-            if _order_key(sp, sn, s.get("fecha")) == okey:
-                target_ids.add(s["id"])
-        for tid in target_ids:
-            await db.igss_produccion.update_one(
-                {"evaluacion_id": tid},
-                {"$set": {**bool_fields, "updated_at": now, "updated_by": uid},
-                 "$setOnInsert": {"evaluacion_id": tid}},
-                upsert=True,
-            )
-
-    # Costo: solo en el representante (la evaluación de la fila)
-    if "costo_override" in provided:
-        v = provided["costo_override"]
-        doc = {"$set": {"updated_at": now, "updated_by": uid},
-               "$setOnInsert": {"evaluacion_id": evaluacion_id}}
-        if v is None:
-            doc["$unset"] = {"costo_override": ""}
-        else:
-            doc["$set"]["costo_override"] = v
-        await db.igss_produccion.update_one({"evaluacion_id": evaluacion_id}, doc, upsert=True)
-
-    fresh = await db.igss_produccion.find_one({"evaluacion_id": evaluacion_id}, {"_id": 0})
-    return fresh
-
-
-@router.get("/produccion/reporte/excel")
-async def exportar_produccion_excel(
-    fecha: Optional[str] = None,
-    desde: Optional[str] = None,
-    hasta: Optional[str] = None,
-    unidad_id: Optional[str] = None,
-    nog: Optional[str] = None,
-    current_user: dict = Depends(require_role(PRODUCCION_ROLES))
-):
-    """Exporta el reporte de producción (detalle + totales) a Excel."""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    if not (fecha or desde or hasta):
-        fecha = today_str_gt()
-    rows = await _build_produccion_rows(fecha, desde, hasta, unidad_id, nog)
-    tot = _produccion_totales(rows)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Produccion"
-    hf = PatternFill(start_color="0F6E56", end_color="0F6E56", fill_type="solid")
-    bold = Font(color="FFFFFF", bold=True)
-    headers = ["Fecha", "Unidad", "NOG", "NOG Catalogado", "No. SPS", "Paciente", "Expediente", "Procedimiento", "Médico", "Costo (Q)", "Impreso", "Enviado", "Facturado", "Pagado"]
-    ws.append(headers)
-    for c in ws[1]:
-        c.fill = hf
-        c.font = bold
-    si = lambda b: "Sí" if b else "No"
-    for r in rows:
-        ws.append([r["fecha"], r["unidad_nombre"], r["nog"], si(r.get("nog_catalogado", True)), r["no_sps"], r["paciente_nombre"], r["expediente"], r["procedimiento"], r["medico_nombre"], r["costo"], si(r["impreso"]), si(r["enviado"]), si(r["facturado"]), si(r["pagado"])])
-    ws.append([])
-    ws.append(["TOTALES", "", "", "", "", "", "", "", tot["total_costo"]])
-    ws.append(["Servicios", tot["servicios"]])
-    ws.append(["Total pagado (Q)", tot["total_pagado"]])
-    ws.append(["Total pendiente (Q)", tot["total_pendiente"]])
-    ws.append([])
-    ws.append(["Por estado", "Cantidad", "Monto (Q)"])
-    for e in ["impreso", "enviado", "facturado", "pagado"]:
-        ws.append([e.capitalize(), tot["por_estado"][e]["cantidad"], tot["por_estado"][e]["monto"]])
-    ws.append([])
-    ws.append(["Por NOG", "Unidad", "Cantidad", "Monto (Q)"])
-    for pn in tot["por_nog"]:
-        ws.append([pn["nog"], pn["unidad_nombre"], pn["cantidad"], pn["monto"]])
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    periodo = fecha or f"{desde or ''}_{hasta or ''}"
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="produccion_igss_{periodo}.xlsx"'}
-    )
 
 
 

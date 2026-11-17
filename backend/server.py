@@ -3169,6 +3169,10 @@ api_router.include_router(roles_router, tags=["Roles"])
 
 
 # ==================== MÓDULO DE PACIENTES (Refactorizado) ====================
+from routes.igss_libro_atenciones import (router as igss_libro_atenciones_router,
+                                         pacientes_router as igss_libro_pacientes_router,
+                                         ensure_atenciones_indexes)
+api_router.include_router(igss_libro_pacientes_router, tags=["Pacientes"])
 from routes.patients import router as patients_router, pacientes_router
 
 # Incluir routers de pacientes
@@ -3178,8 +3182,11 @@ api_router.include_router(pacientes_router, tags=["Pacientes - Búsqueda rápida
 # ==================== MÓDULO NOG POR UNIDAD IGSS ====================
 from routes.igss_libro import router as igss_libro_router, ensure_libro_indexes
 api_router.include_router(igss_libro_router, tags=["IGSS - Libro de órdenes"])
+api_router.include_router(igss_libro_atenciones_router, tags=["IGSS - Libro de órdenes"])
 from routes.igss_nogs import router as igss_nogs_router
 api_router.include_router(igss_nogs_router, tags=["Unidades IGSS - NOG"])
+from routes.igss_libro_lecturas import router as igss_libro_lecturas_router
+api_router.include_router(igss_libro_lecturas_router, tags=["IGSS - Libro (lecturas)"])
 
 # ==================== INTEGRACIÓN GOOGLE CALENDAR ====================
 from routes.google_calendar import router as google_calendar_router
@@ -3585,7 +3592,8 @@ async def get_dashboard_resumen_dia(
     """Resumen operativo: ventas de óptica, citas, evaluaciones, servicios IGSS y
     facturación de producción IGSS. Filtra por un día (fecha) o un rango (desde/hasta).
     Sin parámetros usa el día de hoy (hora Guatemala)."""
-    from routes.igss_nogs import _build_produccion_rows, _produccion_totales
+    from routes.igss_nogs import _produccion_totales
+    from routes.igss_libro_lecturas import produccion_rows
 
     # Resolver ventana de fechas (strings YYYY-MM-DD en hora Guatemala)
     if desde and hasta:
@@ -3647,25 +3655,9 @@ async def get_dashboard_resumen_dia(
     # Evaluaciones oftalmológicas
     evaluaciones_total = await db.evaluaciones_oftalmologicas.count_documents({"fecha": fecha_filtro})
 
-    # Servicios al IGSS: acreditaciones NOG no anuladas + total monetario (precio del NOG)
-    acreditaciones = await db.igss_nog_acreditaciones.find(
-        {"fecha_acreditacion": {"$gte": inicio_utc, "$lte": fin_utc}, "anulada": {"$ne": True}},
-        {"_id": 0, "nog_id": 1}
-    ).to_list(10000)
-    nog_ids = list({a["nog_id"] for a in acreditaciones if a.get("nog_id")})
-    precios = {}
-    if nog_ids:
-        async for n in db.igss_nogs.find({"id": {"$in": nog_ids}}, {"_id": 0, "id": 1, "precio": 1}):
-            precios[n["id"]] = n.get("precio", 0) or 0
-    igss_total = round(sum(precios.get(a.get("nog_id"), 0) for a in acreditaciones), 2)
-
-    # Producción IGSS (módulo de facturación): una línea por orden con costo y estados
-    rows = await _build_produccion_rows(
-        f_desde if f_desde == f_hasta else None,
-        None if f_desde == f_hasta else f_desde,
-        None if f_desde == f_hasta else f_hasta,
-        None, None
-    )
+    # Servicios al IGSS y Producción: órdenes del libro atendidas (1 por No. SPS) cuya
+    # primera atención cae en el periodo
+    rows = await produccion_rows(None, f_desde, f_hasta)
     prod_tot = _produccion_totales(rows)
 
     return {
@@ -3677,7 +3669,7 @@ async def get_dashboard_resumen_dia(
         "ventas_optica": ventas_optica,
         "citas": {"total": len(citas), "atendidas": citas_atendidas, "canceladas": citas_canceladas},
         "evaluaciones": {"total": evaluaciones_total},
-        "igss": {"servicios": len(acreditaciones), "total": igss_total},
+        "igss": {"servicios": len(rows), "total": round(sum(r["precio_nog"] for r in rows), 2)},
         "produccion_igss": {
             "servicios": prod_tot["servicios"],
             "total": prod_tot["total_costo"],
@@ -4722,6 +4714,7 @@ async def startup_event():
         pass
     # Libro de órdenes IGSS + índices parciales del catálogo (baja cuantía sin número)
     await ensure_libro_indexes()
+    await ensure_atenciones_indexes()
     # Índices de Óptica
     await db.doctors.create_index([("name", 1)])
     await db.doctors.create_index([("is_active", 1)])

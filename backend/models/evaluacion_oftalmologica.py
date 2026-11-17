@@ -383,6 +383,7 @@ class EvaluacionOftalmologicaBase(BaseModel):
     
     # Orden IGSS vinculada a esta consulta (para expediente/informe por orden)
     igss_orden_id: Optional[str] = None
+    igss_nog_id: Optional[str] = None
     igss_nog: Optional[str] = ""
     igss_no_sps: Optional[str] = ""
     igss_codigo: Optional[str] = ""
@@ -458,6 +459,7 @@ class EvaluacionOftalmologicaUpdate(BaseModel):
     padecimiento_actual: Optional[str] = None
     lectura_examenes: Optional[str] = None
     igss_orden_id: Optional[str] = None
+    igss_nog_id: Optional[str] = None
     igss_nog: Optional[str] = None
     igss_no_sps: Optional[str] = None
     igss_codigo: Optional[str] = None
@@ -491,6 +493,7 @@ class EvaluacionOftalmologicaResponse(EvaluacionOftalmologicaBase):
 
     id: str
     cita_id: Optional[str] = None
+    aviso_igss: Optional[str] = None
     creado_por: str = ""
     creado_por_nombre: str = ""
     fecha_creacion: str = ""
