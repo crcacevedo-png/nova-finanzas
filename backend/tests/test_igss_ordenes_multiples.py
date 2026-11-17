@@ -4,6 +4,7 @@ import random
 import pytest
 import requests
 from pymongo import MongoClient
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -30,12 +31,12 @@ def _login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 @pytest.fixture(scope="module")
 def igss_admin():
-    return _login("igss.admin", "IgssAdmin2024$")
+    return _login(*par("igss"))
 
 
 def _nog(numero):
@@ -105,14 +106,17 @@ class TestOrdenesIgss:
         assert all(o.get("id") for o in ords)
         self.state["ordenes"] = ords
 
-    def test_same_nog_twice_single_discount(self, sa, created):
+    def test_same_nog_two_sps_two_discounts(self, sa, created):
+        # ACTUALIZADA (2026-11-17), antes test_same_nog_twice_single_discount: esperaba que dos
+        # órdenes del mismo NOG con distinto No. SPS descontaran 1 solo cupo. Regla vigente
+        # (aprobada, igual que en el libro): cada No. SPS es una autorización y consume su cupo.
         a0 = _nog(NOG_A)["acreditados"]
         p = _payload(igss_ordenes=[{"nog": NOG_A, "no_sps": "X1"}, {"nog": NOG_A, "no_sps": "X2"}])
         r = sa.post(f"{API}/patients", json=p)
         assert r.status_code in (200, 201), r.text
         created["patients"].append(r.json()["id"])
-        assert _nog(NOG_A)["acreditados"] == a0 + 1
-        assert len(_vigentes(r.json()["id"])) == 1
+        assert _nog(NOG_A)["acreditados"] == a0 + 2
+        assert len(_vigentes(r.json()["id"])) == 2
 
     def test_put_remove_order_releases_one(self, sa):
         b0 = _nog(NOG_B)["acreditados"]

@@ -4,6 +4,7 @@ import uuid
 import pytest
 import requests
 from pymongo import MongoClient
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 UNIT_ID = "37e430e9-4e82-43ce-ac98-28347b7c21e4"
@@ -30,17 +31,17 @@ def _login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 @pytest.fixture(scope="module")
 def opt():
-    return _login("optica", "Optica2024$")
+    return _login(*par("optica"))
 
 
 @pytest.fixture(scope="module")
 def usr():
-    return _login("usuario", "user2024")
+    return _login(*par("usuario"))
 
 
 # ---- Cancel role restriction ----
@@ -110,13 +111,13 @@ class TestCancelRevertsStock:
 class TestOpticaNog:
     def test_optica_create_igss_patient_discounts_nog(self, opt, sa):
         def nog():
-            # Contador LEGADO (acreditaciones) en Mongo: el selector `nogs-activos` ya no
-            # devuelve contadores a roles fuera del Libro IGSS (Fase 3).
+            # Contador LEGADO (acreditaciones) leído de Mongo: `nogs-activos` es solo para los
+            # roles del Libro IGSS desde 2026-11-17 (óptica recibe 403).
             lst = requests.get(f"{BASE_URL}/api/igss-units/{UNIT_ID}/nogs-activos", headers=opt)
-            assert lst.status_code == 200
-            if not any(n["numero"] == NOG_NUM for n in lst.json()):
+            assert lst.status_code == 403
+            d = mdb.igss_nogs.find_one({"unidad_id": UNIT_ID, "numero": NOG_NUM, "is_active": True}, {"_id": 0})
+            if not d:
                 return None
-            d = mdb.igss_nogs.find_one({"unidad_id": UNIT_ID, "numero": NOG_NUM}, {"_id": 0})
             acr = int(d.get("acreditados") or 0)
             return {"acreditados": acr, "disponibles": max(int(d.get("cantidad") or 0) - acr, 0)}
         n0 = nog()

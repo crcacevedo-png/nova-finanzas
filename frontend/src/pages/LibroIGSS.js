@@ -9,7 +9,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { toast, Toaster } from 'sonner';
-import { BookOpen, ShieldCheck, ShieldOff, Search, Link2, XCircle, Loader2 } from 'lucide-react';
+import { BookOpen, ShieldCheck, ShieldOff, Search, Link2, XCircle, Loader2, Lock, Unlock } from 'lucide-react';
 import { igssLibroApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { MotivoDialog, ElegirOrdenDialog } from '../components/igss/OrdenDialogs';
@@ -18,47 +18,58 @@ const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : 
 const fmtHora = (f) => (f ? new Date(f).toLocaleString('es-GT') : '—');
 const ESTADOS = [['pendiente', 'Pendientes'], ['resuelta', 'Resueltas'], ['descartada', 'Descartadas']];
 
-const Interruptor = ({ config, esSuperadmin, onCambiar }) => {
+const INTERRUPTORES = {
+  exigir_orden: {
+    testId: 'libro-interruptor', titulo: 'Exigir orden del libro', iconos: [ShieldCheck, ShieldOff],
+    quien: 'actualizado_por_nombre', cuando: 'actualizado_en', confirmarTitulo: '¿Encender la exigencia de orden?',
+    texto: 'Encendido: una cirugía IGSS nueva exige paciente y un No. SPS del libro, y se rechaza la dosis de más. Apagado: se guarda igual y queda en "atenciones sin orden". En ambos casos una orden con sus dosis completas no admite otra.',
+    confirmar: (c) => <>Hay <b data-testid="libro-interruptor-pendientes">{c?.atenciones_sin_orden_pendientes ?? 0}</b> atenciones sin orden pendientes. Las cirugías IGSS nuevas sin una orden del libro ya no se podrán guardar.</>,
+  },
+  usar_solo_libro: {
+    testId: 'libro-solo-libro', titulo: 'Usar solo el libro', iconos: [Lock, Unlock],
+    quien: 'solo_libro_actualizado_por_nombre', cuando: 'solo_libro_actualizado_en', confirmarTitulo: '¿Usar solo el libro?',
+    texto: 'Encendido: guardar, desactivar o eliminar pacientes y evaluaciones, eliminar un NOG y limpiar borradores dejan de escribir en el sistema anterior (acreditaciones, contador "acreditados" y producción antigua), y sus recálculos quedan deshabilitados. El libro se sigue actualizando igual. Apagado por defecto.',
+    confirmar: () => 'Los botones y funciones antiguas de recalcular, reconciliar, aplicar y anular acreditación quedarán deshabilitados. Los datos antiguos no se borran.',
+  },
+};
+
+const Interruptor = ({ campo, config, esSuperadmin, onCambiar }) => {
+  const d = INTERRUPTORES[campo];
   const [confirmar, setConfirmar] = useState(false);
-  const encendido = !!config?.exigir_orden;
-  const pedirCambio = (v) => (v ? setConfirmar(true) : onCambiar(false));
+  const encendido = !!config?.[campo];
+  const [IconoOn, IconoOff] = d.iconos;
+  const pedirCambio = (v) => (v ? setConfirmar(true) : onCambiar(campo, false));
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-wrap items-center justify-between gap-4" data-testid="libro-interruptor">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-wrap items-center justify-between gap-4" data-testid={d.testId}>
       <div className="flex items-start gap-3">
-        {encendido ? <ShieldCheck className="w-6 h-6 text-emerald-600" /> : <ShieldOff className="w-6 h-6 text-slate-400" />}
+        {encendido ? <IconoOn className="w-6 h-6 text-emerald-600" /> : <IconoOff className="w-6 h-6 text-slate-400" />}
         <div>
           <p className="font-semibold text-slate-800">
-            Exigir orden del libro{' '}
-            <Badge className={encendido ? 'bg-emerald-100 text-emerald-700 border-0' : 'bg-slate-100 text-slate-600 border-0'} data-testid="libro-interruptor-estado">
+            {d.titulo}{' '}
+            <Badge className={encendido ? 'bg-emerald-100 text-emerald-700 border-0' : 'bg-slate-100 text-slate-600 border-0'} data-testid={`${d.testId}-estado`}>
               {encendido ? 'Encendido' : 'Apagado'}
             </Badge>
           </p>
-          <p className="text-xs text-slate-500 max-w-xl mt-1">
-            Encendido: una cirugía IGSS nueva exige paciente y un No. SPS del libro, y se rechaza la dosis de más.
-            Apagado: se guarda igual y queda en "atenciones sin orden". En ambos casos una orden con sus dosis completas no admite otra.
-          </p>
-          {config?.actualizado_en && (
-            <p className="text-xs text-slate-400 mt-1">Último cambio: {config.actualizado_por_nombre} · {fmtHora(config.actualizado_en)}</p>
+          <p className="text-xs text-slate-500 max-w-xl mt-1">{d.texto}</p>
+          {config?.[d.cuando] && (
+            <p className="text-xs text-slate-400 mt-1">Último cambio: {config[d.quien]} · {fmtHora(config[d.cuando])}</p>
           )}
         </div>
       </div>
       {esSuperadmin ? (
-        <Switch checked={encendido} onCheckedChange={pedirCambio} data-testid="libro-interruptor-switch" />
+        <Switch checked={encendido} onCheckedChange={pedirCambio} data-testid={`${d.testId}-switch`} />
       ) : (
         <span className="text-xs text-slate-400">Solo superadmin puede cambiarlo</span>
       )}
       <AlertDialog open={confirmar} onOpenChange={setConfirmar}>
-        <AlertDialogContent data-testid="libro-interruptor-confirmar">
+        <AlertDialogContent data-testid={`${d.testId}-confirmar`}>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Encender la exigencia de orden?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Hay <b data-testid="libro-interruptor-pendientes">{config?.atenciones_sin_orden_pendientes ?? 0}</b> atenciones sin orden pendientes.
-              Las cirugías IGSS nuevas sin una orden del libro ya no se podrán guardar.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{d.confirmarTitulo}</AlertDialogTitle>
+            <AlertDialogDescription>{d.confirmar(config)}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => onCambiar(true)} data-testid="libro-interruptor-confirmar-btn">Encender</AlertDialogAction>
+            <AlertDialogAction onClick={() => onCambiar(campo, true)} data-testid={`${d.testId}-confirmar-btn`}>Encender</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -116,10 +127,10 @@ export default function LibroIGSS() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const cambiarInterruptor = async (v) => {
+  const cambiarInterruptor = async (campo, v) => {
     try {
-      await igssLibroApi.cambiarConfig(v);
-      toast.success(v ? 'Exigencia encendida' : 'Exigencia apagada');
+      await igssLibroApi.cambiarConfig({ [campo]: v });
+      toast.success(`${INTERRUPTORES[campo].titulo}: ${v ? 'encendido' : 'apagado'}`);
       cargar();
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'No se pudo cambiar');
@@ -136,7 +147,9 @@ export default function LibroIGSS() {
             <p className="text-sm text-slate-500">Atenciones que no pudieron vincularse a una orden (No. SPS).</p>
           </div>
         </div>
-        <Interruptor config={config} esSuperadmin={user?.role === 'superadmin'} onCambiar={cambiarInterruptor} />
+        {['exigir_orden', 'usar_solo_libro'].map((campo) => (
+          <Interruptor key={campo} campo={campo} config={config} esSuperadmin={user?.role === 'superadmin'} onCambiar={cambiarInterruptor} />
+        ))}
         <div className="rounded-xl border border-slate-200 bg-white">
           <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
             <div className="flex gap-1">

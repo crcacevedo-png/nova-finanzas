@@ -2,6 +2,7 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://novavision-finanzas.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
@@ -15,17 +16,17 @@ def _login(username, password):
 
 @pytest.fixture(scope="module")
 def superadmin_token():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 @pytest.fixture(scope="module")
 def admin_token():
-    return _login("admin", "Admin2024Nuevo!")
+    return _login(*par("admin"))
 
 
 @pytest.fixture(scope="module")
 def user_token():
-    return _login("usuario", "user2024")
+    return _login(*par("usuario"))
 
 
 def _h(token):
@@ -140,23 +141,32 @@ class TestEvaluacionSealed:
         )
         assert r.status_code == 423
 
-    def test_user_cannot_update(self, user_token, admin_token):
-        eid = self._get_unsealed_id(admin_token)
-        if not eid:
-            pytest.skip("No unsealed evaluation")
-        r = requests.put(
-            f"{API}/evaluaciones/{eid}",
-            headers=_h(user_token),
-            json={"plan": "no debe permitir"},
-            timeout=30,
-        )
-        assert r.status_code == 403
+    def test_user_cannot_update(self, user_token, admin_token, superadmin_token):
+        # Trabaja sobre una evaluación creada aquí: si el permiso cambió, no debe tocar una evaluación real
+        rp = requests.get(f"{API}/patients?limit=1", headers=_h(admin_token), timeout=30)
+        pdata = rp.json() if isinstance(rp.json(), list) else rp.json().get("data", rp.json().get("patients", []))
+        if not pdata:
+            pytest.skip("No patients available")
+        rc = requests.post(f"{API}/evaluaciones", headers=_h(admin_token),
+                           json={"paciente_id": pdata[0]["id"], "motivo_consulta": "TEST_usuario_no_edita"}, timeout=30)
+        assert rc.status_code in (200, 201), rc.text
+        eid = rc.json()["id"]
+        try:
+            r = requests.put(
+                f"{API}/evaluaciones/{eid}",
+                headers=_h(user_token),
+                json={"plan": "no debe permitir"},
+                timeout=30,
+            )
+            assert r.status_code == 403
+        finally:
+            requests.delete(f"{API}/evaluaciones/{eid}", headers=_h(superadmin_token), timeout=30)
 
 
 class TestEvaluacionCrud:
     """CRUD test with cleanup."""
 
-    def test_create_update_get_delete(self, admin_token):
+    def test_create_update_get_delete(self, admin_token, superadmin_token):
         # Get a patient id
         rp = requests.get(f"{API}/patients?limit=1", headers=_h(admin_token), timeout=30)
         assert rp.status_code == 200
@@ -206,4 +216,4 @@ class TestEvaluacionCrud:
             assert ra.json()["motivo_consulta"] == "TEST_autoguardado"
         finally:
             # Cleanup
-            requests.delete(f"{API}/evaluaciones/{eid}", headers=_h(admin_token), timeout=30)
+            requests.delete(f"{API}/evaluaciones/{eid}", headers=_h(superadmin_token), timeout=30)

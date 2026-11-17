@@ -11,6 +11,7 @@ import pytest
 import requests
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 load_dotenv('/app/frontend/.env')
 load_dotenv('/app/backend/.env')
@@ -25,11 +26,11 @@ UNIT3 = f"TEST_libro_u3_{TAG}"
 PAC1 = f"TEST_libro_p1_{TAG}"
 PAC2 = f"TEST_libro_p2_{TAG}"
 CREDS = {
-    "superadmin": ("superadmin", "nova2024"),
-    "admin": ("admin", "Admin2024$"),
-    "administrador_igss": ("igss.admin", "IgssAdmin2024$"),
-    "usuario": ("usuario", "user2024"),
-    "medico": ("medico_test", "medico2024"),
+    "superadmin": par("superadmin"),
+    "admin": par("admin"),
+    "administrador_igss": par("igss"),
+    "usuario": par("usuario"),
+    "medico": par("medico"),
 }
 CONFIG_PREVIA = []
 AUTORIZADOS = ["superadmin", "admin", "administrador_igss"]
@@ -800,10 +801,9 @@ def test_fase3_permisos_de_lecturas(H):
             assert requests.get(u, headers=H[rol]).status_code == 200, (u, rol)
         for rol in DENEGADOS:
             assert requests.get(u, headers=H[rol]).status_code == 403, (u, rol)
-    # Selector ligero: los roles clínicos no reciben contadores ni porcentajes
-    med = requests.get(f"{UNITS_API}/{UNIT}/nogs-activos", headers=H["medico"]).json()
-    fila = next(x for x in med if x["id"] == n["id"])
-    assert set(fila) == {"id", "numero", "nombre_servicio", "estado"}
+    # Selector nogs-activos: solo roles del libro (restringido 2026-11-17); los demás reciben 403
+    for rol in DENEGADOS:
+        assert requests.get(f"{UNITS_API}/{UNIT}/nogs-activos", headers=H[rol]).status_code == 403, rol
     full = requests.get(f"{UNITS_API}/{UNIT}/nogs-activos", headers=sa).json()
     assert "consumidos" in next(x for x in full if x["id"] == n["id"])
 

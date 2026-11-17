@@ -2,7 +2,7 @@
 # Libro de órdenes IGSS — Fase 3: las lecturas salen del libro y cuentan ÓRDENES (No. SPS),
 # nunca dosis ni atenciones: consumidos = atendidas, reservados = pendientes. Contadores y
 # alertas del catálogo, Producción y listado oficial en Excel (1 fila por orden atendida).
-# Exclusivo de LIBRO_IGSS_ROLES, salvo el selector ligero `nogs-activos`.
+# Exclusivo de LIBRO_IGSS_ROLES (incluido el selector `nogs-activos`).
 
 import io
 import re
@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from config.database import db
 from config.permissions import LIBRO_IGSS_ROLES
-from routes.auth import get_current_user, require_role
+from routes.auth import require_role
 from routes.igss_nogs import (TIPO_COMPRA_LABELS, UMBRAL_AVISO, _calcular_edad, _get_nog_or_404,
                               _produccion_totales, _unidad_or_404, etiqueta_catalogo, norm_txt)
 from utils.timezone import now_gt, today_str_gt
@@ -196,14 +196,11 @@ async def listar_nogs_unidad(unit_id: str, current_user: dict = Depends(require_
 
 
 @router.get("/{unit_id}/nogs-activos")
-async def listar_nogs_activos(unit_id: str, current_user: dict = Depends(get_current_user)):
-    """Selector ligero de NOG (ficha del paciente, cirugías). Los roles fuera del libro solo
-    reciben número, servicio y si el NOG está completo; nunca contadores ni porcentajes."""
+async def listar_nogs_activos(unit_id: str, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    """Selector de NOG activos de la unidad (filtro de Pacientes, formulario de cirugía).
+    Exclusivo de LIBRO_IGSS_ROLES: los demás roles no ven números de NOG."""
     nogs = await _nogs_libro({"unidad_id": unit_id, "is_active": True, "numero": {"$nin": [None, ""]}})
     nogs.sort(key=lambda n: n["numero"])
-    if current_user.get("role") not in LIBRO_IGSS_ROLES:
-        return [{"id": n["id"], "numero": n["numero"], "nombre_servicio": n["nombre_servicio"],
-                 "estado": "completado" if n["bloqueado"] else "activo"} for n in nogs]
     conteo = {c["_id"]: c["total"] for c in await db.patients.aggregate([
         {"$match": {"igss_unit_id": unit_id, "is_active": True, "igss_nog": {"$nin": [None, ""]}}},
         {"$group": {"_id": "$igss_nog", "total": {"$sum": 1}}}]).to_list(None)}

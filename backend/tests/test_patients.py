@@ -7,13 +7,14 @@ import pytest
 import requests
 import os
 from datetime import datetime, timedelta
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
-SUPERADMIN_CREDS = {"username": "superadmin", "password": "nova2024"}
-ADMIN_CREDS = {"username": "admin", "password": "admin2024"}
-USER_CREDS = {"username": "usuario", "password": "user2024"}
+SUPERADMIN_CREDS = cred("superadmin")
+ADMIN_CREDS = cred("admin")
+USER_CREDS = cred("usuario")
 
 
 @pytest.fixture(scope="module")

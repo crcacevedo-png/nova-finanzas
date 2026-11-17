@@ -29,6 +29,25 @@ TIPO_COMPRA_LABELS = {
 
 UMBRAL_AVISO = 0.9  # 90%
 
+# ==================== INTERRUPTOR "USAR SOLO EL LIBRO" ====================
+# Encendido: nada escribe en el sistema anterior (igss_nog_acreditaciones, igss_produccion
+# ni igss_nogs.acreditados). Las acciones principales siguen funcionando y el libro se
+# sigue actualizando; solo se apaga su efecto sobre el sistema anterior.
+
+LIBRO_CONFIG_ID = "libro_igss"
+MSG_SOLO_LIBRO = ("Función del sistema anterior deshabilitada: el interruptor \"Usar solo el libro\" está "
+                  "encendido. Los cupos IGSS se cuentan únicamente en el Libro de órdenes IGSS.")
+
+
+async def solo_libro_activo() -> bool:
+    c = await db.igss_libro_config.find_one({"id": LIBRO_CONFIG_ID}, {"_id": 0, "usar_solo_libro": 1})
+    return bool((c or {}).get("usar_solo_libro"))
+
+
+async def _bloquear_si_solo_libro():
+    if await solo_libro_activo():
+        raise HTTPException(status_code=409, detail=MSG_SOLO_LIBRO)
+
 
 # ==================== MODELOS ====================
 
@@ -191,6 +210,8 @@ async def _crear_acreditacion(nog: dict, paciente: dict, evaluacion: dict, orige
       - Una acreditación vigente SIN No. SPS (legada/pre-regla) actúa como
         comodín y bloquea nuevos descuentos del paciente en ese NOG.
       - Misma autorización (mismo No. SPS) ya acreditada => no descuenta de nuevo."""
+    if await solo_libro_activo():
+        return False, "solo_libro"
     pac_id = (paciente or {}).get("id")
     eval_id = (evaluacion or {}).get("id")
     sps = (no_sps or "").strip()
@@ -244,7 +265,7 @@ async def _sincronizar_acreditaciones(nog: dict, user: dict, origen: str = "retr
     unidad_id = nog.get("unidad_id")
     numero = (nog.get("numero") or "").strip()
     cantidad = int(nog.get("cantidad") or 0)
-    if not unidad_id or not numero or cantidad <= 0:
+    if not unidad_id or not numero or cantidad <= 0 or await solo_libro_activo():
         return 0
 
     actual = await db.igss_nogs.find_one({"id": nog["id"]}, {"_id": 0, "acreditados": 1})
@@ -275,6 +296,8 @@ async def _sincronizar_acreditaciones(nog: dict, user: dict, origen: str = "retr
 
 async def _anular_acreditacion_interna(acred: dict, user: dict, motivo: str):
     """Anula una acreditación y libera el cupo del NOG (uso interno)."""
+    if await solo_libro_activo():
+        return
     now = datetime.now(timezone.utc).isoformat()
     await db.igss_nog_acreditaciones.update_one(
         {"id": acred["id"]},
@@ -300,7 +323,7 @@ async def _reconciliar_nog_paciente(paciente: dict, user: dict, origen: str = "a
     Hook llamado al crear/editar/desactivar/reactivar un paciente.
     Si se pasa `solo_numeros` (set), solo se consideran objetivo los NOG cuyo número
     esté en ese conjunto (usado por el recálculo basado en evaluaciones reales)."""
-    if not paciente:
+    if not paciente or await solo_libro_activo():
         return
     pac_id = paciente.get("id")
     if not pac_id:
@@ -383,9 +406,7 @@ async def _acreditar_evaluacion(paciente: dict, evaluacion: dict, user: dict):
     Acredita 1 servicio al NOG de la orden (autorización/No. SPS) de la evaluación
     si tiene cupo. La primera consulta por autorización descuenta; las siguientes
     bajo el mismo No. SPS no vuelven a descontar (dedup por nog/paciente/No. SPS)."""
-    if not paciente:
-        return
-    if paciente.get("referral_institution") != "igss":
+    if not paciente or paciente.get("referral_institution") != "igss" or await solo_libro_activo():
         return
     unidad_id = paciente.get("igss_unit_id")
     # Preferir el NOG de la orden vinculada a la evaluación; si no, el legacy del paciente
@@ -530,7 +551,8 @@ async def eliminar_nog(
     nog = await _get_nog_or_404(nog_id)
     if await db.igss_ordenes_libro.find_one({"nog_id": nog_id}, {"_id": 1}):
         raise HTTPException(status_code=400, detail="Esta entrada del catálogo tiene órdenes en el libro y no se puede eliminar. Desactívela en su lugar.")
-    await db.igss_nog_acreditaciones.delete_many({"nog_id": nog_id})
+    if not await solo_libro_activo():
+        await db.igss_nog_acreditaciones.delete_many({"nog_id": nog_id})
     await db.igss_nogs.delete_one({"id": nog_id})
     await _audit_catalogo("LIBRO_CATALOGO_ELIMINADO", current_user, {
         "nog_id": nog_id, "unidad_id": nog.get("unidad_id", ""), "numero": nog.get("numero", ""),
@@ -545,6 +567,7 @@ async def reconciliar_todo(
     """Backfill idempotente: recalcula el consumo de TODOS los NOG a partir de los
     pacientes activos asignados (1 servicio por paciente). Corrige NOG de pacientes
     ingresados antes de que la asignación descontara el cupo y elimina duplicados."""
+    await _bloquear_si_solo_libro()
     pacientes = await db.patients.find({"is_active": True}, {"_id": 0}).to_list(None)
     reconciliados = 0
     for pac in pacientes:
@@ -560,6 +583,7 @@ async def recalcular_nog(
 ):
     """Re-sincroniza el contador con las evaluaciones existentes (idempotente).
     Útil tras importar evaluaciones o pacientes. Respeta las anulaciones."""
+    await _bloquear_si_solo_libro()
     nog = await _get_nog_or_404(nog_id)
     creadas = await _sincronizar_acreditaciones(nog, current_user, origen="recalculo")
     # Corregir cualquier desajuste del contador: acreditados = acreditaciones vigentes
@@ -633,9 +657,11 @@ async def limpiar_borradores_vacios(
     for i in range(0, len(ids), 500):
         res = await db.evaluaciones_oftalmologicas.delete_many({"id": {"$in": ids[i:i + 500]}})
         eliminados += res.deleted_count
-    # Limpiar estados de producción huérfanos de las evaluaciones eliminadas
-    for i in range(0, len(ids), 500):
-        await db.igss_produccion.delete_many({"evaluacion_id": {"$in": ids[i:i + 500]}})
+    await _quitar_del_libro(ids, current_user)
+    # Limpiar estados de producción huérfanos (sistema anterior) de las evaluaciones eliminadas
+    if not await solo_libro_activo():
+        for i in range(0, len(ids), 500):
+            await db.igss_produccion.delete_many({"evaluacion_id": {"$in": ids[i:i + 500]}})
     await db.audit_logs.insert_one({
         "id": str(uuid.uuid4()),
         "action": "LIMPIEZA_BORRADORES_VACIOS",
@@ -645,6 +671,21 @@ async def limpiar_borradores_vacios(
         "details": {"eliminados": eliminados},
     })
     return {"eliminados": eliminados}
+
+
+async def _quitar_del_libro(ids: list, user: dict):
+    """Las evaluaciones eliminadas salen del libro (atención de su orden o "sin orden")."""
+    from routes.igss_libro_atenciones import quitar_evaluacion
+    en_libro = set()
+    for i in range(0, len(ids), 500):
+        lote = ids[i:i + 500]
+        async for o in db.igss_ordenes_libro.find({"atenciones": {"$elemMatch": {"tipo": "evaluacion", "ref_id": {"$in": lote}}}},
+                                                 {"_id": 0, "atenciones.tipo": 1, "atenciones.ref_id": 1}):
+            en_libro |= {a["ref_id"] for a in o.get("atenciones", []) if a.get("tipo") == "evaluacion" and a.get("ref_id") in lote}
+        en_libro |= set(await db.igss_atenciones_sin_orden.distinct(
+            "ref_id", {"tipo": "evaluacion", "estado": "pendiente", "ref_id": {"$in": lote}}))
+    for ev_id in en_libro:
+        await quitar_evaluacion(ev_id, user)
 
 
 async def _recalcular_consumo_por_evaluaciones(user: dict):
@@ -701,6 +742,7 @@ async def recalcular_por_evaluaciones(
 ):
     """Recalcula el consumo de TODOS los NOG contando solo a los pacientes con una
     evaluación real (con datos clínicos). Útil tras limpiar borradores vacíos."""
+    await _bloquear_si_solo_libro()
     res = await _recalcular_consumo_por_evaluaciones(current_user)
     await db.audit_logs.insert_one({
         "id": str(uuid.uuid4()),
@@ -723,6 +765,7 @@ async def anular_acreditacion(
     current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))
 ):
     """Anula una acreditación hecha por error; libera el servicio (queda disponible)."""
+    await _bloquear_si_solo_libro()
     acred = await db.igss_nog_acreditaciones.find_one({"id": acred_id, "nog_id": nog_id}, {"_id": 0})
     if not acred:
         raise HTTPException(status_code=404, detail="Acreditación no encontrada")
@@ -757,6 +800,7 @@ async def aplicar_acreditacion_manual(
 ):
     """Aplica manualmente 1 descuento de este NOG a un paciente (corrección puntual).
     Respeta el cupo y evita duplicar el mismo NOG para el mismo paciente."""
+    await _bloquear_si_solo_libro()
     nog = await _get_nog_or_404(nog_id)
     paciente = await db.patients.find_one({"id": paciente_id, "is_active": True}, {"_id": 0})
     if not paciente:

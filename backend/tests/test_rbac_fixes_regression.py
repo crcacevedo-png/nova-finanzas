@@ -2,17 +2,18 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 
 CREDS = {
-    "igss": ("igss.admin", "IgssAdmin2024$"),
-    "superadmin": ("superadmin", "nova2024"),
-    "admin": ("admin", "Admin2024$"),
-    "usuario": ("usuario", "user2024"),
-    "optica": ("optica", "Optica2024$"),
-    "anestesia": ("anestesia", "anest2024"),
-    "medico": ("medico_test", "medico2024"),
+    "igss": par("igss"),
+    "superadmin": par("superadmin"),
+    "admin": par("admin"),
+    "usuario": par("usuario"),
+    "optica": par("optica"),
+    "anestesia": par("anestesia"),
+    "medico": par("medico"),
 }
 _sessions = {}
 

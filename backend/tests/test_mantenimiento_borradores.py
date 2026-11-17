@@ -2,6 +2,7 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 IGSS = f"{BASE_URL}/api/igss-units"
@@ -19,17 +20,17 @@ def _login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 @pytest.fixture(scope="module")
 def igss_admin():
-    return _login("igss.admin", "IgssAdmin2024$")
+    return _login(*par("igss"))
 
 
 @pytest.fixture(scope="module")
 def std():
-    return _login("usuario", "user2024")
+    return _login(*par("usuario"))
 
 
 @pytest.fixture(scope="module")

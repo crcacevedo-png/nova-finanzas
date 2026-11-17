@@ -1646,7 +1646,8 @@ async def seed_igss_nogs_from_list():
     (unidad, servicio) para baja cuantía sin número. Si ya existen, se omiten."""
     import json as _json
     import re as _re
-    from routes.igss_nogs import norm_txt
+    from routes.igss_nogs import norm_txt, solo_libro_activo
+    solo_libro = await solo_libro_activo()
     path = os.path.join(os.path.dirname(__file__), "data", "igss_nogs_seed.json")
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -1731,7 +1732,7 @@ async def seed_igss_nogs_from_list():
             "precio": precio,
             "monto_total": monto_total,
             "fecha_asignacion": "",
-            "acreditados": max(acreditados, 0),
+            "acreditados": 0 if solo_libro else max(acreditados, 0),
             "libro_ocupados": 0,
             "is_active": True,
             "created_by": created_by,
@@ -1766,6 +1767,14 @@ async def cleanup_igss_nog_seed_duplicates():
     flag = await db.system_flags.find_one({"key": "nog_dedup_cleanup_v1"})
     if flag and flag.get("done"):
         return
+    from routes.igss_nogs import solo_libro_activo
+    solo_libro = await solo_libro_activo()  # encendido: no toca las acreditaciones antiguas
+
+    async def _reapuntar_libro(filtro, cambios):
+        try:
+            await db.igss_ordenes_libro.update_many(filtro, {"$set": cambios})
+        except Exception as e:  # No. SPS repetido entre las dos unidades: queda para revisión manual
+            print(f"Limpieza NOG IGSS: órdenes del libro {filtro} no reapuntadas: {e}")
 
     path = os.path.join(os.path.dirname(__file__), "data", "igss_nogs_seed.json")
     try:
@@ -1816,6 +1825,7 @@ async def cleanup_igss_nog_seed_duplicates():
         survivor_nogs = await db.igss_nogs.find({"unidad_id": survivor_id}, {"_id": 0}).to_list(5000)
         survivor_numeros = {(n.get("numero") or "").strip() for n in survivor_nogs if (n.get("numero") or "").strip()}
         survivor_servicios = {_norm(n.get("nombre_servicio")) for n in survivor_nogs if not (n.get("numero") or "").strip()}
+        survivor_ids = {((n.get("numero") or "").strip() or _norm(n.get("nombre_servicio"))): n["id"] for n in survivor_nogs}
 
         # Para cada unidad duplicada: borrar el NOG si ya existe en la conservada;
         # si no existe, reapuntarlo a la conservada (NOG genuinamente nuevo).
@@ -1826,8 +1836,11 @@ async def cleanup_igss_nog_seed_duplicates():
                 serv = _norm(n.get("nombre_servicio"))
                 ya_existe = (numero in survivor_numeros) if numero else (serv in survivor_servicios)
                 if ya_existe:
+                    # Libro: sus órdenes pasan a la entrada conservada antes de borrar la copia
+                    await _reapuntar_libro({"nog_id": n["id"]}, {"nog_id": survivor_ids.get(numero or serv), "unidad_id": survivor_id})
                     await db.igss_nogs.delete_one({"id": n["id"]})
-                    await db.igss_nog_acreditaciones.delete_many({"nog_id": n["id"]})
+                    if not solo_libro:
+                        await db.igss_nog_acreditaciones.delete_many({"nog_id": n["id"]})
                     nogs_eliminados += 1
                 else:
                     await db.igss_nogs.update_one({"id": n["id"]}, {"$set": {"unidad_id": survivor_id}})
@@ -1835,9 +1848,11 @@ async def cleanup_igss_nog_seed_duplicates():
                         survivor_numeros.add(numero)
                     else:
                         survivor_servicios.add(serv)
-            # Reapuntar acreditaciones restantes y pacientes de la copia
-            await db.igss_nog_acreditaciones.update_many(
-                {"unidad_id": dup["id"]}, {"$set": {"unidad_id": survivor_id}})
+            # Reapuntar acreditaciones restantes (sistema anterior), libro y pacientes de la copia
+            if not solo_libro:
+                await db.igss_nog_acreditaciones.update_many(
+                    {"unidad_id": dup["id"]}, {"$set": {"unidad_id": survivor_id}})
+            await _reapuntar_libro({"unidad_id": dup["id"]}, {"unidad_id": survivor_id})
             await db.patients.update_many(
                 {"igss_unit_id": dup["id"]}, {"$set": {"igss_unit_id": survivor_id}})
 

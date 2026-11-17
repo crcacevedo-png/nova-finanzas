@@ -1,10 +1,10 @@
 """
 Pruebas de acceso del rol 'medico' (ERP NovaVisión).
 Valida:
- - Login medico_test con permisos efectivos esperados.
+ - Login del médico de prueba (sembrado) con permisos efectivos esperados.
  - GET /roles/available-permissions incluye categoría 'clinica' con 4 permisos.
  - GET /roles/medico retorna display_name 'Médico' y permisos clínicos True.
- - GET /agenda/mi-dia con token de médico retorna 'Dr. Carlos Méndez' y filtra por médico.
+ - GET /agenda/mi-dia con token de médico retorna la ficha vinculada y filtra por médico.
  - Menu config del rol medico contiene los 4 menús esperados.
  - Vincular usuario_id a ficha de médico vía PATCH /medicos-agenda/{id}.
  - Regresión: rol usuario y admin conservan view_agenda; optica no.
@@ -12,12 +12,14 @@ Valida:
 import os
 import pytest
 import requests
+from usuarios_prueba import DOCTOR_PRUEBA, USUARIOS, par, password  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
-MEDICO_FICHA_ID = "a8bb541a-7fcb-49ab-bd20-32788f57acb5"
-DR_NAME = "Dr. Carlos Méndez"
+# ficha de médico sembrada y vinculada al usuario de prueba "medico"
+MEDICO_FICHA_ID = DOCTOR_PRUEBA
+DR_NAME = USUARIOS["medico"][2]
 
 
 def _login(username, password):
@@ -28,17 +30,17 @@ def _login(username, password):
 
 @pytest.fixture(scope="module")
 def superadmin():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 @pytest.fixture(scope="module")
 def medico():
-    return _login("medico_test", "medico2024")
+    return _login(*par("medico"))
 
 
 @pytest.fixture(scope="module")
 def usuario():
-    return _login("usuario", "user2024")
+    return _login(*par("usuario"))
 
 
 def _h(tok): return {"Authorization": f"Bearer {tok['access_token'] if 'access_token' in tok else tok.get('token','')}"}
@@ -105,12 +107,12 @@ def test_menu_config_medico(superadmin):
 
 # ---------- 6. Vinculación usuario_id a ficha médico ----------
 def test_patch_medico_usuario_id_idempotent(superadmin, medico):
-    # Obtener user id medico_test
+    # Obtener user id del médico de prueba
     r = requests.get(f"{API}/users", headers=_h(superadmin), timeout=30)
     assert r.status_code == 200
     users = r.json() if isinstance(r.json(), list) else r.json().get("users", [])
-    medico_user = next((u for u in users if u.get("username") == "medico_test"), None)
-    assert medico_user, "medico_test user no encontrado"
+    medico_user = next((u for u in users if u.get("username") == USUARIOS["medico"][0]), None)
+    assert medico_user, "usuario médico de prueba no encontrado"
     uid = medico_user.get("id") or medico_user.get("_id")
 
     # PATCH setear usuario_id (idempotente)
@@ -156,7 +158,7 @@ def test_mi_dia_sin_vinculo(superadmin):
         f"{API}/users",
         json={
             "username": uname,
-            "password": "test1234",
+            "password": password("medico_temporal"),
             "name": "TEST Medico Sin Ficha",
             "role": "medico",
             "email": f"{uname}@test.com",
@@ -168,7 +170,7 @@ def test_mi_dia_sin_vinculo(superadmin):
     created_id = r.json().get("id") or r.json().get("user", {}).get("id")
 
     # login
-    tok = _login(uname, "test1234")
+    tok = _login(uname, password("medico_temporal"))
     r = requests.get(f"{API}/agenda/mi-dia", headers=_h(tok), timeout=30)
     assert r.status_code == 403, f"esperado 403, got {r.status_code} {r.text}"
     assert "vinculado" in r.text.lower() or "medico" in r.text.lower()

@@ -180,7 +180,7 @@ const Pacientes = () => {
   // Cargar los NOG de la unidad elegida en el filtro (cascada unidad -> NOG)
   useEffect(() => {
     const unitId = filters.igss_unit_id;
-    if (!unitId) {
+    if (!unitId || !puedeVerLibroIgss(user)) {
       setFilterNogs([]);
       return;
     }
@@ -189,7 +189,7 @@ const Pacientes = () => {
       .then((res) => { if (!cancelled) setFilterNogs(res.data || []); })
       .catch(() => { if (!cancelled) setFilterNogs([]); });
     return () => { cancelled = true; };
-  }, [filters.igss_unit_id]);
+  }, [filters.igss_unit_id, user]);
 
   useEffect(() => {
     fetchPatients();

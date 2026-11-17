@@ -3,6 +3,7 @@ import os
 import uuid
 import pytest
 import requests
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 
@@ -17,12 +18,16 @@ def _read_env(key):
 
 @pytest.fixture(scope="module")
 def headers():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json={"username": "superadmin", "password": "nova2024"})
+    r = requests.post(f"{BASE_URL}/api/auth/login", json=cred("superadmin"))
     if r.status_code != 200:
         pytest.skip(f"login failed {r.status_code}")
     d = r.json()
     tk = d.get("access_token") or d.get("token")
     return {"Authorization": f"Bearer {tk}", "Content-Type": "application/json"}
+
+
+RESUMEN_KEYS = ("ingreso_facturado", "total_cobrado", "cxc_generada_hoy", "cobrado_de_ventas_hoy",
+                "abonos_cuentas_previas", "egresos", "num_ventas")
 
 
 def _cierre(headers, fecha=None):
@@ -33,24 +38,33 @@ def _cierre(headers, fecha=None):
 
 # ---------- Cierre del día: structure & invariants ----------
 class TestCierreDiario:
+    # Estructura vigente desde 2026-11-04: "general" + secciones "clinica" y "optica"
     def test_structure(self, headers):
         d = _cierre(headers)
-        for k in ("fecha", "resumen", "cobrado_por_metodo", "por_usuario", "conciliacion_cajas", "ventas"):
+        for k in ("fecha", "general", "clinica", "optica", "conciliacion_cajas"):
             assert k in d
-        for k in ("ingreso_facturado", "total_cobrado", "cxc_generada_hoy", "cobrado_de_ventas_hoy",
-                  "abonos_cuentas_previas", "egresos", "num_ventas"):
-            assert k in d["resumen"]
-            assert isinstance(d["resumen"][k], (int, float))
-        for m in ("efectivo", "tarjeta", "transferencia", "cheque", "otro"):
-            assert m in d["cobrado_por_metodo"]
+        for r in (d["general"], d["clinica"]["resumen"], d["optica"]["resumen"]):
+            for k in RESUMEN_KEYS:
+                assert isinstance(r[k], (int, float)), k
+        for sec in ("clinica", "optica"):
+            for k in ("cobrado_por_metodo", "por_usuario", "ventas"):
+                assert k in d[sec]
+            for m in ("efectivo", "tarjeta", "transferencia", "cheque", "otro"):
+                assert m in d[sec]["cobrado_por_metodo"]
 
     def test_devengado_invariant(self, headers):
         d = _cierre(headers)
-        r = d["resumen"]
-        assert abs(r["ingreso_facturado"] - (r["cobrado_de_ventas_hoy"] + r["cxc_generada_hoy"])) < 0.02, r
-        assert abs(r["total_cobrado"] - sum(d["cobrado_por_metodo"].values())) < 0.02
-        assert r["num_ventas"] == len(d["ventas"])
-        assert abs(sum(u["facturado"] for u in d["por_usuario"]) - r["ingreso_facturado"]) < 0.05
+        for sec in ("clinica", "optica"):
+            s, r = d[sec], d[sec]["resumen"]
+            assert abs(r["ingreso_facturado"] - (r["cobrado_de_ventas_hoy"] + r["cxc_generada_hoy"])) < 0.02, (sec, r)
+            assert abs(r["total_cobrado"] - sum(s["cobrado_por_metodo"].values())) < 0.02, sec
+            assert r["num_ventas"] == len(s["ventas"]), sec
+            assert abs(sum(u["facturado"] for u in s["por_usuario"]) - r["ingreso_facturado"]) < 0.05, sec
+        g, c, o = d["general"], d["clinica"]["resumen"], d["optica"]["resumen"]
+        for k in ("ingreso_facturado", "total_cobrado", "cxc_generada_hoy", "cobrado_de_ventas_hoy",
+                  "abonos_cuentas_previas", "num_ventas"):
+            assert abs(g[k] - (c[k] + o[k])) < 0.05, k
+        assert abs(g["egresos"] - c["egresos"]) < 0.02
 
     def test_specific_date(self, headers):
         d = _cierre(headers, "2026-11-02")
@@ -58,8 +72,8 @@ class TestCierreDiario:
 
     def test_empty_past_date(self, headers):
         d = _cierre(headers, "2001-01-01")
-        assert d["resumen"]["ingreso_facturado"] == 0
-        assert d["ventas"] == []
+        assert d["general"]["ingreso_facturado"] == 0
+        assert d["clinica"]["ventas"] == [] and d["optica"]["ventas"] == []
 
     def test_invalid_date_returns_4xx(self, headers):
         r = requests.get(f"{BASE_URL}/api/caja/cierre-diario", params={"fecha": "not-a-date"}, headers=headers)
@@ -70,7 +84,7 @@ class TestCierreDiario:
         assert r.status_code in (401, 403)
 
     def test_non_admin_forbidden(self):
-        r = requests.post(f"{BASE_URL}/api/auth/login", json={"username": "usuario", "password": "user2024"})
+        r = requests.post(f"{BASE_URL}/api/auth/login", json=cred("usuario"))
         if r.status_code != 200:
             pytest.skip("usuario login failed")
         tk = r.json().get("access_token") or r.json().get("token")
@@ -141,7 +155,7 @@ class TestCxCDescripcion:
                                json={"nombre": "TEST_Responsable Cierre", "tipo": "otro"}, headers=headers)
             assert cr.status_code == 200, cr.text
             resp_list = [cr.json()]
-        before = _cierre(headers)["resumen"]
+        before = _cierre(headers)["clinica"]["resumen"]
         r = None
         for p in cands:
             sub = p["precio_venta"]
@@ -165,13 +179,13 @@ class TestCxCDescripcion:
             c = requests.get(f"{BASE_URL}/api/cuentas-cobrar/{cxc_id}", headers=headers).json()
             print("CXC descripcion:", c.get("descripcion"))
             assert p["nombre"] in (c.get("descripcion") or ""), c
-        after = _cierre(headers)["resumen"]
+        after = _cierre(headers)["clinica"]["resumen"]
         assert abs(after["ingreso_facturado"] - before["ingreso_facturado"] - total) < 0.02
         assert abs(after["cxc_generada_hoy"] - before["cxc_generada_hoy"] - total) < 0.02
         # anular -> cierre should drop back
         a = requests.post(f"{BASE_URL}/api/ventas/{v['id']}/anular",
                           json={"motivo": "TEST anulacion cierre", "devolver_inventario": True}, headers=headers)
         assert a.status_code == 200, a.text
-        final = _cierre(headers)["resumen"]
+        final = _cierre(headers)["clinica"]["resumen"]
         assert abs(final["ingreso_facturado"] - before["ingreso_facturado"]) < 0.02, \
             f"Venta anulada sigue contando en cierre: before={before['ingreso_facturado']} final={final['ingreso_facturado']}"

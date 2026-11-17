@@ -4,6 +4,7 @@ import uuid
 import pytest
 import requests
 from pymongo import MongoClient
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
@@ -17,7 +18,7 @@ def _login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    r = _login("superadmin", "nova2024")
+    r = _login(*par("superadmin"))
     if r.status_code != 200:
         pytest.skip("superadmin login failed")
     s = requests.Session()
@@ -44,7 +45,7 @@ def created_ids():
 
 
 def test_igss_admin_login():
-    r = _login("igss.admin", "IgssAdmin2024$")
+    r = _login(*par("igss"))
     assert r.status_code == 200
     assert r.json().get("access_token")
 

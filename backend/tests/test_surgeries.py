@@ -5,13 +5,13 @@ Tests CRUD operations for surgeries, equipment, supplies, and report exports.
 import pytest
 import requests
 import os
-from datetime import datetime
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials
-SUPERADMIN_CREDS = {"username": "superadmin", "password": "nova2024"}
-ADMIN_CREDS = {"username": "admin", "password": "admin2024"}
+SUPERADMIN_CREDS = cred("superadmin")
+ADMIN_CREDS = cred("admin")
 
 # Store tokens and test data
 tokens = {}

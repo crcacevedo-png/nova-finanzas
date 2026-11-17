@@ -4,6 +4,7 @@ import os
 import io
 import pytest
 import requests
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api/igss-units/produccion"
@@ -22,7 +23,7 @@ def _login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 class TestListado:
@@ -62,12 +63,12 @@ class TestExcel:
 
 class TestAccess:
     def test_medico_403(self):
-        s = _login("medico_test", "medico2024")
+        s = _login(*par("medico"))
         assert s.get(API, params=RANGE).status_code == 403
         assert s.get(f"{API}/reporte/excel", params=RANGE).status_code == 403
 
     def test_igss_admin_allowed(self):
-        s = _login("igss.admin", "IgssAdmin2024$")
+        s = _login(*par("igss"))
         assert s.get(API, params=RANGE).status_code == 200
 
     def test_unauth(self):

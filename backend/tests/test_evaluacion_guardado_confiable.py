@@ -2,6 +2,7 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
@@ -11,7 +12,7 @@ LEGACY_EVAL_ID = "75837fc6-020b-46b6-bbac-a553923eb634"  # round-2 legacy record
 
 @pytest.fixture(scope="module")
 def s():
-    r = requests.post(f"{API}/auth/login", json={"username": "superadmin", "password": "nova2024"}, timeout=30)
+    r = requests.post(f"{API}/auth/login", json=cred("superadmin"), timeout=30)
     if r.status_code != 200:
         pytest.skip("login failed")
     sess = requests.Session()

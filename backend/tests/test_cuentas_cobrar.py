@@ -2,6 +2,7 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://novavision-finanzas.preview.emergentagent.com').rstrip('/')
 API = f"{BASE_URL}/api"
@@ -9,7 +10,7 @@ API = f"{BASE_URL}/api"
 
 @pytest.fixture(scope="module")
 def token():
-    r = requests.post(f"{API}/auth/login", json={"username": "superadmin", "password": "nova2024"})
+    r = requests.post(f"{API}/auth/login", json=cred("superadmin"))
     assert r.status_code == 200, f"Login failed: {r.status_code} {r.text}"
     data = r.json()
     tok = data.get("access_token") or data.get("token")

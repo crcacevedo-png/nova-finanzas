@@ -45,7 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
-import { igssUnitApi, igssNogApi, patientApi } from '../services/api';
+import { igssUnitApi, igssNogApi, igssLibroApi, patientApi } from '../services/api';
 import { ProduccionIGSS } from '../components/ProduccionIGSS';
 import { NogsUnidadDialog } from '../components/NogsUnidadDialog';
 import { NogAlertasBanner } from '../components/NogAlertasBanner';
@@ -190,6 +190,7 @@ const UnidadesIGSS = () => {
   const [mantLoading, setMantLoading] = useState(false);
   const [limpiando, setLimpiando] = useState(false);
   const [recalcEval, setRecalcEval] = useState(false);
+  const [soloLibro, setSoloLibro] = useState(false);
   const [legacyPreview, setLegacyPreview] = useState(null);
   const [migrandoLegacy, setMigrandoLegacy] = useState(false);
   const [confirmLimpiar, setConfirmLimpiar] = useState(false);
@@ -231,6 +232,7 @@ const UnidadesIGSS = () => {
     setConfirmLimpiar(false);
     setMantPreview(null);
     setMantLoading(true);
+    igssLibroApi.config().then((r) => setSoloLibro(!!r.data?.usar_solo_libro)).catch(() => setSoloLibro(false));
     try {
       const res = await igssNogApi.previewBorradoresVacios();
       setMantPreview(res.data);
@@ -266,7 +268,7 @@ const UnidadesIGSS = () => {
       setLimpiando(true);
       const res = await igssNogApi.limpiarBorradoresVacios();
       const n = res.data?.eliminados ?? 0;
-      toast.success(`${n} borrador(es) vacío(s) eliminado(s). Recalcula el consumo para actualizar los NOG.`);
+      toast.success(`${n} borrador(es) vacío(s) eliminado(s).${soloLibro ? "" : " Recalcula el consumo para actualizar los NOG."}`);
       setConfirmLimpiar(false);
       // refrescar preview
       const fresh = await igssNogApi.previewBorradoresVacios();
@@ -880,7 +882,7 @@ const UnidadesIGSS = () => {
                 </div>
                 <Button
                   size="sm"
-                  disabled={recalcEval}
+                  disabled={recalcEval || soloLibro}
                   onClick={handleRecalcularPorEvaluaciones}
                   className="btn-primary"
                   data-testid="mant-recalcular-eval-button"
@@ -888,6 +890,11 @@ const UnidadesIGSS = () => {
                   {recalcEval ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-2" />}
                   {recalcEval ? 'Recalculando...' : 'Recalcular consumo'}
                 </Button>
+                {soloLibro && (
+                  <p className="text-xs text-amber-700" data-testid="mant-recalcular-deshabilitado">
+                    Deshabilitado: el interruptor "Usar solo el libro" está encendido. Los cupos se cuentan únicamente en el Libro de órdenes IGSS.
+                  </p>
+                )}
               </div>
 
               {/* Sección 3: Migración de órdenes legacy */}

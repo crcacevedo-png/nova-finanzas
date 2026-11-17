@@ -2,6 +2,7 @@
 import os
 import requests
 import pytest
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://novavision-finanzas.preview.emergentagent.com').rstrip('/')
 API = f"{BASE_URL}/api"
@@ -21,9 +22,9 @@ def headers(token):
 @pytest.fixture(scope="module")
 def tokens():
     return {
-        "usuario": login("usuario", "user2024")[0],
-        "admin": login("admin", "Admin2024Nuevo!")[0],
-        "superadmin": login("superadmin", "nova2024")[0],
+        "usuario": login(*par("usuario"))[0],
+        "admin": login(*par("admin"))[0],
+        "superadmin": login(*par("superadmin"))[0],
     }
 
 
@@ -50,6 +51,8 @@ class TestUsuarioNoPuedeEscribir:
     def test_usuario_POST_evaluacion_403(self, tokens, paciente_id):
         r = requests.post(f"{API}/evaluaciones", headers=headers(tokens["usuario"]), json=_payload(paciente_id), timeout=30)
         print(f"USUARIO POST => {r.status_code} : {r.text[:300]}")
+        if r.status_code in (200, 201) and r.json().get("id"):
+            requests.delete(f"{API}/evaluaciones/{r.json()['id']}", headers=headers(tokens["superadmin"]), timeout=30)
         assert r.status_code == 403, f"Expected 403 for usuario, got {r.status_code}: {r.text}"
 
     def test_usuario_PUT_evaluacion_403(self, tokens, paciente_id):

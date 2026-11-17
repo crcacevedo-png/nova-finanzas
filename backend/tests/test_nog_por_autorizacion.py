@@ -6,6 +6,7 @@ import uuid
 import pytest
 import requests
 from pymongo import MongoClient
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
@@ -30,12 +31,12 @@ def _login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    return _login("superadmin", "nova2024")
+    return _login(*par("superadmin"))
 
 
 @pytest.fixture(scope="module")
 def ia():
-    return _login("igss.admin", "IgssAdmin2024$")
+    return _login(*par("igss"))
 
 
 @pytest.fixture(scope="module")

@@ -8,13 +8,14 @@ import time
 import uuid
 import pytest
 import requests
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://novavision-finanzas.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-SUPERADMIN = {"username": "superadmin", "password": "nova2024"}
-IGSS_ADMIN = {"username": "igss.admin", "password": "IgssAdmin2024"}
-OPTICA = {"username": "optica", "password": "optica2024"}
+SUPERADMIN = cred("superadmin")
+IGSS_ADMIN = cred("igss")
+OPTICA = cred("optica")
 
 
 def _login(creds):
@@ -139,6 +140,17 @@ class TestCatalogoNOG:
 class TestAcreditacionYBloqueo:
     """Crear NOG cantidad=3, paciente con ese NOG, 4 evaluaciones -> acreditados=3."""
 
+    # RETIRADA (2026-11-17). Verificaba dos reglas que ya fueron reemplazadas:
+    #  1) "1 acreditación por evaluación": desde 2026-11 el sistema anterior descuenta 1 cupo
+    #     por AUTORIZACIÓN (No. SPS); 4 evaluaciones del mismo paciente = 1 cupo, nunca 3.
+    #  2) Desde la Fase 3 del libro, GET /{unidad}/nogs y /nogs/{id}/pacientes muestran los
+    #     contadores del LIBRO (órdenes atendidas/pendientes), no el campo "acreditados".
+    # La regla vigente ya fallaba antes de la Fase 1 (línea base). Cobertura equivalente:
+    # test_igss_libro.py::test_03_tres_dosis_un_cupo_y_cuarta_rechazada,
+    # ::test_06_consulta_seguimiento_no_consume_otro_cupo, ::test_fase3_contadores_cuentan_ordenes_no_dosis
+    # y ::test_fase3_aviso_90_y_bloqueo_100. test_anular_libera_cupo y test_recalcular_respeta_anulacion
+    # dependen de esta prueba y quedan omitidas con ella.
+    @pytest.mark.skip(reason="Retirada: regla '1 acreditación por evaluación' reemplazada; ver comentario")
     def test_flujo_completo(self, super_token, unidad_id):
         numero = f"NOG-BLOQ-{uuid.uuid4().hex[:6]}"
         r = requests.post(
@@ -248,8 +260,11 @@ class TestRetroactivo:
         )
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d.get("acreditaciones_retroactivas") == 2, f"retro esperado 2, got {d}"
-        assert d["acreditados"] == 2
+        # ACTUALIZADA (2026-11-17): antes esperaba 2 (regla vieja "1 por evaluación"). Regla
+        # vigente del sistema anterior: 1 cupo por paciente/autorización; 2 evaluaciones del
+        # mismo paciente sin No. SPS = 1 acreditación retroactiva.
+        assert d.get("acreditaciones_retroactivas") == 1, f"retro esperado 1, got {d}"
+        assert d["acreditados"] == 1
 
 
 class TestExportaciones:

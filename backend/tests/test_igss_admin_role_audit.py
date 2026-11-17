@@ -3,10 +3,10 @@ import os
 import uuid
 import pytest
 import requests
+from usuarios_prueba import cred, par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
-USER = "igss.admin"
-PWD = "IgssAdmin2024$"
+USER, PWD = par("igss")
 
 RESULTS = {}
 
@@ -151,7 +151,7 @@ def test_patient_create_edit_flow(client):
         print("IGSS DELETE PATIENT (expected 403)", d.status_code)
     finally:
         sa = requests.Session()
-        lr = sa.post(f"{BASE_URL}/api/auth/login", json={"username": "superadmin", "password": "nova2024"})
+        lr = sa.post(f"{BASE_URL}/api/auth/login", json=cred("superadmin"))
         if lr.status_code == 200:
             tok = lr.json().get("access_token") or lr.json().get("token")
             if tok:

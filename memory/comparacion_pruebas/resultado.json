@@ -1,0 +1,1021 @@
+{
+ "totales": {
+  "A": {
+   "error": 9,
+   "falla": 39,
+   "omitida": 12,
+   "pasa": 329,
+   "total": 389
+  },
+  "B": {
+   "error": 9,
+   "falla": 62,
+   "omitida": 12,
+   "pasa": 306,
+   "total": 389
+  },
+  "C": {
+   "falla": 68,
+   "omitida": 23,
+   "pasa": 338,
+   "total": 429
+  },
+  "D": {
+   "falla": 18,
+   "omitida": 23,
+   "pasa": 388,
+   "total": 429
+  }
+ },
+ "pruebas_originales_A_vs_B": {
+  "pasaba_y_ahora_falla": [
+   {
+    "prueba": "test_gestion_nog.py::test_list_all_superadmin",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert 'acreditados' in {'aviso_90': False, 'bloqueado': False, 'cantidad': 43, 'consumidos': 0, ...}",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_igss_ordenes_multiples.py::TestOrdenesIgss::test_aplicar_manual_and_duplicate",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditaciones'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_mantenimiento_borradores.py::TestRecalculo::test_recalculo_idempotent_no_overdraft",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'servicios_acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_counter_consistency",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_eval_new_sps_discounts",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_evals_existing_sps_no_extra",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_legacy_wildcard_blocks",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_no_sps_legacy",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_one_sps_many_evals",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_put_reconcile",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestAutorizacion::test_two_sps_two_cupos",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestCupo::test_aviso_90",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestCupo::test_cap_block",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestEdicionPaciente::test_put_phone_keeps_eval_sps",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestProduccion::test_rows_by_authorization",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: []\nassert [] == ['SPS-A1', 'SPS-A2']\n  \n  Right contains 2 more items, first extra item: 'SPS-A1'\n  Use -v to get more diff",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_nog_por_autorizacion.py::TestProduccion::test_rows_no_sps",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "assert (0 == 1)\n +  where 0 = len([])",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_optica_ventas_cancel_nog.py::TestOpticaNog::test_optica_create_igss_patient_discounts_nog",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "assert 403 == 200\n +  where 403 = <Response [403]>.status_code",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestAccess::test_medico_403",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert 404 == 403\n +  where 404 = <Response [404]>.status_code\n +    where <Response [404]> = patch('http://127.0.0.1:8102/api/igss-units/produccion/x', json={'pagado': True})\n +      where patch = <requests.sessions.Session object at 0xfe226dec5210>.patch",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestExcel::test_excel",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert 'Fecha 1ª atención' == 'Fecha'\n  \n  - Fecha\n  + Fecha 1ª atención",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestPatch::test_costo_override",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "assert 404 == 200\n +  where 404 = <Response [404]>.status_code",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestPatch::test_negative_cost_rejected",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: negative cost accepted: 404\nassert 404 in (400, 422)\n +  where 404 = <Response [404]>.status_code",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestPatch::test_patch_empty_400",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "assert 404 == 400\n +  where 404 = <Response [404]>.status_code",
+    "msg_antes": ""
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestPatch::test_toggle_pagado_updates_totals",
+    "antes": "pasa",
+    "ahora": "falla",
+    "msg_ahora": "assert (404 == 200)\n +  where 404 = <Response [404]>.status_code",
+    "msg_antes": ""
+   }
+  ],
+  "fallaba_y_ahora_pasa": [],
+  "falla_en_ambos": [
+   {
+    "prueba": "test_cierre_diario.py::TestCierreDiario::test_devengado_invariant",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'resumen'",
+    "msg_antes": "KeyError: 'resumen'"
+   },
+   {
+    "prueba": "test_cierre_diario.py::TestCierreDiario::test_empty_past_date",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'resumen'",
+    "msg_antes": "KeyError: 'resumen'"
+   },
+   {
+    "prueba": "test_cierre_diario.py::TestCierreDiario::test_structure",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert 'resumen' in {'clinica': {'cobrado_por_metodo': {'cheque': 0.0, 'efectivo': 0.0, 'otro': 0.0, 'tarjeta': 0.0, ...}, 'por_usuario': ...neral': {'abonos_cuentas_previas': 0.0, 'cobrado_de_ventas_hoy': 0.0, 'cxc_generada_hoy': 0.0, 'egresos': 0, ...}, ...}",
+    "msg_antes": "AssertionError: assert 'resumen' in {'clinica': {'cobrado_por_metodo': {'cheque': 0.0, 'efectivo': 0.0, 'otro': 0.0, 'tarjeta': 0.0, ...}, 'por_usuario': ...neral': {'abonos_cuentas_previas': 0.0, 'cobrado_de_ventas_hoy': 0.0, 'cxc_generada_hoy': 0.0, 'egresos': 0, ...}, ...}"
+   },
+   {
+    "prueba": "test_cierre_diario.py::TestCxCDescripcion::test_clinica_pos_cxc_autodescripcion_and_cierre",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'resumen'",
+    "msg_antes": "KeyError: 'resumen'"
+   },
+   {
+    "prueba": "test_cierre_diario.py::TestEnvioManual::test_enviar_manual",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: {\"detail\":\"No se pudo enviar el cierre: No se pudo enviar el correo\"}\nassert 502 == 200\n +  where 502 = <Response [502]>.status_code",
+    "msg_antes": "AssertionError: {\"detail\":\"No se pudo enviar el cierre: No se pudo enviar el correo\"}\nassert 502 == 200\n +  where 502 = <Response [502]>.status_code"
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionCrud::test_create_update_get_delete",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionSealed::test_autoguardar_on_sealed_returns_423",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionSealed::test_put_on_sealed_returns_423",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionSealed::test_sample_sealed_exists",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: Expected at least 1 sealed sample evaluation\nassert None is not None",
+    "msg_antes": "AssertionError: Expected at least 1 sealed sample evaluation\nassert None is not None"
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionSealed::test_user_cannot_update",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login failed for admin: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluaciones_permisos.py::TestAdminYSuperadminSiPueden::test_admin_POST_evaluacion_ok",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluaciones_permisos.py::TestAdminYSuperadminSiPueden::test_superadmin_POST_evaluacion_ok",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluaciones_permisos.py::TestUsuarioNoPuedeEscribir::test_usuario_POST_evaluacion_403",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_evaluaciones_permisos.py::TestUsuarioNoPuedeEscribir::test_usuario_PUT_evaluacion_403",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login admin failed: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_igss_admin_role_audit.py::test_blocked_endpoints[/api/surgery-crm]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: /api/surgery-crm returned 200\nassert 200 in (401, 403, 404, 405)\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "AssertionError: /api/surgery-crm returned 200\nassert 200 in (401, 403, 404, 405)\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_igss_nogs.py::TestAcreditacionYBloqueo::test_flujo_completo",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'acreditados'",
+    "msg_antes": "AssertionError: Esperado 3, got 1\nassert 1 == 3"
+   },
+   {
+    "prueba": "test_igss_nogs.py::TestPermisos::test_optica_sin_permiso_403",
+    "antes": "error",
+    "ahora": "error",
+    "msg_ahora": "failed on setup with \"AssertionError: Login failed for optica: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\"",
+    "msg_antes": "failed on setup with \"AssertionError: Login failed for optica: 401 {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code\""
+   },
+   {
+    "prueba": "test_igss_nogs.py::TestRetroactivo::test_conteo_retroactivo_al_crear_nog",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: retro esperado 2, got {'id': 'cca56a1d-b469-4d5b-a675-7ba5d21e4764', 'unidad_id': 'f26257dd-d0ca-405b-a5c8-74152670838e', 'numero': 'NOG-RETRO-6dfbf5', 'nombre_servicio': '', 'tipo_compra': '', 'tipo_compra_label': '', 'modalidad': '', 'etiqueta': 'NOG-RETRO-6dfbf5', 'sin_tope': Fals",
+    "msg_antes": "AssertionError: retro esperado 2, got {'id': 'f1ea60a0-769d-4660-9aff-b2c712daf8c1', 'unidad_id': '33d46e0e-749b-4fa4-b458-03dc97504358', 'numero': 'NOG-RETRO-1aad07', 'nombre_servicio': '', 'tipo_compra': '', 'tipo_compra_label': '', 'fecha_asignacion': '', 'cantidad': 5, 'precio': 10.0, 'monto_tot"
+   },
+   {
+    "prueba": "test_igss_ordenes_multiples.py::TestOrdenesIgss::test_same_nog_twice_single_discount",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 4 == (2 + 1)",
+    "msg_antes": "assert 4 == (2 + 1)"
+   },
+   {
+    "prueba": "test_iter147_cxc_perms_and_exports.py::test_login_permissions_include_cxc[usuario-True-False]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfcc85072ac00>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfcc85072ac00> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch",
+    "msg_antes": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfd6325ce8ec0>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfd6325ce8ec0> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch"
+   },
+   {
+    "prueba": "test_iter147_cxc_perms_and_exports.py::test_me_permissions_include_cxc",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfcc85077fd00>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfcc85077fd00> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch",
+    "msg_antes": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfd632561e000>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfd632561e000> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch"
+   },
+   {
+    "prueba": "test_iter147_cxc_perms_and_exports.py::test_usuario_cannot_manage_cxc",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_medico_role_access.py::test_menu_config_medico",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: {'agenda', 'evaluacion_oftalmologica', 'pacientes'}\nassert False\n +  where False = <built-in method issubset of set object at 0xff2304119e00>({'agenda', 'evaluacion_oftalmologica', 'pacientes'})\n +    where <built-in method issubset of set object at 0xff2304119e00> = {'agenda', 'eval",
+    "msg_antes": "AssertionError: {'agenda', 'evaluacion_oftalmologica', 'pacientes'}\nassert False\n +  where False = <built-in method issubset of set object at 0xfdf7301750e0>({'agenda', 'evaluacion_oftalmologica', 'pacientes'})\n +    where <built-in method issubset of set object at 0xfdf7301750e0> = {'agenda', 'eval"
+   },
+   {
+    "prueba": "test_patients.py::TestIGSSConditionalField::test_patient_with_igss_institution_requires_unit",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 400 == 200\n +  where 400 = <Response [400]>.status_code",
+    "msg_antes": "assert 400 == 200\n +  where 400 = <Response [400]>.status_code"
+   },
+   {
+    "prueba": "test_patients.py::TestPatientsCRUD::test_user_cannot_update_patient",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_produccion_consolidacion.py::TestConsolidacion::test_rows_equal_servicios",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 0 > 0\n +  where 0 = len([])",
+    "msg_antes": "assert 0 > 0\n +  where 0 = len([])"
+   },
+   {
+    "prueba": "test_produccion_consolidacion.py::TestEstado::test_toggle_facturado_persists",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "IndexError: list index out of range",
+    "msg_antes": "IndexError: list index out of range"
+   },
+   {
+    "prueba": "test_produccion_consolidacion.py::TestEstado::test_uncheck_when_state_on_member_eval",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "StopIteration",
+    "msg_antes": "StopIteration"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_read[/api/cuentas-cobrar/clinica-optica-403]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_read[/api/cuentas-cobrar/clinica/resumen-optica-403]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_read[/api/cuentas-cobrar/responsables-optica-403]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_write_blocked[optica]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_write_blocked[usuario]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryAuth::test_02_admin_login",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: Login failed: {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code",
+    "msg_antes": "AssertionError: Login failed: {\"detail\":\"Credenciales inválidas\"}\nassert 401 == 200\n +  where 401 = <Response [401]>.status_code"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryCRUD::test_06_create_surgery_without_igss",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryCRUD::test_07_create_surgery_with_igss",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryCRUD::test_08_get_surgery_by_id",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryCRUD::test_09_update_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryCRUD::test_10_admin_cannot_delete_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryCancel::test_17_cancel_surgery_with_reason",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'surgery_no_igss'",
+    "msg_antes": "KeyError: 'surgery_no_igss'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryDelete::test_21_superadmin_can_delete_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'surgery_with_igss'",
+    "msg_antes": "KeyError: 'surgery_with_igss'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryEquipment::test_11_add_equipment_to_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgeryEquipment::test_12_delete_equipment_from_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgerySupplies::test_13_add_supply_to_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgerySupplies::test_14_add_multiple_supplies",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgerySupplies::test_15_verify_total_cost_calculation",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries.py::TestSurgerySupplies::test_16_delete_supply_from_surgery",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "KeyError: 'admin'",
+    "msg_antes": "KeyError: 'admin'"
+   },
+   {
+    "prueba": "test_surgeries_manage_permission.py::test_cancel_endpoint",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: {\"detail\":\"La cirugía ya está cancelada\"}\nassert 400 == 200\n +  where 400 = <Response [400]>.status_code",
+    "msg_antes": "AssertionError: {\"detail\":\"La cirugía ya está cancelada\"}\nassert 400 == 200\n +  where 400 = <Response [400]>.status_code"
+   }
+  ],
+  "solo_en_una": [],
+  "cambia_omitida": []
+ },
+ "pruebas_actuales_C_vs_D": {
+  "pasaba_y_ahora_falla": [],
+  "fallaba_y_ahora_pasa": [
+   {
+    "prueba": "test_gestion_nog.py::test_list_all_superadmin",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: assert 'consumidos' in {'acreditados': 0, 'cantidad': 43, 'created_at': '2026-10-28T03:55:19.660251+00:00', 'disponibles': 43, ...}"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_01_sps_repetido_en_la_misma_unidad_falla",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_02_orden_sin_sps_rechazada",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "assert (404 == 422)\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_03_tres_dosis_un_cupo_y_cuarta_rechazada",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_04_una_dosis_segunda_cirugia",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_05_cirugia_programada_no_registra",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_06_consulta_seguimiento_no_consume_otro_cupo",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_07_orden_pendiente_cuenta_como_reservada",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_09_veinte_creaciones_simultaneas_con_cupo_para_cinco",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: [404, 404, 404, 404, 404, 404, ...]\nassert 0 == 5\n +  where 0 = <built-in method count of list object at 0xfa42f5edf440>(200)\n +    where <built-in method count of list object at 0xfa42f5edf440> = [404, 404, 404, 404, 404, 404, ...].count"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_10_eliminar_evaluacion_devuelve_a_pendiente",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_11_entrada_con_ordenes_no_se_puede_eliminar",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_13_roles_autorizados_200[admin]",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_13_roles_autorizados_200[administrador_igss]",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_13_roles_autorizados_200[superadmin]",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_13_roles_no_autorizados_403[medico]",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_13_roles_no_autorizados_403[usuario]",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_14_medico_registra_atencion_sin_ver_libro",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_15_roles_no_autorizados_no_modifican_ordenes_del_paciente",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: assert ('HACK-1' == 'LEG-2'\n  \n  - LEG-2\n  + HACK-1)"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_16_baja_cuantia_sin_numero_por_servicio",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"string_too_short\",\"loc\":[\"body\",\"numero\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/string_too_short\"},{\"type\":\"int_type\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be a valid int"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_17_contrato_sin_numero_rechazado",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: assert (422 == 422 and 'obligatorio' in [{'ctx': {'min_length': 1}, 'input': '', 'loc': ['body', 'numero'], 'msg': 'String should have at least 1 character', ...}])\n +  where 422 = <Response [422]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_18_texto_baja_cuantia_como_numero_rechazado",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "assert 200 == 422\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_19_baja_cuantia_atendida_se_consume",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"string_too_short\",\"loc\":[\"body\",\"numero\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/string_too_short\"},{\"type\":\"int_type\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be a valid int"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_19_orden_baja_cuantia_con_sps",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"string_too_short\",\"loc\":[\"body\",\"numero\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/string_too_short\"},{\"type\":\"int_type\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be a valid int"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_20_entrada_sin_tope_nunca_bloquea",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"greater_than_equal\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be greater than or equal to 1\",\"input\":0,\"ctx\":{\"ge\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/greater_than_equal\"}]}\nassert 422 == 200\n +  where 422 = <Response [422]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_anular_libera_cupo_y_exige_motivo",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_auditoria_de_creacion_y_anulacion",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_cirugia_sin_orden_con_interruptor_apagado",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "assert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_dosis_y_edicion_atomica",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "assert 404 == 422\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_fase3_aviso_90_y_bloqueo_100",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_fase3_contadores_cuentan_ordenes_no_dosis",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_fase3_listado_oficial_filtro_fechas_y_un_nog",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"string_too_short\",\"loc\":[\"body\",\"numero\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/string_too_short\"},{\"type\":\"int_type\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be a valid int"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_fase3_listado_oficial_unidad",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"string_too_short\",\"loc\":[\"body\",\"numero\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/string_too_short\"},{\"type\":\"int_type\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be a valid int"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_fase3_permisos_de_lecturas",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: usuario\nassert 200 == 403\n +  where 200 = <Response [200]>.status_code\n +    where <Response [200]> = <function get at 0xfa42fc93f740>('http://127.0.0.1:8103/api/igss-units/TEST_libro_u1_50664c/nogs-activos', headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJz"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_fase3_produccion_y_dashboard_desde_libro",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":[{\"type\":\"string_too_short\",\"loc\":[\"body\",\"numero\"],\"msg\":\"String should have at least 1 character\",\"input\":\"\",\"ctx\":{\"min_length\":1},\"url\":\"https://errors.pydantic.dev/2.12/v/string_too_short\"},{\"type\":\"int_type\",\"loc\":[\"body\",\"cantidad\"],\"msg\":\"Input should be a valid int"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_interruptor_solo_superadmin_y_exigencia",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: assert 404 == 403\n +  where 404 = <Response [404]>.status_code\n +    where <Response [404]> = <function put at 0xfa42fc96cea0>('http://127.0.0.1:8103/api/igss-units/libro/config', json={'exigir_orden': True}, headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJz"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_ninguna_y_asignacion_desde_sin_orden",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_opciones_solo_ordenes_abiertas",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_libro.py::test_reasignar_atencion_entre_ordenes",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_01_interruptor_apagado_por_defecto_y_solo_superadmin",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "KeyError: 'usar_solo_libro'"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_02_endpoints_antiguos_deshabilitados",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: ('http://127.0.0.1:8103/api/igss-units/nogs/reconciliar-todo', 200, '{\"pacientes_reconciliados\":17917}')\nassert 200 == 409\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_03_paciente_crear_editar_desactivar_reactivar",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: cambió igss_nog_acreditaciones\nassert (136, '8f086a...4d32b209e56b') == (131, '622822...4b02f64ab1cb')\n  \n  At index 0 diff: 136 != 131\n  Use -v to get more diff"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_04_evaluacion_guardar_editar_eliminar_actualiza_el_libro",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: {\"detail\":\"Not Found\"}\nassert 404 == 200\n +  where 404 = <Response [404]>.status_code"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_05_limpiar_borradores_y_crear_eliminar_nog",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: cambió igss_nog_acreditaciones\nassert (133, '4c0db5...46eac73654e3') == (136, '8f086a...4d32b209e56b')\n  \n  At index 0 diff: 133 != 136\n  Use -v to get more diff"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_06_fusion_de_unidades_duplicadas_no_toca_acreditaciones",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "TypeError: 'NoneType' object is not subscriptable"
+   },
+   {
+    "prueba": "test_igss_solo_libro.py::test_07_apagar_restaura_el_sistema_anterior",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "KeyError: 'usar_solo_libro'"
+   },
+   {
+    "prueba": "test_mantenimiento_borradores.py::TestRecalculo::test_recalculo_idempotent_no_overdraft",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "KeyError: 'servicios_consumidos'"
+   },
+   {
+    "prueba": "test_optica_ventas_cancel_nog.py::TestOpticaNog::test_optica_create_igss_patient_discounts_nog",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestExcel::test_excel",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: assert 'Fecha' == 'Fecha 1ª atención'\n  \n  - Fecha 1ª atención\n  + Fecha"
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestListado::test_fecha_invalida_422",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "AssertionError: assert 200 == 422\n +  where 200 = <Response [200]>.status_code\n +    where <Response [200]> = get('http://127.0.0.1:8103/api/igss-units/produccion', params={'fecha': '16-11-2026'})\n +      where get = <requests.sessions.Session object at 0xfacfe22e3d90>.get"
+   },
+   {
+    "prueba": "test_produccion_igss.py::TestListado::test_list_structure",
+    "antes": "falla",
+    "ahora": "pasa",
+    "msg_ahora": "",
+    "msg_antes": "KeyError: 'estado'"
+   }
+  ],
+  "falla_en_ambos": [
+   {
+    "prueba": "test_cierre_diario.py::TestEnvioManual::test_enviar_manual",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: {\"detail\":\"No se pudo enviar el cierre: No se pudo enviar el correo\"}\nassert 502 == 200\n +  where 502 = <Response [502]>.status_code",
+    "msg_antes": "AssertionError: {\"detail\":\"No se pudo enviar el cierre: No se pudo enviar el correo\"}\nassert 502 == 200\n +  where 502 = <Response [502]>.status_code"
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionSealed::test_sample_sealed_exists",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: Expected at least 1 sealed sample evaluation\nassert None is not None",
+    "msg_antes": "AssertionError: Expected at least 1 sealed sample evaluation\nassert None is not None"
+   },
+   {
+    "prueba": "test_evaluacion_oftalmologica.py::TestEvaluacionSealed::test_user_cannot_update",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_evaluaciones_permisos.py::TestUsuarioNoPuedeEscribir::test_usuario_POST_evaluacion_403",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: Expected 403 for usuario, got 200: {\"paciente_id\":\"39f64541-45cc-4cdf-a22d-0ce0c4ca1a36\",\"paciente_nombre\":\"TESTNOGR Apellido5d6d\",\"paciente_edad\":36,\"paciente_sexo\":\"masculino\",\"paciente_expediente\":\"EXP-202611-0104\",\"cita_id\":null,\"fecha\":\"2026-11-17\",\"medico_id\":\"\",\"medico_nombre\"",
+    "msg_antes": "AssertionError: Expected 403 for usuario, got 200: {\"paciente_id\":\"49022ea3-7b5c-4243-a9ac-04860a49c0a9\",\"paciente_nombre\":\"TESTNOGR Apellido576f\",\"paciente_edad\":36,\"paciente_sexo\":\"masculino\",\"paciente_expediente\":\"EXP-202611-0103\",\"cita_id\":null,\"fecha\":\"2026-11-17\",\"medico_id\":\"\",\"medico_nombre\""
+   },
+   {
+    "prueba": "test_evaluaciones_permisos.py::TestUsuarioNoPuedeEscribir::test_usuario_PUT_evaluacion_403",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_igss_admin_role_audit.py::test_blocked_endpoints[/api/surgery-crm]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: /api/surgery-crm returned 200\nassert 200 in (401, 403, 404, 405)\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "AssertionError: /api/surgery-crm returned 200\nassert 200 in (401, 403, 404, 405)\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_iter147_cxc_perms_and_exports.py::test_login_permissions_include_cxc[usuario-True-False]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfe5b9c2f66c0>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfe5b9c2f66c0> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch",
+    "msg_antes": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfd5c49875d00>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfd5c49875d00> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch"
+   },
+   {
+    "prueba": "test_iter147_cxc_perms_and_exports.py::test_me_permissions_include_cxc",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfe5b9c40f300>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfe5b9c40f300> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch",
+    "msg_antes": "AssertionError: assert True is False\n +  where True = <built-in method get of dict object at 0xfd5c498755c0>('manage_cuentas_cobrar')\n +    where <built-in method get of dict object at 0xfd5c498755c0> = {'authorize_payments': False, 'create_expenses': False, 'create_patients': False, 'delete_caja_ch"
+   },
+   {
+    "prueba": "test_iter147_cxc_perms_and_exports.py::test_usuario_cannot_manage_cxc",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_medico_role_access.py::test_menu_config_medico",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: {'agenda', 'evaluacion_oftalmologica', 'pacientes'}\nassert False\n +  where False = <built-in method issubset of set object at 0xf8bc838550e0>({'agenda', 'evaluacion_oftalmologica', 'pacientes'})\n +    where <built-in method issubset of set object at 0xf8bc838550e0> = {'agenda', 'eval",
+    "msg_antes": "AssertionError: {'agenda', 'evaluacion_oftalmologica', 'pacientes'}\nassert False\n +  where False = <built-in method issubset of set object at 0xfec2525d50e0>({'agenda', 'evaluacion_oftalmologica', 'pacientes'})\n +    where <built-in method issubset of set object at 0xfec2525d50e0> = {'agenda', 'eval"
+   },
+   {
+    "prueba": "test_patients.py::TestIGSSConditionalField::test_patient_with_igss_institution_requires_unit",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 400 == 200\n +  where 400 = <Response [400]>.status_code",
+    "msg_antes": "assert 400 == 200\n +  where 400 = <Response [400]>.status_code"
+   },
+   {
+    "prueba": "test_patients.py::TestPatientsCRUD::test_user_cannot_update_patient",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_read[/api/cuentas-cobrar/clinica-optica-403]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_read[/api/cuentas-cobrar/clinica/resumen-optica-403]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_read[/api/cuentas-cobrar/responsables-optica-403]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_write_blocked[optica]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_rbac_fixes_regression.py::test_cxc_write_blocked[usuario]",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code",
+    "msg_antes": "assert 200 == 403\n +  where 200 = <Response [200]>.status_code"
+   },
+   {
+    "prueba": "test_surgeries_manage_permission.py::test_cancel_endpoint",
+    "antes": "falla",
+    "ahora": "falla",
+    "msg_ahora": "AssertionError: {\"detail\":\"La cirugía ya está cancelada\"}\nassert 400 == 200\n +  where 400 = <Response [400]>.status_code",
+    "msg_antes": "AssertionError: {\"detail\":\"La cirugía ya está cancelada\"}\nassert 400 == 200\n +  where 400 = <Response [400]>.status_code"
+   }
+  ],
+  "solo_en_una": [],
+  "cambia_omitida": []
+ }
+}

@@ -6,6 +6,7 @@ import requests
 
 pytestmark = pytest.mark.skip(reason="Producción legada por evaluación reemplazada por el libro. Fase 3 del Libro IGSS: las lecturas públicas salen del libro (ver tests/test_igss_libro.py)")
 from collections import Counter
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api/igss-units/produccion"
@@ -17,7 +18,7 @@ MEMBER_ID = "7f68a258-5206-49cb-b530-fd09bac8f088"
 
 @pytest.fixture(scope="module")
 def sa():
-    r = requests.post(f"{BASE_URL}/api/auth/login", json={"username": "superadmin", "password": "nova2024"})
+    r = requests.post(f"{BASE_URL}/api/auth/login", json=cred("superadmin"))
     if r.status_code != 200:
         pytest.skip("login failed")
     tok = r.json().get("access_token") or r.json().get("token")

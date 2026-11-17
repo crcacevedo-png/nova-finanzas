@@ -2,6 +2,7 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import cred  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 MEDICOS = ['Dr. Cristian Acevedo', 'Dra. Mariamercedes Palma', 'Dr. Manuel de la Cruz', 'Dra. Rocío Muñoz']
@@ -11,7 +12,7 @@ PATIENT_ID = '4ceb89de-628f-4aa9-a545-fe6c4f4affc5'
 @pytest.fixture(scope='module')
 def client():
     s = requests.Session()
-    r = s.post(f"{BASE_URL}/api/auth/login", json={"username": "superadmin", "password": "nova2024"})
+    r = s.post(f"{BASE_URL}/api/auth/login", json=cred("superadmin"))
     if r.status_code != 200:
         pytest.skip(f"login failed {r.status_code}")
     tok = r.json().get('access_token') or r.json().get('token')

@@ -14,6 +14,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server import app
+import usuarios_prueba
+from usuarios_prueba import cred
+
+
+def pytest_configure(config):
+    _registrar_markers(config)
+    usuarios_prueba.sembrar()
+
+
+def pytest_unconfigure(config):
+    usuarios_prueba.retirar()
 
 
 # ============= Configuración de Event Loop =============
@@ -31,37 +42,25 @@ def event_loop():
 @pytest.fixture
 def superadmin_credentials():
     """Credenciales de SuperAdmin para testing"""
-    return {
-        "username": "superadmin",
-        "password": "nova2024"
-    }
+    return cred("superadmin")
 
 
 @pytest.fixture
 def admin_credentials():
     """Credenciales de Admin para testing"""
-    return {
-        "username": "admin",
-        "password": "Admin2024Nuevo!"
-    }
+    return cred("admin")
 
 
 @pytest.fixture
 def usuario_credentials():
     """Credenciales de Usuario regular para testing"""
-    return {
-        "username": "usuario",
-        "password": "user2024"
-    }
+    return cred("usuario")
 
 
 @pytest.fixture
 def optica_credentials():
     """Credenciales de Usuario óptica para testing"""
-    return {
-        "username": "optica",
-        "password": "optica2024"
-    }
+    return cred("optica")
 
 
 # ============= Fixtures de Cliente HTTP =============
@@ -190,8 +189,7 @@ def assert_contains_fields(data, required_fields):
 
 # ============= Markers Personalizados =============
 
-def pytest_configure(config):
-    """Configurar markers personalizados"""
+def _registrar_markers(config):
     config.addinivalue_line(
         "markers", "slow: marca tests lentos que pueden saltarse con -m 'not slow'"
     )

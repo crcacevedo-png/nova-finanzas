@@ -42,7 +42,7 @@ def msg_dosis_completas(n: int) -> str:
 
 async def get_config() -> dict:
     c = await db.igss_libro_config.find_one({"id": CONFIG_ID}, {"_id": 0})
-    return c or {"id": CONFIG_ID, "exigir_orden": False}
+    return c or {"id": CONFIG_ID, "exigir_orden": False, "usar_solo_libro": False}
 
 
 async def exigencia_activa() -> bool:
@@ -407,34 +407,53 @@ async def ensure_atenciones_indexes():
 # ==================== ENDPOINTS: INTERRUPTOR ====================
 
 class ConfigUpdate(BaseModel):
-    exigir_orden: bool
+    exigir_orden: Optional[bool] = None
+    usar_solo_libro: Optional[bool] = None
 
 
 @router.get("/config")
 async def ver_config(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
-    c = await get_config()
+    return _config_out(await get_config(), await _pendientes_sin_orden())
+
+
+def _config_out(c: dict, pendientes: int) -> dict:
     return {"exigir_orden": bool(c.get("exigir_orden")), "actualizado_por_nombre": c.get("actualizado_por_nombre"),
-            "actualizado_en": c.get("actualizado_en"), "atenciones_sin_orden_pendientes": await _pendientes_sin_orden()}
+            "actualizado_en": c.get("actualizado_en"), "atenciones_sin_orden_pendientes": pendientes,
+            "usar_solo_libro": bool(c.get("usar_solo_libro")),
+            "solo_libro_actualizado_por_nombre": c.get("solo_libro_actualizado_por_nombre"),
+            "solo_libro_actualizado_en": c.get("solo_libro_actualizado_en")}
 
 
 @router.put("/config")
 async def cambiar_config(body: ConfigUpdate, current_user: dict = Depends(require_role(["superadmin"]))):
-    """Interruptor de exigencia (solo superadmin). Apagado: las cirugías sin orden o con la
-    orden ya completa se guardan y quedan en "atenciones sin orden". Encendido: cirugía IGSS
-    nueva exige orden y se rechaza la dosis de más."""
+    """Interruptores del libro (solo superadmin), cada cambio queda en audit_logs.
+    exigir_orden — apagado: las cirugías sin orden o con la orden ya completa se guardan y
+    quedan en "atenciones sin orden"; encendido: cirugía IGSS nueva exige orden y se
+    rechaza la dosis de más.
+    usar_solo_libro — encendido: nada escribe en el sistema anterior (acreditaciones,
+    igss_produccion, contador acreditados) y sus recálculos quedan deshabilitados."""
+    if body.exigir_orden is None and body.usar_solo_libro is None:
+        raise HTTPException(status_code=400, detail="Indique el interruptor a cambiar")
     antes = await get_config()
     pendientes = await _pendientes_sin_orden()
     now = datetime.now(timezone.utc).isoformat()
-    await db.igss_libro_config.update_one(
-        {"id": CONFIG_ID},
-        {"$set": {"exigir_orden": body.exigir_orden, "actualizado_por": current_user.get("id", ""),
-                  "actualizado_por_nombre": _nombre_usuario(current_user), "actualizado_en": now}},
-        upsert=True)
-    await _audit("LIBRO_INTERRUPTOR_CAMBIADO", current_user, {
-        "antes": bool(antes.get("exigir_orden")), "despues": body.exigir_orden,
-        "atenciones_sin_orden_pendientes": pendientes})
-    return {"exigir_orden": body.exigir_orden, "actualizado_por_nombre": _nombre_usuario(current_user),
-            "actualizado_en": now, "atenciones_sin_orden_pendientes": pendientes}
+    quien = {"id": current_user.get("id", ""), "nombre": _nombre_usuario(current_user)}
+    cambios = {}
+    if body.exigir_orden is not None:
+        cambios.update({"exigir_orden": body.exigir_orden, "actualizado_por": quien["id"],
+                        "actualizado_por_nombre": quien["nombre"], "actualizado_en": now})
+    if body.usar_solo_libro is not None:
+        cambios.update({"usar_solo_libro": body.usar_solo_libro, "solo_libro_actualizado_por": quien["id"],
+                        "solo_libro_actualizado_por_nombre": quien["nombre"], "solo_libro_actualizado_en": now})
+    await db.igss_libro_config.update_one({"id": CONFIG_ID}, {"$set": cambios}, upsert=True)
+    if body.exigir_orden is not None:
+        await _audit("LIBRO_INTERRUPTOR_CAMBIADO", current_user, {
+            "antes": bool(antes.get("exigir_orden")), "despues": body.exigir_orden,
+            "atenciones_sin_orden_pendientes": pendientes})
+    if body.usar_solo_libro is not None:
+        await _audit("LIBRO_SOLO_LIBRO_CAMBIADO", current_user, {
+            "antes": bool(antes.get("usar_solo_libro")), "despues": body.usar_solo_libro})
+    return _config_out({**antes, **cambios}, pendientes)
 
 
 # ==================== ENDPOINTS: ATENCIONES SIN ORDEN Y REASIGNACIÓN ====================

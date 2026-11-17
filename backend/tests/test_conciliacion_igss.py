@@ -8,6 +8,7 @@ import pytest
 import requests
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 load_dotenv('/app/frontend/.env')
 load_dotenv('/app/backend/.env')
@@ -47,7 +48,7 @@ def login(u, p):
 
 @pytest.fixture(scope="module")
 def sa():
-    return login("superadmin", "nova2024")
+    return login(*par("superadmin"))
 
 
 def _pac(pid, nombre, **kw):
@@ -314,14 +315,14 @@ class TestNogLimpio:
 # ---------- 4. Control de acceso ----------
 class TestAcceso:
     def test_rol_sin_permiso_403(self):
-        h = login("usuario", "user2024")
+        h = login(*par("usuario"))
         r = requests.get(f"{API}/igss-units/conciliacion", headers=h)
         assert r.status_code == 403
         r2 = requests.get(f"{API}/igss-units/conciliacion/export/excel", headers=h)
         assert r2.status_code == 403
 
     def test_administrador_igss_puede(self):
-        h = login("igss.admin", "IgssAdmin2024$")
+        h = login(*par("igss"))
         r = requests.get(f"{API}/igss-units/conciliacion", headers=h, params={"unidad_id": UNIT_ID})
         assert r.status_code == 200, r.text
         assert "resumen_por_nog" in r.json()

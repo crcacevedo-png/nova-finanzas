@@ -51,6 +51,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { Skeleton } from '../components/ui/skeleton';
 import { toast, Toaster } from 'sonner';
+import { puedeVerLibroIgss } from '../lib/igssLibro';
 
 // Constantes
 const ANESTHESIA_TYPES = [
@@ -154,6 +155,7 @@ const getCategoryBadge = (category) => {
 
 const SalaOperaciones = () => {
   const { user, hasPermission } = useAuth();
+  const verNog = puedeVerLibroIgss(user); // los números de NOG solo los ven los roles del libro IGSS
   const isSuperAdmin = user?.role === 'superadmin';
   const canEdit = hasPermission('manage_sala_operaciones');
   const canEditPatient = hasPermission('edit_patients') || hasPermission('edit_patients_in_surgery');
@@ -366,7 +368,7 @@ const SalaOperaciones = () => {
   }, []);
 
   const fetchNogs = async (unitId) => {
-    if (!unitId) { setNogsList([]); return; }
+    if (!unitId || !verNog) { setNogsList([]); return; }
     try {
       const res = await axios.get(`${API_URL}/igss-units/${unitId}/nogs-activos`);
       setNogsList(res.data || []);
@@ -1564,7 +1566,7 @@ const SalaOperaciones = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div>
+                      {verNog && <div>
                         <Label>NOG {nogLibre && <span className="text-slate-400">(libre)</span>}</Label>
                         {!nogLibre ? (
                           <Select value={formData.igss_data.nog_id || ''} onValueChange={handleSelectNog} disabled={!formData.igss_data.unit_id}>
@@ -1591,7 +1593,7 @@ const SalaOperaciones = () => {
                             </Button>
                           </div>
                         )}
-                      </div>
+                      </div>}
                       <div>
                         <Label>SPS *</Label>
                         <Input
@@ -1871,7 +1873,7 @@ const SalaOperaciones = () => {
                       <Badge className="bg-blue-100 text-blue-700 border-0 mb-3">Datos IGSS</Badge>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><span className="text-slate-500">Unidad:</span> <span className="font-medium">{selectedSurgery.igss_data.unit}</span></div>
-                        <div><span className="text-slate-500">NOG:</span> <span className="font-medium">{selectedSurgery.igss_data.nog_number || '—'}</span></div>
+                        {verNog && <div><span className="text-slate-500">NOG:</span> <span className="font-medium">{selectedSurgery.igss_data.nog_number || '—'}</span></div>}
                         <div><span className="text-slate-500">SPS:</span> <span className="font-medium">{selectedSurgery.igss_data.sps}</span></div>
                         <div><span className="text-slate-500">No. afiliación:</span> <span className="font-medium">{selectedSurgery.igss_data.affiliation_number}</span></div>
                         <div><span className="text-slate-500">Código:</span> <span className="font-medium">{selectedSurgery.igss_data.code}</span></div>

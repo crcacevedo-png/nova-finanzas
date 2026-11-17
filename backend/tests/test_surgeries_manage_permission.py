@@ -2,6 +2,7 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 
@@ -19,10 +20,10 @@ def _login(u, p):
 @pytest.fixture(scope="module")
 def sessions():
     return {
-        "superadmin": _login("superadmin", "nova2024"),
-        "usuario": _login("usuario", "user2024"),
-        "medico": _login("medico_test", "medico2024"),
-        "anestesia": _login("anestesia", "anest2024"),
+        "superadmin": _login(*par("superadmin")),
+        "usuario": _login(*par("usuario")),
+        "medico": _login(*par("medico")),
+        "anestesia": _login(*par("anestesia")),
     }
 
 

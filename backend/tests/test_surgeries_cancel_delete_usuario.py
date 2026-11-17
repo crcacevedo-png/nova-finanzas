@@ -2,11 +2,12 @@
 import os
 import pytest
 import requests
+from usuarios_prueba import par  # usuarios sembrados solo para pruebas
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 
-CREDS = {"superadmin": ("superadmin", "nova2024"), "usuario": ("usuario", "user2024"),
-         "anestesia": ("anestesia", "anest2024")}
+CREDS = {"superadmin": par("superadmin"), "usuario": par("usuario"),
+         "anestesia": par("anestesia")}
 
 
 def _login(u, p):
