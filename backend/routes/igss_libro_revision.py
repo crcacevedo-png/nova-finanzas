@@ -11,7 +11,7 @@ from pymongo import ReturnDocument
 from config.database import db
 from config.permissions import LIBRO_IGSS_ROLES
 from routes.auth import require_role
-from routes.igss_libro import _audit, _liberar_cupo, _nombre_usuario, _orden_out
+from routes.igss_libro import ESTADOS_VIGENTES, _audit, _liberar_cupo, _nombre_usuario, _orden_out
 from routes.igss_nogs import etiqueta_catalogo
 
 router = APIRouter(prefix="/igss-units/libro", tags=["IGSS - Libro de órdenes"])
@@ -28,9 +28,9 @@ async def _nogs(ids) -> dict:
 
 @router.get("/sps-por-revisar")
 async def sps_por_revisar(current_user: dict = Depends(ROL_LIBRO)):
-    """Órdenes migradas con una forma de No. SPS poco común: en las vivas no se puede marcar
-    facturado hasta confirmar el número contra la hoja; en las históricas es informativo."""
-    docs = await db.igss_ordenes_libro.find({"sps_por_revisar": True, "estado": {"$ne": "anulada"}}, {"_id": 0}) \
+    """Órdenes VIVAS con una forma de No. SPS poco común: no se marcan facturadas hasta confirmar
+    el número contra la hoja. Las históricas marcadas solo se ven en la ficha (es informativo)."""
+    docs = await db.igss_ordenes_libro.find({"sps_por_revisar": True, "estado": {"$in": list(ESTADOS_VIGENTES)}}, {"_id": 0}) \
         .sort([("estado", 1), ("numero_libro", 1)]).to_list(None)
     nogs = await _nogs({o.get("nog_id") for o in docs})
     data = [_orden_out(o, nogs.get(o.get("nog_id"))) for o in docs]

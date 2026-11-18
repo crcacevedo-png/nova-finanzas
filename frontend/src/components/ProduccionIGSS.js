@@ -15,6 +15,7 @@ import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { Printer, FolderOpen, Download } from 'lucide-react';
 import { igssNogApi, igssUnitApi, igssLibroApi } from '../services/api';
+import { FechaDMA } from './igss/FechaDMA';
 
 const API_URL = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const fmtDia = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
@@ -54,7 +55,10 @@ export const ProduccionIGSS = () => {
     return p;
   }, [modo, fecha, desde, hasta, unidadId, nog]);
 
+  const fechasOk = modo === 'dia' ? !!fecha : !!desde && !!hasta;
+
   const fetchData = useCallback(async () => {
+    if (!fechasOk) return;
     setLoading(true);
     try {
       const res = await igssNogApi.getProduccion(params());
@@ -66,7 +70,7 @@ export const ProduccionIGSS = () => {
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, [params, fechasOk]);
 
   useEffect(() => {
     const t = setTimeout(() => { fetchData(); }, 350);
@@ -158,20 +162,20 @@ export const ProduccionIGSS = () => {
               </SelectContent>
             </Select>
           </div>
-          {modo === 'dia' ? (
+            {modo === 'dia' ? (
             <div className="space-y-1">
               <Label className="text-xs">Fecha</Label>
-              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="input-teal h-9 w-40" data-testid="prod-fecha" />
+              <div className="w-40"><FechaDMA value={fecha} onChange={setFecha} inputClassName="input-teal h-9" testId="prod-fecha" /></div>
             </div>
           ) : (
             <>
               <div className="space-y-1">
                 <Label className="text-xs">Desde</Label>
-                <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="input-teal h-9 w-40" data-testid="prod-desde" />
+                <div className="w-40"><FechaDMA value={desde} onChange={setDesde} inputClassName="input-teal h-9" testId="prod-desde" /></div>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Hasta</Label>
-                <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="input-teal h-9 w-40" data-testid="prod-hasta" />
+                <div className="w-40"><FechaDMA value={hasta} onChange={setHasta} inputClassName="input-teal h-9" testId="prod-hasta" /></div>
               </div>
             </>
           )}
@@ -189,7 +193,7 @@ export const ProduccionIGSS = () => {
             <Label className="text-xs">NOG</Label>
             <Input value={nog} onChange={(e) => setNog(e.target.value)} placeholder="Filtrar NOG" className="input-teal h-9 w-32" data-testid="prod-nog" />
           </div>
-          <Button variant="outline" onClick={exportarExcel} className="h-9 text-emerald-700 border-emerald-200" data-testid="prod-export">
+          <Button variant="outline" onClick={exportarExcel} disabled={!fechasOk} className="h-9 text-emerald-700 border-emerald-200" data-testid="prod-export">
             <Download className="w-4 h-4 mr-1" /> Exportar
           </Button>
         </CardContent>

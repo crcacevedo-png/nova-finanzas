@@ -8,7 +8,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { DatabaseBackup, Download, Trash2, RefreshCw, Loader2, CheckCircle2, AlertCircle, Clock, HardDriveDownload } from 'lucide-react';
+import { DatabaseBackup, Download, Trash2, RefreshCw, Loader2, CheckCircle2, AlertCircle, Clock, HardDriveDownload, RotateCcw } from 'lucide-react';
+import { RestaurarRespaldoDialog } from '../components/respaldos/RestaurarRespaldoDialog';
 
 const fmtSize = (bytes) => {
   if (!bytes) return '—';
@@ -21,10 +22,33 @@ const fmtFecha = (iso) => {
   if (!iso) return '—';
   try {
     return new Date(iso).toLocaleString('es-GT', {
-      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Guatemala',
     });
   } catch { return iso; }
 };
+
+const TIPOS = { automatico: 'Automático', manual: 'Manual', previo_restauracion: 'Previo a restaurar' };
+const ESTADO_REST = { listo: ['Terminada', 'bg-green-100 text-green-700'], cancelada: ['Cancelada: no se tocó nada', 'bg-amber-100 text-amber-800'],
+  error: ['Detenida a medias', 'bg-red-100 text-red-700'], en_curso: ['En curso', 'bg-sky-100 text-sky-700'] };
+
+const Restauraciones = ({ filas }) => (filas.length === 0 ? null : (
+  <Card className="p-4" data-testid="restauraciones-recientes">
+    <h2 className="text-sm font-semibold mb-2">Restauraciones recientes</h2>
+    <ul className="text-xs space-y-1">
+      {filas.map((r) => {
+        const [txt, cls] = ESTADO_REST[r.estado] || [r.estado, ''];
+        return (
+          <li key={r.id} className="flex flex-wrap items-center gap-2" data-testid={`restauracion-${r.id}`}>
+            <span>{fmtFecha(r.created_at)}</span> · <span>respaldo del {fmtFecha(r.respaldo?.created_at)}</span> ·
+            <span>{r.created_by_nombre}</span> <Badge className={cls}>{txt}</Badge>
+            {r.segundos != null && <span className="text-muted-foreground">{r.segundos} s</span>}
+            {r.error && <span className="text-muted-foreground">{r.error}</span>}
+          </li>
+        );
+      })}
+    </ul>
+  </Card>
+));
 
 const EstadoBadge = ({ status }) => {
   if (status === 'completado') return <Badge className="bg-green-100 text-green-700 gap-1" data-testid="backup-estado-completado"><CheckCircle2 className="w-3 h-3" /> Completado</Badge>;
@@ -38,12 +62,15 @@ export default function Respaldos() {
   const [running, setRunning] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restaurarTarget, setRestaurarTarget] = useState(null);
+  const [restauraciones, setRestauraciones] = useState([]);
 
   const cargar = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const { data } = await backupApi.getAll();
+      const [{ data }, rest] = await Promise.all([backupApi.getAll(), backupApi.restauraciones()]);
       setBackups(data.data || []);
+      setRestauraciones(rest.data.data || []);
     } catch (e) {
       if (!silent) toast.error('No se pudieron cargar los respaldos');
     } finally {
@@ -52,6 +79,7 @@ export default function Respaldos() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+  const refrescar = useCallback(() => cargar(true), [cargar]);
 
   // Auto-refresco mientras haya alguno en progreso
   useEffect(() => {
@@ -156,7 +184,7 @@ export default function Respaldos() {
                     <HardDriveDownload className="w-4 h-4 text-muted-foreground" /> {b.filename}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant="outline">{b.tipo === 'automatico' ? 'Automático' : 'Manual'}</Badge>
+                    <Badge variant="outline">{TIPOS[b.tipo] || 'Manual'}</Badge>
                   </td>
                   <td className="px-4 py-3"><EstadoBadge status={b.status} /></td>
                   <td className="px-4 py-3 whitespace-nowrap">{fmtFecha(b.created_at)}</td>
@@ -174,6 +202,15 @@ export default function Respaldos() {
                       </Button>
                       <Button
                         size="sm" variant="outline"
+                        disabled={b.status !== 'completado'}
+                        onClick={() => setRestaurarTarget(b)}
+                        title="Restaurar este respaldo"
+                        data-testid={`backup-restaurar-${b.id}`}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm" variant="outline"
                         className="text-red-600 hover:text-red-700"
                         onClick={() => setDeleteTarget(b)}
                         data-testid={`backup-delete-${b.id}`}
@@ -188,6 +225,10 @@ export default function Respaldos() {
           </table>
         </div>
       </Card>
+
+      <Restauraciones filas={restauraciones} />
+
+      <RestaurarRespaldoDialog respaldo={restaurarTarget} onClose={() => setRestaurarTarget(null)} onTerminado={refrescar} />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent data-testid="backup-delete-dialog">

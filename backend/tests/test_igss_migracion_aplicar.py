@@ -397,6 +397,7 @@ def test_08b_deshacer_negado_si_se_confirmo_un_sps(sa):
 def test_09_sps_por_revisar_impide_facturar_hasta_confirmar(sa):
     now = datetime.now(timezone.utc).isoformat()
     oids = {k: f"TEST_apl_orden{k}_{TAG}" for k in ("igss", "admin")}
+    hist = f"TEST_apl_ordenhist_{TAG}"
 
     async def ins(db):
         await db.igss_ordenes_libro.insert_many([{
@@ -405,7 +406,15 @@ def test_09_sps_por_revisar_impide_facturar_hasta_confirmar(sa):
             "dosis_autorizadas": 1, "fecha_ingreso": "2026-11-01", "atenciones": [{"tipo": "evaluacion", "ref_id": "x", "fecha": "2026-11-02"}],
             "cirugias_programadas": [], "sps_por_revisar": True, "facturado": False, "pagado": False, "created_at": now, "updated_at": now}
             for i, oid in enumerate(oids.values())])
+        await db.igss_ordenes_libro.insert_one({
+            "id": hist, "unidad_id": U, "nog_id": N2, "numero_nog": NUM2, "no_sps": f"01-{NUM:05d}-2026-999990",
+            "paciente_id": P[7], "paciente_nombre": "TEST_APL P7", "estado": "historica", "vigente": False, "tipo": "consulta",
+            "dosis_autorizadas": 1, "fecha_ingreso": "2024-01-01", "atenciones": [], "cirugias_programadas": [],
+            "sps_por_revisar": True, "created_at": now, "updated_at": now})
     _db_call(ins)
+    # La tarjeta "SPS por revisar" lista solo órdenes vivas; la histórica marcada queda fuera
+    lista = {o["id"] for o in requests.get(f"{LIBRO}/sps-por-revisar", headers=sa, timeout=60).json()["data"]}
+    assert set(oids.values()) <= lista and hist not in lista
     for oid in oids.values():
         for campo in ("facturado", "pagado"):
             r = requests.put(f"{LIBRO}/ordenes/{oid}", json={campo: True}, headers=sa, timeout=60)

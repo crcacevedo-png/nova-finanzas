@@ -25,6 +25,7 @@ from typing import List, Optional, Literal, Dict, Set
 import uuid
 from datetime import datetime, timezone, timedelta
 from utils.timezone import now_gt, GUATEMALA_TZ, dia_gt_a_rango_utc
+from utils.actividad import marcar_actividad, cerrar_actividad
 import jwt
 import bcrypt
 import io
@@ -968,6 +969,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         
         user["permissions"] = await resolve_permissions(user["role"])
         user["_token"] = token  # Store token for logout
+        await marcar_actividad(user)
         
         return user
     except jwt.ExpiredSignatureError:
@@ -2718,6 +2720,7 @@ async def logout(request: Request, current_user: dict = Depends(get_current_user
             user_name=current_user.get("username", "unknown"),
             ip_address=client_ip
         )
+    await cerrar_actividad(current_user["id"])
     
     return {"message": "Sesión cerrada correctamente"}
 
@@ -3066,6 +3069,8 @@ from routes.menu_config import router as menu_config_router
 api_router.include_router(menu_config_router, tags=["Configuración de Menús"])
 
 from routes.backups import router as backups_router, cron_router as backups_cron_router
+from routes.backups_restaurar import router as backups_restaurar_router
+api_router.include_router(backups_restaurar_router, tags=["Respaldos"])
 api_router.include_router(backups_router, tags=["Respaldos"])
 api_router.include_router(backups_cron_router, tags=["Cron"])
 

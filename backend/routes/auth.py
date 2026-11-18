@@ -11,6 +11,7 @@ import bcrypt
 
 from config.database import db, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS, blacklisted_tokens
 from config.permissions import PERMISSIONS, get_permissions, resolve_permissions
+from utils.actividad import marcar_actividad, cerrar_actividad
 
 # Pydantic imports
 from pydantic import BaseModel, ConfigDict, Field
@@ -99,6 +100,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         
         user["permissions"] = await resolve_permissions(user["role"])
         user["_token"] = token  # Store token for logout
+        await marcar_actividad(user)
         
         return user
     except jwt.ExpiredSignatureError:
@@ -178,6 +180,7 @@ async def logout(current_user: dict = Depends(get_current_user)):
             "user_id": current_user.get("id"),
             "blacklisted_at": datetime.now(timezone.utc).isoformat()
         })
+    await cerrar_actividad(current_user.get("id", ""))
     return {"message": "Sesión cerrada correctamente"}
 
 @router.get("/me", response_model=UserResponse)

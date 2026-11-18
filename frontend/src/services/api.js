@@ -869,6 +869,10 @@ export const backupApi = {
   run: () => axios.post(`${API_URL}/backups/run`),
   remove: (id) => axios.delete(`${API_URL}/backups/${id}`),
   download: (id) => axios.get(`${API_URL}/backups/${id}/download`, { responseType: 'blob' }),
+  revisarRestauracion: (id) => axios.post(`${API_URL}/backups/${id}/restaurar/revisar`),
+  restaurar: (revisionId, palabra) => axios.post(`${API_URL}/backups/restaurar`, { revision_id: revisionId, palabra }),
+  tarea: (id) => axios.get(`${API_URL}/backups/restauraciones/${id}`),
+  restauraciones: () => axios.get(`${API_URL}/backups/restauraciones`),
 };
 
 

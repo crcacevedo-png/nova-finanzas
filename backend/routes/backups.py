@@ -118,14 +118,15 @@ async def _run_backup(backup_id: str):
         }})
 
 
-async def _crear_backup(tipo: str, created_by: str) -> dict:
+async def registrar_backup(tipo: str, created_by: str) -> dict:
+    """Crea el registro "en_progreso" (el volcado lo hace _run_backup)."""
     now = datetime.now(timezone.utc)
     backup_id = str(uuid.uuid4())
     filename = f"respaldo-{now.strftime('%Y-%m-%d_%H%M%S')}.json.gz"
     doc = {
         "id": backup_id,
         "filename": filename,
-        "tipo": tipo,                 # "automatico" | "manual"
+        "tipo": tipo,                 # "automatico" | "manual" | "previo_restauracion"
         "status": "en_progreso",      # en_progreso | completado | error
         "storage_path": None,
         "size": 0,
@@ -137,8 +138,13 @@ async def _crear_backup(tipo: str, created_by: str) -> dict:
         "is_deleted": False,
     }
     await db.backups.insert_one(doc)
-    asyncio.create_task(_run_backup(backup_id))
     doc.pop("_id", None)
+    return doc
+
+
+async def _crear_backup(tipo: str, created_by: str) -> dict:
+    doc = await registrar_backup(tipo, created_by)
+    asyncio.create_task(_run_backup(doc["id"]))
     return doc
 
 
