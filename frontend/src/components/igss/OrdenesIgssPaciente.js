@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Plus, Pencil, Ban, ChevronDown, ChevronRight, Shuffle, Loader2, AlertTriangle, CircleSlash, ClipboardCheck } from 'lucide-react';
+import { Plus, Pencil, Ban, ChevronDown, ChevronRight, Shuffle, Loader2, AlertTriangle, CircleSlash, ClipboardCheck, FileCheck2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { igssLibroApi } from '../../services/api';
+import { igssLibroApi, formatDateTime } from '../../services/api';
 import { OrdenLibroDialog } from './OrdenLibroDialog';
 import { MotivoDialog, ElegirOrdenDialog } from './OrdenDialogs';
 import { ESTADOS_ACTIVOS, estadoOrden } from './estadosLibro';
 import { ConfirmarDosisDialog } from './ConfirmarDosisDialog';
+import { ConfirmarSpsDialog } from './ConfirmarSpsDialog';
 import { useAuth } from '../../context/AuthContext';
 import { puedeVerLibroIgss } from '../../lib/igssLibro';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
-const fmtHora = (f) => (f ? new Date(f).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—');
+const fmtHora = (f) => (f ? formatDateTime(f) : '—');
 
 const Atenciones = ({ orden, onReasignar }) => (
   <div className="mt-2 border-t border-slate-100 pt-2 space-y-1" data-testid={`orden-atenciones-${orden.id}`}>
@@ -39,8 +40,13 @@ const Atenciones = ({ orden, onReasignar }) => (
 );
 
 // Acciones de administración (solo roles del libro)
-const AccionesLibro = ({ o, onEditar, onAnular, onCerrar, onConfirmar }) => (
+const AccionesLibro = ({ o, onEditar, onAnular, onCerrar, onConfirmar, onConfirmarSps }) => (
   <>
+    {o.sps_por_revisar && o.estado !== 'anulada' && (
+      <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-amber-700 border-amber-300" type="button" onClick={onConfirmarSps} data-testid={`orden-confirmar-sps-${o.id}`}>
+        <FileCheck2 className="w-3.5 h-3.5 mr-1" /> Confirmar SPS
+      </Button>
+    )}
     {o.dosis_por_confirmar && ESTADOS_ACTIVOS.includes(o.estado) && (
       <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-amber-700 border-amber-300" type="button" onClick={onConfirmar} data-testid={`orden-confirmar-dosis-${o.id}`}>
         <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Confirmar dosis
@@ -60,18 +66,19 @@ const AccionesLibro = ({ o, onEditar, onAnular, onCerrar, onConfirmar }) => (
   </>
 );
 
-const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar, onConfirmar, onReasignar }) => {
+const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar, onConfirmar, onConfirmarSps, onReasignar }) => {
   const [cls, label] = estadoOrden(o.estado);
   return (
     <div className="border border-slate-200 rounded-lg p-3 bg-white" data-testid={`orden-libro-${o.id}`}>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-        <button type="button" onClick={onToggle} className="flex items-start gap-2 text-left min-w-0 sm:flex-1">
+      <div className="flex flex-col gap-2">
+        <button type="button" onClick={onToggle} className="flex items-start gap-2 text-left min-w-0">
           {abierta ? <ChevronDown className="w-4 h-4 mt-0.5 text-slate-400" /> : <ChevronRight className="w-4 h-4 mt-0.5 text-slate-400" />}
-          <div>
-            <div className="text-sm font-semibold text-slate-800">
-              <span className="font-mono" data-testid={`orden-sps-${o.id}`}>{o.no_sps}</span>
-              <span className="text-slate-400 font-normal"> · </span>{o.etiqueta_nog}
-              <span className="ml-2 font-mono text-[11px] font-normal text-slate-400" data-testid={`orden-numero-${o.id}`}>{o.numero_libro}</span>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-slate-800 flex flex-wrap items-baseline gap-x-2">
+              <span className="font-mono break-all" data-testid={`orden-sps-${o.id}`}>{o.no_sps}</span>
+              <span className="text-slate-600 font-normal">{o.etiqueta_nog}</span>
+              <span className="whitespace-nowrap font-mono text-xs font-medium text-slate-600 bg-slate-100 rounded px-1.5" data-testid={`orden-numero-${o.id}`}>{o.numero_libro}</span>
+              {o.sps_por_revisar && <Badge variant="outline" className="h-5 px-1.5 text-[10px] bg-amber-50 text-amber-700 border-amber-300 whitespace-nowrap" data-testid={`orden-revisar-sps-${o.id}`}>Revisar SPS</Badge>}
             </div>
             <div className="text-xs text-slate-500">
               {o.modalidad || 'Sin modalidad'} · {o.tipo === 'procedimiento' ? 'Procedimiento' : 'Consulta'}
@@ -80,16 +87,21 @@ const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar
             </div>
             <div className="text-[11px] text-slate-400" data-testid={`orden-ingresada-por-${o.id}`}>
               Ingresada por {o.created_by_nombre || '—'} · {fmtHora(o.created_at)}
+              {o.sps_confirmado_en && (
+                <span className="text-emerald-700" data-testid={`orden-sps-confirmado-${o.id}`}>
+                  {' '}· No. SPS confirmado por {o.sps_confirmado_por_nombre || '—'} · {fmtHora(o.sps_confirmado_en)}
+                </span>
+              )}
             </div>
           </div>
         </button>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 pl-6">
           <span className="text-xs font-medium text-slate-700 whitespace-nowrap" data-testid={`orden-dosis-${o.id}`}>
             {o.tipo === 'procedimiento' ? `Dosis aplicadas ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : `${o.total_atenciones} atención(es)`}
           </span>
           <Badge variant="outline" className={cls} data-testid={`orden-estado-${o.id}`}>{label}</Badge>
           {esLibro
-            ? <AccionesLibro o={o} onEditar={onEditar} onAnular={onAnular} onCerrar={onCerrar} onConfirmar={onConfirmar} />
+            ? <AccionesLibro o={o} onEditar={onEditar} onAnular={onAnular} onCerrar={onCerrar} onConfirmar={onConfirmar} onConfirmarSps={onConfirmarSps} />
             : o.puede_corregir && (
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" type="button" onClick={onEditar} title="Corregir" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
             )}
@@ -98,6 +110,13 @@ const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar
       {o.estado === 'anulada' && <p className="text-xs text-slate-500 mt-1">Anulada: {o.motivo_anulacion}</p>}
       {o.dosis_por_confirmar && ESTADOS_ACTIVOS.includes(o.estado) && (
         <p className="text-xs text-amber-700 mt-1" data-testid={`orden-falta-confirmar-${o.id}`}>Falta confirmar las dosis con la hoja: no llega a completa ni se cobra hasta confirmarlas.</p>
+      )}
+      {o.sps_por_revisar && o.estado !== 'anulada' && (
+        <p className="text-xs text-amber-700 mt-1" data-testid={`orden-falta-confirmar-sps-${o.id}`}>
+          {o.estado === 'historica'
+            ? 'No. SPS con forma poco común: confirmarlo con la hoja es solo informativo (orden histórica).'
+            : 'No. SPS con forma poco común: no se puede marcar facturada hasta que un rol del libro lo confirme con la hoja.'}
+        </p>
       )}
       {o.estado === 'cerrada' && <p className="text-xs text-orange-700 mt-1" data-testid={`orden-cerrada-motivo-${o.id}`}>Cerrada sin completar (no se cobra): {o.motivo_cierre}</p>}
       {abierta && <Atenciones orden={o} onReasignar={esLibro ? onReasignar : null} />}
@@ -116,6 +135,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
   const [anular, setAnular] = useState(null);
   const [cerrar, setCerrar] = useState(null);
   const [confirmar, setConfirmar] = useState(null);
+  const [confirmarSps, setConfirmarSps] = useState(null);
   const [reasignar, setReasignar] = useState(null);
 
   const cargar = useCallback(async () => {
@@ -159,6 +179,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
           onAnular={() => setAnular(o)}
           onCerrar={() => setCerrar(o)}
           onConfirmar={() => setConfirmar(o)}
+          onConfirmarSps={() => setConfirmarSps(o)}
           onReasignar={(orden, atencion) => setReasignar({ orden, atencion })}
         />
       ))}
@@ -178,6 +199,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
         accion="Cerrar sin completar" onConfirm={async (motivo) => { await igssLibroApi.cerrar(cerrar.id, motivo); toast.success('Orden cerrada sin completar'); cargar(); }}
       />
       <ConfirmarDosisDialog orden={confirmar} onOpenChange={(v) => !v && setConfirmar(null)} onSaved={cargar} />
+      {esLibro && <ConfirmarSpsDialog orden={confirmarSps} onClose={() => setConfirmarSps(null)} onSaved={cargar} />}
       <ElegirOrdenDialog
         open={!!reasignar} onOpenChange={(v) => !v && setReasignar(null)} pacienteId={pacienteId}
         excluirId={reasignar?.orden?.id} permitirSinOrden titulo="Reasignar atención" onConfirm={confirmarReasignar}

@@ -5,27 +5,51 @@
 # un No. SPS. Unidades duplicadas = advertencia. Un mismo No. SPS vigente en dos unidades
 # duplicadas = BLOQUEO: la aplicación (paso b) se negará mientras exista alguno.
 
+import hashlib
 import io
+import json
 import re
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from config.database import db
+from config.database import JWT_ALGORITHM, JWT_SECRET, db
 from routes.auth import require_role
 from routes.igss_libro import normalizar_sps, sps_valido
 from routes.igss_libro_lecturas import (ESTADOS_PROD, _anchos, _descarga, _encabezado, _fila_titulos, _modalidad,
                                         _nombre_archivo, contadores_libro, fmt_fecha)
 from routes.igss_nogs import _BORRADOR_PROJ, es_texto_baja_cuantia, etiqueta_catalogo, eval_es_borrador_vacio, norm_txt
-from utils.timezone import GUATEMALA_TZ, now_gt
+from utils.timezone import GUATEMALA_TZ, now_gt, today_str_gt
 
 router = APIRouter(prefix="/igss-units/migracion", tags=["IGSS - Libro (migración)"])
 SOLO_SUPERADMIN = require_role(["superadmin"])
 
 FECHA_RX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DIAS_REVISAR = 90
+MIN_PATRON = 2  # una forma de No. SPS repetida en 2 o más órdenes es un formato válido
+VIGENCIA_MIN = 30
+HORAS_RESPALDO = 24
+INYECTABLE = ("avastin", "aflibercept", "aflibecept", "inyec", "intravit", "anti vegf", "anti-vegf", "antivegf",
+              "bevacizumab", "ranibizumab", "lucentis", "eylea", "faricimab", "vabysmo", "bavysmo",
+              "aplicacion de medicamento")
+# Cifras del lote: las mismas en la confirmación, al aplicar y en la comparación simulado / aplicado.
+CIFRAS_LOTE = [
+    ("ordenes_vivas", "Órdenes vivas (reservada / en curso)"),
+    ("vivas_reservadas", "  · vivas reservadas"),
+    ("vivas_en_curso", "  · vivas en curso"),
+    ("ordenes_historicas", "Órdenes históricas"),
+    ("constancias_evaluaciones", "Constancias: evaluaciones"),
+    ("constancias_cirugias", "Constancias: cirugías"),
+    ("dosis_registradas", "Dosis ya marcadas realizadas (órdenes vivas)"),
+    ("cirugias_programadas_vivas", "Cirugías programadas anotadas en órdenes vivas"),
+    ("sps_por_revisar", "Órdenes con SPS por revisar"),
+    ("ajustes_cupo_sin_sps", "Cupos descontados sin SPS guardados como cupo ocupado"),
+    ("no_migrables", "No migrables (no entran)"),
+    ("pendientes_sps", "Pendientes de SPS (no entran)"),
+]
 # Orígenes de acreditación cuya fecha es la del ingreso real de la orden (no un recálculo).
 ORIGENES_INGRESO = ("asignacion", "reasignacion", "evaluacion")
 SIN_ATENCION = "Sin atención (queda pendiente)"
@@ -86,6 +110,17 @@ CRITERIOS = [
     "personal los corrija contra la hoja física; va a 'No migrables' con los dos valores. Si ya coinciden, entra normal.",
     "No. SPS con letras u otros signos (la regla es la misma que al ingresar una orden: solo números y guiones): no "
     "se migra y va a 'No migrables' hasta corregirlo contra la hoja física.",
+    "Orden con una cirugía IGSS programada de hoy en adelante: entra VIVA (reservada, o en curso si es de 1 servicio "
+    "con cirugía programada), con 0 dosis contadas por fecha y la marca 'Confirmar dosis'; sus cirugías pasadas sin "
+    "marcar salen en 'Cirugías sin marcar como realizadas' y cuentan solo cuando una persona las marca. Las demás "
+    "entran como HISTÓRICAS (ocupan cupo, no se cobran).",
+    "Constancias (solo lectura, no cuentan dosis ni cambian estados): evaluaciones y cirugías no canceladas con "
+    "coincidencia exacta (el mismo paciente y el mismo No. SPS escrito en la atención, o la atención apunta a la orden).",
+    "Forma del No. SPS (cantidad de dígitos de cada bloque): una forma repetida en 2 o más órdenes es un formato "
+    "válido; una forma única se migra con la marca 'Revisar SPS' (en una orden viva impide marcarla facturada hasta "
+    "confirmar el número con la hoja; en una histórica es solo informativa).",
+    "Cupo descontado sin No. SPS: se guarda como cupo ocupado del NOG (sin crear orden), una sola vez por acreditación.",
+    "La migración no modifica órdenes que ya están en el libro ni las colecciones del sistema anterior.",
 ]
 
 _PAC_PROJ = {"_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1, "igss_afiliacion": 1,
@@ -124,6 +159,66 @@ def _min(fechas) -> str:
 
 def _regla(motivo: str):
     return next(((m, f) for ini, m, f in REGLAS_MOTIVO if motivo.startswith(ini)), (motivo, "Revisar con la hoja física"))
+
+
+def patron_sps(sps: str) -> str:
+    """Forma del No. SPS: la cantidad de dígitos de cada bloque (01-101104-2026-150323 → 2-6-4-6)."""
+    return re.sub(r"\d+", lambda m: str(len(m.group())), sps or "")
+
+
+def es_inyectable(*textos) -> bool:
+    t = " ".join(norm_txt(x) for x in textos)
+    return any(k in t for k in INYECTABLE)
+
+
+def _canon(v):
+    if isinstance(v, dict):
+        return {str(k): _canon(x) for k, x in v.items()}
+    if isinstance(v, (list, set, tuple)):
+        return sorted((_canon(x) for x in v), key=lambda x: json.dumps(x, sort_keys=True, default=str))
+    return v
+
+
+def huella_datos(d) -> str:
+    """Huella de todos los datos que usa la simulación (y de la fecha de hoy)."""
+    return hashlib.sha256(json.dumps(_canon(d), sort_keys=True, default=str).encode()).hexdigest()
+
+
+_CLAVE_TOKEN = f"{JWT_SECRET}:migracion-libro"
+
+
+def emitir_token(tipo: str, user: dict, huella: str, **extra):
+    """Token firmado de una simulación (no sirve para iniciar sesión): vence a los 30 minutos."""
+    vence = datetime.now(timezone.utc) + timedelta(minutes=VIGENCIA_MIN)
+    token = jwt.encode({"tipo": tipo, "usuario": (user or {}).get("id", ""), "huella": huella, "exp": vence, **extra},
+                       _CLAVE_TOKEN, algorithm=JWT_ALGORITHM)
+    return token, vence.astimezone(GUATEMALA_TZ).isoformat()
+
+
+def leer_token(token: str, tipo: str, user: dict) -> dict:
+    try:
+        p = jwt.decode(token, _CLAVE_TOKEN, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=409, detail=(
+            f"La simulación tiene más de {VIGENCIA_MIN} minutos. Simule de nuevo y revise las cifras: no se ejecutó nada."))
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=409, detail="La simulación no es válida. Simule de nuevo: no se ejecutó nada.")
+    if p.get("tipo") != tipo or p.get("usuario") != (user or {}).get("id"):
+        raise HTTPException(status_code=409, detail="Esa simulación es de otra acción u otro usuario. Simule de nuevo.")
+    return p
+
+
+async def respaldo_reciente() -> dict:
+    """Último respaldo completado y si tiene menos de 24 horas."""
+    b = await db.backups.find_one({"status": "completado", "is_deleted": {"$ne": True}}, {"_id": 0, "completed_at": 1},
+                                  sort=[("completed_at", -1)])
+    if not b or not b.get("completed_at"):
+        return {"vigente": False, "completed_at": "", "horas": None}
+    try:
+        horas = (datetime.now(timezone.utc) - datetime.fromisoformat(str(b["completed_at"]).replace("Z", "+00:00"))).total_seconds() / 3600
+    except ValueError:
+        return {"vigente": False, "completed_at": b["completed_at"], "horas": None}
+    return {"vigente": horas <= HORAS_RESPALDO, "completed_at": b["completed_at"], "horas": round(horas, 1)}
 
 
 def _ordenes_legado(p: dict) -> list:
@@ -192,7 +287,11 @@ class Simulacion:
         self.libro = d["libro"]
         self.libro_por_id = {o["id"]: o for o in d["libro"]}
         self.libro_por_clave = {(o["unidad_id"], o["no_sps"]): o for o in d["libro"]}
-        self.en_libro = {(a.get("tipo"), a.get("ref_id")) for o in d["libro"] for a in o.get("atenciones") or []}
+        self.en_libro = {(a.get("tipo"), a.get("ref_id")) for o in d["libro"]
+                         for a in (o.get("atenciones") or []) + (o.get("constancias") or [])}
+        self.hoy = d["hoy"]
+        self.con_ajuste = {a.get("acreditacion_id") for a in d["ajustes"]}
+        self.patrones = []
         self.cands, self.por_pac_sps, self.legado_por_id, self.legado_por_nog = {}, {}, {}, {}
         self.entradas_pac, self.inicio_igss, self.acred_pac_nog = {}, {}, {}
         self.reubicadas = []
@@ -215,7 +314,8 @@ class Simulacion:
         key = (unidad_id, sps)
         c = self.cands.setdefault(key, {
             "unidad_id": unidad_id, "no_sps": sps, "pacientes": set(), "entradas": {}, "motivos": [], "codigo": "",
-            "procedimiento": "", "fuentes": set(), "ingresos": [], "evaluaciones": [], "cirugias": [], "cx_vinculadas": 0})
+            "procedimiento": "", "fuentes": set(), "ingresos": [], "evaluaciones": [], "cirugias": [], "cx_vinculadas": 0,
+            "cx_programadas": 0, "cx_futuras": 0, "cx_pasadas": []})
         if pid:
             c["pacientes"].add(pid)
             self.por_pac_sps.setdefault((pid, sps), set()).add(key)
@@ -268,8 +368,10 @@ class Simulacion:
             if entrada and dia and a.get("origen") in ORIGENES_INGRESO and dia < self.acred_pac_nog.get(k, "9999"):
                 self.acred_pac_nog[k] = dia
             if not sps:
-                self.pendientes_sps.append(self._pendiente("cupo_sin_sps", a.get("id"), pid, entrada, dia,
-                                                           unidad=a.get("unidad_id"), nombre=a.get("paciente_nombre")))
+                p = self._pendiente("cupo_sin_sps", a.get("id"), pid, entrada, dia,
+                                    unidad=a.get("unidad_id"), nombre=a.get("paciente_nombre"))
+                p["ajuste_existente"] = a.get("id") in self.con_ajuste
+                self.pendientes_sps.append(p)
                 continue
             self.aportar(a.get("unidad_id"), sps, pid, "acreditación", entrada,
                          None if entrada else "La acreditación apunta a una entrada que ya no está en el catálogo",
@@ -277,7 +379,7 @@ class Simulacion:
 
     def _atencion(self, tipo, ref, pid, fecha, medico, proc):
         return {"tipo": tipo, "ref_id": ref, "paciente_id": pid, "fecha": fecha, "medico": medico or "",
-                "procedimiento": (proc or "")[:120], "en_sin_orden": (tipo, ref) in self.sin_orden}
+                "procedimiento": (proc or "")[:120], "en_sin_orden": (tipo, ref) in self.sin_orden, "exacta": False}
 
     def _orden_libro(self, orden_id, pid):
         o = self.libro_por_id.get(orden_id or "")
@@ -319,6 +421,8 @@ class Simulacion:
                                 ev.get("igss_procedimiento") or ev.get("motivo_consulta"))
             c, motivo, entrada = self._orden_de_evaluacion(ev, p)
             if c:
+                lib = self.libro_por_id.get(ev.get("igss_orden_id") or "")
+                at["exacta"] = normalizar_sps(ev.get("igss_no_sps")) == c["no_sps"] or bool(lib and lib.get("no_sps") == c["no_sps"])
                 c["evaluaciones"].append(at)
             else:
                 self.sueltas.append((at, entrada, motivo))
@@ -350,8 +454,16 @@ class Simulacion:
             at["unidad_id"] = unidad
             if c:
                 c["cx_vinculadas"] += 1
+                at["exacta"] = True
                 if realizada:
                     c["cirugias"].append(at)
+                elif fecha and fecha >= self.hoy:
+                    c["cx_programadas"] += 1
+                    c["cx_futuras"] += 1
+                else:
+                    c["cx_programadas"] += 1
+                    if fecha:
+                        c["cx_pasadas"].append(at)
             elif realizada:
                 self.sueltas.append((at, entrada, motivo))
 
@@ -427,8 +539,9 @@ class Simulacion:
                     destino["pacientes"] |= origen["pacientes"]
                     destino["entradas"].update({e["id"]: e for e in equiv.values()})
                     destino["fuentes"] |= origen["fuentes"]
-                    destino["cx_vinculadas"] += origen["cx_vinculadas"]
-                    for k in ("motivos", "ingresos", "evaluaciones", "cirugias"):
+                    for k in ("cx_vinculadas", "cx_programadas", "cx_futuras"):
+                        destino[k] += origen[k]
+                    for k in ("motivos", "ingresos", "evaluaciones", "cirugias", "cx_pasadas"):
                         destino[k] += origen[k]
                     destino["codigo"] = destino["codigo"] or origen["codigo"]
                     destino["procedimiento"] = destino["procedimiento"] or origen["procedimiento"]
@@ -544,6 +657,22 @@ class Simulacion:
                     nombre=at.get("paciente_nombre", "")))
         self._ordenes_probables()
         self._resultado_reubicadas()
+        self._patrones()
+
+    def _patrones(self):
+        """Formas del No. SPS por cantidad de órdenes; una forma única marca la orden 'Revisar SPS'."""
+        claves = {(o["unidad_id"], o["no_sps"]) for o in self.migrables + self.libro if o.get("no_sps")}
+        claves |= {(x["unidad_id"], x["no_sps"]) for x in self.no_migrables if x["no_sps"] and " / " not in x["no_sps"]}
+        cuenta, ejemplo = Counter(), {}
+        for _, sps in sorted(claves):
+            cuenta[patron_sps(sps)] += 1
+            ejemplo.setdefault(patron_sps(sps), sps)
+        self.patrones = [{"patron": p, "ordenes": n, "ejemplo": ejemplo[p], "comun": n >= MIN_PATRON}
+                         for p, n in sorted(cuenta.items(), key=lambda kv: (-kv[1], kv[0]))]
+        for o in self.migrables:
+            if cuenta[o["sps_patron"]] < MIN_PATRON:
+                o["revisar_sps"] = True
+                o["observaciones"].append(f"Revisar SPS: forma poco común ({o['sps_patron']}), no se repite en otra orden")
 
     def _ordenes_probables(self):
         """Para cada cupo sin SPS, la orden con SPS del mismo paciente y NOG (si es una sola)."""
@@ -572,14 +701,24 @@ class Simulacion:
                   else "Registro de la entrada del catálogo" if respaldo else "")
         tipo = "procedimiento" if c["cx_vinculadas"] else "consulta"
         p = self.pacs.get(pid) or {}
+        viva = c["cx_futuras"] > 0
+        dosis = max(1, c["cx_vinculadas"]) if tipo == "procedimiento" else 1
+        exactas = [a for a in evs if a["exacta"]]
+        pasadas = [a for a in c["cx_pasadas"] if not asignacion or a["fecha"] >= asignacion]
+        constancias = sorted(exactas if viva else exactas + cxs + pasadas, key=lambda a: a["fecha"] or "")
+        dosis_reg = cxs if viva else []
+        estado_libro = ("historica" if not viva else "en_curso" if dosis_reg or (dosis <= 1 and c["cx_programadas"])
+                        else "reservada")
         obs = []
+        if viva:
+            obs.append("Entra viva: tiene cirugía programada de hoy en adelante; confirmar dosis con la hoja")
         if revisar:
             obs.append(f"Revisar fecha: {len(tempranas)} atención(es) de más de {DIAS_REVISAR} días antes del "
                        f"{fmt_fecha(respaldo)}" if respaldo else "Revisar fecha: sin ninguna fecha de referencia")
         if entrada.get("is_active") is False:
             obs.append("Entrada del catálogo inactiva")
         if tipo == "procedimiento":
-            obs.append("Dosis autorizadas = cirugías realizadas encontradas (mínimo 1); confirmar con la hoja")
+            obs.append("Dosis autorizadas = cirugías conocidas (programadas o realizadas, mínimo 1); confirmar con la hoja")
         if ev_fuera or cx_fuera:
             obs.append(f"{len(ev_fuera) + len(cx_fuera)} atención(es) anterior(es) al contrato no incluida(s)")
         resueltas = sum(1 for a in dentro if a["en_sin_orden"])
@@ -591,7 +730,7 @@ class Simulacion:
             "paciente_nombre": _nombre(p), "expediente": p.get("record_number", ""),
             "igss_afiliacion": p.get("igss_afiliacion", ""),
             "codigo": c["codigo"], "procedimiento": c["procedimiento"] or entrada.get("nombre_servicio", ""),
-            "tipo": tipo, "dosis_autorizadas": max(1, len(cxs)) if tipo == "procedimiento" else 1,
+            "tipo": tipo, "dosis_autorizadas": dosis,
             "estado": "atendida" if dentro else "pendiente", "fecha_ingreso": ingreso,
             "fecha_referencia": asignacion or respaldo, "fuente_referencia": fuente,
             "fecha_primera_atencion": _min(a["fecha"] for a in dentro),
@@ -600,6 +739,14 @@ class Simulacion:
             "excluidas_anteriores": len(ev_fuera) + len(cx_fuera), "resuelve_sin_orden": resueltas,
             "revisar_fecha": revisar, "origen": sorted(c["fuentes"]), "precio": float(entrada.get("precio") or 0),
             **self._estados(c["evaluaciones"]), "observaciones": obs,
+            "viva": viva, "estado_libro": estado_libro, "dosis_por_confirmar": viva,
+            "inyectable": tipo == "procedimiento" and es_inyectable(c["procedimiento"], entrada.get("nombre_servicio")),
+            "constancias": [{k: a[k] for k in ("tipo", "ref_id", "fecha", "medico")} for a in constancias],
+            "constancias_evaluaciones": sum(1 for a in constancias if a["tipo"] == "evaluacion"),
+            "constancias_cirugias": sum(1 for a in constancias if a["tipo"] == "cirugia"),
+            "dosis_registradas": [{k: a[k] for k in ("tipo", "ref_id", "fecha", "medico")} for a in dosis_reg],
+            "cirugias_programadas": c["cx_programadas"] if viva else 0,
+            "sps_patron": patron_sps(c["no_sps"]), "revisar_sps": False,
         }
 
     def _ya_en_libro(self, o, c):
@@ -659,8 +806,9 @@ async def _cargar() -> dict:
         {"estado": "pendiente"}, {"_id": 0, "tipo": 1, "ref_id": 1})}
     units = {u["id"]: u for u in await db.igss_units.find(
         {}, {"_id": 0, "id": 1, "name": 1, "is_active": 1, "created_at": 1}).to_list(None)}
+    ajustes = await db.igss_libro_ajustes_cupo.find({}, {"_id": 0}).to_list(None)
     return {"nogs": nogs, "acreds": acreds, "cxs": cxs, "pacientes": pacs, "evals": evals, "prod": prod,
-            "libro": libro, "sin_orden": sin_orden, "units": units}
+            "libro": libro, "sin_orden": sin_orden, "units": units, "ajustes": ajustes, "hoy": today_str_gt()}
 
 
 # ==================== UNIDADES DUPLICADAS Y BLOQUEOS ====================
@@ -790,8 +938,26 @@ def _orden_caso(x, units):
     return (units.get(x["unidad_id"], {}).get("name", "") or "~", x["fecha"] or "9999", x.get("paciente_nombre", ""))
 
 
+def _totales_lote(ordenes, pendientes) -> dict:
+    vivas = [o for o in ordenes if o["viva"]]
+    return {
+        "ordenes_vivas": len(vivas),
+        "vivas_reservadas": sum(1 for o in vivas if o["estado_libro"] == "reservada"),
+        "vivas_en_curso": sum(1 for o in vivas if o["estado_libro"] == "en_curso"),
+        "ordenes_historicas": len(ordenes) - len(vivas),
+        "constancias_evaluaciones": sum(o["constancias_evaluaciones"] for o in ordenes),
+        "constancias_cirugias": sum(o["constancias_cirugias"] for o in ordenes),
+        "dosis_registradas": sum(len(o["dosis_registradas"]) for o in ordenes),
+        "cirugias_programadas_vivas": sum(o["cirugias_programadas"] for o in ordenes),
+        "sps_por_revisar": sum(1 for o in ordenes if o["revisar_sps"]),
+        "ajustes_cupo_sin_sps": sum(1 for p in pendientes if p["tipo"] == "cupo_sin_sps" and p["nog_id"]
+                                    and not p.get("ajuste_existente")),
+    }
+
+
 async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
     d = await _cargar()
+    huella = huella_datos(d)
     units = d["units"]
     if unidad_id and unidad_id not in units:
         raise HTTPException(status_code=404, detail="Unidad IGSS no encontrada")
@@ -850,12 +1016,15 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
         "unidades_duplicadas": len(advertencias),
         "ordenes_reubicadas": len(reubicadas),
         "bloqueos": len(bloqueos_unidad),
+        **_totales_lote(ordenes, pendientes),
     }
     return {
         "generado": now_gt().isoformat(), "solo_lectura": True, "unidad_id": unidad_id or "",
         "unidad": units.get(unidad_id, {}).get("name", "") if unidad_id else "Todas las unidades",
         "aplicacion_permitida": not bloqueos, "bloqueos_totales": len(bloqueos),
-        "criterios": CRITERIOS, "totales": totales,
+        "criterios": CRITERIOS, "totales": totales, "huella": huella,
+        "cifras_lote": [{"clave": k, "concepto": t, "valor": totales[k]} for k, t in CIFRAS_LOTE],
+        "patrones_sps": s.patrones, "respaldo": await respaldo_reciente(),
         "por_unidad": _por_unidad(units, ordenes, no_migrables, pendientes), "por_anio": _por_anio(ordenes),
         "por_motivo": _por_motivo(no_migrables, pendientes), "advertencias": advertencias, "bloqueos": bloqueos_unidad,
         "unidades": sorted(({"id": u["id"], "name": u.get("name", ""), "is_active": u.get("is_active", True) is not False}
@@ -868,6 +1037,7 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
 # ==================== EXCEL ====================
 
 REVISION = ["No. SPS correcto", "Revisado por"]
+ENTRA_COMO = {"historica": "Histórica", "reservada": "Viva: reservada", "en_curso": "Viva: en curso"}
 
 
 def _tabla(ws, r, titulos, filas):
@@ -904,6 +1074,7 @@ def _hoja_resumen(ws, sim):
         ("Unidades duplicadas (advertencia)", t["unidades_duplicadas"]),
         ("No. SPS del par duplicado reubicados en la unidad activa", t["ordenes_reubicadas"]),
         ("No. SPS repetidos en unidades duplicadas (bloqueo)", t["bloqueos"])]) + 2
+    r = _tabla(ws, r, ["Cómo entra al libro", "Cantidad"], [(c["concepto"], c["valor"]) for c in sim["cifras_lote"]]) + 2
     r = _tabla(ws, r, ["Unidad", "Órdenes a migrar", "Consumidas", "Pendientes", "No migrables", "Pendientes de SPS"],
                [(u["unidad"], u["a_migrar"], u["consumidas"], u["pendientes"], u["no_migrables"], u["pendientes_sps"])
                 for u in sim["por_unidad"]]) + 2
@@ -941,10 +1112,12 @@ def simulacion_excel(sim: dict) -> io.BytesIO:
            f["pendientes_sps"], f["contador_actual"], f["acreditaciones_vigentes"], f["sobrecupo"])
           for f in sim["resumen_nog"]]),
         ("Órdenes", ["Unidad", "Modalidad", "NOG", "No. SPS", "Expediente", "Paciente", "Afiliación", "Procedimiento",
-                     "Fecha 1ª atención", "Estado propuesto", "Dosis autorizadas", "Origen", "Observaciones"],
+                     "Fecha 1ª atención", "Estado propuesto", "Dosis autorizadas", "Origen", "Observaciones",
+                     "Entra como", "Constancias", "Revisar SPS"],
          [(o["unidad"], o["modalidad"], o["nog"], o["no_sps"], o["expediente"], o["paciente_nombre"], o["igss_afiliacion"],
            o["procedimiento"], fmt_fecha(o["fecha_primera_atencion"]), "Atendida" if o["estado"] == "atendida" else "Pendiente",
-           o["dosis_autorizadas"], ", ".join(o["origen"]), "; ".join(o["observaciones"])) for o in sim["ordenes"]]),
+           o["dosis_autorizadas"], ", ".join(o["origen"]), "; ".join(o["observaciones"]),
+           ENTRA_COMO[o["estado_libro"]], len(o["constancias"]), "Sí" if o["revisar_sps"] else "No") for o in sim["ordenes"]]),
         ("No migrables", ["Unidad", "Fecha", "Tipo", "Motivo", "Qué falta para migrarlo", "NOG", "No. SPS registrado",
                           "Expediente", "Paciente", "Afiliación", "Origen", "Atenciones afectadas", *REVISION],
          [(x["unidad"], fmt_fecha(x["fecha"]), TIPO_CASO[x["tipo_caso"]], x["motivo"], x["falta"], x["nog"],
@@ -959,6 +1132,9 @@ def simulacion_excel(sim: dict) -> io.BytesIO:
                                 "Cupo en la unidad de origen", "Cupo en la unidad de destino", "Resultado"],
          [(f["unidad_origen"], f["unidad_destino"], f["nog"], f["no_sps"], f["expediente"], f["paciente_nombre"],
            f["cupo_origen"], f["cupo_destino"], f["resultado"]) for f in sim["reubicadas"]]),
+        ("Patrones de No. SPS", ["Forma (dígitos por bloque)", "Órdenes", "Ejemplo", "Resultado"],
+         [(p["patron"], p["ordenes"], p["ejemplo"], "Formato válido (se repite)" if p["comun"] else "Revisar SPS")
+          for p in sim["patrones_sps"]]),
     ]
     for nombre, titulos, filas in hojas:
         hoja = wb.create_sheet(nombre)
@@ -977,8 +1153,11 @@ def simulacion_excel(sim: dict) -> io.BytesIO:
 async def simular(unidad_id: Optional[str] = None, detalle: bool = Query(True),
                   current_user: dict = Depends(SOLO_SUPERADMIN)):
     """Paso (a): simulación de solo lectura. No crea, edita ni borra ningún dato.
-    detalle=false devuelve solo totales y desgloses (pantalla)."""
+    detalle=false devuelve solo totales y desgloses (pantalla). Con todas las unidades entrega
+    además el token para aplicar exactamente esta simulación (vence a los 30 minutos)."""
     sim = await simular_migracion(unidad_id)
+    if not unidad_id:
+        sim["token_aplicar"], sim["vence"] = emitir_token("aplicar", current_user, sim["huella"])
     if not detalle:
         for k in ("resumen_nog", "ordenes", "no_migrables", "pendientes_sps", "ya_en_libro", "reubicadas"):
             sim.pop(k)

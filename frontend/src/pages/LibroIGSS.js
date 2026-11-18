@@ -10,15 +10,19 @@ import {
 } from '../components/ui/alert-dialog';
 import { toast, Toaster } from 'sonner';
 import { BookOpen, ShieldCheck, ShieldOff, Search, Link2, XCircle, Loader2, Lock, Unlock } from 'lucide-react';
-import { igssLibroApi } from '../services/api';
+import { igssLibroApi, formatDateTime } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { MotivoDialog, ElegirOrdenDialog } from '../components/igss/OrdenDialogs';
 import { MigracionSimulacion } from '../components/igss/MigracionSimulacion';
-import { ResumenLibro, TarjetasRevision, TablaCirugiasPorMarcar, TablaDetenidas, TablaDosisPorConfirmar, BuscarOrden } from '../components/igss/RevisionLibro';
+import {
+  ResumenLibro, TarjetasRevision, TablaCirugiasPorMarcar, TablaDetenidas, TablaDosisPorConfirmar, BuscarOrden,
+  TablaSpsPorRevisar, TablaAjustesSinSps,
+} from '../components/igss/RevisionLibro';
 import { ConfirmarDosisDialog } from '../components/igss/ConfirmarDosisDialog';
+import { ConfirmarSpsDialog } from '../components/igss/ConfirmarSpsDialog';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
-const fmtHora = (f) => (f ? new Date(f).toLocaleString('es-GT') : '—');
+const fmtHora = (f) => (f ? formatDateTime(f) : '—');
 const ESTADOS = [['pendiente', 'Pendientes'], ['resuelta', 'Resueltas'], ['descartada', 'Descartadas']];
 
 const INTERRUPTORES = {
@@ -115,14 +119,22 @@ export default function LibroIGSS() {
   const [asignar, setAsignar] = useState(null);
   const [descartar, setDescartar] = useState(null);
   const [vista, setVista] = useState('sin_orden');
-  const [revision, setRevision] = useState({ resumen: null, cirugias: [], detenidas: [], dosis: [] });
+  const [revision, setRevision] = useState({ resumen: null, cirugias: [], detenidas: [], dosis: [], sps: [], ajustes: [] });
   const [cerrar, setCerrar] = useState(null);
   const [confirmar, setConfirmar] = useState(null);
+  const [confirmarSps, setConfirmarSps] = useState(null);
+  const [liberar, setLiberar] = useState(null);
 
   const cargarRevision = useCallback(async () => {
     try {
-      const [r, cx, det, dos] = await Promise.all([igssLibroApi.resumen(), igssLibroApi.cirugiasPorMarcar(), igssLibroApi.detenidas(90), igssLibroApi.dosisPorConfirmar()]);
-      setRevision({ resumen: r.data, cirugias: cx.data?.data || [], detenidas: det.data?.data || [], dosis: dos.data?.data || [] });
+      const [r, cx, det, dos, sps, aj] = await Promise.all([
+        igssLibroApi.resumen(), igssLibroApi.cirugiasPorMarcar(), igssLibroApi.detenidas(90), igssLibroApi.dosisPorConfirmar(),
+        igssLibroApi.spsPorRevisar(), igssLibroApi.ajustesCupo(),
+      ]);
+      setRevision({
+        resumen: r.data, cirugias: cx.data?.data || [], detenidas: det.data?.data || [], dosis: dos.data?.data || [],
+        sps: sps.data?.data || [], ajustes: aj.data?.data || [],
+      });
     } catch (e) {
       toast.error('No se pudieron cargar las listas de revisión del libro');
     }
@@ -173,22 +185,27 @@ export default function LibroIGSS() {
           <BookOpen className="w-7 h-7 text-teal-700" />
           <div>
             <h1 className="text-2xl font-semibold text-slate-800">Libro de órdenes IGSS</h1>
-            <p className="text-sm text-slate-500">Cifras del libro y listas para revisar: atenciones sin orden, cirugías sin marcar y órdenes detenidas.</p>
+            <p className="text-sm text-slate-500">Cifras del libro y listas para revisar: atenciones sin orden, cirugías sin marcar, órdenes detenidas, dosis y No. SPS por confirmar y cupos sin No. SPS.</p>
           </div>
         </div>
         {['exigir_orden', 'usar_solo_libro'].map((campo) => (
           <Interruptor key={campo} campo={campo} config={config} esSuperadmin={user?.role === 'superadmin'} onCambiar={cambiarInterruptor} />
         ))}
-        {user?.role === 'superadmin' && <MigracionSimulacion />}
+        {user?.role === 'superadmin' && <MigracionSimulacion onCambio={cargarRevision} />}
         <BuscarOrden />
         <ResumenLibro resumen={revision.resumen} />
         <TarjetasRevision vista={vista} onVista={setVista}
-          conteos={{ sin_orden: config?.atenciones_sin_orden_pendientes, cirugias: revision.cirugias.length, detenidas: revision.detenidas.length, dosis: revision.dosis.length }} />
+          conteos={{
+            sin_orden: config?.atenciones_sin_orden_pendientes, cirugias: revision.cirugias.length, detenidas: revision.detenidas.length,
+            dosis: revision.dosis.length, sps: revision.sps.length, ajustes: revision.ajustes.length,
+          }} />
         {vista !== 'sin_orden' && (
           <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto" data-testid={`libro-vista-${vista}`}>
             {vista === 'cirugias' && <TablaCirugiasPorMarcar filas={revision.cirugias} onMarcar={marcarRealizada} />}
             {vista === 'detenidas' && <TablaDetenidas filas={revision.detenidas} onCerrar={setCerrar} />}
             {vista === 'dosis' && <TablaDosisPorConfirmar filas={revision.dosis} onConfirmar={setConfirmar} />}
+            {vista === 'sps' && <TablaSpsPorRevisar filas={revision.sps} onConfirmar={setConfirmarSps} />}
+            {vista === 'ajustes' && <TablaAjustesSinSps filas={revision.ajustes} onLiberar={setLiberar} />}
           </div>
         )}
         {vista === 'sin_orden' && <div className="rounded-xl border border-slate-200 bg-white" data-testid="libro-vista-sin_orden">
@@ -234,6 +251,13 @@ export default function LibroIGSS() {
         accion="Cerrar sin completar" onConfirm={async (motivo) => { await igssLibroApi.cerrar(cerrar.id, motivo); toast.success('Orden cerrada sin completar'); cargarRevision(); }}
       />
       <ConfirmarDosisDialog orden={confirmar} onOpenChange={(v) => !v && setConfirmar(null)} onSaved={cargarRevision} />
+      <ConfirmarSpsDialog orden={confirmarSps} onClose={() => setConfirmarSps(null)} onSaved={cargarRevision} />
+      <MotivoDialog
+        open={!!liberar} onOpenChange={(v) => !v && setLiberar(null)} testId="liberar-ajuste-dialog"
+        titulo={`Liberar cupo sin SPS de ${liberar?.paciente_nombre || ''}`}
+        descripcion="Úselo cuando ya se ingresó la orden real con su No. SPS o el cupo no corresponde. El cupo queda libre y el cambio queda en auditoría."
+        accion="Liberar cupo" onConfirm={async (motivo) => { await igssLibroApi.liberarAjuste(liberar.id, motivo); toast.success('Cupo liberado'); cargarRevision(); }}
+      />
       <ElegirOrdenDialog
         open={!!asignar} onOpenChange={(v) => !v && setAsignar(null)} pacienteId={asignar?.paciente_id}
         titulo={`Asignar ${asignar?.tipo === 'cirugia' ? 'cirugía' : 'evaluación'} a una orden`}

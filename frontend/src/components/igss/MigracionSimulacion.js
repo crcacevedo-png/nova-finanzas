@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { FlaskConical, FileSpreadsheet, Loader2, OctagonAlert, TriangleAlert, CheckCircle2 } from 'lucide-react';
 import { igssLibroApi } from '../../services/api';
 import { descargarBlob } from '../../lib/igssLibro';
+import { AplicarMigracion, ComparacionLote, EstadoRespaldo, LotesMigracion } from './MigracionAcciones';
 
 // Fase 4, paso (a): simulación de la migración al libro. SOLO LECTURA y solo superadmin.
 // La pantalla es para decidir: totales y desgloses; el detalle caso por caso va en el Excel.
@@ -90,6 +91,12 @@ const Resultado = ({ sim }) => {
         <Cifra label="Pendientes" valor={t.pendientes} tono="text-sky-700" testId="mig-total-pendientes" />
         <Cifra label="No se migra" valor={t.no_se_migra} tono="text-red-600" testId="mig-total-no-migra" />
       </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="mig-como-entra">
+        <Cifra label="Entran vivas" valor={t.ordenes_vivas} tono="text-sky-700" testId="mig-total-vivas" />
+        <Cifra label="Entran históricas" valor={t.ordenes_historicas} tono="text-violet-700" testId="mig-total-historicas" />
+        <Cifra label="Constancias" valor={t.constancias_evaluaciones + t.constancias_cirugias} tono="text-slate-700" testId="mig-total-constancias" />
+        <Cifra label="SPS por revisar" valor={t.sps_por_revisar} tono="text-amber-700" testId="mig-total-sps-revisar" />
+      </div>
       <Bloqueos sim={sim} />
       <Advertencias lista={sim.advertencias} />
       {t.ordenes_reubicadas > 0 && (
@@ -106,20 +113,25 @@ const Resultado = ({ sim }) => {
             filas={sim.por_anio.map((a) => [a.anio, n(a.ordenes), n(a.consumidas), n(a.pendientes)])} />
           <Tabla titulo="No se migra, por motivo" testId="mig-por-motivo" cols={['Motivo', 'Casos']}
             filas={sim.por_motivo.map((m) => [`${m.motivo}${m.grupo === 'Pendiente de SPS' ? ' (pendiente de SPS)' : ''}`, n(m.casos)])} />
+          <Tabla titulo="Formas de No. SPS (todas las unidades)" testId="mig-patrones" cols={['Forma (dígitos por bloque)', 'Órdenes', 'Ejemplo', 'Resultado']}
+            filas={sim.patrones_sps.map((p) => [<span className="font-mono">{p.patron}</span>, n(p.ordenes), <span className="font-mono">{p.ejemplo}</span>,
+              p.comun ? 'Formato válido' : <span className="font-semibold text-amber-700">Revisar SPS</span>])} />
         </div>
       </div>
       <p className="text-xs text-slate-500" data-testid="mig-historial">
         Historial ignorado (solo se cuenta): {n(t.evaluaciones_historicas_ignoradas)} evaluaciones ({n(t.evaluaciones_anteriores_al_contrato)} anteriores al contrato,
         {' '}{n(t.evaluaciones_sin_unidad_igss_en_la_fecha)} anteriores a la primera actividad IGSS del paciente o, si no tiene ninguna, a la creación de su expediente)
         {' '}y {n(t.cirugias_anteriores_al_contrato)} cirugías anteriores al contrato.
-        {' '}{n(t.ordenes_ya_en_libro_con_atenciones_nuevas)} órdenes que ya están en el libro recibirían atenciones · {n(t.revisar_fecha)} para revisar fecha.
+        {' '}{n(t.ordenes_ya_en_libro_con_atenciones_nuevas)} órdenes que ya están en el libro tienen atenciones sin registrar (la migración no las modifica) · {n(t.revisar_fecha)} para revisar fecha.
       </p>
     </div>
   );
 };
 
-export const MigracionSimulacion = () => {
+export const MigracionSimulacion = ({ onCambio }) => {
   const [sim, setSim] = useState(null);
+  const [resultado, setResultado] = useState(null);
+  const [versionLotes, setVersionLotes] = useState(0);
   const [unidad, setUnidad] = useState(TODAS);
   const [cargando, setCargando] = useState('');
   const params = (u) => (u === TODAS ? {} : { unidad_id: u });
@@ -128,6 +140,7 @@ export const MigracionSimulacion = () => {
     setCargando('json');
     try {
       setSim((await igssLibroApi.simularMigracion(params(u))).data);
+      setResultado(null);
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'No se pudo generar la simulación');
     } finally {
@@ -140,7 +153,8 @@ export const MigracionSimulacion = () => {
     try {
       const res = await igssLibroApi.simularMigracionExcel(params(unidad));
       const nombre = unidad === TODAS ? '' : `_${(sim?.unidad || '').replace(/[^A-Za-z0-9]+/g, '_')}`;
-      descargarBlob(res.data, `Simulacion_migracion_libro_IGSS${nombre}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guatemala' });
+      descargarBlob(res.data, `Simulacion_migracion_libro_IGSS${nombre}_${fecha}.xlsx`);
     } catch (e) {
       toast.error('No se pudo descargar el Excel');
     } finally {
@@ -160,8 +174,8 @@ export const MigracionSimulacion = () => {
               Migración al libro — simulación <Badge className="bg-sky-100 text-sky-700 border-0 ml-1">Solo lectura</Badge>
             </p>
             <p className="text-xs text-slate-500 max-w-2xl mt-1">
-              Calcula qué pasaría al migrar el historial al libro. No crea, edita ni borra ningún dato.
-              El detalle caso por caso está en el Excel.
+              Calcula qué pasaría al migrar el historial al libro. Simular no crea, edita ni borra ningún dato;
+              aplicar se hace aparte, con confirmación. El detalle caso por caso está en el Excel.
             </p>
           </div>
         </div>
@@ -185,7 +199,12 @@ export const MigracionSimulacion = () => {
           </Button>
         </div>
       </div>
+      {sim && <EstadoRespaldo respaldo={sim.respaldo} />}
+      {sim && <AplicarMigracion sim={sim} onCaducada={() => setSim(null)}
+        onAplicada={(r) => { setResultado(r); setSim(null); setVersionLotes((v) => v + 1); onCambio?.(); }} />}
+      {resultado && <ComparacionLote resultado={resultado} />}
       {sim && <Resultado sim={sim} />}
+      <LotesMigracion version={versionLotes} onDeshecho={() => { setResultado(null); setSim(null); onCambio?.(); }} />
     </div>
   );
 };

@@ -25,6 +25,7 @@ const ESTADOS = [
   { key: 'facturado', label: 'Facturado' },
   { key: 'pagado', label: 'Pagado' },
 ];
+const COBRO = ['facturado', 'pagado'];
 
 export const ProduccionIGSS = () => {
   const navigate = useNavigate();
@@ -80,7 +81,8 @@ export const ProduccionIGSS = () => {
       toast.success(`${ESTADOS.find((e) => e.key === key)?.label}: ${nuevo ? 'marcado' : 'desmarcado'}`);
     } catch (e) {
       setRows((prev) => prev.map((r) => r.orden_id === row.orden_id ? { ...r, [key]: !nuevo } : r));
-      toast.error('No se pudo actualizar el estado');
+      const d = e?.response?.data?.detail;
+      toast.error(typeof d === 'string' ? d : 'No se pudo actualizar el estado');
     }
     fetchData();
   };
@@ -252,7 +254,12 @@ export const ProduccionIGSS = () => {
                               {!r.paciente_activo && <span className="ml-1 text-[10px] text-gray-400">(inactivo)</span>}
                             </TableCell>
                             <TableCell className="font-mono text-xs">{r.expediente || '—'}</TableCell>
-                            <TableCell className="text-xs">{r.no_sps || '—'}</TableCell>
+                            <TableCell className="text-xs">
+                              {r.no_sps || '—'}
+                              {r.sps_por_revisar && (
+                                <Badge variant="outline" className="ml-1 h-5 px-1.5 text-[10px] bg-amber-50 text-amber-700 border-amber-300 whitespace-nowrap" title="Confirme el No. SPS en el Libro IGSS antes de facturar" data-testid={`prod-revisar-sps-${r.orden_id}`}>Revisar SPS</Badge>
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs">{r.procedimiento || '—'}</TableCell>
                             <TableCell className="text-xs">{r.medico_nombre || '—'}</TableCell>
                             <TableCell className="text-xs">{fmtDia(r.fecha)}</TableCell>
@@ -268,7 +275,9 @@ export const ProduccionIGSS = () => {
                             </TableCell>
                             {ESTADOS.map((e) => (
                               <TableCell key={e.key} className="text-center">
-                                <Checkbox checked={!!r[e.key]} onCheckedChange={() => toggleEstado(r, e.key)} data-testid={`prod-${e.key}-${r.orden_id}`} />
+                                <Checkbox checked={!!r[e.key]} onCheckedChange={() => toggleEstado(r, e.key)} data-testid={`prod-${e.key}-${r.orden_id}`}
+                                  disabled={r.sps_por_revisar && COBRO.includes(e.key) && !r[e.key]}
+                                  title={r.sps_por_revisar && COBRO.includes(e.key) ? 'Confirme el No. SPS antes de facturar' : undefined} />
                               </TableCell>
                             ))}
                             <TableCell className="text-right whitespace-nowrap">

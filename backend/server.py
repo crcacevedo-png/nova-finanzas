@@ -3088,6 +3088,10 @@ api_router.include_router(pacientes_router, tags=["Pacientes - Búsqueda rápida
 # ==================== MÓDULO NOG POR UNIDAD IGSS ====================
 from routes.igss_libro_migracion import router as igss_libro_migracion_router
 api_router.include_router(igss_libro_migracion_router, tags=["IGSS - Libro (migración)"])
+from routes.igss_libro_migracion_aplicar import router as igss_libro_migracion_aplicar_router, ensure_migracion_indexes
+api_router.include_router(igss_libro_migracion_aplicar_router, tags=["IGSS - Libro (migración)"])
+from routes.igss_libro_revision import router as igss_libro_revision_router
+api_router.include_router(igss_libro_revision_router, tags=["IGSS - Libro de órdenes"])
 from routes.igss_libro import router as igss_libro_router, ensure_libro_indexes
 api_router.include_router(igss_libro_router, tags=["IGSS - Libro de órdenes"])
 api_router.include_router(igss_libro_atenciones_router, tags=["IGSS - Libro de órdenes"])
@@ -4623,6 +4627,7 @@ async def startup_event():
     # Libro de órdenes IGSS + índices parciales del catálogo (baja cuantía sin número)
     await ensure_libro_indexes()
     await ensure_atenciones_indexes()
+    await ensure_migracion_indexes()
     try:
         await preparar_estados_libro()
     except Exception as e:

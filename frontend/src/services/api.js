@@ -253,6 +253,15 @@ export const igssLibroApi = {
   // Fase 4 (a): simulación de la migración, solo lectura y solo superadmin
   simularMigracion: (params) => axios.get(`${API_URL}/igss-units/migracion/simular`, { params: { ...params, detalle: false } }),
   simularMigracionExcel: (params) => axios.get(`${API_URL}/igss-units/migracion/simular/excel`, { params, responseType: 'blob' }),
+  // Fase 4 (b): aplicar y deshacer (solo superadmin)
+  aplicarMigracion: (token, palabra) => axios.post(`${API_URL}/igss-units/migracion/aplicar`, { token, palabra }),
+  lotesMigracion: () => axios.get(`${API_URL}/igss-units/migracion/lotes`),
+  simularDeshacer: (loteId) => axios.post(`${API_URL}/igss-units/migracion/deshacer/simular`, { lote_id: loteId }),
+  deshacerMigracion: (token, palabra) => axios.post(`${API_URL}/igss-units/migracion/deshacer`, { token, palabra }),
+  spsPorRevisar: () => axios.get(`${LIBRO}/sps-por-revisar`),
+  confirmarSps: (id) => axios.post(`${LIBRO}/ordenes/${id}/confirmar-sps`),
+  ajustesCupo: () => axios.get(`${LIBRO}/ajustes-cupo`),
+  liberarAjuste: (id, motivo) => axios.post(`${LIBRO}/ajustes-cupo/${id}/liberar`, { motivo }),
 };
 
 // Google Calendar API (sincronización de Agenda por médico)

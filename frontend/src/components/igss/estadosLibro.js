@@ -18,4 +18,5 @@ export const desgloseCupo = (n) => [
   `${n?.en_curso ?? 0} en curso`,
   `${n?.reservadas ?? 0} reservadas`,
   n?.historicas ? `${n.historicas} históricas` : null,
+  n?.sin_sps ? `${n.sin_sps} sin SPS` : null,
 ].filter(Boolean).join(' · ');

@@ -41,7 +41,7 @@ export const OrdenIgssSelector = ({ opciones, cargado, value, onChange, disabled
           {opciones.map((o) => (
             <SelectItem key={o.id} value={o.id} data-testid={`${testIdPrefix}-option-${o.id}`}>
               {o.procedimiento}
-              {o.numero_libro && <span className="ml-1 font-mono text-[11px] text-slate-400">{o.numero_libro}</span>}
+              {o.numero_libro && <span className="ml-1 whitespace-nowrap font-mono text-[11px] text-slate-500">{o.numero_libro}</span>}
               {o.fecha_ingreso ? ` · Ingreso ${fmt(o.fecha_ingreso)}` : ''}
               {o.tipo === 'procedimiento' ? ` · Dosis ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : ''}
             </SelectItem>

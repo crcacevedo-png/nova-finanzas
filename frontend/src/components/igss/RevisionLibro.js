@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
-import { CheckCircle2, CircleSlash, ClipboardCheck, Clock, Inbox, Loader2, Scissors, Search } from 'lucide-react';
+import { CheckCircle2, CircleSlash, ClipboardCheck, Clock, FileWarning, Inbox, Loader2, PackageMinus, Scissors, Search, Unlock } from 'lucide-react';
 import { toast } from 'sonner';
 import { igssLibroApi } from '../../services/api';
 import { estadoOrden } from './estadosLibro';
@@ -35,10 +35,12 @@ const TARJETAS = [
   ['cirugias', Scissors, 'Cirugías sin marcar como realizadas', 'De órdenes reservadas o en curso: ya pasó su fecha y no se cobran hasta marcarlas'],
   ['detenidas', Clock, 'En curso sin movimiento', 'Sin dosis ni atención nueva en más de 90 días'],
   ['dosis', ClipboardCheck, 'Pendientes de confirmar dosis', 'No llegan a completa ni se cobran hasta confirmar con la hoja'],
+  ['sps', FileWarning, 'Órdenes con SPS por revisar', 'Forma de No. SPS poco común: una orden viva no se marca facturada hasta confirmarlo'],
+  ['ajustes', PackageMinus, 'Cupos ocupados sin No. SPS', 'Cupos descontados antes del libro sin hoja identificada'],
 ];
 
 export const TarjetasRevision = ({ vista, onVista, conteos }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" data-testid="libro-revision">
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="libro-revision">
     {TARJETAS.map(([k, Icono, titulo, sub]) => (
       <button key={k} type="button" onClick={() => onVista(k)} data-testid={`libro-revision-${k}`}
         className={`text-left rounded-xl border p-4 bg-white transition-colors hover:bg-slate-50 ${vista === k ? 'border-teal-600 ring-1 ring-teal-600' : 'border-slate-200'}`}>
@@ -72,7 +74,7 @@ export const TablaCirugiasPorMarcar = ({ filas, onMarcar }) => (
           <td className="px-3 py-2 text-sm font-medium text-slate-800">{c.paciente_nombre || '—'}<div className="text-xs text-slate-400 font-normal">{c.unidad}</div></td>
           <td className="px-3 py-2 text-sm text-slate-600">{c.procedimiento} {c.ojo}<div className="text-xs text-slate-400">{c.cirujano}</div></td>
           <td className="px-3 py-2 text-xs">
-            <span className="font-mono">{c.orden?.no_sps}</span> <span className="font-mono text-slate-400">{c.orden?.numero_libro}</span>
+            <span className="font-mono">{c.orden?.no_sps}</span> <span className="whitespace-nowrap font-mono text-slate-500">{c.orden?.numero_libro}</span>
             <div className="text-slate-400">{estadoOrden(c.orden?.estado)[1]}{c.orden?.inyectable ? ' · Inyectable' : ''}</div>
           </td>
           <td className="px-3 py-2 text-xs text-red-600 whitespace-nowrap">{c.dias_atraso} días</td>
@@ -90,7 +92,7 @@ export const TablaCirugiasPorMarcar = ({ filas, onMarcar }) => (
 // No. SPS + número del libro, paciente, procedimiento y avance (listas de revisión y búsqueda)
 const CeldasOrden = ({ o }) => (
   <>
-    <td className="px-3 py-2 text-xs font-mono">{o.no_sps} <span className="text-slate-400">{o.numero_libro}</span><div className="font-sans text-slate-400">{o.etiqueta_nog}</div></td>
+    <td className="px-3 py-2 text-xs font-mono">{o.no_sps} <span className="whitespace-nowrap text-slate-500">{o.numero_libro}</span><div className="font-sans text-slate-400">{o.etiqueta_nog}</div></td>
     <td className="px-3 py-2 text-sm font-medium text-slate-800">{o.paciente_nombre}<div className="text-xs text-slate-400 font-normal">{o.paciente_expediente}</div></td>
     <td className="px-3 py-2 text-sm text-slate-600">{o.procedimiento || o.nombre_servicio || '—'}</td>
     <td className="px-3 py-2 text-xs whitespace-nowrap">
@@ -113,6 +115,54 @@ export const TablaDosisPorConfirmar = ({ filas, onConfirmar }) => (
           <td className="px-3 py-2 text-right">
             <Button size="sm" variant="outline" className="h-7 text-xs text-amber-700 border-amber-300" onClick={() => onConfirmar(o)} data-testid={`dosis-confirmar-${o.id}`}>
               <ClipboardCheck className="w-3 h-3 mr-1" /> Confirmar dosis
+            </Button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+export const TablaSpsPorRevisar = ({ filas, onConfirmar }) => (
+  <table className="w-full text-left" data-testid="sps-por-revisar-tabla">
+    <thead className="text-xs uppercase text-slate-500 bg-slate-50">
+      <tr><Th>No. SPS / Número</Th><Th>Paciente</Th><Th>Procedimiento</Th><Th>Estado</Th><Th>Efecto</Th><Th /></tr>
+    </thead>
+    <tbody>
+      {filas.length === 0 && <Vacio cols={6} texto="No hay órdenes con el No. SPS por revisar." testId="sps-por-revisar-vacio" />}
+      {filas.map((o) => (
+        <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`sps-por-revisar-${o.id}`}>
+          <CeldasOrden o={o} />
+          <td className="px-3 py-2 text-xs text-slate-600">
+            {o.estado === 'historica' ? 'Solo informativo (histórica)' : 'No se puede marcar facturada hasta confirmar'}
+            <div className="text-slate-400 font-mono">forma {o.sps_patron}</div>
+          </td>
+          <td className="px-3 py-2 text-right">
+            <Button size="sm" variant="outline" className="h-7 text-xs text-amber-700 border-amber-300" onClick={() => onConfirmar(o)} data-testid={`sps-confirmar-${o.id}`}>
+              <CheckCircle2 className="w-3 h-3 mr-1" /> Confirmar SPS
+            </Button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+export const TablaAjustesSinSps = ({ filas, onLiberar }) => (
+  <table className="w-full text-left" data-testid="ajustes-cupo-tabla">
+    <thead className="text-xs uppercase text-slate-500 bg-slate-50">
+      <tr><Th>Fecha</Th><Th>Paciente</Th><Th>Unidad / NOG</Th><Th /></tr>
+    </thead>
+    <tbody>
+      {filas.length === 0 && <Vacio cols={4} texto="No hay cupos ocupados sin No. SPS." testId="ajustes-cupo-vacio" />}
+      {filas.map((a) => (
+        <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`ajuste-cupo-${a.id}`}>
+          <td className="px-3 py-2 text-sm whitespace-nowrap">{fmt(a.fecha)}</td>
+          <td className="px-3 py-2 text-sm font-medium text-slate-800">{a.paciente_nombre || '—'}<div className="text-xs text-slate-400 font-normal">{a.paciente_expediente}</div></td>
+          <td className="px-3 py-2 text-xs text-slate-600">{a.unidad}<div className="font-mono text-slate-400">{a.etiqueta_nog}</div></td>
+          <td className="px-3 py-2 text-right">
+            <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-700" onClick={() => onLiberar(a)} data-testid={`ajuste-liberar-${a.id}`}>
+              <Unlock className="w-3 h-3 mr-1" /> Liberar cupo
             </Button>
           </td>
         </tr>

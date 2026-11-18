@@ -17,13 +17,14 @@ const errorDe = (e, fb) => {
 
 const VACIO = { unidad_id: '', nog_id: '', no_sps: '', tipo: 'consulta', dosis_autorizadas: 1, codigo: '', procedimiento: '', inyectable: false };
 
+const sinCupo = (c) => !c.sin_tope && (c.disponibles === undefined ? !c.con_cupo : c.disponibles <= 0);
 const cupoTexto = (c) => {
   if (c.sin_tope) return 'sin tope';
-  if (c.disponibles === undefined) return c.con_cupo ? 'con cupo' : 'sin cupo';
+  if (sinCupo(c)) return 'SIN CUPO';
+  if (c.disponibles === undefined) return 'con cupo';
   const casiLleno = c.cantidad > 0 && c.ocupados >= c.cantidad * 0.9;
-  return `${c.disponibles} disponibles${casiLleno && c.disponibles > 0 ? ' · ≥ 90 %' : ''}`;
+  return `${c.disponibles} disponibles${casiLleno ? ' · ≥ 90 %' : ''}`;
 };
-const sinCupo = (c) => !c.sin_tope && (c.disponibles === undefined ? !c.con_cupo : c.disponibles <= 0);
 
 // Crear o editar una orden del libro (No. SPS, entrada del catálogo, tipo y dosis)
 export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, orden, onSaved }) => {
@@ -101,12 +102,15 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
                   <SelectTrigger className="mt-1" data-testid="orden-form-nog"><SelectValue placeholder="Entrada del catálogo" /></SelectTrigger>
                   <SelectContent>
                     {catalogo.map((c) => (
-                      <SelectItem key={c.id} value={c.id} disabled={sinCupo(c)} data-testid={`orden-form-nog-${c.id}`}>
-                        {c.etiqueta} · {cupoTexto(c)}
+                      <SelectItem key={c.id} value={c.id} disabled={sinCupo(c)} data-testid={`orden-form-nog-${c.id}`} data-sin-cupo={sinCupo(c) ? 'si' : 'no'}>
+                        {c.etiqueta} · <span className={sinCupo(c) ? 'font-semibold text-red-600' : ''}>{cupoTexto(c)}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {catalogo.some(sinCupo) && (
+                  <p className="text-[11px] text-slate-500 mt-1" data-testid="orden-form-nota-sin-cupo">Las entradas SIN CUPO no se pueden elegir.</p>
+                )}
               </div>
             </>
           )}

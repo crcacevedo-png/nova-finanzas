@@ -305,10 +305,11 @@ def test_reubicacion_en_la_unidad_activa(sim):
     assert sim["u"]["bloqueos"] == [] and sim["u"]["advertencias"] == [] and sim["u"]["aplicacion_permitida"] is False
 
 
-def test_excel_seis_hojas(sim):
+def test_excel_siete_hojas(sim):
     for contenido in (sim["excel"], sim["excel2"]):
         wb = load_workbook(io.BytesIO(contenido))
-        assert wb.sheetnames == ["Resumen", "Por NOG", "Órdenes", "No migrables", "Pendientes de SPS", "Órdenes reubicadas"]
+        assert wb.sheetnames == ["Resumen", "Por NOG", "Órdenes", "No migrables", "Pendientes de SPS", "Órdenes reubicadas",
+                                 "Patrones de No. SPS"]
     wb = load_workbook(io.BytesIO(sim["excel"]))
     cab = {h: [c.value for c in wb[h][1]] for h in wb.sheetnames[1:]}
     assert cab["Por NOG"][-3:-1] == ["Contador actual (acreditados)", "Acreditaciones vigentes hoy"]

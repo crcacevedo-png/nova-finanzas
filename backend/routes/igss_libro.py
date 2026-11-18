@@ -41,6 +41,8 @@ ESTADO_TEXTO = {"reservada": "reservada", "en_curso": "en curso", "completa": "c
                 "historica": "histórica", "cerrada": "cerrada sin completar"}
 CAMPOS_COBRO = ("facturado", "pagado")
 MSG_INYECTABLE = "Solo una orden de procedimiento puede marcarse como inyectable"
+MSG_SPS_REVISAR = ("Confirme el No. SPS contra la hoja antes de marcarla facturada: una hoja con el número mal "
+                   "escrito la rechaza el IGSS.")
 CONTADOR_NUMERO = "libro_orden_numero"
 
 
@@ -462,6 +464,7 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
     cobro = [k for k in CAMPOS_COBRO if upd.get(k) is True]
     if cobro:
         filtro["estado"] = "completa"
+        filtro["sps_por_revisar"] = {"$ne": True}
     cambia_tipo = "tipo" in set_ or "dosis_autorizadas" in set_
     if cambia_tipo:
         filtro.update({"facturado": {"$ne": True}, "pagado": {"$ne": True}})
@@ -486,6 +489,8 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
             raise HTTPException(status_code=422, detail=(
                 f"Solo una orden completa se puede marcar como {' o '.join(cobro)}: "
                 f"esta orden está {ESTADO_TEXTO.get(cur.get('estado'), cur.get('estado'))}."))
+        if cobro and cur.get("sps_por_revisar"):
+            raise HTTPException(status_code=422, detail=MSG_SPS_REVISAR)
         if cambia_tipo and (cur.get("facturado") or cur.get("pagado")):
             raise HTTPException(status_code=422, detail="No se puede cambiar el tipo ni las dosis de una orden ya facturada o pagada")
         aplicadas = sum(1 for a in cur.get("atenciones") or [] if a.get("tipo") == "cirugia")
@@ -575,6 +580,29 @@ async def confirmar_dosis(orden_id: str, body: DosisConfirmar, current_user: dic
     return _orden_out(o, nog)
 
 
+@router.post("/ordenes/{orden_id}/confirmar-sps")
+async def confirmar_sps(orden_id: str, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    """Confirma contra la hoja física el No. SPS de una orden marcada "Revisar SPS" (forma poco
+    común al migrar). Registra quién y cuándo; desde entonces la orden viva puede facturarse."""
+    now = datetime.now(timezone.utc).isoformat()
+    antes = await db.igss_ordenes_libro.find_one_and_update(
+        {"id": orden_id, "sps_por_revisar": True, "estado": {"$ne": "anulada"}},
+        {"$set": {"sps_por_revisar": False, "sps_confirmado_por": current_user.get("id", ""),
+                  "sps_confirmado_por_nombre": _nombre_usuario(current_user), "sps_confirmado_en": now, "updated_at": now}},
+        projection={"_id": 0}, return_document=ReturnDocument.BEFORE)
+    if not antes:
+        cur = await _orden_or_404(orden_id)
+        if cur.get("estado") == "anulada":
+            raise HTTPException(status_code=400, detail="La orden está anulada")
+        raise HTTPException(status_code=400, detail="El No. SPS de esta orden no está marcado para revisar")
+    await _audit("LIBRO_ORDEN_SPS_CONFIRMADO", current_user, {
+        "orden_id": orden_id, "no_sps": antes.get("no_sps"), "numero_libro": antes.get("numero_libro"),
+        "estado": antes.get("estado")})
+    o = await _orden_or_404(orden_id)
+    nog = await db.igss_nogs.find_one({"id": o.get("nog_id")}, {"_id": 0})
+    return _orden_out(o, nog)
+
+
 @router.post("/ordenes/{orden_id}/cerrar")
 async def cerrar_sin_completar(orden_id: str, body: OrdenCerrar, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
     """Cierra SIN COMPLETAR una orden en curso (tratamiento suspendido): exige motivo, queda
@@ -613,15 +641,16 @@ async def contador_nog(nog_id: str, current_user: dict = Depends(require_role(LI
     ]).to_list(None)
     por = {g["_id"]: g for g in grupos}
     n = {e: int((por.get(e) or {}).get("n", 0)) for e in (*ESTADOS_CUPO, "cerrada", "anulada")}
+    sin_sps = await db.igss_libro_ajustes_cupo.count_documents({"nog_id": nog_id, "activo": True})
     sin_tope = bool(nog.get("sin_tope"))
     cantidad = int(nog.get("cantidad") or 0)
-    usados = sum(n[e] for e in ESTADOS_CUPO)
+    usados = sum(n[e] for e in ESTADOS_CUPO) + sin_sps
     res = {
         "nog_id": nog_id, "unidad_id": nog.get("unidad_id", ""), "etiqueta": etiqueta_catalogo(nog),
         "modalidad": TIPO_COMPRA_LABELS.get(nog.get("tipo_compra", ""), nog.get("tipo_compra", "")),
         "sin_tope": sin_tope, "cantidad": None if sin_tope else cantidad,
         "reservadas": n["reservada"], "en_curso": n["en_curso"], "completas": n["completa"],
-        "historicas": n["historica"], "ocupados": usados, "cerradas": n["cerrada"], "anuladas": n["anulada"],
+        "historicas": n["historica"], "sin_sps": sin_sps, "ocupados": usados, "cerradas": n["cerrada"], "anuladas": n["anulada"],
         "monto_cobrable": round(float((por.get("completa") or {}).get("monto", 0)), 2),
         "disponibles": None, "porcentaje": None, "aviso_90": False, "bloqueado": False,
     }

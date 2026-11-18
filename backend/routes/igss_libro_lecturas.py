@@ -58,10 +58,13 @@ async def contadores_libro(match: Optional[dict] = None) -> dict:
         c[CONTADOR.get(g["_id"]["estado"], "cerradas")] = g["n"]
         if g["_id"]["estado"] == "completa":
             c["monto_cobrable"] = round(float(g["monto"]), 2)
+    async for g in db.igss_libro_ajustes_cupo.aggregate([{"$match": {"activo": True, **(match or {})}},
+                                                         {"$group": {"_id": "$nog_id", "n": {"$sum": 1}}}]):
+        out.setdefault(g["_id"], {**{k: 0 for k in CONTADOR.values()}, "cerradas": 0, "monto_cobrable": 0.0})["sin_sps"] = g["n"]
     return out
 
 
-CIFRAS = (*CONTADOR.values(), "ocupados", "cerradas")
+CIFRAS = (*CONTADOR.values(), "sin_sps", "ocupados", "cerradas")
 
 
 def nog_libro(nog: dict, c: Optional[dict] = None) -> dict:
@@ -72,6 +75,7 @@ def nog_libro(nog: dict, c: Optional[dict] = None) -> dict:
     sin_tope = bool(nog.get("sin_tope"))
     tope = not sin_tope and cantidad > 0
     cifras = {k: int(c.get(k, 0)) for k in CONTADOR.values()}
+    cifras["sin_sps"] = int(c.get("sin_sps", 0))
     usados = sum(cifras.values())
     cifras["cerradas"] = int(c.get("cerradas", 0))
     activo = nog.get("is_active", True) is not False
@@ -142,7 +146,7 @@ def fila_orden(o: dict, nog: Optional[dict], pac: Optional[dict]) -> dict:
         "dosis_aplicadas": aplicadas, "dosis_autorizadas": autorizadas, "fechas_dosis": [f for f in fechas if f],
         "evaluacion_id": ev.get("ref_id") if ev else None,
         "precio_nog": float(o.get("precio") or 0), "costo": costo_orden(o),
-        "costo_editado": o.get("costo_override") is not None,
+        "costo_editado": o.get("costo_override") is not None, "sps_por_revisar": bool(o.get("sps_por_revisar")),
         **{k: bool(o.get(k)) for k in ESTADOS_PROD},
     }
 
