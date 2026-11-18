@@ -35,6 +35,7 @@ ESTADO_TEXTO = {"reservada": "reservada", "en_curso": "en curso", "completa": "c
                 "historica": "histórica", "cerrada": "cerrada sin completar"}
 CAMPOS_COBRO = ("facturado", "pagado")
 MSG_INYECTABLE = "Solo una orden de procedimiento puede marcarse como inyectable"
+CONTADOR_NUMERO = "libro_orden_numero"
 
 
 # ==================== MODELOS ====================
@@ -114,12 +115,14 @@ def etapas_estado() -> list:
     """Recalcula estado y fecha_completa (anulada, cerrada e histórica no cambian).
     Consulta: reservada → completa con la evaluación (los seguimientos no cambian nada).
     Procedimiento: en curso con la 1.ª dosis o con una consulta previa (si es de 1 servicio,
-    también con la cirugía programada); completa con la dosis N de N / cirugía realizada."""
+    también con la cirugía programada); completa con la dosis N de N / cirugía realizada.
+    Con "dosis por confirmar" pendiente nunca llega a completa (queda en curso)."""
     fechas = lambda tipo: {"$map": {"input": _de_tipo(tipo), "in": "$$this.fecha"}}  # noqa: E731
     consulta = {"$eq": ["$tipo", "consulta"]}
     dosis = {"$ifNull": ["$dosis_autorizadas", 1]}
     evals = {"$size": _de_tipo("evaluacion")}
-    completa = {"$cond": [consulta, {"$gte": [evals, 1]}, {"$gte": [_expr_cirugias(), dosis]}]}
+    completa = {"$and": [{"$ne": ["$dosis_por_confirmar", True]},
+                         {"$cond": [consulta, {"$gte": [evals, 1]}, {"$gte": [_expr_cirugias(), dosis]}]}]}
     programada = {"$and": [{"$lte": [dosis, 1]}, {"$gt": [{"$size": {"$ifNull": ["$cirugias_programadas", []]}}, 0]}]}
     en_curso = {"$and": [{"$not": [consulta]}, {"$or": [{"$gte": [_expr_cirugias(), 1]}, {"$gte": [evals, 1]}, programada]}]}
     fijo = {"$in": ["$estado", list(ESTADOS_FIJOS)]}
@@ -180,6 +183,17 @@ def _msg_sps_duplicado(sps: str) -> str:
     return f"Ya existe una orden vigente con el No. SPS {sps} en esta unidad"
 
 
+async def siguiente_numero_libro() -> str:
+    """Número fijo del libro (ORD-000123): contador atómico, nunca se reutiliza."""
+    if await db.counters.find_one({"_id": CONTADOR_NUMERO}) is None:
+        ult = await db.igss_ordenes_libro.find_one({"numero_libro": {"$regex": "^ORD-"}}, sort=[("numero_libro", -1)])
+        inicio = int(ult["numero_libro"].split("-")[-1]) if ult else 0
+        await db.counters.update_one({"_id": CONTADOR_NUMERO}, {"$setOnInsert": {"seq": inicio}}, upsert=True)
+    doc = await db.counters.find_one_and_update({"_id": CONTADOR_NUMERO}, {"$inc": {"seq": 1}},
+                                                return_document=ReturnDocument.AFTER)
+    return f"ORD-{int(doc['seq']):06d}"
+
+
 async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
     """Crea una orden en estado "reservada" (ya ocupa cupo). Valida No. SPS
     obligatorio y único por unidad (índice único parcial) y cupo de la entrada del
@@ -213,6 +227,7 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
     now = datetime.now(timezone.utc).isoformat()
     doc = {
         "id": str(uuid.uuid4()),
+        "numero_libro": await siguiente_numero_libro(),
         "unidad_id": unidad_id,
         "nog_id": nog["id"],
         "numero_nog": (nog.get("numero") or "").strip(),
@@ -223,6 +238,7 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
         "tipo": tipo,
         "dosis_autorizadas": dosis,
         "inyectable": bool(data.get("inyectable")),
+        "dosis_por_confirmar": bool(data.get("dosis_por_confirmar")),
         **pac,
         "estado": "reservada",
         "vigente": True,
@@ -273,6 +289,8 @@ async def ensure_libro_indexes():
         ([("paciente_id", 1)], {"name": "libro_paciente"}),
         ([("estado", 1), ("unidad_id", 1), ("fecha_primera_atencion", 1)], {"name": "libro_estado_unidad_fecha"}),
         ([("id", 1)], {"unique": True, "name": "libro_id"}),
+        ([("numero_libro", 1)], {"unique": True, "name": "libro_numero",
+                                 "partialFilterExpression": {"numero_libro": {"$exists": True}}}),
     ]
     for keys, opts in specs:
         try:
@@ -326,7 +344,8 @@ async def listar_ordenes(
         filtro["no_sps"] = normalizar_sps(no_sps)
     if q and q.strip():
         rx = {"$regex": re.escape(q.strip()), "$options": "i"}
-        filtro["$or"] = [{"paciente_nombre": rx}, {"paciente_expediente": rx}, {"no_sps": rx}, {"igss_afiliacion": rx}]
+        filtro["$or"] = [{"paciente_nombre": rx}, {"paciente_expediente": rx}, {"no_sps": rx}, {"igss_afiliacion": rx},
+                         {"numero_libro": rx}]
     total = await db.igss_ordenes_libro.count_documents(filtro)
     docs = await db.igss_ordenes_libro.find(filtro, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     nog_ids = list({d.get("nog_id") for d in docs})
@@ -462,6 +481,44 @@ async def anular_orden(orden_id: str, body: OrdenAnular, current_user: dict = De
         "orden_id": orden_id, "nog_id": antes["nog_id"], "no_sps": antes.get("no_sps"),
         "estado_previo": antes.get("estado"), "motivo": body.motivo.strip()})
     o = await _orden_or_404(orden_id)
+    nog = await db.igss_nogs.find_one({"id": o.get("nog_id")}, {"_id": 0})
+    return _orden_out(o, nog)
+
+
+class DosisConfirmar(BaseModel):
+    dosis_autorizadas: int = Field(..., ge=1)
+
+
+@router.post("/ordenes/{orden_id}/confirmar-dosis")
+async def confirmar_dosis(orden_id: str, body: DosisConfirmar, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    """Confirma con la hoja física las dosis autorizadas de una orden marcada "Confirmar
+    dosis con la hoja" (órdenes migradas en curso). Hasta confirmarla no llega a completa
+    ni se cobra; al confirmar se recalcula el estado (puede quedar completa)."""
+    n = int(body.dosis_autorizadas)
+    now = datetime.now(timezone.utc).isoformat()
+    filtro = {"id": orden_id, "dosis_por_confirmar": True, "estado": {"$in": list(ESTADOS_VIGENTES)},
+              "$expr": {"$and": [{"$lte": [_expr_cirugias(), n]},
+                                 {"$or": [{"$ne": ["$tipo", "consulta"]}, {"$eq": [n, 1]}]}]}}
+    antes = await db.igss_ordenes_libro.find_one_and_update(
+        filtro, [{"$set": {"dosis_autorizadas": n, "dosis_por_confirmar": False, "dosis_confirmadas_por": _lit(current_user.get("id", "")),
+                           "dosis_confirmadas_por_nombre": _lit(_nombre_usuario(current_user)),
+                           "fecha_confirmacion_dosis": now, "updated_at": now}}, *etapas_estado()],
+        projection={"_id": 0}, return_document=ReturnDocument.BEFORE)
+    if not antes:
+        cur = await _orden_or_404(orden_id)
+        aplicadas = _orden_out(cur)["dosis_aplicadas"]
+        if not cur.get("dosis_por_confirmar"):
+            raise HTTPException(status_code=400, detail="La orden no tiene dosis por confirmar")
+        if cur.get("estado") not in ESTADOS_VIGENTES:
+            raise HTTPException(status_code=400, detail=f"La orden está {ESTADO_TEXTO.get(cur.get('estado'), cur.get('estado'))}")
+        if cur.get("tipo") == "consulta" and n != 1:
+            raise HTTPException(status_code=422, detail="Una orden de consulta cubre una sola atención (dosis autorizadas = 1)")
+        raise HTTPException(status_code=422, detail=f"La orden ya tiene {aplicadas} dosis aplicadas; las dosis autorizadas no pueden ser menos")
+    o = await _orden_or_404(orden_id)
+    await _audit("LIBRO_ORDEN_DOSIS_CONFIRMADAS", current_user, {
+        "orden_id": orden_id, "no_sps": o.get("no_sps"), "numero_libro": o.get("numero_libro"),
+        "dosis_antes": antes.get("dosis_autorizadas"), "dosis_confirmadas": n,
+        "estado_antes": antes.get("estado"), "estado_despues": o.get("estado")})
     nog = await db.igss_nogs.find_one({"id": o.get("nog_id")}, {"_id": 0})
     return _orden_out(o, nog)
 

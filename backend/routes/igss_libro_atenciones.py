@@ -20,7 +20,7 @@ from config.database import db
 from config.permissions import LIBRO_IGSS_ROLES
 from routes.auth import require_any_permission, require_role
 from routes.igss_libro import (ESTADO_TEXTO, ESTADOS_VIGENTES, _audit, _expr_cirugias, _lit, _nombre_usuario,
-                               _orden_out, crear_orden_libro, etapas_estado, normalizar_sps)
+                               _orden_out, crear_orden_libro, etapas_estado, normalizar_sps, siguiente_numero_libro)
 from routes.igss_nogs import TIPO_COMPRA_LABELS, etiqueta_catalogo, eval_es_borrador_vacio
 from utils.timezone import today_str_gt
 
@@ -425,10 +425,14 @@ def respuesta_registro(r: dict, user: dict) -> dict:
     aviso genérico si hubo una falla."""
     if (user or {}).get("role") in LIBRO_IGSS_ROLES:
         o = r.get("orden") or {}
-        return {"libro": {"resultado": r.get("resultado"), "motivo": r.get("motivo"), "no_sps": o.get("no_sps"),
-                          "estado": o.get("estado"),
-                          "dosis_aplicadas": _cirugias(o) if o else None,
-                          "dosis_autorizadas": o.get("dosis_autorizadas")}}
+        out = {"resultado": r.get("resultado"), "motivo": r.get("motivo"), "no_sps": o.get("no_sps"),
+               "numero_libro": o.get("numero_libro"), "estado": o.get("estado"),
+               "dosis_aplicadas": _cirugias(o) if o else None, "dosis_autorizadas": o.get("dosis_autorizadas")}
+        if o.get("dosis_por_confirmar") and out["dosis_aplicadas"] >= int(o.get("dosis_autorizadas") or 1):
+            out["aviso"] = (f"La orden {o.get('numero_libro', '')} ({o.get('no_sps', '')}) llegó a sus "
+                            f"{out['dosis_aplicadas']} dosis conocidas, pero falta confirmar las dosis con la hoja: "
+                            "queda en curso y no se cobra hasta confirmarlas.")
+        return {"libro": out}
     return {"aviso_igss": AVISO_GENERICO} if r.get("falla") else {}
 
 
@@ -668,16 +672,39 @@ async def ordenes_abiertas_paciente(
     NOG, dosis ni precio."""
     ordenes = await db.igss_ordenes_libro.find(
         {"paciente_id": patient_id, "vigente": True, "estado": {"$in": list(ESTADOS_VIGENTES)},
-         "$expr": {"$lt": [_expr_cirugias(), "$dosis_autorizadas"]}},
-        {"_id": 0, "id": 1, "procedimiento": 1, "codigo": 1, "tipo": 1, "fecha_ingreso": 1, "nog_id": 1},
-    ).sort("fecha_ingreso", 1).to_list(200)
+         "$expr": {"$lt": [_expr_cirugias(), "$dosis_autorizadas"]}}, _PROJ_CLINICA).sort("fecha_ingreso", 1).to_list(200)
+    return await _vista_clinica(ordenes)
+
+
+_PROJ_CLINICA = {"_id": 0, "id": 1, "numero_libro": 1, "procedimiento": 1, "tipo": 1, "fecha_ingreso": 1, "nog_id": 1,
+                 "estado": 1, "dosis_autorizadas": 1, "inyectable": 1, "atenciones.tipo": 1}
+
+
+async def _vista_clinica(ordenes: list) -> list:
+    """Lo que ven médico y recepción: número del libro, procedimiento, fecha de ingreso,
+    estado y avance de dosis. Nunca No. SPS, NOG, código ni precio."""
     servicios = {n["id"]: n.get("nombre_servicio", "") for n in await db.igss_nogs.find(
         {"id": {"$in": list({o.get("nog_id") for o in ordenes})}}, {"_id": 0, "id": 1, "nombre_servicio": 1}).to_list(None)}
-    return [{"id": o["id"],
+    return [{"id": o["id"], "numero_libro": o.get("numero_libro", ""),
              "procedimiento": o.get("procedimiento") or servicios.get(o.get("nog_id")) or
                               ("Consulta" if o.get("tipo") == "consulta" else "Procedimiento"),
-             "fecha_ingreso": o.get("fecha_ingreso", ""),
+             "tipo": o.get("tipo", "consulta"), "fecha_ingreso": o.get("fecha_ingreso", ""), "estado": o.get("estado", ""),
+             "inyectable": bool(o.get("inyectable")), "dosis_aplicadas": _cirugias(o),
+             "dosis_autorizadas": int(o.get("dosis_autorizadas") or 1),
              "motivo_sugerido": servicios.get(o.get("nog_id"), "")} for o in ordenes]
+
+
+@pacientes_router.get("/{patient_id}/igss-ordenes-ficha")
+async def ordenes_ficha_clinica(
+    patient_id: str,
+    current_user: dict = Depends(require_any_permission(["view_patients", "view_agenda", "view_evaluacion"])),
+):
+    """Sección de solo lectura de la ficha para médico y recepción: solo órdenes reservadas y
+    en curso (nunca completas, históricas, cerradas ni anuladas), sin No. SPS ni NOG."""
+    ordenes = await db.igss_ordenes_libro.find(
+        {"paciente_id": patient_id, "estado": {"$in": ["reservada", "en_curso"]}}, _PROJ_CLINICA,
+    ).sort([("fecha_ingreso", -1), ("numero_libro", -1)]).to_list(200)
+    return await _vista_clinica(ordenes)
 
 
 # ==================== REVISIÓN: CIRUGÍAS SIN MARCAR Y ÓRDENES DETENIDAS ====================
@@ -705,7 +732,7 @@ async def cirugias_por_marcar(current_user: dict = Depends(require_role(LIBRO_IG
     por_id, por_sps = {}, {}
     async for o in db.igss_ordenes_libro.find(
             {"paciente_id": {"$in": list({c["patient_id"] for c in cxs})}, "vigente": True},
-            {"_id": 0, "id": 1, "no_sps": 1, "estado": 1, "paciente_id": 1, "inyectable": 1}):
+            {"_id": 0, "id": 1, "no_sps": 1, "estado": 1, "paciente_id": 1, "inyectable": 1, "numero_libro": 1}):
         por_id[o["id"]] = o
         por_sps[(o["paciente_id"], o.get("no_sps"))] = o
 
@@ -722,7 +749,7 @@ async def cirugias_por_marcar(current_user: dict = Depends(require_role(LIBRO_IG
              "paciente_nombre": c.get("patient_name", ""), "procedimiento": c.get("procedure", ""),
              "cirujano": c.get("surgeon", ""), "ojo": c.get("eye", ""), "unidad": (c.get("igss_data") or {}).get("unit", ""),
              "no_sps_indicado": normalizar_sps((c.get("igss_data") or {}).get("sps")),
-             "orden": {k: o.get(k) for k in ("id", "no_sps", "estado", "inyectable")},
+             "orden": {k: o.get(k) for k in ("id", "no_sps", "estado", "inyectable", "numero_libro")},
              "dias_atraso": _dias_desde(c.get("date"), d)} for c, o in cxs]
     return {"data": data, "total": len(data)}
 
@@ -753,11 +780,32 @@ async def en_curso_sin_movimiento(dias: int = Query(90, ge=1, le=3650),
     return {"data": data, "total": len(data), "dias": dias}
 
 
+@router.get("/dosis-por-confirmar")
+async def dosis_por_confirmar(current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+    """Órdenes marcadas "Confirmar dosis con la hoja": no llegan a completa ni se cobran
+    hasta que se confirmen."""
+    docs = await db.igss_ordenes_libro.find(
+        {"dosis_por_confirmar": True, "estado": {"$in": list(ESTADOS_VIGENTES)}}, {"_id": 0},
+    ).sort([("fecha_ingreso", 1), ("numero_libro", 1)]).to_list(None)
+    nogs = {n["id"]: n for n in await db.igss_nogs.find(
+        {"id": {"$in": list({o.get("nog_id") for o in docs})}}, {"_id": 0}).to_list(None)}
+    data = [_orden_out(o, nogs.get(o.get("nog_id"))) for o in docs]
+    return {"data": data, "total": len(data)}
+
+
 # ==================== ARRANQUE: ESTADOS DEL LIBRO (BLOQUE 1) ====================
+
+async def _numerar_existentes():
+    """Órdenes creadas antes del número fijo del libro: se numeran por fecha de creación."""
+    async for o in db.igss_ordenes_libro.find({"numero_libro": {"$exists": False}}, {"_id": 0, "id": 1}).sort("created_at", 1):
+        await db.igss_ordenes_libro.update_one({"id": o["id"], "numero_libro": {"$exists": False}},
+                                               {"$set": {"numero_libro": await siguiente_numero_libro()}})
+
 
 async def preparar_estados_libro():
     """Una sola vez por entorno: anota en su orden las cirugías IGSS programadas y
     recalcula el estado de las órdenes (pendiente/atendida → reservada/en curso/completa)."""
+    await _numerar_existentes()
     flag = "libro_estados_bloque1_v2"
     if await db.system_flags.find_one({"key": flag, "done": True}):
         return

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Plus, Pencil, Ban, ChevronDown, ChevronRight, Shuffle, Loader2, AlertTriangle, CircleSlash } from 'lucide-react';
+import { Plus, Pencil, Ban, ChevronDown, ChevronRight, Shuffle, Loader2, AlertTriangle, CircleSlash, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { igssLibroApi } from '../../services/api';
 import { OrdenLibroDialog } from './OrdenLibroDialog';
 import { MotivoDialog, ElegirOrdenDialog } from './OrdenDialogs';
 import { ESTADOS_ACTIVOS, estadoOrden } from './estadosLibro';
+import { ConfirmarDosisDialog } from './ConfirmarDosisDialog';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
 
@@ -34,7 +35,7 @@ const Atenciones = ({ orden, onReasignar }) => (
   </div>
 );
 
-const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasignar }) => {
+const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onConfirmar, onReasignar }) => {
   const [cls, label] = estadoOrden(o.estado);
   return (
     <div className="border border-slate-200 rounded-lg p-3 bg-white" data-testid={`orden-libro-${o.id}`}>
@@ -45,6 +46,7 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasi
             <div className="text-sm font-semibold text-slate-800">
               <span className="font-mono" data-testid={`orden-sps-${o.id}`}>{o.no_sps}</span>
               <span className="text-slate-400 font-normal"> · </span>{o.etiqueta_nog}
+              <span className="ml-2 font-mono text-[11px] font-normal text-slate-400" data-testid={`orden-numero-${o.id}`}>{o.numero_libro}</span>
             </div>
             <div className="text-xs text-slate-500">
               {o.modalidad || 'Sin modalidad'} · {o.tipo === 'procedimiento' ? 'Procedimiento' : 'Consulta'}
@@ -58,6 +60,11 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasi
             {o.tipo === 'procedimiento' ? `Dosis aplicadas ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : `${o.total_atenciones} atención(es)`}
           </span>
           <Badge variant="outline" className={cls} data-testid={`orden-estado-${o.id}`}>{label}</Badge>
+          {o.dosis_por_confirmar && ESTADOS_ACTIVOS.includes(o.estado) && (
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-amber-700 border-amber-300" type="button" onClick={onConfirmar} data-testid={`orden-confirmar-dosis-${o.id}`}>
+              <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Confirmar dosis
+            </Button>
+          )}
           {o.estado !== 'anulada' && (
             <>
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" type="button" onClick={onEditar} title="Editar" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
@@ -72,6 +79,9 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onReasi
         </div>
       </div>
       {o.estado === 'anulada' && <p className="text-xs text-slate-500 mt-1">Anulada: {o.motivo_anulacion}</p>}
+      {o.dosis_por_confirmar && ESTADOS_ACTIVOS.includes(o.estado) && (
+        <p className="text-xs text-amber-700 mt-1" data-testid={`orden-falta-confirmar-${o.id}`}>Falta confirmar las dosis con la hoja: no llega a completa ni se cobra hasta confirmarlas.</p>
+      )}
       {o.estado === 'cerrada' && <p className="text-xs text-orange-700 mt-1" data-testid={`orden-cerrada-motivo-${o.id}`}>Cerrada sin completar (no se cobra): {o.motivo_cierre}</p>}
       {abierta && <Atenciones orden={o} onReasignar={onReasignar} />}
     </div>
@@ -86,6 +96,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
   const [editar, setEditar] = useState({ open: false, orden: null });
   const [anular, setAnular] = useState(null);
   const [cerrar, setCerrar] = useState(null);
+  const [confirmar, setConfirmar] = useState(null);
   const [reasignar, setReasignar] = useState(null);
 
   const cargar = useCallback(async () => {
@@ -128,6 +139,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
           onEditar={() => setEditar({ open: true, orden: o })}
           onAnular={() => setAnular(o)}
           onCerrar={() => setCerrar(o)}
+          onConfirmar={() => setConfirmar(o)}
           onReasignar={(orden, atencion) => setReasignar({ orden, atencion })}
         />
       ))}
@@ -146,6 +158,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
         descripcion="Para tratamientos suspendidos (el paciente mejora, no regresa o fallece). La orden deja de admitir dosis, libera su cupo y NO se cobra. Queda en auditoría."
         accion="Cerrar sin completar" onConfirm={async (motivo) => { await igssLibroApi.cerrar(cerrar.id, motivo); toast.success('Orden cerrada sin completar'); cargar(); }}
       />
+      <ConfirmarDosisDialog orden={confirmar} onOpenChange={(v) => !v && setConfirmar(null)} onSaved={cargar} />
       <ElegirOrdenDialog
         open={!!reasignar} onOpenChange={(v) => !v && setReasignar(null)} pacienteId={pacienteId}
         excluirId={reasignar?.orden?.id} permitirSinOrden titulo="Reasignar atención" onConfirm={confirmarReasignar}

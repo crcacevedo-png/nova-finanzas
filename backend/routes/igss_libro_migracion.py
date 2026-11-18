@@ -33,8 +33,10 @@ SIN_SPS = {"cupo_sin_sps": "Cupo descontado sin SPS", "evaluacion": "Evaluación
            "cirugia": "Cirugía sin No. SPS"}
 TIPO_CASO = {"orden": "Orden", "evaluacion": "Evaluación", "cirugia": "Cirugía"}
 # (inicio del motivo, motivo agrupado, qué falta para poder migrarlo). El orden importa.
+SPS_DISTINTO = "No. SPS distinto entre la cirugía y la ficha"
 REGLAS_MOTIVO = [
     ("Orden del paciente sin No. SPS", "Orden sin No. SPS", "El No. SPS de la hoja de autorización"),
+    (SPS_DISTINTO, SPS_DISTINTO, "Corregir contra la hoja física el No. SPS de la cirugía o el de la ficha del paciente"),
     ("Reubicación:", "NOG no existe en la unidad activa (reubicación)",
      "Registrar el NOG en el catálogo de la unidad activa"),
     ("El NOG ", "NOG no está en el catálogo de la unidad",
@@ -77,6 +79,9 @@ CRITERIOS = [
     "caso no se migra. Detalle en la hoja 'Órdenes reubicadas'. Solo aplica a ese par, nunca como regla general.",
     "Un mismo No. SPS vigente en dos unidades duplicadas que no se pudo reubicar: bloqueo, la aplicación se negará "
     "mientras exista.",
+    "Cirugía con un No. SPS que no está en la ficha del paciente, cuando la ficha tiene otro No. SPS: no se migra ni "
+    "el de la cirugía ni el de la ficha (de la misma entrada del catálogo, o el único de la ficha) hasta que el "
+    "personal los corrija contra la hoja física; va a 'No migrables' con los dos valores. Si ya coinciden, entra normal.",
 ]
 
 _PAC_PROJ = {"_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1, "igss_afiliacion": 1,
@@ -188,6 +193,7 @@ class Simulacion:
         self.entradas_pac, self.inicio_igss, self.acred_pac_nog = {}, {}, {}
         self.reubicadas = []
         self.sueltas, self.pac_sin_sps = [], []
+        self.sps_distintos = {}
         self.pendientes_sps, self.no_migrables, self.migrables, self.ya_en_libro = [], [], [], []
         self.hist = Counter()
         for o in d["libro"]:
@@ -334,6 +340,7 @@ class Simulacion:
                     motivo = SIN_SPS["cirugia"]
                 else:
                     c = self.cand_de(pid, unidad, sps, "cirugía", entrada, motivo_cat, g.get("code"), cx.get("procedure"))
+                    self._sps_de_ficha(p, sps, entrada)
             at = self._atencion("cirugia", cx["id"], pid, fecha, cx.get("surgeon"), cx.get("procedure"))
             at["paciente_nombre"] = cx.get("patient_name", "")
             at["unidad_id"] = unidad
@@ -343,6 +350,41 @@ class Simulacion:
                     c["cirugias"].append(at)
             elif realizada:
                 self.sueltas.append((at, entrada, motivo))
+
+    def _sps_de_ficha(self, p, sps, entrada):
+        """Anota el conflicto si el No. SPS de la cirugía no está en la ficha y la ficha tiene otro."""
+        ficha = {}
+        for o in _ordenes_legado(p):
+            s = normalizar_sps(o.get("no_sps"))
+            if s:
+                e, _ = self.cat.resolver(p.get("igss_unit_id") or "", o.get("nog_id") or "", o.get("nog") or "", o.get("procedimiento"))
+                ficha[s] = (e or {}).get("id")
+        if not ficha or sps in ficha:
+            return
+        disputa = set(ficha) if len(ficha) == 1 else {s for s, e in ficha.items() if entrada and e == entrada["id"]}
+        x = self.sps_distintos.setdefault((p["id"], sps), {"excluir": set(), "ficha": set()})
+        x["excluir"] |= disputa
+        x["ficha"] |= set(ficha)
+
+    def conflictos_sps(self):
+        """Saca de la migración las órdenes con No. SPS distinto entre cirugía y ficha: una fila
+        en 'No migrables' por conflicto, con los dos valores."""
+        for (pid, sps_cx), x in sorted(self.sps_distintos.items()):
+            ficha = sorted(x["ficha"])
+            claves = sorted({k for s in [sps_cx, *x["excluir"]] for k in self.por_pac_sps.get((pid, s)) or set()
+                             if k in self.cands and k not in self.libro_por_clave})
+            if not claves:
+                continue
+            cs = [self.cands.pop(k) for k in claves]
+            entradas = {i: e for c in cs for i, e in c["entradas"].items()}
+            ats = [a for c in cs for a in c["evaluaciones"] + c["cirugias"]]
+            valores = f"cirugía: {sps_cx} · ficha: {', '.join(ficha)}"
+            caso = self._caso("orden", cs[0]["unidad_id"], _min([i for c in cs for i in c["ingresos"]] + [a["fecha"] for a in ats]),
+                              f"{SPS_DISTINTO} ({valores})", set().union(*(c["pacientes"] for c in cs)),
+                              list(entradas.values()), " / ".join([sps_cx, *sorted(x["excluir"])]),
+                              set().union(*(c["fuentes"] for c in cs)), len(ats))
+            caso.update({"sps_cirugia": sps_cx, "sps_ficha": ", ".join(ficha)})
+            self.no_migrables.append(caso)
 
     # ---------- reubicación (par de unidades duplicadas) ----------
 
@@ -752,6 +794,7 @@ async def simular_migracion(unidad_id: Optional[str] = None) -> dict:
     s.acreditaciones(d["acreds"])
     s.evaluaciones(d["evals"])
     s.cirugias(d["cxs"])
+    s.conflictos_sps()
     s.reubicar(_pares_duplicados(units))
     s.clasificar()
     grupos = _grupos_duplicados(units)

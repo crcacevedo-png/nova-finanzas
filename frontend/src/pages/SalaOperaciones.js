@@ -286,7 +286,8 @@ const SalaOperaciones = () => {
       if (data.aviso_igss) toast.warning(data.aviso_igss);
       const libro = data.libro;
       if (libro && realizada && libro.resultado === 'registrada') {
-        toast.info(`Libro IGSS: SPS ${libro.no_sps} · dosis ${libro.dosis_aplicadas} de ${libro.dosis_autorizadas}${libro.excede_dosis ? ' (excede lo autorizado)' : ''}`);
+        toast.info(`Libro IGSS: ${libro.numero_libro || ''} SPS ${libro.no_sps} · dosis ${libro.dosis_aplicadas} de ${libro.dosis_autorizadas}${libro.excede_dosis ? ' (excede lo autorizado)' : ''}`);
+        if (libro.aviso) toast.warning(libro.aviso, { duration: 10000 });
       } else if (libro && realizada && libro.resultado === 'sin_orden') {
         toast.warning(`Libro IGSS: quedó en "atenciones sin orden" — ${libro.motivo}`);
       }

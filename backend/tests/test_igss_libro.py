@@ -567,11 +567,12 @@ def test_14_medico_registra_atencion_sin_ver_libro(H):
     sa, med = H["superadmin"], H["medico"]
     n = entrada(sa)
     o = orden(sa, n["id"], procedimiento="Consulta retina")
-    # Opciones del selector: solo procedimiento y fecha de ingreso
+    # Opciones del selector: número del libro, procedimiento, ingreso, estado y avance (Bloque 3); nunca SPS/NOG
     r = requests.get(f"{API}/patients/{PAC1}/igss-ordenes-abiertas", headers=med)
     assert r.status_code == 200
     op = next(x for x in r.json() if x["id"] == o["id"])
-    assert set(op) == {"id", "procedimiento", "fecha_ingreso", "motivo_sugerido"}
+    assert set(op) == {"id", "numero_libro", "procedimiento", "tipo", "fecha_ingreso", "estado", "inyectable",
+                       "dosis_aplicadas", "dosis_autorizadas", "motivo_sugerido"}
     assert op["procedimiento"] == "Consulta retina"
     ev = crear_eval(med, orden_id=o["id"])
     assert ev.get("aviso_igss") is None and "libro" not in ev
@@ -1342,3 +1343,95 @@ def test_b1_17_varias_dosis_con_consulta_previa_en_curso(H):
     assert filas_listado_nog(sa, n) == []
     assert requests.delete(f"{EVAL_API}/{ev['id']}", headers=sa).status_code == 200
     assert get_orden(sa, o["id"])["estado"] == "reservada"
+
+
+def test_b2_3_dosis_por_confirmar_bloquea_completa(H):
+    """Ajuste aprobado: con "Confirmar dosis con la hoja" pendiente la orden no llega a
+    completa ni se cobra; al registrar la última dosis conocida queda en curso con aviso."""
+    sa = H["superadmin"]
+    n, o = orden_dosis(sa, 0, dosis=2)
+    _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": o["id"]}, {"$set": {"dosis_por_confirmar": True}}))
+    cxs = [crear_cx(sa, no_sps=o["no_sps"], date=f"2026-09-1{i}") for i in range(2)]
+    r1 = realizar(sa, cxs[0]["id"])
+    assert r1.status_code == 200 and not r1.json()["libro"].get("aviso")
+    r2 = realizar(sa, cxs[1]["id"])
+    assert r2.status_code == 200 and "falta confirmar las dosis" in r2.json()["libro"]["aviso"]
+    od = get_orden(sa, o["id"])
+    assert (od["estado"], od["dosis_aplicadas"], od["fecha_completa"]) == ("en_curso", 2, None)
+    assert filas_listado_nog(sa, n) == []
+    assert requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"facturado": True}, headers=sa).status_code == 422
+    assert requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"pagado": True}, headers=sa).status_code == 422
+    url_lista, url = f"{LIBRO}/dosis-por-confirmar", f"{LIBRO}/ordenes/{o['id']}/confirmar-dosis"
+    assert o["id"] in {x["id"] for x in requests.get(url_lista, headers=sa).json()["data"]}
+    for rol in DENEGADOS:
+        assert requests.get(url_lista, headers=H[rol]).status_code == 403
+        assert requests.post(url, json={"dosis_autorizadas": 2}, headers=H[rol]).status_code == 403
+    r = requests.post(url, json={"dosis_autorizadas": 1}, headers=sa)
+    assert r.status_code == 422 and "2 dosis aplicadas" in r.json()["detail"]
+    # La hoja dice 2: se confirma y queda completa (ya es cobrable)
+    r = requests.post(url, json={"dosis_autorizadas": 2}, headers=H["administrador_igss"])
+    assert r.status_code == 200, r.text
+    assert (r.json()["estado"], r.json()["dosis_por_confirmar"], r.json()["fecha_completa"]) == ("completa", False, "2026-09-11")
+    assert [f[0] for f in filas_listado_nog(sa, n)] == [o["no_sps"]]
+    assert o["id"] not in {x["id"] for x in requests.get(url_lista, headers=sa).json()["data"]}
+    assert requests.post(url, json={"dosis_autorizadas": 2}, headers=sa).status_code == 400
+    log = _db_call(lambda db: db.audit_logs.find_one({"action": "LIBRO_ORDEN_DOSIS_CONFIRMADAS", "details.orden_id": o["id"]}))
+    assert log and log["details"]["estado_antes"] == "en_curso" and log["details"]["estado_despues"] == "completa"
+    # Otra hoja dice 3: confirmada sigue en curso (2 de 3)
+    n2, o2 = orden_dosis(sa, 2, dosis=2)
+    _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": o2["id"]}, [
+        {"$set": {"dosis_por_confirmar": True, "estado": "en_curso", "fecha_completa": None}}]))
+    r = requests.post(f"{LIBRO}/ordenes/{o2['id']}/confirmar-dosis", json={"dosis_autorizadas": 3}, headers=sa)
+    assert r.status_code == 200 and (r.json()["estado"], r.json()["dosis_autorizadas"]) == ("en_curso", 3)
+
+
+def test_b3_1_numero_fijo_del_libro(H):
+    sa = H["superadmin"]
+    n = entrada(sa)
+    a, b = orden(sa, n["id"]), orden(sa, n["id"])
+    assert a["numero_libro"].startswith("ORD-") and len(a["numero_libro"]) == 10
+    assert int(b["numero_libro"][4:]) > int(a["numero_libro"][4:])
+    # Nunca cambia: ni al editar ni al anular; no se reutiliza
+    r = requests.put(f"{LIBRO}/ordenes/{a['id']}", json={"procedimiento": "Otro", "numero_libro": "ORD-999999"}, headers=sa)
+    assert r.status_code == 200 and r.json()["numero_libro"] == a["numero_libro"]
+    assert requests.post(f"{LIBRO}/ordenes/{a['id']}/anular", json={"motivo": "prueba número"}, headers=sa).status_code == 200
+    assert get_orden(sa, a["id"])["numero_libro"] == a["numero_libro"]
+    c = orden(sa, n["id"])
+    assert c["numero_libro"] not in (a["numero_libro"], b["numero_libro"])
+    # Búsqueda por número en el libro
+    r = requests.get(f"{LIBRO}/ordenes", params={"q": b["numero_libro"].lower()}, headers=sa)
+    assert [x["id"] for x in r.json()["data"]] == [b["id"]]
+
+
+def test_b3_2_lista_del_medico_sin_sps_ni_nog(H):
+    """Prueba pedida: la sección de la ficha, con rol médico, no contiene No. SPS ni NOG en
+    ningún campo; muestra solo reservadas y en curso, nunca completas, históricas ni cerradas."""
+    sa, med = H["superadmin"], H["medico"]
+    n = entrada(sa, cantidad=10)
+    res = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3, procedimiento="Avastin OD", inyectable=True)
+    cur = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3)
+    realizar(sa, crear_cx(sa, no_sps=cur["no_sps"], date="2026-10-01")["id"])
+    com = orden(sa, n["id"])
+    crear_eval(sa, orden_id=com["id"], fecha="2026-10-02")
+    his, cer, anu = orden(sa, n["id"]), orden_dosis(sa, 1)[1], orden(sa, n["id"])
+    _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": his["id"]}, {"$set": {"estado": "historica"}}))
+    assert requests.post(f"{LIBRO}/ordenes/{cer['id']}/cerrar", json={"motivo": "suspendido"}, headers=sa).status_code == 200
+    assert requests.post(f"{LIBRO}/ordenes/{anu['id']}/anular", json={"motivo": "error"}, headers=sa).status_code == 200
+    r = requests.get(f"{API}/patients/{PAC1}/igss-ordenes-ficha", headers=med)
+    assert r.status_code == 200, r.text
+    filas = {x["id"]: x for x in r.json()}
+    assert {res["id"], cur["id"]} <= set(filas)
+    assert get_orden(sa, com["id"])["estado"] == "completa"
+    assert not {com["id"], his["id"], cer["id"], anu["id"]} & set(filas)
+    assert {x["estado"] for x in filas.values()} <= {"reservada", "en_curso"}
+    assert filas[cur["id"]]["estado"] == "en_curso" and (filas[cur["id"]]["dosis_aplicadas"], filas[cur["id"]]["dosis_autorizadas"]) == (1, 3)
+    assert filas[res["id"]]["procedimiento"] == "Avastin OD" and filas[res["id"]]["numero_libro"] == res["numero_libro"]
+    texto = r.text.upper()
+    prohibidos = [o["no_sps"].upper() for o in (res, cur, com)] + [n["numero"].upper(), n["id"].upper()]
+    assert not [p for p in prohibidos if p in texto]
+    assert not {"no_sps", "nog_id", "numero_nog", "etiqueta_nog", "codigo", "precio"} & {k for x in r.json() for k in x}
+    # El selector de evaluación/cita: también trae número y avance, sin SPS ni NOG
+    r = requests.get(f"{API}/patients/{PAC1}/igss-ordenes-abiertas", headers=med)
+    sel = {x["id"]: x for x in r.json()}
+    assert sel[cur["id"]]["numero_libro"] == cur["numero_libro"] and sel[cur["id"]]["dosis_aplicadas"] == 1
+    assert not [p for p in prohibidos if p in r.text.upper()]

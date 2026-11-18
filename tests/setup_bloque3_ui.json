@@ -1,0 +1,44 @@
+{
+ "unit_id": "37e430e9-4e82-43ce-ac98-28347b7c21e4",
+ "unit_name": "CENTRO DE ATENCION MEDICA INTEGRAL PARA PENSIONADOS, \"CAMIP 2 BARRANQUILLA\"",
+ "nog_id": "dae99148-022d-4495-baf3-47a147d65ef4",
+ "nog_numero": "TESTB315812",
+ "patient_id": "4e57ccd5-3aa6-40ef-ab1a-d624ec4d6830",
+ "patient_name": "TEST_B3 Paciente15812",
+ "record_number": "EXP-202611-0132",
+ "o1_por_confirmar": {
+  "id": "baf7fb9f-6c88-4aa6-b108-c4d4930be57d",
+  "numero_libro": "ORD-000408",
+  "no_sps": "TESTB3A-15812",
+  "estado": "en_curso",
+  "dosis": "2/2"
+ },
+ "o2_consulta": {
+  "id": "68281d25-9931-443c-ba76-2fa3b5de478f",
+  "numero_libro": "ORD-000409",
+  "no_sps": "TESTB3B-15812",
+  "estado": "reservada",
+  "dosis": "0/1"
+ },
+ "o3_en_curso": {
+  "id": "1659da76-1824-4f8d-b70f-45a20e25d567",
+  "numero_libro": "ORD-000410",
+  "no_sps": "TESTB3C-15812",
+  "estado": "en_curso",
+  "dosis": "1/3"
+ },
+ "o4_historica": {
+  "id": "5de63259-7dec-44a9-8242-27a08cbf452e",
+  "numero_libro": "ORD-000411",
+  "no_sps": "TESTB3D-15812",
+  "estado": "historica",
+  "dosis": "0/1"
+ },
+ "o5_completa": {
+  "id": "1072ea94-a2b0-4d6f-9faa-22844354bf2f",
+  "numero_libro": "ORD-000412",
+  "no_sps": "TESTB3E-15812",
+  "estado": "completa",
+  "dosis": "0/1"
+ }
+}

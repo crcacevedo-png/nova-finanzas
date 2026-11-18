@@ -232,6 +232,8 @@ export const igssLibroApi = {
   editar: (id, data) => axios.put(`${LIBRO}/ordenes/${id}`, data),
   anular: (id, motivo) => axios.post(`${LIBRO}/ordenes/${id}/anular`, { motivo }),
   cerrar: (id, motivo) => axios.post(`${LIBRO}/ordenes/${id}/cerrar`, { motivo }),
+  confirmarDosis: (id, dosis) => axios.post(`${LIBRO}/ordenes/${id}/confirmar-dosis`, { dosis_autorizadas: dosis }),
+  dosisPorConfirmar: () => axios.get(`${LIBRO}/dosis-por-confirmar`),
   cirugiasPorMarcar: () => axios.get(`${LIBRO}/cirugias-por-marcar`),
   detenidas: (dias = 90) => axios.get(`${LIBRO}/en-curso-sin-movimiento`, { params: { dias } }),
   resumen: () => axios.get(`${API_URL}/igss-units/nogs/resumen`),
@@ -245,6 +247,7 @@ export const igssLibroApi = {
   reasignar: (data) => axios.post(`${LIBRO}/atenciones/reasignar`, data),
   // Para médicos/recepción: solo procedimiento y fecha de ingreso de las órdenes abiertas
   abiertas: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes-abiertas`),
+  ficha: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes-ficha`),
   // Fase 4 (a): simulación de la migración, solo lectura y solo superadmin
   simularMigracion: (params) => axios.get(`${API_URL}/igss-units/migracion/simular`, { params: { ...params, detalle: false } }),
   simularMigracionExcel: (params) => axios.get(`${API_URL}/igss-units/migracion/simular/excel`, { params, responseType: 'blob' }),

@@ -10,7 +10,7 @@ const fmt = (f) => {
   return d ? `${d}/${m}/${y}` : f;
 };
 
-// Órdenes abiertas del paciente (solo procedimiento y fecha de ingreso; nunca SPS/NOG/dosis)
+// Órdenes abiertas del paciente: procedimiento, número del libro, ingreso y avance de dosis (nunca SPS/NOG)
 export const useOrdenesAbiertas = (pacienteId, activo = true) => {
   const [estado, setEstado] = useState({ opciones: [], cargado: false });
   useEffect(() => {
@@ -40,7 +40,10 @@ export const OrdenIgssSelector = ({ opciones, cargado, value, onChange, disabled
         <SelectContent>
           {opciones.map((o) => (
             <SelectItem key={o.id} value={o.id} data-testid={`${testIdPrefix}-option-${o.id}`}>
-              {o.procedimiento}{o.fecha_ingreso ? ` · Ingreso ${fmt(o.fecha_ingreso)}` : ''}
+              {o.procedimiento}
+              {o.numero_libro && <span className="ml-1 font-mono text-[11px] text-slate-400">{o.numero_libro}</span>}
+              {o.fecha_ingreso ? ` · Ingreso ${fmt(o.fecha_ingreso)}` : ''}
+              {o.tipo === 'procedimiento' ? ` · Dosis ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : ''}
             </SelectItem>
           ))}
           {legacy && <SelectItem value={value}>Orden registrada anteriormente</SelectItem>}
