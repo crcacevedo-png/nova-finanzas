@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend-only Playwright test of IGSS Phase 4 step B (Confirm SPS, SIN CUPO in Nueva orden, migration Apply and Undo, Undo denied, permissions). 7 of 8 steps passed. Step 7 (Producción facturado/pagado disabled for an unconfirmed Revisar SPS order) could not be checked in the UI because preview has no 'completa' order with sps_por_revisar. The code was reviewed instead. No critical bugs found.",
+  "results": {
+    "1_confirmar_sps_ficha": "PASS. usuario and óptica see the 'Revisar SPS' badge and the warning, but no Confirmar SPS button. igss.admin sees the button. The dialog shows ORD-DEMO01 and 1-23-4-56-7-89-0. After 'Coincide con la hoja': toast shown, badge/warning/button gone. Line reads 'Ingresada por Carga de demostración · 17/11/26, 07:34 p. m. · No. SPS confirmado por Admin IGSS Prueba · 17/11/26, 07:46 p. m.', which is correct Guatemala time (test ran at 01:46 UTC).",
+    "2_nueva_orden_sin_cupo": "PASS with igss.admin and usuario. Unidad is pre-filled with 'DEMO Unidad captura SIN CUPO'. The DEMO_cap_nog_lleno entry says 'DEMO-LLENO · SIN CUPO', has data-sin-cupo=si and aria-disabled=true, and clicking it does not select it. DEMO_cap_nog_libre can be selected ('10 disponibles' for igss.admin, 'con cupo' for usuario: counts are hidden by role on purpose). The orden-form-nota-sin-cupo note is visible.",
+    "3_libro_sps_por_revisar": "PASS. After applying lot a7cc6186 the counter was 3. The table listed ORD-000582/583/584. Confirming ORD-000582 removed its row and the counter dropped to 2.",
+    "4_simular_aplicar": "PASS. Without a recent backup: mig-aplicar-btn disabled, reason 'Falta un respaldo de menos de 24 horas.', mig-respaldo red (682 h). After POST /api/backups/run: mig-respaldo green, button enabled, mig-vence shows '30 min más'. The dialog shows the figures. The confirm button stays disabled for '', 'migrar' and 'MIGRA' and enables only for 'MIGRAR'. After applying: toast 'Migración aplicada: 3 órdenes y 125 cupos sin SPS', all 12 rows of mig-comparacion have data-igual=si, and mig-lotes shows the lot as 'aplicado'. No blocks (mig-sin-bloqueos).",
+    "5_deshacer": "PASS. Lot a296f8aa: title '¿Deshacer este lote de migración?'. The confirm button is disabled for 'deshacer' and enabled for 'DESHACER'. After confirming, the state is 'deshecho' and the Deshacer button is gone. The success toast was not captured because it had already closed after the 5 s wait; the state change was verified.",
+    "6_deshacer_negado": "PASS. Lot a7cc6186, after confirming the SPS of ORD-000582: title 'Este lote no se puede deshacer', mig-deshacer-cambios with mig-deshacer-cambio-4afcd762..., 'Cambió: No. SPS confirmado con la hoja', 'No. SPS confirmado · Administrador General · 17/11/26, 07:50 p. m.'. There is no word field and no confirm button.",
+    "7_produccion": "NOT VERIFIABLE IN UI. No 'completa' order with sps_por_revisar exists (only 2 historical ones). The Producción tab renders without console errors. The code at ProduccionIGSS.js:259-280 correctly disables facturado/pagado.",
+    "8_permisos": "PASS. admin and igss.admin open /igss/libro with no migracion-simulacion, mig-aplicar or mig-lotes. The route is /igss/libro; /libro-igss as written in the request redirects to /pacientes."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Deshacer negado dialog (Cambios)", "issues": ["The order state shows the raw value '(historica)' without the accent. Map it to the label 'Histórica'."]},
+      {"screen": "Ficha del paciente", "issues": ["'Registrado: 17/11/26 por' has an empty name (DEMO patient without creator). Hide 'por' when there is no name.", "Date formats are mixed: 'Ingreso 01/06/2026' vs 'dd/mm/aa, hh:mm p. m.'. The request expected 'dd/mm/aa hh:mm'; the UI adds a comma and 'p. m.' (cosmetic)."]},
+      {"screen": "Unidades IGSS > Producción", "issues": ["The Fecha filter uses the browser's native date input and shows mm/dd/yyyy (11/17/2026) instead of a shadcn calendar with dd/mm/yyyy."]},
+      {"screen": "Libro IGSS card 'Órdenes con SPS por revisar'", "issues": ["It counts historical orders too (3 historical after migration), but its subtitle says 'una orden viva no se marca facturada'. This may confuse users, because historical orders are 'Solo informativo'. Consider stating that it includes historical orders, or counting only live ones."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: show the accented label for the estado in the Cambios list of the Deshacer dialog.",
+    "Optional: clarify or limit the 'Órdenes con SPS por revisar' counter, which currently includes historical orders.",
+    "Optional: replace the native date input in Producción with a shadcn date picker.",
+    "To check step 7 in the UI, seed a 'completa' order with sps_por_revisar=true in the current production period."
+  ],
+  "critical_code_review_comments": [
+    "MigracionSimulacion: after applying, setSim(null) hides mig-aplicar, so the user must simulate again for each apply. This is OK and intentional.",
+    "LotesMigracion: the success toast closes at the default ~4 s. Consider a longer duration because this action is destructive."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% of verifiable steps (7/7); step 7 not verifiable"},
+  "seed_data_creation": "No new seed data. State changes in preview: DEMO_cap_orden SPS confirmed by igss.admin (sps_por_revisar now false). A manual backup was run (dab73f91..., completado). Lot a296f8aa-5250-49a6-8a2b-7f4d9578ce20 was applied and then undone. Lot a7cc6186-d7b3-409e-98ed-25c53fdbc070 is still 'aplicado' and cannot be undone, as designed, because ORD-000582 (order 4afcd762-8b93-49a0-8288-93c60842068d) was confirmed. ORD-000583 and ORD-000584 are still Revisar SPS (historical).",
+  "test_credentials": "From /app/memory/test_credentials.md: superadmin/nova2024, admin/Admin2024$, igss.admin/IgssAdmin2024$, usuario/user2024, optica/Optica2024$. All worked.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The Libro IGSS route is /igss/libro, not /libro-igss. To avoid the login rate limit, get a token via POST /api/auth/login and inject it with localStorage.setItem('token', ...). /pacientes?id=DEMO_cap_pac opens the DEMO patient detail. DEMO_cap_orden is already confirmed, so to retest Confirmar SPS on the ficha, set sps_por_revisar back to true. Lot a7cc6186 is applied and denied for undo.",
+  "rca of the issue": "No functional bugs found."
+}
