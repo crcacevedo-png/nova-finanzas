@@ -76,4 +76,6 @@ Backlog priorizado. Para contexto completo de cada ítem ver `CHANGELOG.md` (ses
 ## Para después (anotado por el usuario 2026-11-17)
 - Paginación y buscador en la lista de cirugías sin marcar como realizadas.
 - Aviso de consola por etiqueta mal anidada (Badge `<div>` dentro de `<p>` en el título de los interruptores de `LibroIGSS.js`).
-- P3 (cosméticos reportados iteration_152): estado "historica" sin tilde en el diálogo Deshacer; tarjeta "SPS por revisar" cuenta históricas; "Registrado: … por" sin nombre; formato fecha con coma y "p. m."; filtro de fecha nativo en Producción.
+- P3 (dejar para después, decisión del usuario): tilde de "histórica" en Deshacer; "Registrado: … por" sin nombre; coma en fecha y hora.
+- P3 (iteration_153, sin pedir aún): doble punto tras "p. m." en el diálogo Restaurar; año de 2 dígitos en el diálogo; tabla vacía sin "Sin diferencias"; sin indicador los primeros 2 s del progreso; X visible mientras restaura; "hoy" del calendario con fecha del navegador; Fecha de nacimiento con selector nativo; sondeo sin límite si el servidor cae.
+- PENDIENTE usuario: fijar la noche; guion entregado 2026-11-18 (respaldo PRIMERO, luego publicar, simular, aplicar, revisar, deshacer/restaurar, interruptores apagados).

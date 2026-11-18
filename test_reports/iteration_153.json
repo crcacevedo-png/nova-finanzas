@@ -1,0 +1,41 @@
+{
+  "summary": "Frontend E2E (preview) of 5 features: Producción IGSS dd/mm/aaaa filter, Libro IGSS 'SPS por revisar' card (live orders only), Respaldos → Restaurar (review, sessions warning, RESTAURAR word, mandatory pre-backup, progress, result, recent restorations), and permissions. All requested checks PASS. Only minor text/UX polish items found.",
+  "results": {
+    "1_produccion_fecha": "PASS - prod-fecha is a text input showing today in Guatemala time (17/11/2026 while UTC was already 18/11). Typing '01112026' becomes '01/11/2026' and calls /api/igss-units/produccion?fecha=2026-11-01. The calendar is in Spanish (noviembre 2026, lu..do, week starts Monday); picking 15 gives 15/11/2026 and reloads. '31/02/2026' shows prod-fecha-error 'Fecha inválida: use dd/mm/aaaa', makes no request and prod-export is disabled. Rango mode: prod-desde/prod-hasta use the same format; typing gives desde=2026-10-01; an invalid hasta ('32/13') shows the error, makes no request and disables export; a calendar pick re-enables export and reloads.",
+    "2_libro_sps": "PASS - libro-revision-sps-total = 1. The table holds only sps-por-revisar-DEMO_cap_orden (ORD-DEMO01, Reservada); DEMO_cap_hist is not listed. Patient DEMO-CAP-1 record shows the 'Revisar SPS' badge on both orden-revisar-sps-DEMO_cap_orden and DEMO_cap_hist. ORD-DEMO01 was NOT confirmed.",
+    "3_revision_restaurar": "PASS - Backup type labels Automático/Manual (and later 'Previo a restaurar') show; dates are in Guatemala time. The new manual backup was Completado in about 6s. The dialog showed rest-cargando and then rest-revision with rest-fecha, all 6 group cards (all 0/0/0, as expected), rest-total, the toggle ('0 con diferencias, 80 sin cambios'), rest-sesiones listing rest-sesion-admin ('Administrador NovaVision (admin) · última actividad 17/11/26, 09:00 p. m.') and rest-vence (+15 min). rest-confirmar is disabled for ''/'restaurar'/'RESTAURA' and enabled only for 'RESTAURAR'.",
+    "4_restauracion": "PASS - rest-progreso showed the 4 steps in order with their seconds (2.8 / 1.1 / 9.6 / 0 s). Escape did not close the dialog and rest-cerrar was disabled while running. rest-resultado-ok: 'Restauración terminada en 13.5 s ... Respaldo previo guardado: respaldo-2026-11-18_030120.json.gz'. After closing, the list's top row is that file, 'Previo a restaurar', Completado. The restauraciones-recientes card shows 'Terminada 13.5 s'. audit_logs holds REVISADA/INICIADA/COMPLETADA entries after the restore (the log survived). The superadmin session still works on /pacientes and /igss/libro (SPS total still 1). The admin's other session also kept working.",
+    "5_permisos": "PASS - admin, igss.admin and usuario are all redirected from /respaldos to /pacientes, with no Restaurar buttons and no Respaldos menu entry (menu checked for igss.admin and usuario). GET /api/backups/restauraciones returns 403 for igss.admin and usuario."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RestaurarRespaldoDialog", "issues": [
+        "Double period: 'Los datos volvieron al 17/11/26, 09:01 p. m..' (rest-resultado-ok) and 'Esta revisión vale hasta las 17/11/26, 09:16 p. m..' — formatDateTime ends with 'p. m.' and the sentence adds another '.'",
+        "Year format differs: the dialog (rest-fecha, rest-vence, session time) uses 2-digit years (17/11/26) while the Respaldos list and Restauraciones recientes use 17/11/2026. Use 4 digits in the dialog too, which matters when telling backups from different years apart",
+        "When nothing differs, opening rest-todas-toggle shows an empty table with only headers. Show 'Sin diferencias' instead",
+        "During progress, the first poll only comes after about 2s, so for the first 1-2s all 4 steps show empty circles and no spinner (paso_actual is not yet in the initial POST response)",
+        "The X close icon stays visible and looks clickable while the restore runs (it is blocked correctly). Hide or disable it while enCurso"
+      ]},
+      {"screen": "Producción IGSS calendar", "issues": ["The calendar's 'today' highlight uses the browser's local date (it showed the 18th while Guatemala was still on the 17th). Cosmetic only"]},
+      {"screen": "Editar Paciente (out of scope)", "issues": ["Fecha de Nacimiento still uses the native mm/dd/yyyy date input, unlike the new FechaDMA dd/mm/aaaa control"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Remove the trailing '.' after formatDateTime(...) in RestaurarRespaldoDialog (Resultado and rest-vence lines), or change the wording",
+    "Optional: use 4-digit years in the restore dialog, add an empty state for the all-modules table, show a spinner on respaldo_previo right away, and hide the dialog's X while running"
+  ],
+  "critical_code_review_comments": [
+    "RestaurarRespaldoDialog useSeguir: on a poll error it calls setTarea({...tarea}) to retry forever every 2s with no cap or user feedback. If the backend stays down, the user sees an endless spinner",
+    "Respaldos.js fmtFecha duplicates formatDateTime with a different year format; reuse one helper"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100% (5/5 features)"},
+  "seed_data_creation": "Created manual backup respaldo-2026-11-18_030107.json.gz (id 6aab3e8c-ba0c-4a03-a969-2fea91f2c9ba) and restored it; the restore created the pre-restore backup respaldo-2026-11-18_030120.json.gz. No other data changed (the diff was 0 in all modules).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The /igss/libro route works (the request said /libro-igss). The Periodo select is data-testid='prod-modo'. Opening a second browser context via page.context.browser.new_context() works for multi-session tests. Restoring a just-created backup takes about 14s in preview. The login rate limit is 5/min, so space out logins."
+}

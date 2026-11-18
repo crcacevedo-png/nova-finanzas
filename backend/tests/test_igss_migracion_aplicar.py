@@ -35,7 +35,7 @@ NUM1, NUM2, NUMB = f"TAPL1{TAG}", f"TAPL2{TAG}", f"TAPLB{TAG}"
 P = {k: f"TEST_apl_p{k}_{TAG}" for k in range(1, 9)}
 SPS = {k: f"01-{NUM:05d}-2026-{i:06d}" for i, k in enumerate("ABCDEF", 1)}
 RARO = "9-8-7-6-5-4-3-2-1"  # forma 1-1-1-1-1-1-1-1-1: única
-RARO2 = "1-23-4-56-7-89-0"  # forma 1-2-1-2-1-2-1: única
+RARO2 = "1-2-34-5-67-8-90-1"  # forma 1-1-2-1-2-1-2-1: única
 LEG1 = f"TEST_apl_leg1_{TAG}"
 CX = {k: f"TEST_apl_cx{k}_{TAG}" for k in ("1", "2a", "2b", "3")}
 BACKUP = f"TEST_apl_bk_{TAG}"
@@ -310,7 +310,7 @@ def test_05_ordenes_creadas_como_se_simulo(sa, aplicado):
     cx = {x["id"] for x in requests.get(f"{LIBRO}/cirugias-por-marcar", headers=sa, timeout=60).json()["data"]}
     assert CX["2a"] in cx and CX["1"] not in cx
     sps = {x["id"] for x in requests.get(f"{LIBRO}/sps-por-revisar", headers=sa, timeout=60).json()["data"]}
-    assert o[P[4]]["id"] in sps
+    assert o[P[4]]["id"] not in sps  # la tarjeta lista solo vivas; la histórica marcada se ve en la ficha
     aj = [a for a in requests.get(f"{LIBRO}/ajustes-cupo", headers=sa, timeout=60).json()["data"] if a["paciente_id"] == P[5]]
     assert len(aj) == 1 and aj[0]["nog_id"] == N1
 
