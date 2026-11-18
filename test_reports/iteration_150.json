@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only test of IGSS Libro Fase 4 Bloque 3 + Bloque 2 adjustment (playwright, 1920px + 390px). All 6 requested flows PASS. (1) As medico_test the patient detail (view-patient-ordenes-igss) renders the read-only ordenes-igss-ficha with exactly 3 rows: ORD-000410 Eylea OI 'Dosis 1 de 3' En curso, ORD-000409 Consulta control 'Consulta' Reservada, ORD-000408 Avastin OD Inyectable 'Dosis 2 de 2' En curso. ORD-000411/412 are not shown, 0 buttons in the section, and 'TESTB3', 'TESTB315812', 'No. SPS' and 'NOG' do not appear anywhere in the page HTML. The edit form (patient-igss-ordenes-ficha) shows the same read-only list, and the admin section patient-igss-ordenes does not appear. (2) As medico, /igss/libro redirects to /pacientes and the libro does not render. (3) As igss.admin the admin view shows orden-sps and orden-numero for each order. Only ORD-000408 shows orden-falta-confirmar and orden-confirmar-dosis, with state 'En curso' at 2 de 2. (4) As superadmin, /igss/libro shows the 4 review cards and libro-revision-dosis has count 4. Clicking it opens libro-vista-dosis with the row for baf7fb9f (TESTB3A-15812 ORD-000408). The confirm dialog pre-fills 2. Entering 1 shows the error toast 'La orden ya tiene 2 dosis aplicadas; las dosis autorizadas no pueden ser menos', the dialog stays open and the row remains. Entering 2 shows the toast 'Dosis confirmadas: ORD-000408 queda completa', the row disappears, the count drops to 3 and the Completas summary goes from 2 to 3. As medico afterwards, ORD-000408 is gone from the ficha (2 rows). As admin it now shows 'Completa' without the aviso. (5) Searching 'ORD-000409' returns 1 row (libro-buscar-fila-68281d25...). Searching 'zzzz-no-existe' shows 'Sin resultados.' (6) The libro at 1920 and 390 has no page-level horizontal overflow (scrollWidth equals the viewport). At 390 the dosis table scrolls inside its overflow-x-auto wrapper, which is acceptable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Patient detail dialog (admin, OrdenesIgssPaciente inside sm:max-w-[600px] dialog)", "issues": [
+        "When an order shows the 'Confirmar dosis' button (plus edit/close/anular icons), the order row is pushed wider than the dialog. The screenshot showed the rows' right edge past the dialog edge and the left text squeezed to one word per line ('Contrato · / Procedimiento / Inyectable · Avastin / OD · Ingreso'). Once the order was confirmed and the button disappeared, the rows fit (685-1235px inside a 660-1260px dialog). Suggest wrapping the action buttons (flex-wrap), an icon-only button on narrow widths, or a wider view dialog.",
+        "The ORD number (text-[11px] text-slate-400 font-mono) wraps mid-token ('ORD-' / '000412') in narrow rows. Add whitespace-nowrap. Its contrast is also low (slate-400 on white), in both the admin view and the medico ficha."
+      ]},
+      {"screen": "/igss/libro header", "issues": ["The subtitle 'Cifras del libro y listas para revisar: atenciones sin orden, cirugías sin marcar y órdenes detenidas.' does not mention the new 'Pendientes de confirmar dosis' list (cosmetic)."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional polish: stop the 'Confirmar dosis' action row in OrdenesIgssPaciente from overflowing the 600px patient detail dialog (flex-wrap / smaller button).",
+    "Optional polish: whitespace-nowrap and better contrast for the ORD number badge.",
+    "Optional: update the libro subtitle to mention the dosis-por-confirmar list."
+  ],
+  "critical_code_review_comments": [
+    "OrdenesIgssFicha swallows API errors and shows the empty state 'Sin órdenes IGSS reservadas ni en curso.' on failure. A failed request looks the same as 'no orders' to the medico; an error message would be better.",
+    "ConfirmarDosisDialog: the success toast uses data.estado.replace('_',' '), which crashes if estado is missing from the response. Minor."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped as requested)", "frontend": "100% (6/6 flows)"},
+  "seed_data_creation": "No new seed. Used the existing setup_bloque3_ui.json patient. As required by the test, order baf7fb9f (ORD-000408) was confirmed with 2 doses and is now 'completa'. Re-run /app/tests/setup_bloque3_ui.py for a fresh scenario.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "ORD-000408 (baf7fb9f) is already confirmed/completa. The libro has 3 other pending-dosis orders from earlier TEST_B3 patients. Login rate limit is 5/min. medico_test cannot reach /igss/libro (redirects to /pacientes)."
+}
