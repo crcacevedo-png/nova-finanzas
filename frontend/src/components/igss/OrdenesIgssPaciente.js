@@ -8,8 +8,11 @@ import { OrdenLibroDialog } from './OrdenLibroDialog';
 import { MotivoDialog, ElegirOrdenDialog } from './OrdenDialogs';
 import { ESTADOS_ACTIVOS, estadoOrden } from './estadosLibro';
 import { ConfirmarDosisDialog } from './ConfirmarDosisDialog';
+import { useAuth } from '../../context/AuthContext';
+import { puedeVerLibroIgss } from '../../lib/igssLibro';
 
 const fmt = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '—');
+const fmtHora = (f) => (f ? new Date(f).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
 const Atenciones = ({ orden, onReasignar }) => (
   <div className="mt-2 border-t border-slate-100 pt-2 space-y-1" data-testid={`orden-atenciones-${orden.id}`}>
@@ -20,7 +23,7 @@ const Atenciones = ({ orden, onReasignar }) => (
           {a.tipo === 'cirugia' ? `Cirugía · dosis ${a.numero_dosis}` : 'Evaluación'} · {fmt(a.fecha)}{a.medico ? ` · ${a.medico}` : ''}
           {a.excede_dosis && <span className="ml-1 text-red-600 font-medium">(excede dosis)</span>}
         </span>
-        {ESTADOS_ACTIVOS.includes(orden.estado) && (
+        {onReasignar && ESTADOS_ACTIVOS.includes(orden.estado) && (
           <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" type="button" onClick={() => onReasignar(orden, a)} data-testid={`reasignar-${a.ref_id}`}>
             <Shuffle className="w-3 h-3 mr-1" /> Reasignar
           </Button>
@@ -35,7 +38,29 @@ const Atenciones = ({ orden, onReasignar }) => (
   </div>
 );
 
-const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onConfirmar, onReasignar }) => {
+// Acciones de administración (solo roles del libro)
+const AccionesLibro = ({ o, onEditar, onAnular, onCerrar, onConfirmar }) => (
+  <>
+    {o.dosis_por_confirmar && ESTADOS_ACTIVOS.includes(o.estado) && (
+      <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-amber-700 border-amber-300" type="button" onClick={onConfirmar} data-testid={`orden-confirmar-dosis-${o.id}`}>
+        <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Confirmar dosis
+      </Button>
+    )}
+    {o.estado !== 'anulada' && (
+      <>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" type="button" onClick={onEditar} title="Editar" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
+        {o.estado === 'en_curso' && (
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-600" type="button" onClick={onCerrar} title="Cerrar sin completar" data-testid={`orden-cerrar-${o.id}`}><CircleSlash className="w-3.5 h-3.5" /></Button>
+        )}
+        {o.estado !== 'cerrada' && (
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" type="button" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
+        )}
+      </>
+    )}
+  </>
+);
+
+const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar, onConfirmar, onReasignar }) => {
   const [cls, label] = estadoOrden(o.estado);
   return (
     <div className="border border-slate-200 rounded-lg p-3 bg-white" data-testid={`orden-libro-${o.id}`}>
@@ -53,6 +78,9 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onConfi
               {o.inyectable && <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px] bg-sky-50 text-sky-700 border-sky-200" data-testid={`orden-inyectable-${o.id}`}>Inyectable</Badge>}
               {o.procedimiento ? ` · ${o.procedimiento}` : ''} · Ingreso {fmt(o.fecha_ingreso)}
             </div>
+            <div className="text-[11px] text-slate-400" data-testid={`orden-ingresada-por-${o.id}`}>
+              Ingresada por {o.created_by_nombre || '—'} · {fmtHora(o.created_at)}
+            </div>
           </div>
         </button>
         <div className="flex items-center gap-2 shrink-0">
@@ -60,22 +88,11 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onConfi
             {o.tipo === 'procedimiento' ? `Dosis aplicadas ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : `${o.total_atenciones} atención(es)`}
           </span>
           <Badge variant="outline" className={cls} data-testid={`orden-estado-${o.id}`}>{label}</Badge>
-          {o.dosis_por_confirmar && ESTADOS_ACTIVOS.includes(o.estado) && (
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs text-amber-700 border-amber-300" type="button" onClick={onConfirmar} data-testid={`orden-confirmar-dosis-${o.id}`}>
-              <ClipboardCheck className="w-3.5 h-3.5 mr-1" /> Confirmar dosis
-            </Button>
-          )}
-          {o.estado !== 'anulada' && (
-            <>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" type="button" onClick={onEditar} title="Editar" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
-              {o.estado === 'en_curso' && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-orange-600" type="button" onClick={onCerrar} title="Cerrar sin completar" data-testid={`orden-cerrar-${o.id}`}><CircleSlash className="w-3.5 h-3.5" /></Button>
-              )}
-              {o.estado !== 'cerrada' && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" type="button" onClick={onAnular} title="Anular" data-testid={`orden-anular-${o.id}`}><Ban className="w-3.5 h-3.5" /></Button>
-              )}
-            </>
-          )}
+          {esLibro
+            ? <AccionesLibro o={o} onEditar={onEditar} onAnular={onAnular} onCerrar={onCerrar} onConfirmar={onConfirmar} />
+            : o.puede_corregir && (
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" type="button" onClick={onEditar} title="Corregir" data-testid={`orden-editar-${o.id}`}><Pencil className="w-3.5 h-3.5" /></Button>
+            )}
         </div>
       </div>
       {o.estado === 'anulada' && <p className="text-xs text-slate-500 mt-1">Anulada: {o.motivo_anulacion}</p>}
@@ -83,13 +100,15 @@ const FilaOrden = ({ o, abierta, onToggle, onEditar, onAnular, onCerrar, onConfi
         <p className="text-xs text-amber-700 mt-1" data-testid={`orden-falta-confirmar-${o.id}`}>Falta confirmar las dosis con la hoja: no llega a completa ni se cobra hasta confirmarlas.</p>
       )}
       {o.estado === 'cerrada' && <p className="text-xs text-orange-700 mt-1" data-testid={`orden-cerrada-motivo-${o.id}`}>Cerrada sin completar (no se cobra): {o.motivo_cierre}</p>}
-      {abierta && <Atenciones orden={o} onReasignar={onReasignar} />}
+      {abierta && <Atenciones orden={o} onReasignar={esLibro ? onReasignar : null} />}
     </div>
   );
 };
 
-// Sección de órdenes IGSS de la ficha del paciente (solo LIBRO_IGSS_ROLES)
+// Sección de órdenes IGSS de la ficha del paciente (roles que ingresan órdenes; administración solo en el libro)
 export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
+  const { user } = useAuth();
+  const esLibro = puedeVerLibroIgss(user);
   const [ordenes, setOrdenes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [abiertas, setAbiertas] = useState({});
@@ -103,8 +122,8 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
     if (!pacienteId) return;
     setCargando(true);
     try {
-      const { data } = await igssLibroApi.listar({ paciente_id: pacienteId, limit: 200 });
-      setOrdenes(data?.data || []);
+      const { data } = await igssLibroApi.delPaciente(pacienteId);
+      setOrdenes(data || []);
     } catch (e) {
       setOrdenes([]);
     } finally {
@@ -134,7 +153,7 @@ export const OrdenesIgssPaciente = ({ pacienteId, unidadId }) => {
       )}
       {ordenes.map((o) => (
         <FilaOrden
-          key={o.id} o={o} abierta={!!abiertas[o.id]}
+          key={o.id} o={o} esLibro={esLibro} abierta={!!abiertas[o.id]}
           onToggle={() => setAbiertas((a) => ({ ...a, [o.id]: !a[o.id] }))}
           onEditar={() => setEditar({ open: true, orden: o })}
           onAnular={() => setAnular(o)}

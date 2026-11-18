@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { igssLibroApi, igssUnitApi } from '../../services/api';
+import { spsValido } from '../../lib/igssLibro';
 
 const errorDe = (e, fb) => {
   const d = e?.response?.data?.detail;
@@ -18,9 +19,11 @@ const VACIO = { unidad_id: '', nog_id: '', no_sps: '', tipo: 'consulta', dosis_a
 
 const cupoTexto = (c) => {
   if (c.sin_tope) return 'sin tope';
+  if (c.disponibles === undefined) return c.con_cupo ? 'con cupo' : 'sin cupo';
   const casiLleno = c.cantidad > 0 && c.ocupados >= c.cantidad * 0.9;
   return `${c.disponibles} disponibles${casiLleno && c.disponibles > 0 ? ' · ≥ 90 %' : ''}`;
 };
+const sinCupo = (c) => !c.sin_tope && (c.disponibles === undefined ? !c.con_cupo : c.disponibles <= 0);
 
 // Crear o editar una orden del libro (No. SPS, entrada del catálogo, tipo y dosis)
 export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, orden, onSaved }) => {
@@ -42,10 +45,12 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
   }, [open, editando, form.unidad_id]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const spsMalo = !!form.no_sps.trim() && !spsValido(form.no_sps) && !(editando && form.no_sps.trim().toUpperCase() === orden?.no_sps);
   const onTipo = (v) => setForm((f) => ({ ...f, tipo: v, dosis_autorizadas: v === 'consulta' ? 1 : f.dosis_autorizadas, inyectable: v === 'consulta' ? false : f.inyectable }));
 
   const guardar = async () => {
     if (!form.no_sps.trim()) { toast.error('El No. SPS es obligatorio'); return; }
+    if (spsMalo) { toast.error('El No. SPS solo admite números y guiones'); return; }
     if (!editando && !form.nog_id) { toast.error('Elija la entrada del catálogo (NOG o Baja Cuantía)'); return; }
     const payload = {
       no_sps: form.no_sps, tipo: form.tipo, dosis_autorizadas: Number(form.dosis_autorizadas) || 1,
@@ -96,7 +101,7 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
                   <SelectTrigger className="mt-1" data-testid="orden-form-nog"><SelectValue placeholder="Entrada del catálogo" /></SelectTrigger>
                   <SelectContent>
                     {catalogo.map((c) => (
-                      <SelectItem key={c.id} value={c.id} disabled={!c.sin_tope && c.disponibles <= 0} data-testid={`orden-form-nog-${c.id}`}>
+                      <SelectItem key={c.id} value={c.id} disabled={sinCupo(c)} data-testid={`orden-form-nog-${c.id}`}>
                         {c.etiqueta} · {cupoTexto(c)}
                       </SelectItem>
                     ))}
@@ -107,7 +112,10 @@ export const OrdenLibroDialog = ({ open, onOpenChange, pacienteId, unidadId, ord
           )}
           <div>
             <Label className="text-xs">No. SPS *</Label>
-            <Input value={form.no_sps} onChange={(e) => set('no_sps', e.target.value)} className="mt-1 font-mono uppercase" data-testid="orden-form-sps" />
+            <Input value={form.no_sps} onChange={(e) => set('no_sps', e.target.value)} className="mt-1 font-mono" inputMode="numeric" placeholder="Solo números y guiones" data-testid="orden-form-sps" />
+            {spsMalo && (
+              <p className="text-[11px] text-red-600 mt-1" data-testid="orden-form-sps-error">Solo números y guiones</p>
+            )}
           </div>
           <div>
             <Label className="text-xs">Tipo</Label>

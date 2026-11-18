@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from config.database import db
 from routes.auth import require_role
-from routes.igss_libro import normalizar_sps
+from routes.igss_libro import normalizar_sps, sps_valido
 from routes.igss_libro_lecturas import (ESTADOS_PROD, _anchos, _descarga, _encabezado, _fila_titulos, _modalidad,
                                         _nombre_archivo, contadores_libro, fmt_fecha)
 from routes.igss_nogs import _BORRADOR_PROJ, es_texto_baja_cuantia, etiqueta_catalogo, eval_es_borrador_vacio, norm_txt
@@ -34,9 +34,11 @@ SIN_SPS = {"cupo_sin_sps": "Cupo descontado sin SPS", "evaluacion": "Evaluación
 TIPO_CASO = {"orden": "Orden", "evaluacion": "Evaluación", "cirugia": "Cirugía"}
 # (inicio del motivo, motivo agrupado, qué falta para poder migrarlo). El orden importa.
 SPS_DISTINTO = "No. SPS distinto entre la cirugía y la ficha"
+SPS_FORMATO_MALO = "Formato de No. SPS inválido"
 REGLAS_MOTIVO = [
     ("Orden del paciente sin No. SPS", "Orden sin No. SPS", "El No. SPS de la hoja de autorización"),
     (SPS_DISTINTO, SPS_DISTINTO, "Corregir contra la hoja física el No. SPS de la cirugía o el de la ficha del paciente"),
+    (SPS_FORMATO_MALO, SPS_FORMATO_MALO, "Corregir el No. SPS contra la hoja física (solo números y guiones)"),
     ("Reubicación:", "NOG no existe en la unidad activa (reubicación)",
      "Registrar el NOG en el catálogo de la unidad activa"),
     ("El NOG ", "NOG no está en el catálogo de la unidad",
@@ -82,6 +84,8 @@ CRITERIOS = [
     "Cirugía con un No. SPS que no está en la ficha del paciente, cuando la ficha tiene otro No. SPS: no se migra ni "
     "el de la cirugía ni el de la ficha (de la misma entrada del catálogo, o el único de la ficha) hasta que el "
     "personal los corrija contra la hoja física; va a 'No migrables' con los dos valores. Si ya coinciden, entra normal.",
+    "No. SPS con letras u otros signos (la regla es la misma que al ingresar una orden: solo números y guiones): no "
+    "se migra y va a 'No migrables' hasta corregirlo contra la hoja física.",
 ]
 
 _PAC_PROJ = {"_id": 0, "id": 1, "record_number": 1, "first_name": 1, "last_name": 1, "igss_afiliacion": 1,
@@ -451,6 +455,8 @@ class Simulacion:
         if libro:
             return "libro" if libro.get("paciente_id") in c["pacientes"] else (
                 f"El No. SPS ya está en el libro para otro paciente ({libro.get('paciente_nombre', '')})")
+        if not sps_valido(c["no_sps"]):
+            return f"{SPS_FORMATO_MALO}: {c['no_sps']} (solo números y guiones)"
         if not c["unidad_id"]:
             return "Paciente sin unidad IGSS"
         if not c["entradas"]:

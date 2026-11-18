@@ -248,6 +248,8 @@ export const igssLibroApi = {
   // Para médicos/recepción: solo procedimiento y fecha de ingreso de las órdenes abiertas
   abiertas: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes-abiertas`),
   ficha: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes-ficha`),
+  // Órdenes del paciente con No. SPS y NOG (roles que ingresan órdenes)
+  delPaciente: (pacienteId) => axios.get(`${API_URL}/patients/${pacienteId}/igss-ordenes`),
   // Fase 4 (a): simulación de la migración, solo lectura y solo superadmin
   simularMigracion: (params) => axios.get(`${API_URL}/igss-units/migracion/simular`, { params: { ...params, detalle: false } }),
   simularMigracionExcel: (params) => axios.get(`${API_URL}/igss-units/migracion/simular/excel`, { params, responseType: 'blob' }),

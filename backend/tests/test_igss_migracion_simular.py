@@ -28,7 +28,7 @@ N1, N2, NBC, N3, ND1, ND2, N4, ND3, NA1, NA2 = (f"TEST_mig_{k}_{TAG}" for k in (
 NUM1, NUM2, NUM3, NUMD = f"TMIG1{TAG}", f"TMIG2{TAG}", f"TMIG3{TAG}", f"TMIGD{TAG}"
 NUM4, NUMD2, NUMA = f"TMIG4{TAG}", f"TMIGE{TAG}", f"TMIGA{TAG}"
 P = {k: f"TEST_mig_p{k}_{TAG}" for k in range(1, 20)}
-SPS = {k: f"TMIG-{k}-{TAG}".upper() for k in "ABCDEFGHIJKLXYZ"}
+SPS = {k: f"{ord(k)}-{int(TAG, 16)}" for k in "ABCDEFGHIJKLXYZ"}  # solo números y guiones
 LIBRO_ID, LEG1 = f"TEST_mig_libro_{TAG}", f"TEST_mig_leg1_{TAG}"
 COLECCIONES = ["igss_nogs", "igss_nog_acreditaciones", "igss_produccion", "igss_ordenes_libro", "igss_atenciones_sin_orden",
                "patients", "evaluaciones_oftalmologicas", "surgeries", "igss_units", "audit_logs", "igss_libro_config"]

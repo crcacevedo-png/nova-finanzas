@@ -20,6 +20,7 @@ API = f"{BASE_URL}/api"
 LIBRO = f"{API}/igss-units/libro"
 
 TAG = uuid.uuid4().hex[:6]
+NT = str(int(TAG, 16))  # parte numérica del No. SPS (solo números y guiones)
 UNIT = f"TEST_libro_u1_{TAG}"
 UNIT2 = f"TEST_libro_u2_{TAG}"
 UNIT3 = f"TEST_libro_u3_{TAG}"
@@ -30,6 +31,7 @@ CREDS = {
     "admin": par("admin"),
     "administrador_igss": par("igss"),
     "usuario": par("usuario"),
+    "optica": par("optica"),
     "medico": par("medico"),
 }
 CONFIG_PREVIA = []
@@ -117,7 +119,7 @@ _SPS_N = [0]
 
 def sps():
     _SPS_N[0] += 1
-    return f"sps-{TAG}-{_SPS_N[0]}"
+    return f"{NT}-{_SPS_N[0]}"
 
 
 def nueva_entrada(h, unit=UNIT, **kw):
@@ -156,19 +158,19 @@ def contador(h, nog_id):
 def test_01_sps_repetido_en_la_misma_unidad_falla(H):
     sa = H["superadmin"]
     n1 = entrada(sa)
-    o = orden(sa, n1["id"], no_sps=f"  abc-{TAG} ")
-    assert o["no_sps"] == f"ABC-{TAG}".upper() and o["estado"] == "reservada"
-    r = nueva_orden(sa, n1["id"], no_sps=f"Abc-{TAG}", pac=PAC2)
+    o = orden(sa, n1["id"], no_sps=f"  {NT}-501 ")
+    assert o["no_sps"] == f"{NT}-501" and o["estado"] == "reservada"
+    r = nueva_orden(sa, n1["id"], no_sps=f"{NT}-501", pac=PAC2)
     assert r.status_code == 409 and "No. SPS" in r.json()["detail"]
     # Otra entrada del catálogo de la MISMA unidad tampoco admite el SPS repetido
     n1b = entrada(sa)
-    assert nueva_orden(sa, n1b["id"], no_sps=f"ABC-{TAG}").status_code == 409
+    assert nueva_orden(sa, n1b["id"], no_sps=f"{NT}-501").status_code == 409
     # El mismo SPS en OTRA unidad sí se permite
     n2 = entrada(sa, unit=UNIT2)
-    assert nueva_orden(sa, n2["id"], no_sps=f"ABC-{TAG}").status_code == 200
+    assert nueva_orden(sa, n2["id"], no_sps=f"{NT}-501").status_code == 200
     # Al anular la orden el SPS queda libre (índice único parcial solo para vigentes)
     assert requests.post(f"{LIBRO}/ordenes/{o['id']}/anular", json={"motivo": "SPS mal digitado"}, headers=sa).status_code == 200
-    assert nueva_orden(sa, n1["id"], no_sps=f"abc-{TAG}").status_code == 200
+    assert nueva_orden(sa, n1["id"], no_sps=f" {NT}-501").status_code == 200
 
 
 def test_02_orden_sin_sps_rechazada(H):
@@ -199,7 +201,7 @@ def test_09_veinte_creaciones_simultaneas_con_cupo_para_cinco(H):
     sa = H["superadmin"]
     n = entrada(sa, cantidad=5)
     with ThreadPoolExecutor(max_workers=20) as ex:
-        codigos = list(ex.map(lambda i: nueva_orden(sa, n["id"], no_sps=f"CONC-{TAG}-{i}").status_code, range(20)))
+        codigos = list(ex.map(lambda i: nueva_orden(sa, n["id"], no_sps=f"{NT}-{i}-9").status_code, range(20)))
     assert codigos.count(200) == 5, codigos
     assert codigos.count(409) == 15, codigos
     vig = _db_call(lambda db: db.igss_ordenes_libro.count_documents({"nog_id": n["id"], "vigente": True}))
@@ -314,7 +316,7 @@ def test_13_roles_no_autorizados_403(H, rol):
     llamadas = [
         requests.get(f"{LIBRO}/ordenes", headers=h),
         requests.get(f"{LIBRO}/ordenes/{o['id']}", headers=h),
-        nueva_orden(h, n["id"]),
+        nueva_orden(h, n["id"]) if rol == "medico" else requests.get(f"{LIBRO}/config", headers=h),
         requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"codigo": "X"}, headers=h),
         requests.post(f"{LIBRO}/ordenes/{o['id']}/anular", json={"motivo": "no autorizado"}, headers=h),
         requests.get(f"{LIBRO}/nogs/{n['id']}/contador", headers=h),
@@ -606,10 +608,9 @@ def test_15_roles_no_autorizados_no_modifican_ordenes_del_paciente(H):
     assert r.status_code == 200, r.text
     creado = _db_call(lambda db: db.patients.find_one({"id": r.json()["id"]}, {"_id": 0}))
     assert creado["igss_ordenes"] == [] and creado["igss_no_sps"] == "" and creado["igss_nog"] == ""
-    # Ningún rol sin acceso puede crear órdenes en el libro
+    # El médico no puede crear órdenes en el libro (usuario y óptica sí: ver test_ing_*)
     n = entrada(sa)
-    for rol in DENEGADOS:
-        assert nueva_orden(H[rol], n["id"], pac=PAC2).status_code == 403
+    assert nueva_orden(H["medico"], n["id"], pac=PAC2).status_code == 403
 
 
 def test_19_baja_cuantia_completa_se_cuenta(H):
@@ -831,10 +832,10 @@ def _escenario_unidad2(sa):
     n = entrada(sa, unit=UNIT3, cantidad=5, precio=150)
     bc = entrada(sa, unit=UNIT3, numero="", tipo_compra="baja_cuantia", nombre_servicio=f"Campimetría U2 {TAG}",
                  cantidad=None, precio=80)
-    c1 = orden(sa, n["id"], no_sps=f"B-{TAG}", procedimiento="Consulta U2")
+    c1 = orden(sa, n["id"], no_sps=f"2-{NT}", procedimiento="Consulta U2")
     crear_eval(sa, orden_id=c1["id"], fecha="2026-08-05")
     crear_eval(sa, orden_id=c1["id"], fecha="2026-08-20")
-    c2 = orden(sa, n["id"], no_sps=f"A-{TAG}", pac=PAC2)
+    c2 = orden(sa, n["id"], no_sps=f"1-{NT}", pac=PAC2)
     crear_eval(sa, pac=PAC2, orden_id=c2["id"], fecha="2026-08-05")
     p = orden(sa, n["id"], tipo="procedimiento", dosis_autorizadas=3, procedimiento="Avastin U2")
     for fecha in ("2026-08-12", "2026-09-15"):
@@ -1435,3 +1436,146 @@ def test_b3_2_lista_del_medico_sin_sps_ni_nog(H):
     sel = {x["id"]: x for x in r.json()}
     assert sel[cur["id"]]["numero_libro"] == cur["numero_libro"] and sel[cur["id"]]["dosis_aplicadas"] == 1
     assert not [p for p in prohibidos if p in r.text.upper()]
+
+
+# ---------- Ingreso de órdenes: usuario y óptica (INGRESO_ORDEN_ROLES) ----------
+
+INGRESAN = ["usuario", "optica"]
+SOLO_LIBRO = {"precio", "costo_override", "facturado", "pagado", "impreso", "enviado", "aviso_cupo"}
+
+
+def test_ing_1_usuario_y_optica_crean_orden_con_las_mismas_validaciones(H):
+    sa = H["superadmin"]
+    n = entrada(sa, cantidad=20)
+    for rol in INGRESAN:
+        h = H[rol]
+        r = nueva_orden(h, n["id"], tipo="procedimiento", dosis_autorizadas=3, procedimiento=f"Avastin {rol}")
+        assert r.status_code == 200, r.text
+        o = r.json()
+        assert o["numero_libro"].startswith("ORD-") and o["estado"] == "reservada" and o["no_sps"].startswith(NT)
+        assert o["created_by_nombre"] and o["created_at"] and o["puede_corregir"] is True
+        assert not SOLO_LIBRO & set(o)
+        # Las mismas validaciones que un administrador
+        assert nueva_orden(h, n["id"], no_sps="").status_code == 422
+        r = nueva_orden(h, n["id"], no_sps=f"ABC-{NT}")
+        assert r.status_code == 422 and "números y guiones" in r.json()["detail"]
+        assert nueva_orden(h, n["id"], no_sps=o["no_sps"]).status_code == 409
+        assert nueva_orden(h, n["id"], tipo="consulta", dosis_autorizadas=3).status_code == 422
+        # No fijan precio, costo ni fecha de ingreso
+        for extra in ({"precio": 1}, {"costo_override": 1}, {"fecha_ingreso": "2026-01-01"}):
+            assert nueva_orden(h, n["id"], **extra).status_code == 403, extra
+    # El formato aplica a todos los roles, también a la administración
+    for mala in (f"ABC-{NT}", f"{NT} 12", f"{NT}--1", f"-{NT}", f"{NT}-", "12.34", "1" * 41):
+        assert nueva_orden(sa, n["id"], no_sps=mala).status_code == 422, mala
+    assert nueva_orden(sa, n["id"], no_sps=f" 01-{NT}-2026 ").json()["no_sps"] == f"01-{NT}-2026"
+    # Cupo lleno: también para quien ingresa
+    lleno = entrada(sa, cantidad=1)
+    orden(sa, lleno["id"])
+    assert nueva_orden(H["usuario"], lleno["id"]).status_code == 409
+
+
+def test_ing_2_catalogo_sin_cifras_y_ficha_con_sps_y_nog(H):
+    sa = H["superadmin"]
+    n, lleno = entrada(sa, cantidad=5), entrada(sa, cantidad=1)
+    orden(sa, lleno["id"])
+    propia = orden(H["usuario"], n["id"], procedimiento="Consulta usuario")
+    for rol in INGRESAN:
+        cat = {c["id"]: c for c in requests.get(f"{LIBRO}/catalogo", params={"unidad_id": UNIT}, headers=H[rol]).json()}
+        assert cat[n["id"]]["con_cupo"] is True and cat[lleno["id"]]["con_cupo"] is False
+        assert not {"cantidad", "ocupados", "disponibles", "precio"} & set(cat[n["id"]])
+        r = requests.get(f"{API}/patients/{PAC1}/igss-ordenes", headers=H[rol])
+        assert r.status_code == 200, r.text
+        fila = next(x for x in r.json() if x["id"] == propia["id"])
+        assert fila["no_sps"] == propia["no_sps"] and fila["etiqueta_nog"] == n["numero"] and fila["numero_nog"] == n["numero"]
+        assert fila["created_by_nombre"] == "Prueba Usuario" and fila["created_at"]
+        assert fila["puede_corregir"] is (rol == "usuario")
+        assert not SOLO_LIBRO & {k for x in r.json() for k in x}
+    cat_sa = {c["id"]: c for c in requests.get(f"{LIBRO}/catalogo", params={"unidad_id": UNIT}, headers=sa).json()}
+    assert cat_sa[lleno["id"]]["disponibles"] == 0
+    r = requests.get(f"{API}/patients/{PAC1}/igss-ordenes", headers=sa)
+    assert "precio" in next(x for x in r.json() if x["id"] == propia["id"])
+
+
+def test_ing_3_usuario_y_optica_no_hacen_tareas_del_libro(H):
+    sa = H["superadmin"]
+    n_cur, cur = orden_dosis(sa, 1, dosis=3)  # en curso
+    n_com, com = orden_dosis(sa, 1, dosis=1)  # completa
+    assert (get_orden(sa, cur["id"])["estado"], get_orden(sa, com["id"])["estado"]) == ("en_curso", "completa")
+    _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": cur["id"]}, {"$set": {"dosis_por_confirmar": True}}))
+    for rol in INGRESAN:
+        h = H[rol]
+        propia = orden(h, n_cur["id"])
+        llamadas = {
+            "anular": requests.post(f"{LIBRO}/ordenes/{propia['id']}/anular", json={"motivo": "no autorizado"}, headers=h),
+            "anular_otra": requests.post(f"{LIBRO}/ordenes/{com['id']}/anular", json={"motivo": "no autorizado"}, headers=h),
+            "cerrar": requests.post(f"{LIBRO}/ordenes/{cur['id']}/cerrar", json={"motivo": "no autorizado"}, headers=h),
+            "confirmar": requests.post(f"{LIBRO}/ordenes/{cur['id']}/confirmar-dosis", json={"dosis_autorizadas": 3}, headers=h),
+            "pagado": requests.put(f"{LIBRO}/ordenes/{com['id']}", json={"pagado": True}, headers=h),
+            "facturado": requests.put(f"{LIBRO}/ordenes/{com['id']}", json={"facturado": True}, headers=h),
+            "pagado_propia": requests.put(f"{LIBRO}/ordenes/{propia['id']}", json={"pagado": True}, headers=h),
+            "excel_nog": requests.get(f"{UNITS_API}/nogs/{n_com['id']}/export/excel", headers=h),
+            "excel_unidad": requests.get(f"{UNITS_API}/{UNIT}/nogs/export/excel", headers=h),
+            "listado": requests.get(f"{LIBRO}/ordenes", headers=h),
+            "ver_orden": requests.get(f"{LIBRO}/ordenes/{propia['id']}", headers=h),
+            "contador": requests.get(f"{LIBRO}/nogs/{n_cur['id']}/contador", headers=h),
+            "resumen": requests.get(f"{UNITS_API}/nogs/resumen", headers=h),
+            "config": requests.get(f"{LIBRO}/config", headers=h),
+            "dosis_lista": requests.get(f"{LIBRO}/dosis-por-confirmar", headers=h),
+            "cirugias_lista": requests.get(f"{LIBRO}/cirugias-por-marcar", headers=h),
+            "reasignar": requests.post(f"{LIBRO}/atenciones/reasignar", json={"tipo": "cirugia", "ref_id": "x",
+                                                                            "orden_destino_id": propia["id"]}, headers=h),
+        }
+        assert {k: r.status_code for k, r in llamadas.items() if r.status_code != 403} == {}, rol
+    assert get_orden(sa, cur["id"])["estado"] == "en_curso" and get_orden(sa, com["id"])["pagado"] is False
+
+
+def test_ing_4_corrige_solo_su_orden_reservada_sin_atenciones(H):
+    sa, us, op = H["superadmin"], H["usuario"], H["optica"]
+    n = entrada(sa, cantidad=20)
+    propia = orden(us, n["id"], procedimiento="Consulta")
+    nuevo = sps()
+    r = requests.put(f"{LIBRO}/ordenes/{propia['id']}", headers=us, json={
+        "no_sps": nuevo, "tipo": "procedimiento", "dosis_autorizadas": 3, "procedimiento": "Avastin OD",
+        "codigo": "C-1", "inyectable": True})
+    assert r.status_code == 200, r.text
+    assert (r.json()["no_sps"], r.json()["dosis_autorizadas"], r.json()["inyectable"], r.json()["puede_corregir"]) == (nuevo, 3, True, True)
+    assert not SOLO_LIBRO & set(r.json())
+    log = _db_call(lambda db: db.audit_logs.find_one({"action": "LIBRO_ORDEN_EDITADA", "details.orden_id": propia["id"]}))
+    assert log and log["user_name"] == "Prueba Usuario"
+    assert requests.put(f"{LIBRO}/ordenes/{propia['id']}", json={"no_sps": "X-1"}, headers=us).status_code == 422
+    # Campos que solo cambia el libro
+    for campo in ({"precio": 1}, {"fecha_ingreso": "2026-01-01"}, {"paciente_id": PAC2}, {"impreso": True}):
+        assert requests.put(f"{LIBRO}/ordenes/{propia['id']}", json=campo, headers=us).status_code == 403, campo
+    # La de otro: 403 (de administración y de otro rol que ingresa)
+    ajena = orden(sa, n["id"])
+    assert requests.put(f"{LIBRO}/ordenes/{ajena['id']}", json={"codigo": "X"}, headers=us).status_code == 403
+    assert requests.put(f"{LIBRO}/ordenes/{propia['id']}", json={"codigo": "X"}, headers=op).status_code == 403
+    # Con atenciones: 403 (en curso por una dosis, o reservada con una atención registrada)
+    realizar(sa, crear_cx(sa, no_sps=nuevo, date="2026-10-01")["id"])
+    assert get_orden(sa, propia["id"])["estado"] == "en_curso"
+    r = requests.put(f"{LIBRO}/ordenes/{propia['id']}", json={"codigo": "X"}, headers=us)
+    assert r.status_code == 403 and "rol del libro" in r.json()["detail"]
+    otra = orden(us, n["id"])
+    _db_call(lambda db: db.igss_ordenes_libro.update_one({"id": otra["id"]}, {"$push": {"atenciones": {
+        "tipo": "evaluacion", "ref_id": f"TEST_ing_{TAG}", "fecha": "2026-10-02"}}}))
+    assert get_orden(sa, otra["id"])["estado"] == "reservada"
+    assert requests.put(f"{LIBRO}/ordenes/{otra['id']}", json={"codigo": "X"}, headers=us).status_code == 403
+    # Anulada: tampoco
+    tercera = orden(us, n["id"])
+    assert requests.post(f"{LIBRO}/ordenes/{tercera['id']}/anular", json={"motivo": "mal ingresada"}, headers=sa).status_code == 200
+    assert requests.put(f"{LIBRO}/ordenes/{tercera['id']}", json={"codigo": "X"}, headers=us).status_code == 403
+    # Un rol del libro sí corrige la orden con atenciones
+    assert requests.put(f"{LIBRO}/ordenes/{propia['id']}", json={"codigo": "ADM"}, headers=sa).status_code == 200
+
+
+def test_ing_5_medico_no_ingresa_ni_ve_sps_ni_nog(H):
+    sa, med = H["superadmin"], H["medico"]
+    n = entrada(sa)
+    o = orden(H["usuario"], n["id"], procedimiento="Consulta médico")
+    assert nueva_orden(med, n["id"]).status_code == 403
+    assert requests.put(f"{LIBRO}/ordenes/{o['id']}", json={"codigo": "X"}, headers=med).status_code == 403
+    assert requests.get(f"{API}/patients/{PAC1}/igss-ordenes", headers=med).status_code == 403
+    assert requests.get(f"{LIBRO}/catalogo", params={"unidad_id": UNIT}, headers=med).status_code == 403
+    r = requests.get(f"{API}/patients/{PAC1}/igss-ordenes-ficha", headers=med)
+    assert r.status_code == 200 and o["id"] in {x["id"] for x in r.json()}
+    assert o["no_sps"] not in r.text and n["numero"] not in r.text

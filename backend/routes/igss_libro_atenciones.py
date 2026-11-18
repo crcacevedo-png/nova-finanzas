@@ -17,10 +17,11 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from config.database import db
-from config.permissions import LIBRO_IGSS_ROLES
+from config.permissions import INGRESO_ORDEN_ROLES, LIBRO_IGSS_ROLES
 from routes.auth import require_any_permission, require_role
 from routes.igss_libro import (ESTADO_TEXTO, ESTADOS_VIGENTES, _audit, _expr_cirugias, _lit, _nombre_usuario,
-                               _orden_out, crear_orden_libro, etapas_estado, normalizar_sps, siguiente_numero_libro)
+                               _orden_out, crear_orden_libro, es_rol_libro, etapas_estado, normalizar_sps,
+                               orden_ingreso_out, siguiente_numero_libro)
 from routes.igss_nogs import TIPO_COMPRA_LABELS, etiqueta_catalogo, eval_es_borrador_vacio
 from utils.timezone import today_str_gt
 
@@ -643,21 +644,38 @@ async def reasignar_atencion(body: ReasignarBody, current_user: dict = Depends(r
 
 @router.get("/catalogo")
 async def catalogo_para_ordenes(unidad_id: str = Query(..., min_length=1),
-                                current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
-    """Entradas activas del catálogo de la unidad (con y sin número) y su cupo."""
+                                current_user: dict = Depends(require_role(INGRESO_ORDEN_ROLES))):
+    """Entradas activas del catálogo de la unidad (con y sin número) y su cupo. Fuera del
+    libro solo se indica si hay cupo (sin cifras ni precio)."""
+    libro = es_rol_libro(current_user)
     nogs = await db.igss_nogs.find({"unidad_id": unidad_id, "is_active": {"$ne": False}}, {"_id": 0}).to_list(None)
     out = []
     for n in nogs:
         cant = int(n.get("cantidad") or 0)
         usados = int(n.get("libro_ocupados") or 0)
         sin_tope = bool(n.get("sin_tope"))
-        out.append({"id": n["id"], "etiqueta": etiqueta_catalogo(n), "numero": n.get("numero", ""),
-                    "nombre_servicio": n.get("nombre_servicio", ""),
-                    "modalidad": TIPO_COMPRA_LABELS.get(n.get("tipo_compra", ""), n.get("tipo_compra", "")),
-                    "sin_tope": sin_tope, "cantidad": None if sin_tope else cant, "ocupados": usados,
-                    "disponibles": None if sin_tope else max(cant - usados, 0), "precio": n.get("precio", 0)})
+        fila = {"id": n["id"], "etiqueta": etiqueta_catalogo(n), "numero": n.get("numero", ""),
+                "nombre_servicio": n.get("nombre_servicio", ""),
+                "modalidad": TIPO_COMPRA_LABELS.get(n.get("tipo_compra", ""), n.get("tipo_compra", "")), "sin_tope": sin_tope}
+        if libro:
+            fila.update({"cantidad": None if sin_tope else cant, "ocupados": usados,
+                         "disponibles": None if sin_tope else max(cant - usados, 0), "precio": n.get("precio", 0)})
+        else:
+            fila["con_cupo"] = sin_tope or usados < cant
+        out.append(fila)
     out.sort(key=lambda x: (x["numero"] == "", x["etiqueta"]))
     return out
+
+
+@pacientes_router.get("/{patient_id}/igss-ordenes")
+async def ordenes_del_paciente(patient_id: str, current_user: dict = Depends(require_role(INGRESO_ORDEN_ROLES))):
+    """Órdenes del libro de un paciente para la ficha: con No. SPS y NOG. Los roles del libro
+    reciben todo; quien solo ingresa no ve precio ni marcas de cobro, y sabe cuáles puede corregir."""
+    docs = await db.igss_ordenes_libro.find({"paciente_id": patient_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    nogs = {n["id"]: n for n in await db.igss_nogs.find(
+        {"id": {"$in": list({d.get("nog_id") for d in docs})}}, {"_id": 0}).to_list(None)}
+    out = [_orden_out(d, nogs.get(d.get("nog_id"))) for d in docs]
+    return out if es_rol_libro(current_user) else [orden_ingreso_out(o, current_user) for o in out]
 
 
 # ==================== ENDPOINT: OPCIONES PARA ROLES CLÍNICOS ====================

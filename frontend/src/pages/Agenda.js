@@ -51,7 +51,7 @@ import { agendaApi } from '../services/agendaApi';
 import { patientApi, googleCalendarApi, getGuatemalaDate, igssUnitApi, igssLibroApi } from '../services/api';
 import { OrdenIgssSelector, ordenPreseleccionada } from '../components/igss/OrdenIgssSelector';
 import { OrdenesIgssPaciente } from '../components/igss/OrdenesIgssPaciente';
-import { puedeVerLibroIgss } from '../lib/igssLibro';
+import { puedeIngresarOrdenIgss } from '../lib/igssLibro';
 import { GoogleCalendarDialog } from '../components/GoogleCalendarDialog';
 import { BloqueosAgenda } from './AgendaBloqueos';
 
@@ -2770,7 +2770,7 @@ const Agenda = () => {
                     </Select>
                   </div>
                   <div><Label className="text-xs">Afiliación</Label><Input value={completarForm.igss_afiliacion} onChange={(e) => setCompletarForm(p => ({ ...p, igss_afiliacion: e.target.value }))} /></div>
-                  {puedeVerLibroIgss(user) && (
+                  {puedeIngresarOrdenIgss(user) && (
                     <div className="col-span-2 pt-1" data-testid="cf-igss-ordenes">
                       {!completarEsNuevo && completarPidRef.current ? (
                         <OrdenesIgssPaciente pacienteId={completarPidRef.current} unidadId={completarForm.igss_unit_id} />

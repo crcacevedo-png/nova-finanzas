@@ -17,7 +17,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from config.database import db
-from config.permissions import LIBRO_IGSS_ROLES
+from config.permissions import INGRESO_ORDEN_ROLES, LIBRO_IGSS_ROLES
 from routes.auth import require_role
 from routes.igss_nogs import TIPO_COMPRA_LABELS, UMBRAL_AVISO, _get_nog_or_404, etiqueta_catalogo, norm_txt
 from utils.timezone import today_str_gt
@@ -26,6 +26,12 @@ router = APIRouter(prefix="/igss-units/libro", tags=["IGSS - Libro de órdenes"]
 logger = logging.getLogger("igss_libro")
 
 MSG_SIN_SPS = "El No. SPS es obligatorio: sin No. SPS no se puede registrar la orden."
+MSG_SPS_FORMATO = "El No. SPS solo admite números y guiones (por ejemplo 01-10126-2026-100424)."
+SPS_FORMATO = re.compile(r"[0-9]+(-[0-9]+)*")
+MSG_NO_CORRIGE = ("Solo puede corregir una orden que usted ingresó, mientras esté reservada y sin ninguna "
+                  "atención. Cualquier otra corrección la hace un rol del libro.")
+CAMPOS_INGRESO = ("no_sps", "tipo", "dosis_autorizadas", "codigo", "procedimiento", "inyectable")
+CAMPOS_SOLO_LIBRO = ("precio", "costo_override", "impreso", "enviado", "facturado", "pagado")
 CAMPOS_EDITABLES = ("codigo", "procedimiento", "precio", "costo_override", "fecha_ingreso",
                     "impreso", "enviado", "facturado", "pagado", "inyectable")
 ESTADOS_VIGENTES = ("reservada", "en_curso", "completa")
@@ -82,6 +88,37 @@ OrdenCerrar = OrdenAnular
 
 def normalizar_sps(v) -> str:
     return str(v or "").strip().upper()
+
+
+def sps_valido(sps: str) -> bool:
+    return len(sps) <= 40 and bool(SPS_FORMATO.fullmatch(sps))
+
+
+def validar_sps(v) -> str:
+    """Misma regla para todos los roles: obligatorio y solo números y guiones."""
+    sps = normalizar_sps(v)
+    if not sps:
+        raise HTTPException(status_code=422, detail=MSG_SIN_SPS)
+    if not sps_valido(sps):
+        raise HTTPException(status_code=422, detail=MSG_SPS_FORMATO)
+    return sps
+
+
+def es_rol_libro(user: dict) -> bool:
+    return (user or {}).get("role") in LIBRO_IGSS_ROLES
+
+
+def puede_corregir(o: dict, user: dict) -> bool:
+    """Quien ingresa (fuera del libro) corrige solo su orden reservada y sin atenciones."""
+    return (o.get("created_by") == (user or {}).get("id") and o.get("estado") == "reservada"
+            and not o.get("atenciones"))
+
+
+def orden_ingreso_out(o: dict, user: dict) -> dict:
+    """Lo que ve quien ingresa órdenes: No. SPS y NOG, sin precio ni marcas de cobro."""
+    out = {k: v for k, v in o.items() if k not in CAMPOS_SOLO_LIBRO}
+    out["puede_corregir"] = puede_corregir(o, user)
+    return out
 
 
 def _nombre_usuario(user: dict) -> str:
@@ -198,9 +235,7 @@ async def crear_orden_libro(data: dict, user: dict, origen: str = "manual"):
     """Crea una orden en estado "reservada" (ya ocupa cupo). Valida No. SPS
     obligatorio y único por unidad (índice único parcial) y cupo de la entrada del
     catálogo (reserva atómica). Devuelve (orden, entrada_catalogo)."""
-    sps = normalizar_sps(data.get("no_sps"))
-    if not sps:
-        raise HTTPException(status_code=422, detail=MSG_SIN_SPS)
+    sps = validar_sps(data.get("no_sps"))
     tipo = data.get("tipo") or "consulta"
     dosis = int(data.get("dosis_autorizadas") or 1)
     if tipo == "consulta" and dosis != 1:
@@ -361,11 +396,16 @@ async def obtener_orden(orden_id: str, current_user: dict = Depends(require_role
 
 
 @router.post("/ordenes")
-async def crear_orden(data: OrdenCreate, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+async def crear_orden(data: OrdenCreate, current_user: dict = Depends(require_role(INGRESO_ORDEN_ROLES))):
     from routes.igss_libro_atenciones import programar_existentes
+    libro = es_rol_libro(current_user)
+    if not libro and any(getattr(data, k) not in (None, "") for k in ("precio", "costo_override", "fecha_ingreso")):
+        raise HTTPException(status_code=403, detail="Solo un rol del libro puede fijar precio, costo o fecha de ingreso")
     doc, nog = await crear_orden_libro(data.model_dump(), current_user, origen="manual")
     doc = await programar_existentes(doc)
     out = _orden_out(doc, nog)
+    if not libro:
+        return orden_ingreso_out(out, current_user)
     cantidad, ocupados = int(nog.get("cantidad") or 0), int(nog.get("libro_ocupados") or 0)
     if not nog.get("sin_tope") and cantidad > 0 and ocupados >= cantidad * UMBRAL_AVISO:
         out["aviso_cupo"] = (f"{etiqueta_catalogo(nog)} ya ocupa {ocupados} de {cantidad} cupos "
@@ -374,23 +414,32 @@ async def crear_orden(data: OrdenCreate, current_user: dict = Depends(require_ro
 
 
 @router.put("/ordenes/{orden_id}")
-async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = Depends(require_role(LIBRO_IGSS_ROLES))):
+async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = Depends(require_role(INGRESO_ORDEN_ROLES))):
     """Edita una orden vigente en una sola operación atómica: las reglas que dependen
     del estado actual (dosis ya aplicadas, tipo, atenciones, completa para cobrar) van
-    como condiciones, y el estado se recalcula en la misma operación."""
+    como condiciones, y el estado se recalcula en la misma operación. Fuera del libro solo
+    se corrige la orden propia, reservada y sin atenciones (también como condición)."""
     upd = data.model_dump(exclude_unset=True)
     upd = {k: v for k, v in upd.items() if v is not None or k == "costo_override"}
     if not upd:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+    libro = es_rol_libro(current_user)
+    if not libro and [k for k in upd if k not in CAMPOS_INGRESO]:
+        raise HTTPException(status_code=403, detail="Solo un rol del libro puede cambiar: " + ", ".join(
+            k for k in upd if k not in CAMPOS_INGRESO))
+    cur = await _orden_or_404(orden_id)
+    if not libro and not puede_corregir(cur, current_user):
+        raise HTTPException(status_code=403, detail=MSG_NO_CORRIGE)
     filtro = {"id": orden_id, "estado": {"$ne": "anulada"}}
     expr = []
+    if not libro:
+        filtro.update({"created_by": current_user.get("id", ""), "estado": "reservada"})
+        expr.append({"$eq": [{"$size": {"$ifNull": ["$atenciones", []]}}, 0]})
     set_ = {k: (v.strip() if isinstance(v, str) else v) for k, v in upd.items() if k in CAMPOS_EDITABLES}
 
     if "no_sps" in upd:
         sps = normalizar_sps(upd["no_sps"])
-        if not sps:
-            raise HTTPException(status_code=422, detail=MSG_SIN_SPS)
-        set_["no_sps"] = sps
+        set_["no_sps"] = sps if sps and sps == cur.get("no_sps") else validar_sps(sps)
     tipo = upd.get("tipo")
     dosis = upd.get("dosis_autorizadas")
     if tipo == "consulta":
@@ -429,6 +478,8 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
         raise HTTPException(status_code=409, detail=_msg_sps_duplicado(set_.get("no_sps", "")))
     if not antes:
         cur = await _orden_or_404(orden_id)
+        if not libro and not puede_corregir(cur, current_user):
+            raise HTTPException(status_code=403, detail=MSG_NO_CORRIGE)
         if cur.get("estado") == "anulada":
             raise HTTPException(status_code=400, detail="La orden está anulada y no se puede editar")
         if cobro and cur.get("estado") != "completa":
@@ -454,7 +505,8 @@ async def editar_orden(orden_id: str, data: OrdenUpdate, current_user: dict = De
         "antes": {k: antes.get(k) for k in set_ if k not in ("updated_at", "updated_by")},
         "despues": {k: v for k, v in set_.items() if k not in ("updated_at", "updated_by")}})
     nog = await db.igss_nogs.find_one({"id": despues.get("nog_id")}, {"_id": 0})
-    return _orden_out(despues, nog)
+    out = _orden_out(despues, nog)
+    return out if libro else orden_ingreso_out(out, current_user)
 
 
 @router.post("/ordenes/{orden_id}/anular")

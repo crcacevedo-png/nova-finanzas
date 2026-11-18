@@ -21,7 +21,7 @@ import {
 import { toast } from 'sonner';
 import { OrdenesIgssPaciente } from './igss/OrdenesIgssPaciente';
 import { OrdenesIgssFicha } from './igss/OrdenesIgssFicha';
-import { puedeVerLibroIgss } from '../lib/igssLibro';
+import { puedeIngresarOrdenIgss } from '../lib/igssLibro';
 import { useAuth } from '../context/AuthContext';
 import {
   patientApi,
@@ -358,7 +358,7 @@ export const PatientEditDialog = ({ open, onOpenChange, patientId, onSaved }) =>
                     </div>
 
                     <div className="md:col-span-2 pt-2" data-testid="patient-edit-igss-ordenes">
-                      {puedeVerLibroIgss(user)
+                      {puedeIngresarOrdenIgss(user)
                         ? <OrdenesIgssPaciente pacienteId={patientId} unidadId={formData.igss_unit_id} />
                         : <OrdenesIgssFicha pacienteId={patientId} />}
                     </div>

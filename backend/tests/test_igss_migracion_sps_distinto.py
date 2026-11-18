@@ -18,8 +18,9 @@ SIM = f"{API}/igss-units/migracion/simular"
 TAG = uuid.uuid4().hex[:6]
 U, N = f"TEST_spsd_unit_{TAG}", f"TEST_spsd_nog_{TAG}"
 NUM = f"TSPSD{TAG}"
-P = {k: f"TEST_spsd_p{k}_{TAG}" for k in "ABC"}
-X, Y, B, C = (f"TSPSD-{k}-{TAG}".upper() for k in "XYBC")
+P = {k: f"TEST_spsd_p{k}_{TAG}" for k in "ABCD"}
+MALO = f"AB-{TAG}"  # letras: formato inválido
+X, Y, B, C = (f"{ord(k)}-{int(TAG, 16)}" for k in "XYBC")  # solo números y guiones
 CX = {k: f"TEST_spsd_cx{k}_{TAG}" for k in "ABC"}
 
 
@@ -55,7 +56,7 @@ def seed():
                                        "nombre_servicio_norm": "inyeccion", "tipo_compra": "contrato", "cantidad": 10,
                                        "precio": 100.0, "acreditados": 0, "is_active": True, "fecha_asignacion": "",
                                        "sin_tope": False})
-        await db.patients.insert_many([_pac("A", Y), _pac("B", B), _pac("C")])
+        await db.patients.insert_many([_pac("A", Y), _pac("B", B), _pac("C"), _pac("D", MALO)])
         await db.surgeries.insert_many([_cx("A", X.lower()), _cx("B", B), _cx("C", C)])
     _db_call(ins)
     yield
@@ -100,3 +101,11 @@ def test_corregido_entra_normal(sa):
     s = _simular(sa)
     assert {o["no_sps"] for o in s["ordenes"]} == {B, C, Y}
     assert not [x for x in s["no_migrables"] if x["motivo_agrupado"] == "No. SPS distinto entre la cirugía y la ficha"]
+
+
+def test_sps_con_formato_invalido_no_se_migra(sa):
+    """Misma regla que al ingresar una orden: solo números y guiones."""
+    s = _simular(sa)
+    assert MALO.upper() not in {o["no_sps"] for o in s["ordenes"]}
+    f = next(x for x in s["no_migrables"] if x["no_sps"] == MALO.upper())
+    assert f["motivo_agrupado"] == "Formato de No. SPS inválido" and "solo números y guiones" in f["falta"]

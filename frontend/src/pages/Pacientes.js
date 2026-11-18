@@ -54,7 +54,7 @@ import { Badge } from '../components/ui/badge';
 import { EvaluacionesPacienteDialog } from '../components/EvaluacionesPacienteDialog';
 import { OrdenesIgssPaciente } from '../components/igss/OrdenesIgssPaciente';
 import { OrdenesIgssFicha } from '../components/igss/OrdenesIgssFicha';
-import { puedeVerLibroIgss } from '../lib/igssLibro';
+import { puedeIngresarOrdenIgss, puedeVerLibroIgss } from '../lib/igssLibro';
 import { toast, Toaster } from 'sonner';
 import { 
   patientApi, 
@@ -1339,8 +1339,8 @@ const Pacientes = () => {
                         </div>
                       </div>
 
-                      {/* Órdenes IGSS: viven en el libro (solo superadmin/admin/administrador_igss) */}
-                      {puedeVerLibroIgss(user) && (
+                      {/* Órdenes IGSS: viven en el libro (las ingresan también usuario y óptica) */}
+                      {puedeIngresarOrdenIgss(user) && (
                         <div className="md:col-span-2 pt-2" data-testid="patient-igss-ordenes">
                           {editingPatient ? (
                             <OrdenesIgssPaciente pacienteId={editingPatient.id} unidadId={formData.igss_unit_id} />
@@ -1349,7 +1349,7 @@ const Pacientes = () => {
                           )}
                         </div>
                       )}
-                      {!puedeVerLibroIgss(user) && editingPatient && (
+                      {!puedeIngresarOrdenIgss(user) && editingPatient && (
                         <div className="md:col-span-2 pt-2" data-testid="patient-igss-ordenes-ficha">
                           <OrdenesIgssFicha pacienteId={editingPatient.id} />
                         </div>
@@ -1514,7 +1514,7 @@ const Pacientes = () => {
 
                 {selectedPatient.referral_institution === 'igss' && (
                   <div className="border-t pt-4" data-testid="view-patient-ordenes-igss">
-                    {puedeVerLibroIgss(user)
+                    {puedeIngresarOrdenIgss(user)
                       ? <OrdenesIgssPaciente pacienteId={selectedPatient.id} unidadId={selectedPatient.igss_unit_id} />
                       : <OrdenesIgssFicha pacienteId={selectedPatient.id} />}
                   </div>

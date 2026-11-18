@@ -7,6 +7,8 @@ from config.database import db
 
 # Roles con acceso exclusivo al Libro de órdenes IGSS (catálogo, órdenes, contadores, listados, migración)
 LIBRO_IGSS_ROLES = ["superadmin", "admin", "administrador_igss"]
+# Pueden INGRESAR órdenes desde la ficha (y corregir las suyas mientras estén reservadas y sin atenciones)
+INGRESO_ORDEN_ROLES = LIBRO_IGSS_ROLES + ["usuario", "optica"]
 
 PERMISSIONS = {
     "superadmin": {
