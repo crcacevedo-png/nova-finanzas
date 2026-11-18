@@ -1,0 +1,36 @@
+{
+  "summary": "Frontend-only test of the IGSS order permission change (usuario/optica can enter orders). All 8 requested steps passed with Playwright on patient TEST_B3 Paciente15812 (4e57ccd5-...). No critical issues: usuario and óptica see no admin actions, and médico sees no SPS or NOG.",
+  "results": {
+    "1_usuario_ficha": "PASS - shows ordenes-igss-libro, not ordenes-igss-ficha. 'Nueva orden' button present. SPS, NOG, ORD number and 'Ingresada por Administrador General · fecha hora' shown on every row. 0 anular/cerrar/confirmar/reasignar buttons, also with rows expanded. 0 pencils on orders entered by others.",
+    "2_usuario_crear": "PASS - NOG options for CAMIP 2: '28017447 · con cupo', 'TESTB315812 · con cupo', ... No 'disponibles' figures. 'ABC-123' shows orden-form-sps-error; Guardar gives toast 'El No. SPS solo admite números y guiones' and the dialog stays open. SPS 7707659-1, Procedimiento, 3 dosis, 'Avastin prueba usuario' gave toast 'Orden registrada en el libro'. New row TESTB315812ORD-000548: Reservada, 'Ingresada por Usuario NovaVision', with pencil and no anular.",
+    "3_usuario_corregir": "PASS - procedure changed to 'Avastin corregido' with toast 'Orden actualizada' and the row updated. Changing SPS to '12A-5' in the correction shows the inline error and an error toast, and nothing is saved.",
+    "4_optica": "PASS - ordenes-igss-libro with SPS/NOG and 'Nueva orden'. The usuario's order (7707659-1) has no pencil for óptica. 0 admin actions. NOG options show only 'con cupo'. /igss/libro redirects to /pacientes.",
+    "5_usuario_libro": "PASS - /igss/libro redirects to /pacientes.",
+    "6_medico": "PASS - only ordenes-igss-ficha, no 'Nueva orden' button. Neither the text nor the HTML contains '7707659' or 'TESTB3'. Rows show only the procedure, ORD number, ingreso date, doses and status.",
+    "7_admin_igss": "PASS - igss.admin sees 6 pencils, 6 anular, 1 cerrar (the en curso row), Reasignar on the attention, and 'Ingresada por' on all rows. NOG shows '43 disponibles', '4 disponibles', etc. SPS '12AB-3' is rejected with the inline error and toast, dialog stays open. /igss/libro loads for the admin. confirmar-dosis: 0 buttons, because no order on this patient currently has dosis_por_confirmar (checked in iteration 150).",
+    "8_mobile_390": "PASS - as usuario, scrollWidth equals clientWidth (390): no horizontal overflow. Order cards stack correctly."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Patient detail dialog (admin roles, 1920px)", "issues": ["With the admin action icons the left column gets narrow, so the ORD number breaks across lines ('ORD-' / '000548'). Add whitespace-nowrap to orden-numero-{id}."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: add whitespace-nowrap to the ORD number span in OrdenesIgssPaciente FilaOrden.",
+    "Not verified in the UI: a disabled 'sin cupo' option for usuario/óptica, because every NOG of CAMIP 2 had cupo. Code check: sinCupo() sets the disabled prop."
+  ],
+  "critical_code_review_comments": [
+    "OrdenesIgssPaciente: fmtHora uses the browser's timezone while fecha_ingreso is a date-only string, so in non-GT timezones the two can show different days (e.g. Ingreso 17/11 vs Ingresada 18/11 12:39 a.m. in a UTC browser). This is cosmetic. Consider timeZone: 'America/Guatemala'.",
+    "OrdenLibroDialog edit mode: the SPS exemption compares form.no_sps.trim().toUpperCase() with orden.no_sps. This works for legacy SPS values with letters as long as the backend stores SPS in uppercase."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% (8/8 steps)"},
+  "seed_data_creation": "As usuario, created IGSS order 25f112f7-b6b9-4929-b344-0aba12511dd0 (SPS 7707659-1, ORD-000548) on patient TEST_B3 Paciente15812. Cleanup: igss.admin annulled it with motivo 'TEST_ limpieza prueba permisos usuario' (orders cannot be deleted, only annulled, which frees the cupo).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login is rate-limited (5 per minute per IP), so space out logins. /pacientes?id=<pid> opens the patient detail directly. The patient detail dialog scrolls internally: rows below the fold cannot be clicked without scrolling the dialog. Order 25f112f7... is annulled."
+}
