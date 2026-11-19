@@ -667,11 +667,26 @@ async def catalogo_para_ordenes(unidad_id: str = Query(..., min_length=1),
     return out
 
 
+async def _procedimiento_constancias(docs: list):
+    """Constancias de la migración (solo lectura): a las de cirugía les agrega el procedimiento y el ojo."""
+    ids = {c.get("ref_id") for d in docs for c in d.get("constancias") or [] if c.get("tipo") == "cirugia"}
+    if not ids:
+        return
+    cxs = {s["id"]: s for s in await db.surgeries.find(
+        {"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "procedure": 1, "eye": 1}).to_list(None)}
+    for d in docs:
+        for c in d.get("constancias") or []:
+            s = cxs.get(c.get("ref_id")) if c.get("tipo") == "cirugia" else None
+            if s:
+                c["procedimiento"] = " · ".join(x for x in (s.get("procedure"), s.get("eye")) if x)
+
+
 @pacientes_router.get("/{patient_id}/igss-ordenes")
 async def ordenes_del_paciente(patient_id: str, current_user: dict = Depends(require_role(INGRESO_ORDEN_ROLES))):
     """Órdenes del libro de un paciente para la ficha: con No. SPS y NOG. Los roles del libro
     reciben todo; quien solo ingresa no ve precio ni marcas de cobro, y sabe cuáles puede corregir."""
     docs = await db.igss_ordenes_libro.find({"paciente_id": patient_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    await _procedimiento_constancias(docs)
     nogs = {n["id"]: n for n in await db.igss_nogs.find(
         {"id": {"$in": list({d.get("nog_id") for d in docs})}}, {"_id": 0}).to_list(None)}
     out = [_orden_out(d, nogs.get(d.get("nog_id"))) for d in docs]

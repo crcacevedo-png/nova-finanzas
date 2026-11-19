@@ -259,6 +259,7 @@ export const igssLibroApi = {
   simularDeshacer: (loteId) => axios.post(`${API_URL}/igss-units/migracion/deshacer/simular`, { lote_id: loteId }),
   deshacerMigracion: (token, palabra) => axios.post(`${API_URL}/igss-units/migracion/deshacer`, { token, palabra }),
   spsPorRevisar: () => axios.get(`${LIBRO}/sps-por-revisar`),
+  pdfEvaluacion: (id) => axios.get(`${API_URL}/evaluaciones/${id}/pdf`, { responseType: 'blob' }),
   confirmarSps: (id) => axios.post(`${LIBRO}/ordenes/${id}/confirmar-sps`),
   ajustesCupo: () => axios.get(`${LIBRO}/ajustes-cupo`),
   liberarAjuste: (id, motivo) => axios.post(`${LIBRO}/ajustes-cupo/${id}/liberar`, { motivo }),

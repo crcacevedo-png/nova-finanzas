@@ -9,6 +9,7 @@ import { MotivoDialog, ElegirOrdenDialog } from './OrdenDialogs';
 import { ESTADOS_ACTIVOS, estadoOrden } from './estadosLibro';
 import { ConfirmarDosisDialog } from './ConfirmarDosisDialog';
 import { ConfirmarSpsDialog } from './ConfirmarSpsDialog';
+import { ConstanciasOrden } from './ConstanciasOrden';
 import { useAuth } from '../../context/AuthContext';
 import { puedeVerLibroIgss } from '../../lib/igssLibro';
 
@@ -98,6 +99,7 @@ const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar
         <div className="flex flex-wrap items-center gap-2 pl-6">
           <span className="text-xs font-medium text-slate-700 whitespace-nowrap" data-testid={`orden-dosis-${o.id}`}>
             {o.tipo === 'procedimiento' ? `Dosis aplicadas ${o.dosis_aplicadas} de ${o.dosis_autorizadas}` : `${o.total_atenciones} atención(es)`}
+            {(o.constancias || []).length > 0 && <span className="font-normal text-slate-500"> · {o.constancias.length} constancia(s)</span>}
           </span>
           <Badge variant="outline" className={cls} data-testid={`orden-estado-${o.id}`}>{label}</Badge>
           {esLibro
@@ -120,6 +122,7 @@ const FilaOrden = ({ o, esLibro, abierta, onToggle, onEditar, onAnular, onCerrar
       )}
       {o.estado === 'cerrada' && <p className="text-xs text-orange-700 mt-1" data-testid={`orden-cerrada-motivo-${o.id}`}>Cerrada sin completar (no se cobra): {o.motivo_cierre}</p>}
       {abierta && <Atenciones orden={o} onReasignar={esLibro ? onReasignar : null} />}
+      {abierta && <ConstanciasOrden orden={o} />}
     </div>
   );
 };
